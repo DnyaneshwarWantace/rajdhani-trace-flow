@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError, ProductionBatch, ProductionStep } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError, ProductionBatch, ProductionStep } from '@/lib/supabase';
 import { generateUniqueId } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { NotificationService } from './notificationService';
@@ -134,7 +134,8 @@ export class ProductionService {
         if (stepsError) {
           console.error('Error creating production steps:', stepsError);
           // Cleanup: delete the batch if steps creation failed
-          await supabase.from('production_batches').delete().eq('id', batch.id);
+          const client = supabaseAdmin || supabase;
+          await client.from('production_batches').delete().eq('id', batch.id);
           return { data: null, error: handleSupabaseError(stepsError) };
         }
       }

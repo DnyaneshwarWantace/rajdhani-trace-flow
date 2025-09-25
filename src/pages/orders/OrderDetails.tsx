@@ -31,6 +31,7 @@ interface OrderItem {
   id: string;
   productId: string;
   productName: string;
+  productType: 'product' | 'raw_material';
   quantity: number;
   unitPrice: number;
   totalPrice: number;
@@ -330,6 +331,7 @@ export default function OrderDetails() {
             id: item.id,
             productId: item.product_id,
             productName: item.product_name,
+            productType: item.product_type || 'product',
             quantity: item.quantity,
             unitPrice: item.unit_price,
             totalPrice: item.total_price,
@@ -516,6 +518,7 @@ export default function OrderDetails() {
       id: `item-${Date.now()}`,
       productId: '',
       productName: '',
+      productType: 'product' as const,
       quantity: 1,
       unitPrice: 0,
       totalPrice: 0,
@@ -708,6 +711,43 @@ export default function OrderDetails() {
     if (!order) return;
 
     try {
+      // Check if any raw materials in the order are low stock before dispatch
+      const rawMaterialItems = order.items.filter(item => item.productType === 'raw_material');
+      
+      if (rawMaterialItems.length > 0) {
+        // Check stock for each raw material item
+        for (const item of rawMaterialItems) {
+          const { data: rawMaterials } = await supabase
+            .from('raw_materials')
+            .select('*')
+            .eq('name', item.productName)
+            .order('created_at', { ascending: false });
+
+          if (rawMaterials && rawMaterials.length > 0) {
+            const material = rawMaterials[0];
+            const currentStock = material.current_stock || 0;
+            const minThreshold = material.min_threshold || 10;
+            
+            // Check if material is low stock or out of stock
+            if (currentStock <= 0) {
+              toast({
+                title: "❌ Cannot Dispatch Order",
+                description: `Raw material "${material.name}" is out of stock. Please restock before dispatching.`,
+                variant: "destructive"
+              });
+              return;
+            } else if (currentStock <= minThreshold) {
+              toast({
+                title: "⚠️ Low Stock Warning",
+                description: `Raw material "${material.name}" is running low (${currentStock} units). Consider restocking before dispatch.`,
+                variant: "destructive"
+              });
+              return;
+            }
+          }
+        }
+      }
+
       // Dispatch order using OrderService
       const { error } = await OrderService.updateOrder(order.id, {
         status: 'dispatched',

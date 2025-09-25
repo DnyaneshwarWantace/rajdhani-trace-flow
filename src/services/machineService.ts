@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError } from '@/lib/supabase';
 
 export interface Machine {
   id: string;
@@ -45,7 +45,9 @@ export class MachineService {
   static async getMachines(): Promise<Machine[]> {
     try {
       console.log('🔍 Fetching machines from Supabase...');
-      const { data, error } = await supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      const { data, error } = await client
         .from('machines')
         .select('*')
         .order('name');

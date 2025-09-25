@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Factory, Plus, Play, Pause, CheckCircle,
-  Clock, User, Settings, ArrowRight, AlertTriangle
+  Clock, User, Settings, ArrowRight, AlertTriangle, RefreshCw
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
 import { ProductService } from "@/services/ProductService";
@@ -61,7 +61,7 @@ interface ProductionFlow {
 }
 
 export default function DynamicProductionFlow() {
-  const { productId } = useParams();
+  const { productId } = useParams(); // This is actually the production ID now
   const navigate = useNavigate();
 
   // Core state
@@ -88,34 +88,57 @@ export default function DynamicProductionFlow() {
     loadInitialData();
   }, [productId]);
 
-  const loadInitialData = async () => {
-    // Load production product from Supabase production_flows
-    try {
-      const { data: flows, error } = await supabase
-        .from('production_flows')
-        .select('*')
-        .eq('production_product_id', productId)
-        .single();
+  // Refresh steps when page becomes visible (in case machine was added from another page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && productionFlow) {
+        loadProductionSteps();
+      }
+    };
 
-      if (flows) {
-        // Create mock production product from flow data
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [productionFlow]);
+
+  const loadInitialData = async () => {
+    try {
+      console.log('🔍 Loading production data for ID:', productId);
+
+      // Load production flow from Supabase first
+      const flow = await ProductionFlowService.getProductionFlow(productId);
+      console.log('🔍 Production flow loaded:', flow);
+
+      if (!flow) {
+        console.warn('⚠️ No production flow found for productId:', productId, '- continuing with localStorage data');
+        // Continue with localStorage data even if no flow is found
+      }
+
+      // Load from localStorage first
+      const savedProductions = JSON.parse(localStorage.getItem('rajdhani_productions') || '{}');
+      const savedProduction = savedProductions[productId];
+
+      if (savedProduction) {
+        console.log('✅ Found saved production data:', savedProduction);
+        const { production, productDetails } = savedProduction;
+
+        // Create production product from saved data
         const productionProduct = {
-          id: flows.production_product_id,
-          productId: flows.production_product_id,
-          productName: flows.flow_name.replace(' Production Flow', ''),
-          category: 'Carpet',
-          color: 'N/A',
-          size: 'N/A',
-          pattern: 'N/A',
-          targetQuantity: 1,
-          priority: 'normal' as const,
-          status: 'active' as const,
-          expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: flows.created_at,
+          id: productId, // Use the production ID
+          productId: production.productId || productDetails.id,
+          productName: productDetails.name || production.productName,
+          category: productDetails.category || production.category,
+          color: productDetails.color || production.color || 'N/A',
+          size: productDetails.size || production.size || 'N/A',
+          pattern: productDetails.pattern || production.pattern || 'N/A',
+          targetQuantity: production.targetQuantity || 1,
+          priority: production.priority || 'normal' as const,
+          status: production.status || 'active' as const,
+          expectedCompletion: production.expectedCompletion || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: production.createdAt || new Date().toISOString(),
           materialsConsumed: [],
           wasteGenerated: [],
           expectedProduct: {
-            name: flows.flow_name.replace(' Production Flow', ''),
+            name: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
             category: 'Carpet',
             height: 'N/A',
             width: 'N/A',
@@ -127,14 +150,14 @@ export default function DynamicProductionFlow() {
           notes: ''
         };
         setProductionProduct(productionProduct);
-        setProductionFlow(flows);
+        setProductionFlow(flow);
 
         // Load production steps for this flow
-        console.log('Loading production steps for flow_id:', flows.id);
+        console.log('Loading production steps for flow_id:', flow.id);
         const { data: steps, error: stepsError } = await supabase
           .from('production_flow_steps')
           .select('*')
-          .eq('flow_id', flows.id)
+          .eq('flow_id', flow.id)
           .order('step_order', { ascending: true });
         
         console.log('Production steps query result:', { steps, stepsError });
@@ -145,7 +168,7 @@ export default function DynamicProductionFlow() {
           const { data: stepsFallback, error: fallbackError } = await supabase
             .from('production_flow_steps')
             .select('*')
-            .eq('flow_id', flows.id);
+            .eq('flow_id', flow.id);
           
           console.log('Fallback query result:', { stepsFallback, fallbackError });
           
@@ -188,6 +211,38 @@ export default function DynamicProductionFlow() {
 
           setProductionSteps(transformedSteps);
         }
+      } else {
+        // No saved production data, create from flow data
+        console.log('No saved production data, creating from flow data');
+        const productionProduct = {
+          id: productId,
+          productId: flow.production_product_id,
+          productName: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
+          category: 'Carpet',
+          color: 'Standard',
+          size: 'N/A',
+          pattern: 'N/A',
+          targetQuantity: 1,
+          priority: 'normal' as const,
+          status: 'active' as const,
+          expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: flow.created_at || new Date().toISOString(),
+          materialsConsumed: [],
+          wasteGenerated: [],
+          expectedProduct: {
+            name: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
+            category: 'Carpet',
+            height: 'N/A',
+            width: 'N/A',
+            weight: 'N/A',
+            thickness: 'N/A',
+            materialComposition: 'N/A',
+            qualityGrade: 'A'
+          },
+          notes: ''
+        };
+        setProductionProduct(productionProduct);
+        setProductionFlow(flow);
       }
     } catch (error) {
       console.error('Error loading production flow:', error);
@@ -208,20 +263,24 @@ export default function DynamicProductionFlow() {
   };
 
   const loadProductionSteps = async () => {
-    if (!productionFlow) return;
+    if (!productionFlow) {
+      console.log('❌ No production flow available for loading steps');
+      return;
+    }
 
     try {
-      console.log('Loading production steps for flow_id:', productionFlow.id);
+      console.log('🔄 Loading production steps for flow_id:', productionFlow.id);
       const { data: steps, error } = await supabase
         .from('production_flow_steps')
         .select('*')
         .eq('flow_id', productionFlow.id)
         .order('step_order', { ascending: true });
 
-      console.log('Production steps query result:', { steps, error });
+      console.log('📊 Production steps query result:', { steps, error, count: steps?.length || 0 });
 
       if (error) {
         console.error('Error loading production steps:', error);
+        
         // Try without ordering if step_order doesn't exist
         const { data: stepsFallback, error: fallbackError } = await supabase
           .from('production_flow_steps')
@@ -246,6 +305,10 @@ export default function DynamicProductionFlow() {
             stepType: 'machine_operation' as const
           }));
           setProductionSteps(transformedSteps);
+          console.log('✅ Loaded production steps via fallback query');
+        } else {
+          console.error('❌ Failed to load production steps even with fallback:', fallbackError);
+          setProductionSteps([]);
         }
         return;
       }
@@ -280,6 +343,35 @@ export default function DynamicProductionFlow() {
 
     const selectedMachine = machines.find(m => m.id === selectedMachineId);
     if (!selectedMachine || !productionFlow) return;
+
+    // Check if this machine is already added to prevent duplicates
+    const existingStep = productionSteps.find(step => 
+      step.machineId === selectedMachineId || 
+      step.machineName === selectedMachine.name
+    );
+    
+    if (existingStep) {
+      console.warn('Machine already added to this flow:', selectedMachine.name);
+      setSelectedMachineId('');
+      setInspectorName('');
+      setShowMachineSelectionDialog(false);
+      return;
+    }
+
+    // Check if previous machine operations are completed before allowing next one
+    const machineSteps = productionSteps.filter(step => step.stepType === 'machine_operation');
+    if (machineSteps.length > 0) {
+      const incompleteSteps = machineSteps.filter(step => step.status !== 'completed');
+      if (incompleteSteps.length > 0) {
+        const incompleteStepNames = incompleteSteps.map(step => step.machineName).join(', ');
+        console.warn(`Cannot add new machine. Previous machine operations must be completed first: ${incompleteStepNames}`);
+        alert(`⚠️ Cannot add new machine operation.\n\nPrevious machine operations must be completed first:\n${incompleteStepNames}\n\nPlease complete the current machine operation before adding the next one.`);
+        setSelectedMachineId('');
+        setInspectorName('');
+        setShowMachineSelectionDialog(false);
+        return;
+      }
+    }
 
     try {
       // Add step to Supabase
@@ -381,7 +473,35 @@ export default function DynamicProductionFlow() {
     }
   };
 
-  const skipToWasteGeneration = () => {
+  const skipToWasteGeneration = async () => {
+    if (!productionFlow) return;
+
+    try {
+      console.log('Skipping machine operations and going to waste generation');
+
+      // Create a completed machine step to represent skipped machine operations
+      const skippedStep = await ProductionFlowService.addStepToFlow({
+        flow_id: productionFlow.id,
+        step_name: 'N/A',
+        step_type: 'machine_operation',
+        order_index: productionSteps.length + 1,
+        machine_id: null, // No specific machine since it was skipped
+        inspector_name: 'System',
+        notes: 'Machine operations were skipped - went directly to waste generation'
+      });
+
+      // Mark the step as completed since it was skipped
+      if (skippedStep) {
+        await ProductionFlowService.completeFlowStep(skippedStep.id, 'Machine operations skipped by user');
+        console.log('✅ Skipped machine step marked as completed:', skippedStep);
+      }
+
+      // Reload steps to reflect the changes
+      await loadProductionSteps();
+    } catch (error) {
+      console.error('Error creating skipped machine step:', error);
+    }
+
     setShowMachineSelectionDialog(false);
     goToWasteGeneration();
   };
@@ -401,6 +521,10 @@ export default function DynamicProductionFlow() {
         <Button variant="outline" onClick={() => navigate('/production')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Production
+        </Button>
+        <Button variant="outline" onClick={loadProductionSteps} className="ml-auto">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh Steps
         </Button>
       </div>
 
@@ -524,13 +648,40 @@ export default function DynamicProductionFlow() {
       <Card>
         <CardContent className="pt-6">
           <div className="text-center space-y-4">
-            <Button
-              onClick={() => setShowMachineSelectionDialog(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Machine to Flow
-            </Button>
+            {(() => {
+              const machineSteps = productionSteps.filter(step => step.stepType === 'machine_operation');
+              const incompleteSteps = machineSteps.filter(step => step.status !== 'completed');
+              const canAddMachine = incompleteSteps.length === 0;
+              
+              return (
+                <>
+                  <Button
+                    onClick={() => setShowMachineSelectionDialog(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!canAddMachine}
+                    title={!canAddMachine ? "Complete previous machine operations first" : "Add new machine operation"}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Machine to Flow
+                  </Button>
+                  
+                  {!canAddMachine && (
+                    <div className="text-sm text-orange-600 bg-orange-50 p-3 rounded-lg border border-orange-200">
+                      <AlertTriangle className="w-4 h-4 inline mr-2" />
+                      Complete previous machine operations before adding new ones:
+                      <ul className="mt-2 text-left">
+                        {incompleteSteps.map(step => (
+                          <li key={step.id} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
+                            {step.machineName} - {step.status}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {productionSteps.length > 0 && (
               <div className="pt-4 border-t">
@@ -585,15 +736,33 @@ export default function DynamicProductionFlow() {
           </div>
 
           <DialogFooter className="space-y-3 pt-6 border-t border-gray-100">
-            <Button
-              onClick={addMachineToFlow}
-              disabled={!selectedMachineId || !inspectorName}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              size="default"
-            >
-              <Factory className="w-4 h-4 mr-2" />
-              Add Machine Step
-            </Button>
+            {(() => {
+              const machineSteps = productionSteps.filter(step => step.stepType === 'machine_operation');
+              const incompleteSteps = machineSteps.filter(step => step.status !== 'completed');
+              const canAddMachine = incompleteSteps.length === 0;
+              
+              return (
+                <>
+                  <Button
+                    onClick={addMachineToFlow}
+                    disabled={!selectedMachineId || !inspectorName || !canAddMachine}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                    size="default"
+                    title={!canAddMachine ? "Complete previous machine operations first" : "Add machine step"}
+                  >
+                    <Factory className="w-4 h-4 mr-2" />
+                    Add Machine Step
+                  </Button>
+                  
+                  {!canAddMachine && (
+                    <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
+                      <AlertTriangle className="w-3 h-3 inline mr-1" />
+                      Complete previous operations first: {incompleteSteps.map(s => s.machineName).join(', ')}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             <div className="grid grid-cols-2 gap-3 w-full">
               <Button
                 variant="outline"

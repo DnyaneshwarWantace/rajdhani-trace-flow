@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { handleSupabaseError } from '@/lib/supabase';
 import { IDGenerator } from '@/lib/idGenerator';
 
@@ -6,7 +6,6 @@ export interface IndividualProduct {
   id?: string;
   qr_code: string;
   product_id: string;
-  product_name?: string;
   color?: string;
   pattern?: string;
   weight?: string;
@@ -78,7 +77,9 @@ class IndividualProductService {
         data.added_date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
       }
 
-      const { data: result, error } = await supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      const { data: result, error } = await client
         .from('individual_products')
         .insert([data])
         .select('*')
@@ -99,7 +100,9 @@ class IndividualProductService {
 
   async getIndividualProducts(productId?: string) {
     try {
-      let query = supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      let query = client
         .from('individual_products')
         .select('*')
         .order('created_at', { ascending: false });

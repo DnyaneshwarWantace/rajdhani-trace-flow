@@ -1,10 +1,115 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useAuth, User, UserRole, ROLE_PERMISSIONS } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings as SettingsIcon, Clock, Construction, Bell } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Settings as SettingsIcon,
+  Users,
+  Shield,
+  Plus,
+  Edit3,
+  Trash2,
+  UserCheck,
+  UserX,
+  LogOut,
+  Eye,
+  Factory,
+  Package,
+  Truck,
+  ShoppingCart,
+  Crown,
+  Clock,
+  Bell,
+  Construction
+} from 'lucide-react';
 
-export default function Settings() {
+const Settings: React.FC = () => {
+  const { user, logout, hasPermission } = useAuth();
+  const [activeTab, setActiveTab] = useState('profile');
+  const [showAddUserDialog, setShowAddUserDialog] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  // Mock users data - in real app, this would come from your backend
+  const [users] = useState<User[]>([
+    {
+      id: 'admin_001',
+      email: 'admin@rajdhani.com',
+      name: 'Admin User',
+      role: 'admin',
+      permissions: ROLE_PERMISSIONS.admin,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    },
+    {
+      id: 'prod_001',
+      email: 'production@rajdhani.com',
+      name: 'Production Manager',
+      role: 'production',
+      permissions: ROLE_PERMISSIONS.production,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'inv_001',
+      email: 'inventory@rajdhani.com',
+      name: 'Inventory Manager',
+      role: 'inventory',
+      permissions: ROLE_PERMISSIONS.inventory,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    }
+  ]);
+
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    role: '' as UserRole | '',
+    password: ''
+  });
+
+  const getRoleIcon = (role: UserRole) => {
+    const icons = {
+      admin: Crown,
+      production: Factory,
+      inventory: Package,
+      raw_material: Truck,
+      orders: ShoppingCart
+    };
+    return icons[role] || Users;
+  };
+
+  const getRoleColor = (role: UserRole) => {
+    const colors = {
+      admin: 'bg-purple-100 text-purple-800',
+      production: 'bg-blue-100 text-blue-800',
+      inventory: 'bg-green-100 text-green-800',
+      raw_material: 'bg-orange-100 text-orange-800',
+      orders: 'bg-indigo-100 text-indigo-800'
+    };
+    return colors[role] || 'bg-gray-100 text-gray-800';
+  };
+
+  const handleAddUser = () => {
+    // In real app, this would call your API to create user
+    console.log('Adding user:', newUser);
+    setNewUser({ name: '', email: '', role: '', password: '' });
+    setShowAddUserDialog(false);
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+  };
+
   return (
     <div className="flex-1 space-y-6 p-6">
       {/* Header */}
@@ -123,3 +228,5 @@ export default function Settings() {
     </div>
   );
 }
+
+export default Settings;

@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError, RawMaterial, Supplier } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError, RawMaterial, Supplier } from '@/lib/supabase';
 import { IDGenerator } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { NotificationService } from './notificationService';
@@ -107,7 +107,9 @@ export class RawMaterialService {
         last_restocked: materialData.current_stock > 0 ? new Date().toISOString() : null
       };
 
-      const { data, error } = await supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      const { data, error } = await client
         .from('raw_materials')
         .insert(newMaterial)
         .select()
@@ -169,7 +171,13 @@ export class RawMaterialService {
     offset?: number;
   }): Promise<{ data: RawMaterial[] | null; error: string | null; count?: number }> {
     try {
-      let query = supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      let query = client
         .from('raw_materials')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });

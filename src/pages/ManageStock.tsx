@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { IDGenerator } from "@/lib/idGenerator";
 import {
   Select,
   SelectContent,
@@ -107,38 +108,53 @@ export default function ManageStock() {
         
         // Map database fields to interface format
         const loadedOrders = (data || []).map((order: any) => {
-          // Try to parse material details from notes
+          // Try to get material details from material_details column first, then fallback to notes
           let materialDetails: any = {};
-          try {
-            if (order.notes) {
+          
+          if (order.material_details) {
+            // Use material_details column if available
+            materialDetails = order.material_details;
+          } else if (order.notes) {
+            // Fallback to parsing notes field
+            try {
               materialDetails = JSON.parse(order.notes);
-            }
           } catch (e) {
             // If parsing fails, use the notes as-is (for old orders)
             console.log('Could not parse material details from notes:', order.notes);
+              materialDetails = {
+                materialName: 'Unknown Material',
+                quantity: 0,
+                unit: 'units',
+                costPerUnit: 0,
+                userNotes: order.notes
+              };
+            }
           }
+
+          // Ensure quantity is a valid number, not 0
+          const quantity = materialDetails.quantity || materialDetails.quantity === 0 ? materialDetails.quantity : 1;
 
           return {
             id: order.id,
             order_number: order.order_number,
-            materialName: materialDetails.materialName || 'Material Order',
-            materialBrand: materialDetails.materialBrand || 'Unknown',
-            materialCategory: materialDetails.materialCategory || 'Other',
-            materialBatchNumber: materialDetails.materialBatchNumber || `BATCH-${order.id}`,
+            materialName: materialDetails.materialName || materialDetails.material_name || 'Material Order',
+            materialBrand: materialDetails.materialBrand || materialDetails.material_brand || 'Unknown',
+            materialCategory: materialDetails.materialCategory || materialDetails.material_category || 'Other',
+            materialBatchNumber: materialDetails.materialBatchNumber || materialDetails.material_batch_number || `BATCH-${order.id}`,
             supplier: order.supplier_name,
-            quantity: materialDetails.quantity || 0,
+            quantity: quantity,
             unit: materialDetails.unit || 'units',
-            costPerUnit: materialDetails.costPerUnit || 0,
+            costPerUnit: materialDetails.costPerUnit || materialDetails.cost_per_unit || 0,
             totalCost: order.total_amount,
             orderDate: order.order_date,
             expectedDelivery: order.expected_delivery,
             status: order.status === 'pending' ? 'ordered' : order.status,
-            notes: typeof materialDetails === 'string' ? materialDetails : (materialDetails.userNotes || ''),
+            notes: materialDetails.userNotes || materialDetails.user_notes || '',
             actualDelivery: order.actual_delivery,
-            minThreshold: materialDetails.minThreshold || 100,
-            maxCapacity: materialDetails.maxCapacity || 1000,
-            qualityGrade: materialDetails.qualityGrade || 'A',
-            isRestock: materialDetails.isRestock || false
+            minThreshold: materialDetails.minThreshold || materialDetails.min_threshold || 100,
+            maxCapacity: materialDetails.maxCapacity || materialDetails.max_capacity || 1000,
+            qualityGrade: materialDetails.qualityGrade || materialDetails.quality_grade || 'A',
+            isRestock: materialDetails.isRestock || materialDetails.is_restock || false
           };
         });
 
@@ -472,6 +488,37 @@ export default function ManageStock() {
     try {
       console.log('📦 Processing delivered order:', deliveredOrder);
       
+      // Validate required fields
+      if (!deliveredOrder.materialName) {
+        toast({
+          title: "❌ Missing Material Name",
+          description: "Material name is required for delivery.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (!deliveredOrder.supplier) {
+        toast({
+          title: "❌ Missing Supplier",
+          description: "Supplier information is required for delivery.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Validate quantity before processing
+      if (!deliveredOrder.quantity || deliveredOrder.quantity <= 0) {
+        toast({
+          title: "❌ Invalid Quantity",
+          description: `Cannot deliver order with quantity ${deliveredOrder.quantity}. Please check the order details.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log('✅ All validations passed, proceeding with stock update...');
+      
               // Check if this is EXACTLY the same material (ALL fields must match for restock)
         // SMART RESTOCK LOGIC: Only supplier, brand, and quality matter for restock
         // Price changes are allowed and don't create new materials
@@ -488,33 +535,59 @@ export default function ManageStock() {
         // For new orders: Match by all fields (name, brand, category, supplier, quality, unit)
         let existingMaterial;
         
-        if (deliveredOrder.isRestock) {
-          // RESTOCK ORDER: More flexible matching - prioritize name and supplier
-          const { data: materials, error } = await supabase
+        // AGGRESSIVE MATCHING: Find the material that was created when this order was placed
+        console.log('🔍 Looking for the material created with this order...');
+        
+        // Strategy 1: Look for in-transit materials with same name and supplier
+        let { data: inTransitMaterials, error: inTransitError } = await supabase
             .from('raw_materials')
             .select('*')
             .eq('name', deliveredOrder.materialName)
             .eq('supplier_name', deliveredOrder.supplier)
-            .eq('unit', deliveredOrder.unit);
-          
-          if (error) throw error;
-          existingMaterial = materials?.[0];
-          console.log('🔄 Restock order detected - using flexible matching');
+          .eq('status', 'in-transit');
+        
+        if (inTransitError) {
+          console.error('❌ Error searching for in-transit materials:', inTransitError);
+        } else if (inTransitMaterials && inTransitMaterials.length > 0) {
+          existingMaterial = inTransitMaterials[0];
+          console.log('✅ Found in-transit material:', existingMaterial);
         } else {
-          // NEW ORDER: Strict matching - all fields must match
-          const { data: materials, error } = await supabase
+          console.log('❌ No in-transit material found, trying broader search...');
+          
+          // Strategy 2: Look for any material with same name and supplier (regardless of status)
+          const { data: sameNameSupplier, error: sameNameError } = await supabase
             .from('raw_materials')
             .select('*')
             .eq('name', deliveredOrder.materialName)
-            .eq('brand', deliveredOrder.materialBrand)
-            .eq('category', deliveredOrder.materialCategory)
-            .eq('supplier_name', deliveredOrder.supplier)
-            .eq('quality_grade', deliveredOrder.qualityGrade)
-            .eq('unit', deliveredOrder.unit);
+            .eq('supplier_name', deliveredOrder.supplier);
           
-          if (error) throw error;
-          existingMaterial = materials?.[0];
-          console.log('🆕 New order detected - using strict matching');
+          if (sameNameError) {
+            console.error('❌ Error searching for same name/supplier materials:', sameNameError);
+          } else if (sameNameSupplier && sameNameSupplier.length > 0) {
+            // If multiple found, prefer the one with 0 stock (likely the order material)
+            const zeroStockMaterial = sameNameSupplier.find(m => m.current_stock === 0);
+            existingMaterial = zeroStockMaterial || sameNameSupplier[0];
+            console.log('✅ Found material with same name/supplier:', existingMaterial);
+          } else {
+            console.log('❌ No material found with same name/supplier, trying name only...');
+            
+            // Strategy 3: Look for any material with same name (last resort)
+            const { data: sameName, error: sameNameOnlyError } = await supabase
+              .from('raw_materials')
+              .select('*')
+              .eq('name', deliveredOrder.materialName);
+            
+            if (sameNameOnlyError) {
+              console.error('❌ Error searching for same name materials:', sameNameOnlyError);
+            } else if (sameName && sameName.length > 0) {
+              // Prefer in-transit or 0 stock materials
+              const preferredMaterial = sameName.find(m => 
+                m.status === 'in-transit' || m.current_stock === 0
+              );
+              existingMaterial = preferredMaterial || sameName[0];
+              console.log('✅ Found material with same name:', existingMaterial);
+            }
+          }
         }
         
         console.log('🔍 Searching for existing material with criteria:');
@@ -527,7 +600,52 @@ export default function ManageStock() {
         console.log('  - Is Restock Order:', deliveredOrder.isRestock);
         console.log('🎯 Match found:', !!existingMaterial);
         if (existingMaterial) {
-          console.log('✅ Existing material:', existingMaterial);
+          console.log('✅ Existing material found:', existingMaterial);
+        } else {
+          console.log('❌ No existing material found - will create new one');
+          
+          // Let's also try a broader search to see what materials exist
+          const { data: allMaterials, error: allError } = await supabase
+            .from('raw_materials')
+            .select('id, name, brand, category, supplier_name, status, current_stock, unit, quality_grade')
+            .eq('name', deliveredOrder.materialName);
+          
+          if (!allError && allMaterials) {
+            console.log('🔍 All materials with same name:', allMaterials);
+            
+            // Check if any of these materials match our criteria
+            const potentialMatches = allMaterials.filter(material => 
+              material.supplier_name === deliveredOrder.supplier
+            );
+            
+            if (potentialMatches.length > 0) {
+              console.log('🎯 Potential matches found:', potentialMatches);
+              console.log('❌ Why they didn\'t match:');
+              potentialMatches.forEach(match => {
+                console.log(`  Material ${match.id}:`);
+                console.log(`    - Brand: "${match.brand}" vs "${deliveredOrder.materialBrand || 'Unknown'}"`);
+                console.log(`    - Category: "${match.category}" vs "${deliveredOrder.materialCategory || 'Other'}"`);
+                console.log(`    - Unit: "${match.unit}" vs "${deliveredOrder.unit}"`);
+                console.log(`    - Quality: "${match.quality_grade}" vs "${deliveredOrder.qualityGrade || 'A'}"`);
+                console.log(`    - Status: "${match.status}"`);
+              });
+            }
+          }
+        }
+      
+      // CRITICAL: We should ALWAYS find an existing material for delivery
+      // If we don't find one, something is wrong with the order data
+      if (!existingMaterial) {
+        console.error('❌ CRITICAL ERROR: No existing material found for delivery!');
+        console.error('This should never happen - every order should have a corresponding material.');
+        console.error('Order details:', deliveredOrder);
+        
+        toast({
+          title: "❌ Delivery Error",
+          description: `Cannot deliver order: No existing material found for "${deliveredOrder.materialName}" from "${deliveredOrder.supplier}". Please check the order data.`,
+          variant: "destructive",
+        });
+        return; // Stop processing - don't create new material
         }
       
       if (existingMaterial) {
@@ -537,6 +655,7 @@ export default function ManageStock() {
                          newStock <= existingMaterial.min_threshold ? 'low-stock' : 'in-stock';
         
         // Update material in Supabase
+        console.log('🔄 Updating existing material in database...');
         const { error: updateError } = await supabase
           .from('raw_materials')
           .update({
@@ -548,62 +667,32 @@ export default function ManageStock() {
           })
           .eq('id', existingMaterial.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('❌ Error updating material:', updateError);
+          throw updateError;
+        }
         
-        console.log(`Restocked existing ${deliveredOrder.materialName} from ${existingMaterial.current_stock} to ${newStock}`);
-        
-        // Auto-detect action type: If fields match exactly, it's a restock
-        const isAutoRestock = true; // Since we found an exact match
-        const actionType = deliveredOrder.isRestock ? 'restock_completed' : 'stock_updated';
-        const title = deliveredOrder.isRestock ? "✅ Stock Restocked Successfully!" : "✅ Stock Updated Successfully!";
+        console.log(`✅ Updated existing material ${deliveredOrder.materialName} from ${existingMaterial.current_stock} to ${newStock}`);
         
         toast({
-          title: title,
+          title: "✅ Order Delivered Successfully!",
           description: `${deliveredOrder.materialName} (${deliveredOrder.supplier}): ${existingMaterial.current_stock} + ${deliveredOrder.quantity} = ${newStock} ${deliveredOrder.unit}`,
-          variant: "default",
-        });
-        
-      } else {
-        // This is a NEW material (different name, brand, supplier, quality, price, etc.)
-        // Even if name is same, if ANY field is different, it's treated as NEW
-        const { error: insertError } = await supabase
-          .from('raw_materials')
-          .insert({
-            id: `MAT_${Date.now()}`,
-            name: deliveredOrder.materialName,
-            brand: deliveredOrder.materialBrand || "Unknown",
-            category: deliveredOrder.materialCategory || "Other",
-            batch_number: deliveredOrder.materialBatchNumber || `BATCH-${Date.now()}`,
-            current_stock: deliveredOrder.quantity,
-            unit: deliveredOrder.unit,
-            min_threshold: deliveredOrder.minThreshold || 100,
-            max_capacity: deliveredOrder.maxCapacity || 1000,
-            reorder_point: deliveredOrder.minThreshold || 100,
-            supplier_name: deliveredOrder.supplier,
-            cost_per_unit: deliveredOrder.costPerUnit,
-            quality_grade: deliveredOrder.qualityGrade || "A",
-            last_restocked: new Date().toISOString(),
-            status: 'in-stock',
-            total_value: deliveredOrder.quantity * deliveredOrder.costPerUnit,
-            daily_usage: 0,
-            supplier_performance: 85
-          });
-
-        if (insertError) throw insertError;
-        
-        console.log(`Added NEW material ${deliveredOrder.materialName} from ${deliveredOrder.supplier} to inventory (different specifications)`);
-        
-        toast({
-          title: "🆕 New Material Added to Inventory!",
-          description: `${deliveredOrder.materialName} (${deliveredOrder.supplier}) has been added as a NEW material with ${deliveredOrder.quantity} ${deliveredOrder.unit}`,
           variant: "default",
         });
       }
     } catch (error) {
-      console.error('Error updating raw material stock:', error);
+      console.error('❌ Error updating raw material stock:', error);
+      
+      let errorMessage = "There was an error updating the stock.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        errorMessage = JSON.stringify(error);
+      }
+      
       toast({
         title: "❌ Error Updating Stock",
-        description: "There was an error updating the stock. Please check console for details.",
+        description: `Failed to update stock: ${errorMessage}`,
         variant: "destructive",
         });
     }

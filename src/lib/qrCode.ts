@@ -27,6 +27,7 @@ export interface IndividualProductQRData {
   inspector: string;
   location?: string;
   status: 'active' | 'sold' | 'damaged' | 'returned';
+  notes?: string;
   created_at: string;
 }
 
@@ -35,7 +36,6 @@ export interface MainProductQRData {
   product_name: string;
   description: string;
   category: string;
-  base_price: number;
   total_quantity: number;
   available_quantity: number;
   recipe: {

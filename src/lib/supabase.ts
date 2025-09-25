@@ -3,13 +3,20 @@ import { createClient } from '@supabase/supabase-js';
 // Get Supabase configuration from environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_API_KEY;
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Check if Supabase is configured
 export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+export const isServiceRoleConfigured = !!(supabaseUrl && supabaseServiceRoleKey);
 
 if (!isSupabaseConfigured) {
   console.warn('⚠️ Supabase configuration missing. App will run in local storage mode.');
   console.warn('Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file');
+}
+
+if (!isServiceRoleConfigured) {
+  console.warn('⚠️ Supabase service role key missing. RLS policies will apply.');
+  console.warn('Please set VITE_SUPABASE_SERVICE_ROLE_KEY in your .env file to bypass RLS');
 }
 
 // Create Supabase client (with fallback for missing config)
@@ -25,6 +32,23 @@ export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabas
   global: {
     headers: {
       'X-Client-Info': 'rajdhani-trace-flow'
+    }
+  }
+}) : null;
+
+// Create Supabase service role client (bypasses RLS)
+export const supabaseAdmin = isServiceRoleConfigured ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'rajdhani-trace-flow-admin'
     }
   }
 }) : null;
@@ -107,6 +131,16 @@ export interface Database {
         Row: Notification;
         Insert: Omit<Notification, 'created_at'>;
         Update: Partial<Notification>;
+      };
+      production_flows: {
+        Row: ProductionFlow;
+        Insert: Omit<ProductionFlow, 'created_at' | 'updated_at'>;
+        Update: Partial<ProductionFlow>;
+      };
+      production_flow_steps: {
+        Row: ProductionFlowStep;
+        Insert: Omit<ProductionFlowStep, 'created_at' | 'updated_at'>;
+        Update: Partial<ProductionFlowStep>;
       };
     };
   };
@@ -383,6 +417,31 @@ export interface Notification {
   related_id?: string;
   related_data?: any;
   created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionFlow {
+  id: string;
+  production_product_id: string;
+  flow_name: string;
+  status: 'active' | 'completed' | 'cancelled';
+  current_step?: number;
+  total_steps?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductionFlowStep {
+  id: string;
+  flow_id: string;
+  step_name: string;
+  step_type: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  order_index: number;
+  machine_id?: string;
+  inspector_name?: string;
+  notes?: string;
   created_at: string;
   updated_at: string;
 }

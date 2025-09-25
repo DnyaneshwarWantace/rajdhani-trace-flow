@@ -50,6 +50,9 @@ interface Product {
   category: string;
   color: string;
   size: string;
+  height?: string;
+  width?: string;
+  thickness?: string;
   pattern: string;
   quantity: number;
   unit: string;
@@ -244,16 +247,13 @@ export default function NewBatch() {
               <div>
                       <h4 className="font-medium">{product.name}</h4>
                       <p className="text-sm text-gray-500">
-                        {product.category} • {product.color} • {product.size}
+                        {product.category} • {product.color} • {product.height || 'N/A'} x {product.width || 'N/A'} x {product.thickness || 'N/A'}
                       </p>
                     </div>
                     <div className="text-right">
                       <Badge variant={product.quantity > 0 ? "default" : "destructive"}>
                         {product.quantity} {product.unit}
                       </Badge>
-                      <p className="text-sm text-gray-500 mt-1">
-                        ₹{product.sellingPrice}
-                      </p>
                     </div>
                   </div>
               </div>
@@ -286,11 +286,11 @@ export default function NewBatch() {
                     <div><span className="text-gray-500">Name:</span> {selectedProduct.name}</div>
                     <div><span className="text-gray-500">Category:</span> {selectedProduct.category}</div>
                     <div><span className="text-gray-500">Color:</span> {selectedProduct.color}</div>
-                    <div><span className="text-gray-500">Size:</span> {selectedProduct.size}</div>
+                    <div><span className="text-gray-500">Height:</span> {selectedProduct.height || 'N/A'}</div>
+                    <div><span className="text-gray-500">Width:</span> {selectedProduct.width || 'N/A'}</div>
+                    <div><span className="text-gray-500">Thickness:</span> {selectedProduct.thickness || 'N/A'}</div>
                     <div><span className="text-gray-500">Current Stock:</span> {selectedProduct.quantity} {selectedProduct.unit}</div>
                     <div><span className="text-gray-500">Location:</span> {selectedProduct.location}</div>
-                    <div><span className="text-gray-500">Selling Price:</span> ₹{selectedProduct.sellingPrice}</div>
-                    <div><span className="text-gray-500">Total Cost:</span> ₹{selectedProduct.totalCost}</div>
               </div>
               </div>
 
@@ -328,6 +328,7 @@ export default function NewBatch() {
                   type="date"
                       value={expectedCompletion}
                       onChange={(e) => setExpectedCompletion(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
               />
               </div>
 

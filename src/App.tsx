@@ -4,6 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import NewOrder from "./pages/orders/NewOrder";
@@ -41,13 +44,10 @@ import { useEffect, useState } from "react";
 
 const queryClient = new QueryClient();
 
-const App = () => {
+// Create authenticated layout component
+const AuthenticatedLayout: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [backendReady, setBackendReady] = useState(false);
-
-  // Initialize Rajdhani ERP System
-  useEffect(() => {
-    // RajdhaniERP.initialize(); // Removed - using Supabase now
-  }, []);
 
   // Handle backend connection success
   useEffect(() => {
@@ -58,60 +58,206 @@ const App = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  if (!isAuthenticated) {
+    return null; // This shouldn't render if not authenticated due to ProtectedRoute
+  }
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true
-          }}
-        >
           <div className="flex h-screen bg-background">
             <Sidebar className="hidden md:flex" />
             <main className="flex-1 overflow-auto min-w-0 w-full md:w-auto">
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/orders/new" element={<NewOrder />} />
-                <Route path="/orders/add-item" element={<AddItem />} />
-                <Route path="/orders/:orderId" element={<OrderDetails />} />
-                <Route path="/inventory" element={<Inventory />} />
-                <Route path="/inventory/finished-goods" element={<FinishedGoods />} />
-                <Route path="/inventory/low-stocks" element={<LowStocks />} />
-                <Route path="/production" element={<Production />} />
-                <Route path="/production/new-batch" element={<NewBatch />} />
-                <Route path="/production-detail/:productId" element={<ProductionDetail />} />
-                <Route path="/production/:productId/dynamic-flow" element={<DynamicProductionFlow />} />
-                <Route path="/production/:productId/waste-generation" element={<WasteGeneration />} />
-                <Route path="/production/complete/:productId" element={<Complete />} />
+          {/* Dashboard - accessible to all authenticated users */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
 
-                <Route path="/materials" element={<Materials />} />
-                <Route path="/manage-stock" element={<ManageStock />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/product/:productId" element={<ProductDetail />} />
-                <Route path="/product-stock/:productId" element={<ProductStock />} />
-                <Route path="/qr-scanner" element={<QRScanner />} />
-                <Route path="/qr-result" element={<QRResult />} />
-                <Route path="/qr-redirect" element={<QRRedirect />} />
+          {/* Orders routes - restricted to orders and admin roles */}
+          <Route path="/orders" element={
+            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+              <Orders />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/new" element={
+            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+              <NewOrder />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/add-item" element={
+            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+              <AddItem />
+            </ProtectedRoute>
+          } />
+          <Route path="/orders/:orderId" element={
+            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+              <OrderDetails />
+            </ProtectedRoute>
+          } />
+
+          {/* Inventory routes - restricted to inventory and admin roles only */}
+          <Route path="/inventory" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <Inventory />
+            </ProtectedRoute>
+          } />
+          <Route path="/inventory/finished-goods" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <FinishedGoods />
+            </ProtectedRoute>
+          } />
+          <Route path="/inventory/low-stocks" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <LowStocks />
+            </ProtectedRoute>
+          } />
+
+          {/* Production routes - restricted to production and admin roles */}
+          <Route path="/production" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <Production />
+            </ProtectedRoute>
+          } />
+          <Route path="/production/new-batch" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <NewBatch />
+            </ProtectedRoute>
+          } />
+          <Route path="/production-detail/:productId" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <ProductionDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/production/:productId/dynamic-flow" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <DynamicProductionFlow />
+            </ProtectedRoute>
+          } />
+          <Route path="/production/:productId/waste-generation" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <WasteGeneration />
+            </ProtectedRoute>
+          } />
+          <Route path="/production/complete/:productId" element={
+            <ProtectedRoute allowedRoles={['admin', 'production']}>
+              <Complete />
+            </ProtectedRoute>
+          } />
+
+          {/* Raw materials routes - restricted to raw_material and admin roles only */}
+          <Route path="/materials" element={
+            <ProtectedRoute allowedRoles={['admin', 'raw_material']}>
+              <Materials />
+            </ProtectedRoute>
+          } />
+          <Route path="/manage-stock" element={
+            <ProtectedRoute allowedRoles={['admin', 'raw_material']}>
+              <ManageStock />
+            </ProtectedRoute>
+          } />
+
+          {/* Customer routes - restricted to orders and admin roles */}
+          <Route path="/customers" element={
+            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+              <Customers />
+            </ProtectedRoute>
+          } />
+
+          {/* Analytics - accessible to all authenticated users but admin has full access */}
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          } />
+
+          {/* Product routes - restricted to inventory and admin only */}
+          <Route path="/products" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <Products />
+            </ProtectedRoute>
+          } />
+          <Route path="/product/:productId" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <ProductDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/product-stock/:productId" element={
+            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+              <ProductStock />
+            </ProtectedRoute>
+          } />
+
+          {/* QR scanner routes - accessible to all authenticated users */}
+          <Route path="/qr-scanner" element={
+            <ProtectedRoute>
+              <QRScanner />
+            </ProtectedRoute>
+          } />
+          <Route path="/qr-result" element={
+            <ProtectedRoute>
+              <QRResult />
+            </ProtectedRoute>
+          } />
+          <Route path="/qr-redirect" element={
+            <ProtectedRoute>
+              <QRRedirect />
+            </ProtectedRoute>
+          } />
+
+          {/* Settings - requires settings permissions */}
                 <Route path="/settings" element={<Settings />} />
-                <Route path="/data-initializer" element={<DataInitializer />} />
-                <Route path="/backend-test" element={<BackendTest />} />
 
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* System administration routes - admin only */}
+          <Route path="/data-initializer" element={
+            <ProtectedRoute requiredRole="admin">
+              <DataInitializer />
+            </ProtectedRoute>
+          } />
+          <Route path="/backend-test" element={
+            <ProtectedRoute requiredRole="admin">
+              <BackendTest />
+            </ProtectedRoute>
+          } />
+
+          {/* 404 page */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
-          </div>
 
           {/* Backend Connection Status - Only show briefly on app start */}
           {!backendReady && <BackendInitializer />}
+    </div>
+  );
+};
+
+const App = () => {
+  // Initialize Rajdhani ERP System
+  useEffect(() => {
+    // RajdhaniERP.initialize(); // Removed - using Supabase now
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public login route */}
+              <Route path="/login" element={<Login />} />
+
+              {/* All other routes require authentication */}
+              <Route path="/*" element={
+                <ProtectedRoute>
+                  <AuthenticatedLayout />
+                </ProtectedRoute>
+              } />
+            </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

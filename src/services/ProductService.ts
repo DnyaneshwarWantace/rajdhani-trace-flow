@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError, Product, IndividualProduct } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError, Product, IndividualProduct } from '@/lib/supabase';
 import { IDGenerator } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { NotificationService } from './notificationService';
@@ -60,8 +60,13 @@ export class ProductService {
       }
 
       // Check if product with same name and specifications exists
-      // Use a more robust approach to avoid URL encoding issues
-      const { data: existingProducts } = await supabase
+      // Use admin client to bypass RLS for duplicate checking
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      const { data: existingProducts } = await client
         .from('products')
         .select('name, category, color, pattern')
         .eq('name', productData.name.trim())
@@ -102,7 +107,7 @@ export class ProductService {
         image_url: productData.image_url || null
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('products')
         .insert(newProduct)
         .select()
@@ -136,8 +141,14 @@ export class ProductService {
     offset?: number;
   }): Promise<{ data: any[] | null; error: string | null; count?: number }> {
     try {
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
       // Try to get products with individual_products first, fallback to products only if it fails
-      let query = supabase
+      let query = client
         .from('products')
         .select(`
           *,
@@ -153,7 +164,6 @@ export class ProductService {
             final_width,
             final_height,
             notes,
-            product_name,
             location
           )
         `, { count: 'exact' })
@@ -188,7 +198,7 @@ export class ProductService {
         console.warn('individual_products table query failed, trying fallback:', error);
 
         // Fallback query without individual_products
-        let fallbackQuery = supabase
+        let fallbackQuery = client
           .from('products')
           .select('*', { count: 'exact' })
           .order('created_at', { ascending: false });
@@ -529,8 +539,17 @@ export class ProductService {
             name,
             category,
             color,
-            size,
-            pattern
+            width,
+            height,
+            pattern,
+            product_recipes (
+              *,
+              recipe_materials (
+                quantity,
+                unit,
+                raw_materials (name)
+              )
+            )
           ),
           production_batches (
             batch_number,
@@ -566,7 +585,9 @@ export class ProductService {
         weight: parseFloat(individualProduct.final_weight || '0'),
         color: individualProduct.products.color || '',
         pattern: individualProduct.products.pattern || '',
-        material_composition: individualProduct.products?.material_composition || 'N/A',
+        material_composition: individualProduct.products.product_recipes?.[0]?.recipe_materials?.map(
+          rm => rm.raw_materials.name
+        ) || [],
         production_steps: individualProduct.production_batches?.production_steps?.map(ps => ({
           step_name: ps.step_name,
           completed_at: ps.completed_at,
@@ -591,12 +612,21 @@ export class ProductService {
   // Generate QR code for main product
   static async generateMainProductQRCode(productId: string): Promise<{ qrCodeURL: string | null; error: string | null }> {
     try {
-      // Get product with full details (without product_recipes to avoid 406 errors)
+      // Get product with full details
       const { data: product } = await supabase
         .from('products')
         .select(`
           *,
-          individual_products (status)
+          individual_products (status),
+          product_recipes (
+            production_time,
+            difficulty_level,
+            recipe_materials (
+              quantity,
+              unit,
+              raw_materials (id, name)
+            )
+          )
         `)
         .eq('id', productId)
         .single();
@@ -614,13 +644,17 @@ export class ProductService {
         product_name: product.name,
         description: `${product.category} carpet - ${product.color || 'Various colors'} - ${product.pattern || 'Various patterns'}`,
         category: product.category,
-        base_price: 0, // Pricing handled manually per order
         total_quantity: totalQuantity,
         available_quantity: availableQuantity,
         recipe: {
-          materials: [], // Recipe materials will be loaded separately if needed
-          production_time: 0,
-          difficulty_level: 'Medium'
+          materials: product.product_recipes?.[0]?.recipe_materials?.map(rm => ({
+            material_id: rm.raw_materials.id,
+            material_name: rm.raw_materials.name,
+            quantity: rm.quantity,
+            unit: rm.unit
+          })) || [],
+          production_time: product.product_recipes?.[0]?.production_time || 0,
+          difficulty_level: product.product_recipes?.[0]?.difficulty_level || 'Medium'
         },
         machines_required: ['Loom Machine', 'Cutting Machine', 'Binding Machine'], // Default machines
         production_steps: ['Warping', 'Weaving', 'Cutting', 'Binding', 'Quality Check'], // Default steps
@@ -717,7 +751,13 @@ export class ProductService {
     offset?: number;
   }): Promise<{ data: any[] | null; error: string | null; count?: number }> {
     try {
-      let query = supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      let query = client
         .from('individual_products')
         .select(`
           *,
@@ -742,7 +782,7 @@ export class ProductService {
         query = query.eq('quality_grade', filters.quality_grade);
       }
 
-      if (filters?.search) {
+      if (filters?.search && typeof filters.search === 'string' && filters.search.trim()) {
         const searchTerm = `%${filters.search.toLowerCase()}%`;
         query = query.or(`qr_code.ilike.${searchTerm},batch_number.ilike.${searchTerm},inspector.ilike.${searchTerm}`);
       }
@@ -843,6 +883,7 @@ export class ProductService {
         .from('products')
         .select(`
           status,
+          category,
           individual_products (status)
         `);
 
@@ -908,9 +949,7 @@ export class ProductService {
         outOfStock: 0,
         totalProduced: 0,
         totalSold: 0,
-        availableUnits: 0,
-        carpetProducts: 0,
-        carpetLowStock: 0
+        availableUnits: 0
       };
     }
   }

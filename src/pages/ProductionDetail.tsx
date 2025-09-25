@@ -165,10 +165,10 @@ export default function ProductionDetail() {
               productId: actualProduct.id,
               productName: actualProduct.name,
               category: actualProduct.category,
-              color: actualProduct.color || 'N/A',
-              height: actualProduct.height || 'N/A',
-              width: actualProduct.width || 'N/A',
-              pattern: actualProduct.pattern || 'N/A',
+              color: actualProduct.color || 'NA',
+              height: actualProduct.height || 'AN',
+              width: actualProduct.width || 'NA',
+              pattern: actualProduct.pattern || 'NA',
               targetQuantity: 1,
               priority: "normal",
               status: "planning",
@@ -179,10 +179,10 @@ export default function ProductionDetail() {
               expectedProduct: {
                 name: actualProduct.name,
                 category: actualProduct.category,
-                height: actualProduct.height || '',
-                width: actualProduct.width || '',
-                weight: actualProduct.weight || '',
-                thickness: actualProduct.thickness || '',
+                height: actualProduct.height || '8 ft',
+                width: actualProduct.width || '10 ft',
+                weight: actualProduct.weight || '45 kg',
+                thickness: actualProduct.thickness || '12 mm',
                 materialComposition: actualProduct.materialComposition || '',
                 qualityGrade: "A+"
               },
@@ -194,10 +194,10 @@ export default function ProductionDetail() {
             setExpectedProduct({
               name: actualProduct.name,
               category: actualProduct.category,
-              height: actualProduct.height || '',
-              width: actualProduct.width || '',
-              weight: actualProduct.weight || '',
-              thickness: actualProduct.thickness || '',
+              height: actualProduct.height || '8 ft',
+              width: actualProduct.width || '10 ft',
+              weight: actualProduct.weight || '45 kg',
+              thickness: actualProduct.thickness || '12 mm',
               materialComposition: actualProduct.materialComposition || '',
               qualityGrade: "A+"
             });
@@ -329,7 +329,7 @@ export default function ProductionDetail() {
               unit: material.unit,
               cost_per_unit: rawMaterial?.cost_per_unit || material.cost_per_unit || 0,
               supplier_name: rawMaterial?.supplier_name || material.supplier_name || "From Recipe",
-              status: (rawMaterial?.status || 'in-stock') as const,
+              status: rawMaterial?.status || 'in-stock',
               batch_number: rawMaterial?.batch_number || material.batch_number || '',
               selectedQuantity: material.quantity || 1
             };
@@ -503,11 +503,28 @@ export default function ProductionDetail() {
       if (materialsError) {
         console.error('❌ Error saving recipe materials:', materialsError);
         console.error('Recipe materials data that failed:', recipeMaterials);
+        
+        // Show user-friendly error message
+        showNotification(
+          "Recipe Error", 
+          `Failed to save product recipe: ${materialsError.message}`, 
+          "error"
+        );
       } else {
         console.log('✅ Product recipe saved to database:', recipeMaterialsData);
+        showNotification(
+          "Success", 
+          `Product recipe saved with ${recipeMaterials.length} materials`, 
+          "success"
+        );
       }
     } catch (error) {
       console.error('Error saving product recipe:', error);
+      showNotification(
+        "Recipe Error", 
+        "Failed to save product recipe. Please try again.", 
+        "error"
+      );
     }
   };
 
@@ -520,20 +537,20 @@ export default function ProductionDetail() {
         await supabase
           .from('material_consumption')
           .delete()
-          .eq('production_batch_id', updatedProduct.id);
+          .eq('production_product_id', updatedProduct.id);
 
         // Then insert updated material consumption with custom IDs
         const materialConsumptionData = updatedProduct.materialsConsumed.map((material, index) => ({
           id: `MAT_CONSUME_${Date.now()}_${index}`,
-          production_batch_id: updatedProduct.id,
+          production_product_id: updatedProduct.id,
           material_id: material.materialId,
           material_name: material.materialName,
-          consumed_quantity: material.quantity,
+          quantity_used: material.quantity,
           unit: material.unit,
           cost_per_unit: material.cost / material.quantity,
-          consumption_date: material.consumedAt,
-          operator: 'Production Team',
-          notes: `${material.materialName} - ${material.quantity} ${material.unit} consumed in production of ${updatedProduct.productName}`
+          total_cost: material.cost,
+          consumed_at: material.consumedAt,
+          created_at: new Date().toISOString(),
         }));
 
         console.log('Attempting to save material consumption:', materialConsumptionData);
@@ -546,8 +563,20 @@ export default function ProductionDetail() {
         if (materialError) {
           console.error('❌ Error saving material consumption:', materialError);
           console.error('Data that failed to insert:', materialConsumptionData);
+          
+          // Show user-friendly error message
+          showNotification(
+            "Database Error", 
+            `Failed to save material consumption: ${materialError.message}`, 
+            "error"
+          );
         } else {
           console.log('✅ Material consumption saved to database:', materialData);
+          showNotification(
+            "Success", 
+            `Material consumption saved for ${materialConsumptionData.length} materials`, 
+            "success"
+          );
         }
 
         // Also save as recipe for future reference
@@ -843,7 +872,7 @@ export default function ProductionDetail() {
       }
 
       // Add machine step to flow
-      await ProductionFlowService.addStepToFlow({
+      const newStep = await ProductionFlowService.addStepToFlow({
         flow_id: flow.id,
         step_name: `${machine.name} Operation`,
         step_type: 'machine_operation',
@@ -853,6 +882,7 @@ export default function ProductionDetail() {
         notes: `Machine operation performed by ${inspector}`
       });
 
+      console.log('✅ Machine step added successfully:', newStep);
       showNotification("Success", `Machine step "${machine.name}" added to production flow`, "success");
     } catch (error) {
       console.error('Error adding machine step to flow:', error);
@@ -860,8 +890,45 @@ export default function ProductionDetail() {
     }
   };
 
-  const skipToWasteGeneration = () => {
+  const skipToWasteGeneration = async () => {
     if (!productionProduct) return;
+
+    try {
+      console.log('Skipping machine operations and going to waste generation');
+
+      // Get or create production flow
+      let flow = await ProductionFlowService.getProductionFlow(productionProduct.id);
+      
+      if (!flow) {
+        // Create new production flow
+        flow = await ProductionFlowService.createProductionFlow({
+          production_product_id: productionProduct.id,
+          flow_name: `${productionProduct.productName} Production Flow`
+        });
+      }
+
+      // Create a completed machine step to represent skipped machine operations
+      const skippedStep = await ProductionFlowService.addStepToFlow({
+        flow_id: flow.id,
+        step_name: 'N/A',
+        step_type: 'machine_operation',
+        order_index: 1,
+        machine_id: null, // No specific machine since it was skipped
+        inspector_name: 'System',
+        notes: 'Machine operations were skipped - went directly to waste generation'
+      });
+
+      // Mark the step as completed since it was skipped
+      if (skippedStep) {
+        await ProductionFlowService.completeFlowStep(skippedStep.id, 'Machine operations skipped by user');
+        console.log('✅ Skipped machine step marked as completed:', skippedStep);
+      }
+
+      showNotification("Success", "Machine operations skipped and marked as completed", "success");
+    } catch (error) {
+      console.error('Error creating skipped machine step:', error);
+      showNotification("Warning", "Skipped to waste generation but couldn't update flow status", "warning");
+    }
 
     // Navigate to waste generation page
     navigate(`/production/${productId}/waste-generation`);

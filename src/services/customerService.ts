@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError, Customer } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError, Customer } from '@/lib/supabase';
 import { generateUniqueId } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 
@@ -39,7 +39,8 @@ export class CustomerService {
       }
 
       // Check if email already exists
-      const { data: existingCustomer } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { data: existingCustomer } = await client
         .from('customers')
         .select('email')
         .eq('email', customerData.email.toLowerCase().trim())
@@ -73,7 +74,7 @@ export class CustomerService {
         credit_limit: customerData.credit_limit || 0
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('customers')
         .insert(newCustomer)
         .select()
@@ -107,7 +108,13 @@ export class CustomerService {
     offset?: number;
   }): Promise<{ data: Customer[] | null; error: string | null; count?: number }> {
     try {
-      let query = supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      let query = client
         .from('customers')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false });

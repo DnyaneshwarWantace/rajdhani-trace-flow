@@ -104,18 +104,17 @@ export default function WasteGeneration() {
       // Load production product from production flow data
       const loadProductionData = async () => {
         try {
+          console.log('🔍 Loading production data for productId:', productId);
+          
           // First load the production flow to get the actual product ID
           const flow = await ProductionFlowService.getProductionFlow(productId);
+          console.log('🔍 Production flow loaded:', flow);
+          
           if (flow) {
             setProductionFlow(flow);
 
-            // Extract actual product ID from production_product_id
-            const actualProductId = flow.production_product_id.replace('PRO-', '').replace('PROD_', '');
-
-            // Load the actual product data
-            const response = await ProductService.getProducts();
-            const products = response.data || [];
-            const product = products.find((p: any) => p.id === actualProductId);
+            // Use the same approach as DynamicProductionFlow - create mock production product from flow data
+            console.log('🔍 Creating production product from flow data like DynamicProductionFlow does');
 
             // Load material consumption from Supabase
             const { data: materialsConsumed, error: materialsError } = await supabase
@@ -127,53 +126,86 @@ export default function WasteGeneration() {
               console.warn('Error loading materials consumed:', materialsError);
             }
 
-            if (product) {
-              // Convert to production product format with loaded materials
-              const productionProduct: ProductionProduct = {
-                id: flow.production_product_id, // Use production flow product ID
-                productId: product.id,
-                productName: product.name,
-                category: product.category,
-                color: product.color || 'Standard',
-                size: `${product.height || 'N/A'} x ${product.width || 'N/A'}`,
-                pattern: product.pattern || 'N/A',
-                targetQuantity: 1,
-                priority: 'normal',
-                status: 'active',
-                expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                createdAt: flow.created_at || new Date().toISOString(),
-                materialsConsumed: (materialsConsumed || []).map((m: any) => ({
-                  materialId: m.material_id,
-                  materialName: m.material_name || 'Unknown Material',
-                  quantity: m.consumed_quantity,
-                  unit: m.unit || 'units',
-                  cost: m.cost_per_unit || 0,
-                  consumedAt: m.created_at
-                })),
-                wasteGenerated: [],
-                expectedProduct: {
-                  name: product.name,
-                  category: product.category,
-                  height: product.height || '',
-                  width: product.width || '',
-                  weight: product.weight || '',
-                  thickness: product.thickness || '',
-                  materialComposition: product.material_composition || '',
-                  qualityGrade: 'A+'
-                },
-                notes: ''
-              };
-              setProductionProduct(productionProduct);
-              console.log('Loaded production product with materials:', productionProduct);
-            }
+            // Create production product from flow data (same as DynamicProductionFlow)
+            const productionProduct: ProductionProduct = {
+              id: flow.production_product_id, // This is the batch ID
+              productId: flow.production_product_id, // Use production_product_id as productId
+              productName: flow.flow_name.replace(' Production Flow', ''),
+              category: 'Carpet',
+              color: 'N/A',
+              size: 'N/A',
+              pattern: 'N/A',
+              targetQuantity: 1,
+              priority: 'normal',
+              status: 'active',
+              expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              createdAt: flow.created_at || new Date().toISOString(),
+              materialsConsumed: (materialsConsumed || []).map((m: any) => ({
+                materialId: m.material_id,
+                materialName: m.material_name || 'Unknown Material',
+                quantity: m.quantity_used || 0, // Use consistent field name
+                unit: m.unit || 'units',
+                cost: m.total_cost || (m.cost_per_unit * m.quantity_used) || 0,
+                consumedAt: m.consumed_at || m.created_at
+              })),
+              wasteGenerated: [],
+              expectedProduct: {
+                name: flow.flow_name.replace(' Production Flow', ''),
+                category: 'Carpet',
+                height: 'N/A',
+                width: 'N/A',
+                weight: 'N/A',
+                thickness: 'N/A',
+                materialComposition: 'N/A',
+                qualityGrade: 'A'
+              },
+              notes: ''
+            };
+            setProductionProduct(productionProduct);
+            console.log('✅ Created production product from flow data:', productionProduct);
 
             // Load production steps
             const steps = await ProductionFlowService.getFlowSteps(flow.id);
             if (steps) {
               setProductionSteps(steps);
 
+              // Check if waste tracking step exists, if not create it
+              let wasteStep = steps.find(s => s.step_type === 'wastage_tracking');
+              if (!wasteStep) {
+                console.log('Creating waste tracking step');
+                const newWasteStep = await ProductionFlowService.addStepToFlow({
+                  flow_id: flow.id,
+                  step_name: 'Waste Generation',
+                  step_type: 'wastage_tracking',
+                  order_index: steps.length + 1,
+                  machine_id: null,
+                  inspector_name: 'Admin',
+                  notes: 'Track waste generated during production process'
+                });
+                
+                if (newWasteStep) {
+                  // Add to local steps
+                  const newStep = {
+                    id: newWasteStep.id,
+                    flow_id: flow.id,
+                    step_name: 'Waste Generation',
+                    step_type: 'wastage_tracking',
+                    order_index: steps.length + 1,
+                    machine_id: null,
+                    inspector_name: 'Admin',
+                    notes: 'Track waste generated during production process',
+                    status: 'pending' as const,
+                    start_time: null,
+                    end_time: null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                  };
+                  setProductionSteps([...steps, newStep]);
+                  wasteStep = newStep;
+                }
+              }
+
               // Auto-set waste tracking step to 'in_progress' if it's pending
-              const wasteStep = steps.find(s => s.step_type === 'wastage_tracking');
               if (wasteStep && wasteStep.status === 'pending') {
                 // Update step status to in_progress
                 await ProductionFlowService.updateFlowStep(wasteStep.id, {
@@ -183,9 +215,69 @@ export default function WasteGeneration() {
                 console.log('Waste tracking step set to in_progress');
               }
             }
+          } else {
+            console.error('❌ No production flow found for productId:', productId);
+            // Set fallback product when no flow is found
+            const fallbackProduct: ProductionProduct = {
+              id: productId || 'unknown',
+              productId: productId || 'unknown',
+              productName: 'Unknown Product',
+              category: 'Unknown',
+              color: 'Unknown',
+              size: 'Unknown',
+              pattern: 'Unknown',
+              targetQuantity: 1,
+              priority: 'normal',
+              status: 'active',
+              expectedCompletion: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+              materialsConsumed: [],
+              wasteGenerated: [],
+              expectedProduct: {
+                name: 'Unknown Product',
+                category: 'Unknown',
+                height: '',
+                width: '',
+                weight: '',
+                thickness: '',
+                materialComposition: '',
+                qualityGrade: 'A+'
+              },
+              notes: ''
+            };
+            setProductionProduct(fallbackProduct);
           }
         } catch (error) {
-          console.error('Error loading production data:', error);
+          console.error('❌ Error loading production data:', error);
+          // Set a fallback production product to prevent infinite loading
+          const fallbackProduct: ProductionProduct = {
+            id: productId || 'unknown',
+            productId: productId || 'unknown',
+            productName: 'Unknown Product',
+            category: 'Unknown',
+            color: 'Unknown',
+            size: 'Unknown',
+            pattern: 'Unknown',
+            targetQuantity: 1,
+            priority: 'normal',
+            status: 'active',
+            expectedCompletion: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            materialsConsumed: [],
+            wasteGenerated: [],
+            expectedProduct: {
+              name: 'Unknown Product',
+              category: 'Unknown',
+              height: '',
+              width: '',
+              weight: '',
+              thickness: '',
+              materialComposition: '',
+              qualityGrade: 'A+'
+            },
+            notes: ''
+          };
+          setProductionProduct(fallbackProduct);
         }
       };
       loadProductionData();
@@ -409,6 +501,95 @@ export default function WasteGeneration() {
     
     // Navigate directly to individual details section (Complete page)
       navigate(`/production/complete/${productId}`);
+  };
+
+  const skipWasteGeneration = async () => {
+    if (!productionFlow) {
+      console.error('No production flow found');
+      return;
+    }
+
+    try {
+      console.log('Skipping waste generation for flow:', productionFlow.id);
+      
+      // Find the waste tracking step
+      let wasteStep = productionSteps.find(step => step.stepType === 'wastage_tracking');
+      
+      if (wasteStep) {
+        // Update the existing waste step to completed (skipped)
+        await ProductionFlowService.updateFlowStep(wasteStep.id, {
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          inspector_name: 'Admin',
+          notes: 'Waste generation skipped - no waste was generated during this production process.'
+        });
+        
+        // Update local production steps state
+        const updatedSteps = productionSteps.map(step => 
+          step.id === wasteStep.id 
+            ? { 
+                ...step, 
+                status: 'completed' as const, 
+                end_time: new Date().toISOString(),
+                inspector_name: 'Admin',
+                notes: 'Waste generation skipped - no waste was generated during this production process.'
+              }
+            : step
+        );
+        setProductionSteps(updatedSteps);
+        
+        console.log('Waste generation step skipped and marked as completed');
+      } else {
+        // Create a new waste tracking step and mark it as completed (skipped)
+        console.log('Creating waste tracking step and marking as skipped');
+        const newWasteStep = await ProductionFlowService.addStepToFlow({
+          flow_id: productionFlow.id,
+          step_name: 'Waste Generation',
+          step_type: 'wastage_tracking',
+          order_index: productionSteps.length + 1,
+          machine_id: null,
+          inspector_name: 'Admin',
+          notes: 'Waste generation skipped - no waste was generated during this production process.'
+        });
+
+        // Update the step to completed status
+        if (newWasteStep) {
+          await ProductionFlowService.updateFlowStep(newWasteStep.id, {
+            status: 'completed',
+            end_time: new Date().toISOString(),
+            inspector_name: 'Admin',
+            notes: 'Waste generation skipped - no waste was generated during this production process.'
+          });
+        }
+
+        // Add to local production steps state
+        const newStep = {
+          id: newWasteStep?.id || generateUniqueId('STEP'),
+          flow_id: productionFlow.id,
+          step_name: 'Waste Generation',
+          step_type: 'wastage_tracking',
+          order_index: productionSteps.length + 1,
+          machine_id: null,
+          inspector_name: 'Admin',
+          notes: 'Waste generation skipped - no waste was generated during this production process.',
+          status: 'completed' as const,
+          start_time: new Date().toISOString(),
+          end_time: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        
+        setProductionSteps([...productionSteps, newStep]);
+        console.log('Waste generation step created and marked as skipped');
+      }
+      
+      // Navigate directly to individual details section (Complete page)
+      navigate(`/production/complete/${productId}`);
+    } catch (error) {
+      console.error('Error skipping waste generation:', error);
+      // Still navigate to complete page even if there's an error
+      navigate(`/production/complete/${productId}`);
+    }
   };
 
   if (!productionProduct) {
@@ -680,23 +861,46 @@ export default function WasteGeneration() {
       {/* Complete Waste Tracking */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-medium">Complete Waste Tracking</h3>
-              <p className="text-sm text-gray-600">
-                Once you've recorded all waste items, proceed to the next step in production
-              </p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">Complete Waste Tracking</h3>
+                <p className="text-sm text-gray-600">
+                  Once you've recorded all waste items, proceed to the next step in production
+                </p>
+              </div>
+              <Button 
+                onClick={completeWasteTracking}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Factory className="w-4 h-4 mr-2" />
+                Complete & Continue
+              </Button>
             </div>
-            <Button 
-              onClick={completeWasteTracking}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Factory className="w-4 h-4 mr-2" />
-              Complete & Continue
-            </Button>
+            
+            {/* Skip Option */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-orange-700">No Waste Generated</h4>
+                  <p className="text-sm text-gray-600">
+                    If no waste was generated during this production process, you can skip this step
+                  </p>
+                </div>
+                <Button 
+                  onClick={skipWasteGeneration}
+                  variant="outline"
+                  className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Skip Waste Generation
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
+

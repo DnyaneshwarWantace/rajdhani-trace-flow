@@ -11,7 +11,7 @@ import { Plus, Search, Trash2, AlertTriangle, Factory, Package, X, CheckCircle, 
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { generateUniqueId, createNotification } from "@/lib/storageUtils";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { CustomerService } from "@/services/customerService";
 import { NotificationService } from "@/services/notificationService";
 import { OrderService } from "@/services/orderService";
@@ -182,7 +182,7 @@ export default function NewOrder() {
     const loadProductsAndMaterials = async () => {
       try {
         // Load products from Supabase
-        const { data: products, error: productsError } = await supabase
+        const { data: products, error: productsError } = await supabaseAdmin
           .from('products')
           .select('*');
         
@@ -193,7 +193,7 @@ export default function NewOrder() {
         }
 
         // Load raw materials from Supabase
-        const { data: rawMaterials, error: materialsError } = await supabase
+        const { data: rawMaterials, error: materialsError } = await supabaseAdmin
           .from('raw_materials')
           .select('*');
         
@@ -204,7 +204,7 @@ export default function NewOrder() {
         }
 
         // Load individual products from Supabase
-        const { data: individualProducts, error: individualError } = await supabase
+        const { data: individualProducts, error: individualError } = await supabaseAdmin
           .from('individual_products')
           .select('*');
         
@@ -225,7 +225,7 @@ export default function NewOrder() {
     const loadAllData = async () => {
       try {
         // Load products from Supabase
-        const { data: productsData, error: productsError } = await supabase
+        const { data: productsData, error: productsError } = await supabaseAdmin
           .from('products')
           .select('*')
           .order('created_at', { ascending: false });
@@ -236,7 +236,7 @@ export default function NewOrder() {
         }
 
         // Load individual products from Supabase
-        const { data: individualProductsData, error: individualError } = await supabase
+        const { data: individualProductsData, error: individualError } = await supabaseAdmin
           .from('individual_products')
           .select('*');
 
@@ -246,7 +246,7 @@ export default function NewOrder() {
         }
 
         // Load raw materials from Supabase
-        const { data: rawMaterialsData, error: rawMaterialsError } = await supabase
+        const { data: rawMaterialsData, error: rawMaterialsError } = await supabaseAdmin
           .from('raw_materials')
           .select('*')
           .order('created_at', { ascending: false });

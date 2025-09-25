@@ -95,7 +95,7 @@ export class IDGenerator {
 
   // Get next sequence number for a given prefix and date
   private static getNextSequence(prefix: string, dateStr: string): number {
-    // Check localStorage for existing sequences
+    // Use localStorage for sequence management (no database dependency)
     const storageKey = `id_sequence_${prefix}_${dateStr}`;
     const existingSequence = localStorage.getItem(storageKey);
     

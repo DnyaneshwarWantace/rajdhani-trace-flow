@@ -32,6 +32,7 @@ import { ProductService } from "@/services/ProductService";
 import { MachineService } from "@/services/machineService";
 import { ProductionFlowService } from "@/services/productionFlowService";
 import { ProductionService } from "@/services/productionService";
+import { NotificationService } from "@/services/notificationService";
 import { supabase } from "@/lib/supabase";
 import { Loading } from "@/components/ui/loading";
 
@@ -94,6 +95,67 @@ export default function Production() {
   const [productionProducts, setProductionProducts] = useState<ProductionProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [productionFlows, setProductionFlows] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Load notifications for production requests
+  const loadNotifications = async () => {
+    try {
+      const { data: productionNotifications, error } = await NotificationService.getNotificationsByModule('production');
+      if (error) {
+        console.error('Error loading production notifications:', error);
+        return;
+      }
+      
+      // Filter for unread production requests
+      const unreadRequests = productionNotifications?.filter(n => 
+        n.status === 'unread' && n.type === 'production_request'
+      ) || [];
+      
+      setNotifications(unreadRequests);
+      console.log('📢 Loaded production request notifications:', unreadRequests.length);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  // Handle adding product to production from notification
+  const handleAddToProductionFromNotification = async (notification: any) => {
+    if (!notification.related_data?.productId) return;
+    
+    try {
+      // Navigate to new batch page with the product data
+      navigate('/production/new-batch', {
+        state: {
+          selectedProduct: {
+            id: notification.related_data.productId,
+            name: notification.related_data.productName,
+            category: notification.related_data.category
+          }
+        }
+      });
+      
+      // Mark notification as read
+      await NotificationService.markAsRead(notification.id);
+      
+      // Reload notifications
+      await loadNotifications();
+      
+      console.log('✅ Product added to production from notification:', notification.related_data.productName);
+    } catch (error) {
+      console.error('❌ Error adding product to production from notification:', error);
+    }
+  };
+
+  // Handle dismissing notification
+  const handleDismissNotification = async (notificationId: string) => {
+    try {
+      await NotificationService.markAsDismissed(notificationId);
+      await loadNotifications();
+      console.log('✅ Notification dismissed:', notificationId);
+    } catch (error) {
+      console.error('❌ Error dismissing notification:', error);
+    }
+  };
 
   // Load production products from production_flows table
   useEffect(() => {
@@ -245,6 +307,7 @@ export default function Production() {
     };
 
     loadProductionProducts();
+    loadNotifications();
   }, []);
 
   // Load production flows - now we get them with the products, so just extract them
@@ -466,6 +529,58 @@ export default function Production() {
           </div>
         </div>
       )}
+
+      {/* Production Request Notifications */}
+      {notifications && notifications.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-5 h-5 text-orange-600" />
+            <h3 className="font-semibold text-orange-800">Production Requests</h3>
+            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+              {notifications.length}
+            </Badge>
+          </div>
+          <div className="space-y-3">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="bg-white border border-orange-200 rounded-lg p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900 mb-1">{notification.title}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{notification.message}</p>
+                    {notification.related_data && (
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div>📦 Product: {notification.related_data.productName}</div>
+                        <div>📋 Category: {notification.related_data.category}</div>
+                        <div>👤 Requested by: {notification.related_data.requestedBy}</div>
+                        <div>⏰ Requested at: {new Date(notification.related_data.requestedAt).toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <Button
+                      size="sm"
+                      onClick={() => handleAddToProductionFromNotification(notification)}
+                      className="bg-orange-600 hover:bg-orange-700"
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Add to Production
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDismissNotification(notification.id)}
+                      className="border-gray-300"
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Header
         title="Production Management"
         subtitle="Track manufacturing processes"

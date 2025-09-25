@@ -1,4 +1,4 @@
-import { supabase, ProductRecipe, RecipeMaterial } from '@/lib/supabase';
+import { supabase, supabaseAdmin, ProductRecipe, RecipeMaterial } from '@/lib/supabase';
 import { generateUniqueId } from '@/lib/idGenerator';
 
 export interface CreateRecipeData {
@@ -30,7 +30,8 @@ export class ProductRecipeService {
       );
 
       // Create the recipe
-      const { data: recipe, error: recipeError } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { data: recipe, error: recipeError } = await client
         .from('product_recipes')
         .insert({
           id: recipeId,
@@ -82,7 +83,7 @@ export class ProductRecipeService {
       console.log('🔍 All recipe materials to insert:', recipeMaterials);
 
       console.log('🔍 Inserting recipe materials into database...');
-      const { data: insertedMaterials, error: materialsError } = await supabase
+      const { data: insertedMaterials, error: materialsError } = await client
         .from('recipe_materials')
         .insert(recipeMaterials)
         .select();
@@ -91,14 +92,14 @@ export class ProductRecipeService {
         console.error('❌ Error creating recipe materials:', materialsError);
         console.error('❌ Failed recipe materials data:', recipeMaterials);
         // Clean up the recipe if materials failed
-        await supabase.from('product_recipes').delete().eq('id', recipeId);
+        await client.from('product_recipes').delete().eq('id', recipeId);
         return { data: null, error: materialsError.message };
       }
 
       console.log('✅ Recipe materials inserted successfully:', insertedMaterials);
 
       // Fetch the complete recipe with materials
-      const { data: completeRecipe, error: fetchError } = await supabase
+      const { data: completeRecipe, error: fetchError } = await client
         .from('product_recipes')
         .select('*')
         .eq('id', recipeId)
@@ -110,7 +111,7 @@ export class ProductRecipeService {
       }
 
       // Get recipe materials separately
-      const { data: materials, error: fetchMaterialsError } = await supabase
+      const { data: materials, error: fetchMaterialsError } = await client
         .from('recipe_materials')
         .select('*')
         .eq('recipe_id', recipeId);
@@ -139,12 +140,13 @@ export class ProductRecipeService {
       }
 
       // Update the recipe
+      const client = supabaseAdmin || supabase;
       const updateData: any = {};
       if (recipeData.product_name) updateData.product_name = recipeData.product_name;
       // No total cost since quantities are dynamic
 
       if (Object.keys(updateData).length > 0) {
-        const { error: recipeError } = await supabase
+        const { error: recipeError } = await client
           .from('product_recipes')
           .update(updateData)
           .eq('id', recipeId);
@@ -158,7 +160,7 @@ export class ProductRecipeService {
       // Update recipe materials if provided
       if (recipeData.materials) {
         // Delete existing materials
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await client
           .from('recipe_materials')
           .delete()
           .eq('recipe_id', recipeId);
@@ -180,7 +182,7 @@ export class ProductRecipeService {
           // No total_cost since quantities are dynamic
         }));
 
-        const { error: materialsError } = await supabase
+        const { error: materialsError } = await client
           .from('recipe_materials')
           .insert(recipeMaterials);
 
@@ -191,7 +193,7 @@ export class ProductRecipeService {
       }
 
       // Fetch the updated recipe with materials
-      const { data: recipe, error: recipeError } = await supabase
+      const { data: recipe, error: recipeError } = await client
         .from('product_recipes')
         .select('*')
         .eq('id', recipeId)
@@ -203,7 +205,7 @@ export class ProductRecipeService {
       }
 
       // Get recipe materials separately
-      const { data: materials, error: materialsError } = await supabase
+      const { data: materials, error: materialsError } = await client
         .from('recipe_materials')
         .select('*')
         .eq('recipe_id', recipeId);
@@ -233,13 +235,24 @@ export class ProductRecipeService {
       
       // If we haven't tested yet, test if product_recipes table is accessible
       if (this.tableAccessible === null) {
-        const { error: testError } = await supabase
+        const client = supabaseAdmin || supabase;
+        if (!client) {
+          console.log('🔍 No Supabase client available, skipping recipe lookup');
+          this.tableAccessible = false;
+          return { data: null, error: null };
+        }
+        
+        const { error: testError } = await client
           .from('product_recipes')
           .select('id')
           .limit(1);
         
-        if (testError && (testError.message?.includes('406') || testError.message?.includes('Not Acceptable'))) {
-          console.log('🔍 product_recipes table not accessible (406 error), caching result');
+        if (testError && (testError.message?.includes('406') || testError.message?.includes('Not Acceptable') || testError.code === 'PGRST116')) {
+          console.log('🔍 product_recipes table not accessible (406/PGRST116 error), caching result');
+          this.tableAccessible = false;
+          return { data: null, error: null };
+        } else if (testError) {
+          console.log('🔍 product_recipes table test error:', testError);
           this.tableAccessible = false;
           return { data: null, error: null };
         } else {
@@ -249,31 +262,31 @@ export class ProductRecipeService {
       }
       
       // Method 1: Try to find recipe with exact product ID (with 406 error handling)
-      let { data: recipe, error: recipeError } = await supabase
+      const client = supabaseAdmin || supabase;
+      let { data: recipe, error: recipeError } = await client
         .from('product_recipes')
         .select('*')
         .eq('product_id', productId)
         .single();
 
-      // Handle 406 errors immediately
-      if (recipeError && (recipeError.message?.includes('406') || recipeError.message?.includes('Not Acceptable'))) {
-        console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
+      // Handle 406 errors and other RLS errors immediately
+      if (recipeError && (recipeError.message?.includes('406') || recipeError.message?.includes('Not Acceptable') || recipeError.code === 'PGRST116' || recipeError.code === 'PGRST301')) {
+        console.log('🔍 RLS/406 error on product_recipes table, skipping recipe lookup for:', productId);
+        this.tableAccessible = false; // Cache the result
         return { data: null, error: null }; // Return null data but no error
       }
 
       // Method 2: If not found and productId looks like a production ID, try different patterns
       if (recipeError && recipeError.code === 'PGRST116' && productId.startsWith('PRO-')) {
-        console.log('🔍 Recipe not found with exact ID, trying production ID patterns...');
-        
         // Try with the production ID as-is (with 406 error handling)
-        const { data: recipe2, error: recipeError2 } = await supabase
+        const { data: recipe2, error: recipeError2 } = await client
           .from('product_recipes')
           .select('*')
           .eq('product_id', productId)
           .single();
         
         if (recipeError2 && (recipeError2.message?.includes('406') || recipeError2.message?.includes('Not Acceptable'))) {
-          console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
+          // Silently handle 406 errors - table not accessible
           return { data: null, error: null };
         }
         
@@ -285,10 +298,9 @@ export class ProductRecipeService {
 
       // Method 3: If still not found, try to find by product name (with 406 error handling)
       if (recipeError && recipeError.code === 'PGRST116') {
-        console.log('🔍 Recipe not found with ID, trying to find by product name...');
         
         // Get the product name from products table
-        const { data: product, error: productError } = await supabase
+        const { data: product, error: productError } = await client
           .from('products')
           .select('name')
           .eq('id', productId)
@@ -296,16 +308,16 @@ export class ProductRecipeService {
         
         if (!productError && product) {
           // Try to find recipe by product name (with 406 error handling)
-          const { data: recipe3, error: recipeError3 } = await supabase
+          const { data: recipe3, error: recipeError3 } = await client
             .from('product_recipes')
             .select('*')
             .eq('product_name', product.name)
             .single();
           
-          if (recipeError3 && (recipeError3.message?.includes('406') || recipeError3.message?.includes('Not Acceptable'))) {
-            console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
-            return { data: null, error: null };
-          }
+        if (recipeError3 && (recipeError3.message?.includes('406') || recipeError3.message?.includes('Not Acceptable'))) {
+          // Silently handle 406 errors - table not accessible
+          return { data: null, error: null };
+        }
           
           if (!recipeError3 && recipe3) {
             recipe = recipe3;
@@ -321,14 +333,14 @@ export class ProductRecipeService {
       }
 
       if (!recipe) {
-        console.log('🔍 No recipe found for productId:', productId);
+        // No recipe found - this is normal for new products
         return { data: null, error: null };
       }
 
       console.log('✅ Found recipe:', recipe.id);
 
       // Then get the recipe materials separately (with 406 error handling)
-      const { data: materials, error: materialsError } = await supabase
+      const { data: materials, error: materialsError } = await client
         .from('recipe_materials')
         .select('*')
         .eq('recipe_id', recipe.id);
@@ -356,7 +368,8 @@ export class ProductRecipeService {
   static async getRecipeById(recipeId: string): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
       // First, get the recipe
-      const { data: recipe, error: recipeError } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { data: recipe, error: recipeError } = await client
         .from('product_recipes')
         .select('*')
         .eq('id', recipeId)
@@ -372,7 +385,7 @@ export class ProductRecipeService {
       }
 
       // Then get the recipe materials separately
-      const { data: materials, error: materialsError } = await supabase
+      const { data: materials, error: materialsError } = await client
         .from('recipe_materials')
         .select('*')
         .eq('recipe_id', recipe.id);
@@ -394,7 +407,8 @@ export class ProductRecipeService {
   static async deleteRecipe(recipeId: string): Promise<{ error: string | null }> {
     try {
       // Delete recipe materials first (due to foreign key constraint)
-      const { error: materialsError } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { error: materialsError } = await client
         .from('recipe_materials')
         .delete()
         .eq('recipe_id', recipeId);
@@ -405,7 +419,7 @@ export class ProductRecipeService {
       }
 
       // Delete the recipe
-      const { error: recipeError } = await supabase
+      const { error: recipeError } = await client
         .from('product_recipes')
         .delete()
         .eq('id', recipeId);
@@ -426,7 +440,8 @@ export class ProductRecipeService {
   static async getAllRecipes(): Promise<{ data: RecipeWithMaterials[]; error: string | null }> {
     try {
       // First, get all recipes
-      const { data: recipes, error: recipesError } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { data: recipes, error: recipesError } = await client
         .from('product_recipes')
         .select('*')
         .order('created_at', { ascending: false });
@@ -443,7 +458,7 @@ export class ProductRecipeService {
       // Then get materials for each recipe
       const recipesWithMaterials: RecipeWithMaterials[] = [];
       for (const recipe of recipes) {
-        const { data: materials, error: materialsError } = await supabase
+        const { data: materials, error: materialsError } = await client
           .from('recipe_materials')
           .select('*')
           .eq('recipe_id', recipe.id);

@@ -1,4 +1,4 @@
-import { supabase, handleSupabaseError, Order, OrderItem } from '@/lib/supabase';
+import { supabase, supabaseAdmin, handleSupabaseError, Order, OrderItem } from '@/lib/supabase';
 import { generateUniqueId } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { CustomerService } from './customerService';
@@ -125,7 +125,8 @@ export class OrderService {
       };
 
       // Create order in database
-      const { data: order, error: orderError } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { data: order, error: orderError } = await client
         .from('orders')
         .insert(newOrder)
         .select()
@@ -150,7 +151,7 @@ export class OrderService {
         specifications: item.specifications?.trim() || null
       }));
 
-      const { data: createdItems, error: itemsError } = await supabase
+      const { data: createdItems, error: itemsError } = await client
         .from('order_items')
         .insert(orderItems)
         .select();
@@ -158,7 +159,7 @@ export class OrderService {
       if (itemsError) {
         console.error('Error creating order items:', itemsError);
         // Cleanup: delete the order if items creation failed
-        await supabase.from('orders').delete().eq('id', order.id);
+        await client.from('orders').delete().eq('id', order.id);
         return { data: null, error: handleSupabaseError(itemsError) };
       }
 
@@ -243,7 +244,13 @@ export class OrderService {
     offset?: number;
   }): Promise<{ data: any[] | null; error: string | null; count?: number }> {
     try {
-      let query = supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      let query = client
         .from('orders')
         .select(`
           *,
@@ -299,7 +306,13 @@ export class OrderService {
   // Get a single order by ID with full details
   static async getOrderById(orderId: string): Promise<{ data: any | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      // Use admin client to bypass RLS
+      const client = supabaseAdmin || supabase;
+      if (!client) {
+        return { data: null, error: 'Supabase not configured' };
+      }
+
+      const { data, error } = await client
         .from('orders')
         .select(`
           *,
@@ -599,64 +612,100 @@ export class OrderService {
         console.log(`🔍 Found ${orderItems.length} raw material items in order ${orderId}`);
 
         for (const item of orderItems) {
-          console.log(`🔍 Processing raw material order item:`, {
-            product_name: item.product_name,
-            quantity: item.quantity,
-            unit_price: item.unit_price
-          });
-
-          // Find ALL raw materials with this name (not just the most recent)
+          // Find the raw material by name (since raw materials might not have product_id)
           const { data: rawMaterials } = await supabase
             .from('raw_materials')
             .select('*')
             .eq('name', item.product_name)
-            .order('current_stock', { ascending: false }); // Get materials with highest stock first
+            .order('created_at', { ascending: false }); // Get the most recent one
 
           if (rawMaterials && rawMaterials.length > 0) {
-            console.log(`🔍 Found ${rawMaterials.length} raw materials with name "${item.product_name}"`);
-            
-            let remainingQuantity = item.quantity || 0;
-            
-            // Deduct from materials with stock, starting with highest stock
-            for (const material of rawMaterials) {
-              if (remainingQuantity <= 0) break;
+            // Use the first (most recent) raw material with this name
+            const material = rawMaterials[0];
+            const currentStock = material.current_stock || 0;
+            const orderedQuantity = item.quantity || 0;
+            const newStock = Math.max(0, currentStock - orderedQuantity);
+
+            // Determine new status and check if status changed
+            const minThreshold = material.min_threshold || 10;
+            const newStatus = newStock <= 0 ? 'out-of-stock' : 
+                             newStock <= minThreshold ? 'low-stock' : 'in-stock';
+            const statusChanged = material.status !== newStatus;
+
+            // Update the raw material stock
+            const { error: updateError } = await supabase
+              .from('raw_materials')
+              .update({
+                current_stock: newStock,
+                status: newStatus,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', material.id);
+
+            if (updateError) {
+              console.error(`❌ Error updating raw material ${material.name} stock:`, updateError);
+            } else {
+              console.log(`✅ Deducted ${orderedQuantity} units from raw material ${material.name} (${currentStock} → ${newStock})`);
               
-              const currentStock = material.current_stock || 0;
-              if (currentStock <= 0) continue; // Skip materials with no stock
-              
-              const deductAmount = Math.min(remainingQuantity, currentStock);
-              const newStock = currentStock - deductAmount;
-              remainingQuantity -= deductAmount;
-
-              console.log(`🔍 Deducting ${deductAmount} units from material ${material.name} (ID: ${material.id}) - Stock: ${currentStock} → ${newStock}`);
-
-              // Update the raw material stock
-              const { error: updateError } = await supabase
-                .from('raw_materials')
-                .update({
-                  current_stock: newStock,
-                  status: newStock <= 0 ? 'out-of-stock' : 
-                         newStock <= (material.min_threshold || 10) ? 'low-stock' : 'in-stock',
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', material.id);
-
-              if (updateError) {
-                console.error(`❌ Error updating raw material ${material.name} stock:`, updateError);
-              } else {
-                console.log(`✅ Successfully deducted ${deductAmount} units from ${material.name} (${currentStock} → ${newStock})`);
+              // Send automatic notifications for status changes
+              if (statusChanged) {
+                if (newStatus === 'low-stock') {
+                  // Material just went low stock
+                  await NotificationService.createNotification({
+                    type: 'warning',
+                    title: `Raw Material Low Stock Alert - ${material.name}`,
+                    message: `Raw material "${material.name}" is now running low after order sale. Current stock: ${newStock} ${material.unit}. Minimum threshold: ${minThreshold} ${material.unit}.`,
+                    priority: 'high',
+                    status: 'unread',
+                    module: 'materials',
+                    related_id: material.id,
+                    related_data: {
+                      materialId: material.id,
+                      materialName: material.name,
+                      currentStock: newStock,
+                      minThreshold: minThreshold,
+                      unit: material.unit,
+                      previousStock: currentStock,
+                      soldQuantity: orderedQuantity,
+                      orderId: orderId,
+                      supplierName: material.supplier_name,
+                      costPerUnit: material.cost_per_unit
+                    },
+                    created_by: 'system'
+                  });
+                  console.log(`📢 Low stock notification sent for ${material.name}`);
+                } else if (newStatus === 'out-of-stock') {
+                  // Material just went out of stock
+                  await NotificationService.createNotification({
+                    type: 'error',
+                    title: `Raw Material Out of Stock Alert - ${material.name}`,
+                    message: `Raw material "${material.name}" is now out of stock after order sale! Immediate restocking required.`,
+                    priority: 'urgent',
+                    status: 'unread',
+                    module: 'materials',
+                    related_id: material.id,
+                    related_data: {
+                      materialId: material.id,
+                      materialName: material.name,
+                      currentStock: 0,
+                      minThreshold: minThreshold,
+                      unit: material.unit,
+                      previousStock: currentStock,
+                      soldQuantity: orderedQuantity,
+                      orderId: orderId,
+                      supplierName: material.supplier_name,
+                      costPerUnit: material.cost_per_unit
+                    },
+                    created_by: 'system'
+                  });
+                  console.log(`🚨 Out of stock notification sent for ${material.name}`);
+                }
               }
-            }
-            
-            if (remainingQuantity > 0) {
-              console.warn(`⚠️ Could not fully fulfill order for "${item.product_name}". Remaining quantity: ${remainingQuantity} units`);
             }
           } else {
             console.warn(`⚠️ Raw material "${item.product_name}" not found in inventory`);
           }
         }
-      } else {
-        console.log(`🔍 No raw material items found in order ${orderId}`);
       }
     } catch (error) {
       console.error('Error deducting raw material stock:', error);

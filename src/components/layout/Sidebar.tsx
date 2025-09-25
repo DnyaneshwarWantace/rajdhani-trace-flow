@@ -13,10 +13,12 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
-  QrCode
+  QrCode,
+  LogOut
 } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   className?: string;
@@ -107,6 +109,7 @@ export function Sidebar({ className }: SidebarProps) {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   // Auto-collapse on mobile
   useEffect(() => {
@@ -193,8 +196,37 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Footer */}
       <div className={cn("border-t", isCollapsed ? "p-1 md:p-2" : "p-2 md:p-4")}>
+        {/* User Info & Logout */}
+        {!isCollapsed && user && (
+          <div className="mb-3 p-2 bg-muted/50 rounded-lg">
+            <div className="text-xs text-muted-foreground mb-1">Logged in as:</div>
+            <div className="text-sm font-medium truncate">{user.name}</div>
+            <div className="text-xs text-muted-foreground">{user.role}</div>
+          </div>
+        )}
+        
+        {/* Logout Button */}
+        <Button
+          variant="ghost"
+          onClick={logout}
+          className={cn(
+            "w-full text-left transition-all",
+            isCollapsed ? "h-10 md:h-12 justify-center px-0" : "h-10 md:h-12 justify-start",
+            "hover:bg-destructive/10 hover:text-destructive"
+          )}
+          title={isCollapsed ? "Logout" : undefined}
+        >
+          <LogOut className={cn(
+            "h-4 w-4 md:h-5 md:w-5 flex-shrink-0",
+            !isCollapsed && "mr-2 md:mr-3"
+          )} />
+          {!isCollapsed && (
+            <span className="font-medium text-sm md:text-base">Logout</span>
+          )}
+        </Button>
+
         {!isCollapsed && (
-          <div className="text-xs text-muted-foreground text-center">
+          <div className="text-xs text-muted-foreground text-center mt-2">
             Version 1.0.0
           </div>
         )}

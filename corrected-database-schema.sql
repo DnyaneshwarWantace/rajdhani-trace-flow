@@ -1,5 +1,5 @@
--- Complete Database Schema for Rajdhani Trace Flow
--- This script creates all necessary tables with proper relationships
+-- CORRECTED Database Schema for Rajdhani Trace Flow
+-- This schema matches exactly with the code interfaces and usage
 
 -- Enable necessary extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -27,7 +27,7 @@ DROP TABLE IF EXISTS notifications CASCADE;
 
 -- Create customers table
 CREATE TABLE customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE,
     phone VARCHAR(20),
@@ -62,7 +62,7 @@ CREATE TABLE dropdown_options (
 
 -- Create suppliers table
 CREATE TABLE suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     contact_person VARCHAR(255),
     email VARCHAR(255),
@@ -82,7 +82,7 @@ CREATE TABLE suppliers (
 
 -- Create raw_materials table
 CREATE TABLE raw_materials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     brand VARCHAR(255),
     category VARCHAR(100) NOT NULL,
@@ -94,7 +94,7 @@ CREATE TABLE raw_materials (
     last_restocked TIMESTAMP,
     daily_usage DECIMAL(10,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'in-stock' CHECK (status IN ('in-stock', 'low-stock', 'out-of-stock', 'overstock', 'in-transit')),
-    supplier_id UUID REFERENCES suppliers(id),
+    supplier_id VARCHAR(50) REFERENCES suppliers(id),
     supplier_name VARCHAR(255),
     cost_per_unit DECIMAL(10,2) NOT NULL,
     total_value DECIMAL(12,2) DEFAULT 0,
@@ -106,13 +106,12 @@ CREATE TABLE raw_materials (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create products table
+-- Create products table (CORRECTED - matches code usage)
 CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     category VARCHAR(100) NOT NULL,
     color VARCHAR(100),
-    size VARCHAR(100),
     pattern VARCHAR(100),
     base_quantity DECIMAL(10,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'in-stock' CHECK (status IN ('in-stock', 'low-stock', 'out-of-stock')),
@@ -132,7 +131,7 @@ CREATE TABLE products (
 
 -- Create machines table
 CREATE TABLE machines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'maintenance')),
@@ -142,8 +141,8 @@ CREATE TABLE machines (
 
 -- Create product_recipes table
 CREATE TABLE product_recipes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    id VARCHAR(50) PRIMARY KEY,
+    product_id VARCHAR(50) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     product_name VARCHAR(255) NOT NULL,
     total_cost DECIMAL(10,2) DEFAULT 0,
     production_time INTEGER DEFAULT 0, -- in minutes
@@ -155,9 +154,9 @@ CREATE TABLE product_recipes (
 
 -- Create recipe_materials table
 CREATE TABLE recipe_materials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    recipe_id UUID NOT NULL REFERENCES product_recipes(id) ON DELETE CASCADE,
-    material_id UUID NOT NULL REFERENCES raw_materials(id),
+    id VARCHAR(50) PRIMARY KEY,
+    recipe_id VARCHAR(50) NOT NULL REFERENCES product_recipes(id) ON DELETE CASCADE,
+    material_id VARCHAR(50) NOT NULL REFERENCES raw_materials(id),
     material_name VARCHAR(255) NOT NULL,
     quantity DECIMAL(10,2) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -166,11 +165,11 @@ CREATE TABLE recipe_materials (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create individual_products table
+-- Create individual_products table (CORRECTED - matches code usage)
 CREATE TABLE individual_products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     qr_code VARCHAR(255) UNIQUE NOT NULL,
-    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    product_id VARCHAR(50) NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     batch_number VARCHAR(100),
     production_date TIMESTAMP NOT NULL,
     final_weight VARCHAR(50),
@@ -181,7 +180,7 @@ CREATE TABLE individual_products (
     inspector VARCHAR(255),
     status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'sold', 'damaged', 'reserved')),
     sold_date TIMESTAMP,
-    customer_id UUID REFERENCES customers(id),
+    customer_id VARCHAR(50) REFERENCES customers(id),
     order_id UUID,
     production_notes TEXT,
     location VARCHAR(255) DEFAULT 'Warehouse A - General Storage',
@@ -192,26 +191,26 @@ CREATE TABLE individual_products (
 
 -- Create orders table
 CREATE TABLE orders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     order_number VARCHAR(100) UNIQUE NOT NULL,
-    customer_id UUID REFERENCES customers(id),
+    customer_id VARCHAR(50) REFERENCES customers(id),
     customer_name VARCHAR(255) NOT NULL,
     customer_email VARCHAR(255),
     customer_phone VARCHAR(20),
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expected_delivery TIMESTAMP,
     subtotal DECIMAL(12,2) DEFAULT 0,
-    gst_rate DECIMAL(5,2) DEFAULT 18,
+    gst_rate DECIMAL(5,2) DEFAULT 18.00,
     gst_amount DECIMAL(12,2) DEFAULT 0,
     discount_amount DECIMAL(12,2) DEFAULT 0,
     total_amount DECIMAL(12,2) DEFAULT 0,
     paid_amount DECIMAL(12,2) DEFAULT 0,
     outstanding_amount DECIMAL(12,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'in_production', 'ready', 'dispatched', 'delivered', 'cancelled')),
-    workflow_step VARCHAR(50),
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    workflow_step VARCHAR(50) DEFAULT 'pending',
+    priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     special_instructions TEXT,
-    created_by VARCHAR(255) DEFAULT 'system',
+    created_by VARCHAR(255) NOT NULL,
     accepted_at TIMESTAMP,
     dispatched_at TIMESTAMP,
     delivered_at TIMESTAMP,
@@ -221,9 +220,9 @@ CREATE TABLE orders (
 
 -- Create order_items table
 CREATE TABLE order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES products(id),
+    id VARCHAR(50) PRIMARY KEY,
+    order_id VARCHAR(50) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    product_id VARCHAR(50) REFERENCES products(id),
     product_name VARCHAR(255) NOT NULL,
     product_type VARCHAR(20) DEFAULT 'product' CHECK (product_type IN ('product', 'raw_material')),
     quantity DECIMAL(10,2) NOT NULL,
@@ -231,6 +230,7 @@ CREATE TABLE order_items (
     total_price DECIMAL(12,2) NOT NULL,
     quality_grade VARCHAR(10),
     specifications TEXT,
+    -- Dynamic pricing fields
     pricing_unit VARCHAR(20) DEFAULT 'piece' CHECK (pricing_unit IN ('piece', 'roll', 'sqft', 'sqm', 'yard', 'kg', 'meter')),
     unit_area DECIMAL(10,2),
     product_width DECIMAL(10,2),
@@ -242,16 +242,16 @@ CREATE TABLE order_items (
 
 -- Create production_batches table
 CREATE TABLE production_batches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     batch_number VARCHAR(100) UNIQUE NOT NULL,
-    product_id UUID REFERENCES products(id),
-    order_id UUID REFERENCES orders(id),
+    product_id VARCHAR(50) REFERENCES products(id),
+    order_id VARCHAR(50) REFERENCES orders(id),
     planned_quantity INTEGER NOT NULL,
     actual_quantity INTEGER DEFAULT 0,
     start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completion_date TIMESTAMP,
     status VARCHAR(20) DEFAULT 'planned' CHECK (status IN ('planned', 'in_progress', 'completed', 'paused', 'cancelled')),
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     operator VARCHAR(255),
     supervisor VARCHAR(255),
     notes TEXT,
@@ -261,8 +261,8 @@ CREATE TABLE production_batches (
 
 -- Create production_steps table
 CREATE TABLE production_steps (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    production_batch_id UUID NOT NULL REFERENCES production_batches(id) ON DELETE CASCADE,
+    id VARCHAR(50) PRIMARY KEY,
+    production_batch_id VARCHAR(50) NOT NULL REFERENCES production_batches(id) ON DELETE CASCADE,
     step_number INTEGER NOT NULL,
     step_name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -278,27 +278,42 @@ CREATE TABLE production_steps (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create production_flows table
+-- Create material_consumption table (CORRECTED - matches code usage)
+CREATE TABLE material_consumption (
+    id VARCHAR(50) PRIMARY KEY,
+    production_product_id VARCHAR(50) NOT NULL, -- References production_flows or production_batches
+    material_id VARCHAR(50) NOT NULL REFERENCES raw_materials(id),
+    material_name VARCHAR(255) NOT NULL,
+    quantity_used DECIMAL(10,2) NOT NULL, -- CORRECTED field name
+    unit VARCHAR(20) NOT NULL,
+    cost_per_unit DECIMAL(10,2) NOT NULL,
+    total_cost DECIMAL(10,2) NOT NULL,
+    consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- CORRECTED field name
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create production_flows table (for new production system)
 CREATE TABLE production_flows (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    production_product_id VARCHAR(255) NOT NULL,
+    id VARCHAR(50) PRIMARY KEY,
+    production_product_id VARCHAR(50) NOT NULL, -- References the production product
     flow_name VARCHAR(255) NOT NULL,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
-    current_step INTEGER DEFAULT 1,
+    product_id VARCHAR(50) REFERENCES products(id),
+    product_name VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'planning' CHECK (status IN ('planning', 'active', 'completed', 'cancelled')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create production_flow_steps table
+-- Create production_flow_steps table (for new production system)
 CREATE TABLE production_flow_steps (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id VARCHAR(50) PRIMARY KEY,
     flow_id UUID NOT NULL REFERENCES production_flows(id) ON DELETE CASCADE,
     step_name VARCHAR(255) NOT NULL,
-    step_type VARCHAR(50) NOT NULL,
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped')),
+    step_type VARCHAR(50) NOT NULL CHECK (step_type IN ('material_selection', 'machine_operation', 'wastage_tracking', 'testing_individual')),
     order_index INTEGER NOT NULL,
     machine_id UUID REFERENCES machines(id),
     inspector_name VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed', 'skipped')),
     start_time TIMESTAMP,
     end_time TIMESTAMP,
     notes TEXT,
@@ -306,25 +321,11 @@ CREATE TABLE production_flow_steps (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create material_consumption table
-CREATE TABLE material_consumption (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    production_product_id VARCHAR(255) NOT NULL,
-    material_id UUID NOT NULL REFERENCES raw_materials(id),
-    material_name VARCHAR(255) NOT NULL,
-    quantity_used DECIMAL(10,2) NOT NULL,
-    unit VARCHAR(20) NOT NULL,
-    cost_per_unit DECIMAL(10,2) NOT NULL,
-    total_cost DECIMAL(12,2) NOT NULL,
-    consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- Create purchase_orders table
 CREATE TABLE purchase_orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_number VARCHAR(100) UNIQUE NOT NULL,
-    supplier_id UUID REFERENCES suppliers(id),
+    supplier_id VARCHAR(50) REFERENCES suppliers(id),
     supplier_name VARCHAR(255) NOT NULL,
     order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expected_delivery TIMESTAMP,
@@ -332,7 +333,7 @@ CREATE TABLE purchase_orders (
     paid_amount DECIMAL(12,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'shipped', 'delivered', 'cancelled')),
     notes TEXT,
-    created_by VARCHAR(255) DEFAULT 'system',
+    created_by VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -359,12 +360,12 @@ CREATE TABLE notifications (
     type VARCHAR(50) NOT NULL CHECK (type IN ('info', 'warning', 'error', 'success', 'production_request', 'restock_request')),
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
-    priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+    priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
     status VARCHAR(20) DEFAULT 'unread' CHECK (status IN ('unread', 'read', 'dismissed')),
     module VARCHAR(50) NOT NULL CHECK (module IN ('orders', 'products', 'materials', 'production')),
     related_id UUID,
     related_data JSONB,
-    created_by VARCHAR(255) DEFAULT 'system',
+    created_by VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -374,59 +375,38 @@ CREATE INDEX idx_products_category ON products(category);
 CREATE INDEX idx_products_status ON products(status);
 CREATE INDEX idx_individual_products_product_id ON individual_products(product_id);
 CREATE INDEX idx_individual_products_status ON individual_products(status);
-CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_individual_products_quality_grade ON individual_products(quality_grade);
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
-CREATE INDEX idx_raw_materials_category ON raw_materials(category);
-CREATE INDEX idx_raw_materials_status ON raw_materials(status);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_product_id ON order_items(product_id);
+CREATE INDEX idx_material_consumption_production_product_id ON material_consumption(production_product_id);
+CREATE INDEX idx_material_consumption_material_id ON material_consumption(material_id);
 CREATE INDEX idx_production_flows_production_product_id ON production_flows(production_product_id);
 CREATE INDEX idx_production_flow_steps_flow_id ON production_flow_steps(flow_id);
-CREATE INDEX idx_material_consumption_production_product_id ON material_consumption(production_product_id);
-
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create triggers for updated_at
-CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_suppliers_updated_at BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_raw_materials_updated_at BEFORE UPDATE ON raw_materials FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_machines_updated_at BEFORE UPDATE ON machines FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_product_recipes_updated_at BEFORE UPDATE ON product_recipes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_individual_products_updated_at BEFORE UPDATE ON individual_products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_order_items_updated_at BEFORE UPDATE ON order_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_production_batches_updated_at BEFORE UPDATE ON production_batches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_production_steps_updated_at BEFORE UPDATE ON production_steps FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_production_flows_updated_at BEFORE UPDATE ON production_flows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_production_flow_steps_updated_at BEFORE UPDATE ON production_flow_steps FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_purchase_orders_updated_at BEFORE UPDATE ON purchase_orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_notifications_updated_at BEFORE UPDATE ON notifications FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE INDEX idx_notifications_module ON notifications(module);
+CREATE INDEX idx_notifications_status ON notifications(status);
+CREATE INDEX idx_notifications_created_by ON notifications(created_by);
 
 -- Insert sample data
-INSERT INTO suppliers (name, contact_person, email, phone, address, city, state, pincode, gst_number, performance_rating, status) VALUES
-('Rajdhani Textiles', 'Amit Kumar', 'amit@rajdhanitextiles.com', '+91-9876543210', '123 Textile Street', 'Mumbai', 'Maharashtra', '400001', '27ABCDE1234F1Z5', 4.5, 'active'),
-('Premium Yarns Ltd', 'Priya Sharma', 'priya@premiumyarns.com', '+91-9876543211', '456 Yarn Avenue', 'Delhi', 'Delhi', '110001', '07FGHIJ5678K2L6', 4.2, 'active'),
-('Quality Fibers Co', 'Rajesh Patel', 'rajesh@qualityfibers.com', '+91-9876543212', '789 Fiber Road', 'Ahmedabad', 'Gujarat', '380001', '24MNOPQ9012R3S7', 4.0, 'active');
+INSERT INTO customers (name, email, phone, address, city, state, pincode, customer_type, status, total_orders, total_value, gst_number, company_name, credit_limit, outstanding_amount) VALUES
+('Rajesh Kumar', 'rajesh@example.com', '9876543210', '123 Main Street', 'Mumbai', 'Maharashtra', '400001', 'individual', 'active', 5, 50000, NULL, NULL, 0, 0),
+('ABC Textiles Ltd', 'orders@abctextiles.com', '9876543211', '456 Business Park', 'Delhi', 'Delhi', '110001', 'business', 'active', 10, 150000, '07AABCU9603R1ZX', 'ABC Textiles Ltd', 100000, 25000);
 
-INSERT INTO raw_materials (name, brand, category, current_stock, unit, min_threshold, max_capacity, cost_per_unit, supplier_id, supplier_name, status) VALUES
-('Cotton Yarn', 'Premium Cotton', 'Yarn', 500, 'kg', 50, 1000, 250, (SELECT id FROM suppliers WHERE name = 'Rajdhani Textiles'), 'Rajdhani Textiles', 'in-stock'),
-('Wool Fiber', 'Natural Wool', 'Fiber', 300, 'kg', 30, 800, 450, (SELECT id FROM suppliers WHERE name = 'Premium Yarns Ltd'), 'Premium Yarns Ltd', 'in-stock'),
-('Silk Thread', 'Pure Silk', 'Thread', 200, 'kg', 20, 500, 800, (SELECT id FROM suppliers WHERE name = 'Quality Fibers Co'), 'Quality Fibers Co', 'in-stock'),
-('Backing Cloth', 'Heavy Duty', 'Fabric', 150, 'sqm', 25, 400, 85, (SELECT id FROM suppliers WHERE name = 'Rajdhani Textiles'), 'Rajdhani Textiles', 'in-stock'),
-('Felt Underlay', 'Premium Felt', 'Underlay', 100, 'sqm', 15, 300, 120, (SELECT id FROM suppliers WHERE name = 'Premium Yarns Ltd'), 'Premium Yarns Ltd', 'in-stock'),
-('Marble Powder', 'Fine Grade', 'Filler', 80, 'kg', 10, 200, 35, (SELECT id FROM suppliers WHERE name = 'Quality Fibers Co'), 'Quality Fibers Co', 'in-stock');
+INSERT INTO suppliers (name, contact_person, email, phone, address, city, state, pincode, gst_number, performance_rating, total_orders, total_value, status) VALUES
+('Premium Yarn Suppliers', 'Amit Shah', 'amit@premiumyarn.com', '9876543220', '789 Industrial Area', 'Ahmedabad', 'Gujarat', '380001', '24AABCP1234A1Z5', 4.5, 25, 500000, 'active'),
+('Quality Materials Co', 'Priya Singh', 'priya@qualitymaterials.com', '9876543221', '321 Trade Center', 'Chennai', 'Tamil Nadu', '600001', '33AABCQ5678B2Y6', 4.2, 15, 300000, 'active');
+
+INSERT INTO raw_materials (name, brand, category, current_stock, unit, min_threshold, max_capacity, reorder_point, status, supplier_id, supplier_name, cost_per_unit, total_value, quality_grade) VALUES
+('Wool Yarn', 'Premium Wool', 'Yarn', 500, 'kg', 50, 1000, 100, 'in-stock', (SELECT id FROM suppliers WHERE name = 'Premium Yarn Suppliers'), 'Premium Yarn Suppliers', 250, 125000, 'A'),
+('Cotton Yarn', 'Pure Cotton', 'Yarn', 300, 'kg', 30, 800, 60, 'in-stock', (SELECT id FROM suppliers WHERE name = 'Premium Yarn Suppliers'), 'Premium Yarn Suppliers', 200, 60000, 'A'),
+('Backing Cloth', 'Strong Back', 'Fabric', 200, 'sqm', 20, 500, 40, 'in-stock', (SELECT id FROM suppliers WHERE name = 'Quality Materials Co'), 'Quality Materials Co', 85, 17000, 'A'),
+('Marble Powder', 'Fine Marble', 'Chemical', 100, 'kg', 10, 200, 20, 'in-stock', (SELECT id FROM suppliers WHERE name = 'Quality Materials Co'), 'Quality Materials Co', 35, 3500, 'A');
 
 INSERT INTO machines (name, description, status) VALUES
-('BR3C-Cutter', 'High precision cutting machine for carpet trimming and shaping', 'active'),
+('LOOM MACHINE', 'Traditional loom for carpet weaving', 'active'),
 ('CUTTING MACHINE', 'Multi-purpose cutting machine for various carpet operations', 'active'),
 ('NEEDLE PUNCHING', 'Needle punching machine for carpet finishing and texture work', 'active'),
-('Loom Machine', 'Traditional loom for carpet weaving', 'active'),
 ('Binding Machine', 'Machine for edge binding and finishing', 'active');
 
 INSERT INTO products (name, category, color, pattern, base_quantity, status, individual_stock_tracking, min_stock_level, max_stock_level, weight, thickness, width, height) VALUES
@@ -443,16 +423,15 @@ INSERT INTO product_recipes (product_id, product_name, total_cost, production_ti
 -- Create recipe materials
 INSERT INTO recipe_materials (recipe_id, material_id, material_name, quantity, unit, cost_per_unit, total_cost) VALUES
 -- Traditional Persian Carpet recipe
-((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Cotton Yarn'), 'Cotton Yarn', 20, 'kg', 250, 5000),
-((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Wool Fiber'), 'Wool Fiber', 15, 'kg', 450, 6750),
+((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Wool Yarn'), 'Wool Yarn', 20, 'kg', 250, 5000),
 ((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Backing Cloth'), 'Backing Cloth', 5, 'sqm', 85, 425),
-((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Felt Underlay'), 'Felt Underlay', 3, 'sqm', 120, 360),
+((SELECT id FROM product_recipes WHERE product_name = 'Traditional Persian Carpet'), (SELECT id FROM raw_materials WHERE name = 'Marble Powder'), 'Marble Powder', 10, 'kg', 35, 350),
 -- Modern Geometric Carpet recipe
-((SELECT id FROM product_recipes WHERE product_name = 'Modern Geometric Carpet'), (SELECT id FROM raw_materials WHERE name = 'Cotton Yarn'), 'Cotton Yarn', 15, 'kg', 250, 3750),
-((SELECT id FROM product_recipes WHERE product_name = 'Modern Geometric Carpet'), (SELECT id FROM raw_materials WHERE name = 'Silk Thread'), 'Silk Thread', 8, 'kg', 800, 6400),
+((SELECT id FROM product_recipes WHERE product_name = 'Modern Geometric Carpet'), (SELECT id FROM raw_materials WHERE name = 'Cotton Yarn'), 'Cotton Yarn', 15, 'kg', 200, 3000),
 ((SELECT id FROM product_recipes WHERE product_name = 'Modern Geometric Carpet'), (SELECT id FROM raw_materials WHERE name = 'Backing Cloth'), 'Backing Cloth', 4, 'sqm', 85, 340),
+((SELECT id FROM product_recipes WHERE product_name = 'Modern Geometric Carpet'), (SELECT id FROM raw_materials WHERE name = 'Marble Powder'), 'Marble Powder', 8, 'kg', 35, 280),
 -- Digital Print Carpet recipe
-((SELECT id FROM product_recipes WHERE product_name = 'Digital Print Carpet'), (SELECT id FROM raw_materials WHERE name = 'Cotton Yarn'), 'Cotton Yarn', 10, 'kg', 250, 2500),
+((SELECT id FROM product_recipes WHERE product_name = 'Digital Print Carpet'), (SELECT id FROM raw_materials WHERE name = 'Cotton Yarn'), 'Cotton Yarn', 10, 'kg', 200, 2000),
 ((SELECT id FROM product_recipes WHERE product_name = 'Digital Print Carpet'), (SELECT id FROM raw_materials WHERE name = 'Backing Cloth'), 'Backing Cloth', 3, 'sqm', 85, 255),
 ((SELECT id FROM product_recipes WHERE product_name = 'Digital Print Carpet'), (SELECT id FROM raw_materials WHERE name = 'Marble Powder'), 'Marble Powder', 5, 'kg', 35, 175);
 

@@ -18,12 +18,42 @@ import {
   Save, QrCode, AlertTriangle
 } from "lucide-react";
 import { getFromStorage, saveToStorage, generateUniqueId } from "@/lib/storageUtils";
+import { ProductionFlowService } from "@/services/productionFlowService";
+import { supabase } from "@/lib/supabase";
 import { getProductionFlow, updateProductionStep } from "@/lib/machines";
 import { Loading } from "@/components/ui/loading";
 import ProductionProgressBar from "@/components/production/ProductionProgressBar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QRCodeService, IndividualProductQRData } from "@/lib/qrCode";
 import { individualProductService } from "@/services/individualProductService";
+
+interface ProductionProduct {
+  id: string;
+  productId: string;
+  productName: string;
+  category: string;
+  color: string;
+  size: string;
+  pattern: string;
+  targetQuantity: number;
+  priority: "normal" | "high" | "urgent";
+  status: "planning" | "active" | "completed";
+  expectedCompletion: string;
+  createdAt: string;
+  materialsConsumed: any[];
+  wasteGenerated: any[];
+  expectedProduct: {
+    name: string;
+    category: string;
+    height: string;
+    width: string;
+    weight: string;
+    thickness: string;
+    materialComposition: string;
+    qualityGrade: string;
+  };
+  notes: string;
+}
 
 interface IndividualProduct {
   id: string;
@@ -58,6 +88,7 @@ export default function Complete() {
   const [editValue, setEditValue] = useState("");
   const [inspector, setInspector] = useState("Admin");
   const [productionFlow, setProductionFlow] = useState<any>(null);
+  const [productionSteps, setProductionSteps] = useState<any[]>([]);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Array<{index: number, productId: string, missingFields: string[]}>>([]);
   const [showCompletionPopup, setShowCompletionPopup] = useState(false);
@@ -99,35 +130,101 @@ export default function Complete() {
 
   useEffect(() => {
     if (productId) {
-      const products = getFromStorage('rajdhani_production_products');
-      const product = products.find((p: any) => p.id === productId);
-      if (product) {
-        setProductionProduct(product);
-        
-        // Get production flow to extract step history
-        getProductionFlow(product.id).then(flow => {
+      // Load production data from Supabase like other pages
+      const loadProductionData = async () => {
+        try {
+          console.log('🔍 Loading production data for Complete page, productId:', productId);
+          
+          // Load the production flow from Supabase
+          const flow = await ProductionFlowService.getProductionFlow(productId);
+          console.log('🔍 Production flow loaded for Complete page:', flow);
+          
+          if (flow) {
         setProductionFlow(flow);
-        const productionSteps = flow?.steps.filter(s => s.status === 'completed').map(step => ({
-          stepName: step.name,
-          machineUsed: step.machineName,
-          inspector: step.inspectorName || 'Unknown',
-          completedAt: step.endTime || '',
-          qualityNotes: step.qualityNotes
-        })) || [];
-        
-
-        // Initialize individual products with production history
-        
+            
+            // Load actual product data from database
+            const { data: products, error: productsError } = await supabase
+              .from('products')
+              .select('*')
+              .eq('name', flow.flow_name.replace(' Production Flow', ''))
+              .single();
+            
+            console.log('🔍 Loaded actual product data:', products);
+            
+            // Load material consumption data to get actual materials used
+            const { data: materialsConsumed, error: materialsError } = await supabase
+              .from('material_consumption')
+              .select('*')
+              .eq('production_product_id', flow.production_product_id);
+            
+            console.log('🔍 Loaded materials consumed:', materialsConsumed);
+            
+            // Create production product with real data
+            const productionProduct: ProductionProduct = {
+              id: flow.production_product_id,
+              productId: flow.production_product_id,
+              productName: flow.flow_name.replace(' Production Flow', ''),
+              category: products?.category || 'Carpet',
+              color: products?.color || 'Standard',
+              size: products?.size || 'N/A',
+              pattern: products?.pattern || 'N/A',
+              targetQuantity: 1,
+              priority: 'normal',
+              status: 'active',
+              expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              createdAt: flow.created_at || new Date().toISOString(),
+              materialsConsumed: (materialsConsumed || []).map((m: any) => ({
+                materialId: m.material_id,
+                materialName: m.material_name || 'Unknown Material',
+                quantity: m.quantity_used || m.consumed_quantity || 0,
+                unit: m.unit || 'units',
+                cost: m.cost_per_unit || 0,
+                consumedAt: m.consumed_at || m.created_at
+              })),
+              wasteGenerated: [],
+              expectedProduct: {
+                name: flow.flow_name.replace(' Production Flow', ''),
+                category: products?.category || 'Carpet',
+                height: products?.height || 'N/A',
+                width: products?.width || 'N/A',
+                weight: products?.weight || 'N/A',
+                thickness: products?.thickness || 'N/A',
+                materialComposition: materialsConsumed && materialsConsumed.length > 0 
+                  ? materialsConsumed.map(m => m.material_name).join(', ')
+                  : products?.material_composition || 'N/A',
+                qualityGrade: 'A'
+              },
+              notes: ''
+            };
+            setProductionProduct(productionProduct);
+            console.log('✅ Created production product for Complete page:', productionProduct);
+            
+            // Load production steps
+            const steps = await ProductionFlowService.getFlowSteps(flow.id);
+            if (steps) {
+              // Set all production steps for progress tracking
+              setProductionSteps(steps);
+              
+              // Filter only completed steps for individual product history
+              const completedSteps = steps.filter(s => s.status === 'completed').map(step => ({
+                stepName: step.step_name,
+                machineUsed: step.machine_id || 'Unknown',
+                inspector: step.inspector_name || 'Unknown',
+                completedAt: step.end_time || '',
+                qualityNotes: step.notes || ''
+              }));
+              
+              // Initialize individual products with production history
         // Generate globally unique custom IDs for all products in this batch
         const customIds = [];
-        for (let i = 0; i < product.targetQuantity; i++) {
-          customIds.push(generateGloballyUniqueCustomId(product.productName));
+              for (let i = 0; i < productionProduct.targetQuantity; i++) {
+                customIds.push(generateGloballyUniqueCustomId(productionProduct.productName));
         }
         
-        const initialProducts: IndividualProduct[] = Array.from({ length: product.targetQuantity }, (_, index) => ({
+              const initialProducts: IndividualProduct[] = Array.from({ length: productionProduct.targetQuantity }, (_, index) => ({
           id: generateUniqueId('IND'),
           qrCode: generateUniqueId('QR'),
-          productId: product.productId,
+                productId: productionProduct.productId,
           customId: customIds[index],
           manufacturingDate: new Date().toISOString().split('T')[0],
           finalWeight: "",
@@ -138,12 +235,20 @@ export default function Complete() {
           status: "available" as const,
           inspector: inspector,
           inspectorId: generateUniqueId('INSP'),
-          productionSteps: productionSteps,
+          productionSteps: completedSteps,
           notes: ""
         }));
         setIndividualProducts(initialProducts);
-        });
-      }
+            }
+          } else {
+            console.error('❌ No production flow found for Complete page, productId:', productId);
+          }
+        } catch (error) {
+          console.error('❌ Error loading production data for Complete page:', error);
+        }
+      };
+      
+      loadProductionData();
     }
   }, [productId, inspector]);
 
@@ -177,15 +282,14 @@ export default function Complete() {
   };
 
   const addRow = () => {
-    // Get production flow to extract step history
-    getProductionFlow(productionProduct.id).then(flow => {
-    const productionSteps = flow?.steps.filter(s => s.status === 'completed').map(step => ({
-      stepName: step.name,
-      machineUsed: step.machineName,
-      inspector: step.inspectorName || 'Unknown',
-      completedAt: step.endTime || '',
-      qualityNotes: step.qualityNotes
-    })) || [];
+    // Use production steps from state
+    const completedSteps = productionSteps.filter(s => s.status === 'completed').map(step => ({
+      stepName: step.step_name,
+      machineUsed: step.machine_id || 'Unknown',
+      inspector: step.inspector_name || 'Unknown',
+      completedAt: step.end_time || '',
+      qualityNotes: step.notes || ''
+    }));
     
 
     const newProduct: IndividualProduct = {
@@ -202,7 +306,7 @@ export default function Complete() {
       status: "available" as const,
       inspector: inspector,
       inspectorId: generateUniqueId('INSP'),
-      productionSteps: productionSteps,
+      productionSteps: completedSteps,
       notes: ""
     };
       const updatedProducts = [...individualProducts, newProduct];
@@ -212,7 +316,6 @@ export default function Complete() {
       const existing = getFromStorage('rajdhani_individual_products') || [];
       existing.push(newProduct);
       localStorage.setItem('rajdhani_individual_products', JSON.stringify(existing));
-    });
   };
 
   const removeRow = (index: number) => {
@@ -224,6 +327,41 @@ export default function Complete() {
     const existing = getFromStorage('rajdhani_individual_products') || [];
     const updated = existing.filter((item: any) => item.id !== productToRemove.id);
     localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+  };
+
+  const skipIndividualProductDetails = async () => {
+    if (!productionFlow) {
+      console.error('No production flow found');
+      return;
+    }
+
+    try {
+      console.log('Skipping individual product details');
+
+      // Create a completed individual product step to represent skipped individual product creation
+      const skippedStep = await ProductionFlowService.addStepToFlow({
+        flow_id: productionFlow.id,
+        step_name: 'N/A',
+        step_type: 'testing_individual',
+        order_index: productionSteps.length + 1,
+        machine_id: null, // No specific machine since it was skipped
+        inspector_name: 'System',
+        notes: 'Individual product details were skipped - no individual products were created'
+      });
+
+      // Mark the step as completed since it was skipped
+      if (skippedStep) {
+        await ProductionFlowService.completeFlowStep(skippedStep.id, 'Individual product details skipped by user');
+        console.log('✅ Skipped individual product step marked as completed:', skippedStep);
+      }
+
+      // Navigate back to production overview
+      navigate('/production');
+    } catch (error) {
+      console.error('Error creating skipped individual product step:', error);
+      // Still navigate back even if there's an error
+      navigate('/production');
+    }
   };
 
   const handleCompleteProduction = async () => {
@@ -262,7 +400,7 @@ export default function Complete() {
     // Save individual products with complete production history and QR codes
     for (const individualProduct of individualProducts) {
       try {
-        // Generate QR code for individual product
+        // Generate QR code for individual product with ALL user-filled data
         const individualProductQRData: IndividualProductQRData = {
           id: individualProduct.id,
           product_id: individualProduct.productId,
@@ -289,16 +427,18 @@ export default function Complete() {
           machine_used: individualProduct.productionSteps.map(step => step.machineUsed),
           inspector: individualProduct.inspector,
           status: individualProduct.status as 'active' | 'sold' | 'damaged' | 'returned',
+          notes: individualProduct.notes || '', // Include user-filled notes in QR
           created_at: individualProduct.manufacturingDate
         };
         
+        console.log('🔍 QR Data being generated:', individualProductQRData);
+        
         const individualProductQRCode = await QRCodeService.generateIndividualProductQR(individualProductQRData);
         
-        // Create in Supabase
-        await individualProductService.createIndividualProduct({
+        // Create in Supabase with batch ID for new batch system
+        const individualProductData: any = {
           qr_code: individualProductQRCode,
           product_id: individualProduct.productId,
-          product_name: productionProduct.productName,
           final_weight: individualProduct.finalWeight,
           final_thickness: individualProduct.finalThickness,
           final_width: individualProduct.finalWidth,
@@ -306,13 +446,27 @@ export default function Complete() {
           quality_grade: individualProduct.qualityGrade,
           status: individualProduct.status as 'available' | 'sold' | 'damaged' | 'in-production' | 'completed',
           notes: individualProduct.notes,
-          added_date: individualProduct.manufacturingDate,
+          production_date: individualProduct.manufacturingDate,
           inspector: individualProduct.inspector
-        });
+        };
+
+        // Add batch_id for new batch system
+        if (productionProduct.id?.startsWith('BATCH')) {
+          individualProductData.batch_id = productionProduct.id;
+        }
+
+        console.log('🔍 Saving to Supabase:', individualProductData);
+        const result = await individualProductService.createIndividualProduct(individualProductData);
+        
+        if (result.error) {
+          console.error(`❌ Error creating individual product ${individualProduct.id}:`, result.error);
+          throw new Error(`Failed to create individual product: ${result.error.message}`);
+        }
         
         console.log(`✅ Created individual product "${productionProduct.productName}" with QR code: ${individualProductQRCode}`);
       } catch (error) {
         console.error(`Error creating individual product ${individualProduct.id}:`, error);
+        // Continue with other products even if one fails
       }
     }
     
@@ -321,38 +475,43 @@ export default function Complete() {
     existing.push(...individualProducts);
     localStorage.setItem('rajdhani_individual_products', JSON.stringify(existing));
 
-    // Update main product inventory
-    const availableProducts = getFromStorage('rajdhani_products');
-    const productIndex = availableProducts.findIndex((p: any) => p.id === productionProduct.productId);
-    
-    if (productIndex !== -1) {
+    // Update main product inventory in Supabase
+    try {
       const availableCount = individualProducts.filter(p => p.status === "available").length;
       const damagedCount = individualProducts.filter(p => p.status === "damaged").length;
       
-      // Update quantity with available products only
-      availableProducts[productIndex].quantity += availableCount;
+      console.log(`📊 Production completed: ${availableCount} available, ${damagedCount} damaged products`);
       
-      // Update status back to "in-stock" when production is completed
-      const newQuantity = availableProducts[productIndex].quantity;
-      availableProducts[productIndex].status = newQuantity <= 0 ? 'out-of-stock' : 
+      // Update product quantity in Supabase
+      const { data: currentProduct, error: productError } = await supabase
+        .from('products')
+        .select('quantity, status')
+        .eq('id', productionProduct.productId)
+        .single();
+      
+      if (currentProduct && !productError) {
+        const newQuantity = (currentProduct.quantity || 0) + availableCount;
+        const newStatus = newQuantity <= 0 ? 'out-of-stock' : 
                                               newQuantity <= 5 ? 'low-stock' : 'in-stock';
       
-      // Add production batch information
-      if (!availableProducts[productIndex].productionBatches) {
-        availableProducts[productIndex].productionBatches = [];
+        await supabase
+          .from('products')
+          .update({
+            quantity: newQuantity,
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', productionProduct.productId);
+        
+        console.log(`✅ Updated product inventory: ${currentProduct.quantity} → ${newQuantity} (${newStatus})`);
+        console.log(`✅ Production completed successfully! ${availableCount} individual products added to inventory.`);
+      } else {
+        console.warn('⚠️ Could not update product inventory in Supabase:', productError);
+        console.warn('⚠️ Individual products were created but inventory count could not be updated.');
       }
-      
-      availableProducts[productIndex].productionBatches.push({
-        batchId: productionProduct.id,
-        productionDate: new Date().toISOString(),
-        totalProduced: individualProducts.length,
-        availableCount,
-        damagedCount,
-        inspector: inspector,
-        averageQualityGrade: calculateAverageQualityGrade(individualProducts)
-      });
-      
-      localStorage.setItem('rajdhani_products', JSON.stringify(availableProducts));
+    } catch (error) {
+      console.error('❌ Error updating product inventory:', error);
+      console.error('❌ Individual products were created but there was an error updating inventory.');
     }
 
     // Mark production as completed
@@ -370,11 +529,10 @@ export default function Complete() {
     localStorage.setItem('rajdhani_production_products', JSON.stringify(updatedProduction));
 
     // Update production flow status
-    getProductionFlow(productionProduct.id).then(flow => {
-    if (flow && flow.status !== 'completed') {
-      const lastStep = flow.steps[flow.steps.length - 1];
+    if (productionFlow && productionFlow.status !== 'completed') {
+      const lastStep = productionSteps[productionSteps.length - 1];
       if (lastStep) {
-        updateProductionStep(flow.id, lastStep.id, {
+        updateProductionStep(productionFlow.id, lastStep.id, {
           status: 'completed',
           endTime: new Date().toISOString(),
           inspectorName: inspector,
@@ -382,7 +540,6 @@ export default function Complete() {
         });
       }
     }
-    });
 
     // Show completion summary popup
     setCompletionSummary({
@@ -433,19 +590,19 @@ export default function Complete() {
           {
             id: "material_selection",
             name: "Material Selection",
-            status: "completed",
+            status: productionProduct?.materialsConsumed?.length > 0 ? "completed" : "pending",
             stepType: "material_selection"
           },
           {
             id: "machine_operation",
             name: "Machine Operations",
-            status: productionFlow?.steps?.some((s: any) => s.stepType === 'machine_operation') ? "completed" : "pending",
+            status: productionSteps?.some((s: any) => s.step_type === 'machine_operation' && s.status === 'completed') ? "completed" : "pending",
             stepType: "machine_operation"
           },
           {
             id: "wastage_tracking",
             name: "Waste Generation",
-            status: productionFlow?.steps?.some((s: any) => s.stepType === 'wastage_tracking' && s.status === 'completed') ? "completed" : "pending",
+            status: productionSteps?.some((s: any) => s.step_type === 'wastage_tracking' && s.status === 'completed') ? "completed" : "pending",
             stepType: "wastage_tracking"
           },
           {
@@ -455,7 +612,7 @@ export default function Complete() {
             stepType: "testing_individual"
           }
         ]}
-        machineSteps={productionFlow?.steps?.filter((s: any) => s.stepType === 'machine_operation') || []}
+        machineSteps={productionSteps?.filter((s: any) => s.step_type === 'machine_operation') || []}
         className="mb-6"
       />
 
@@ -509,6 +666,57 @@ export default function Complete() {
                 }}
                 className="w-full"
               />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Product Details for Reference */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            Main Product Specifications (Reference)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">Reference Information</span>
+            </div>
+            <p className="text-sm text-blue-700">
+              Use these specifications as a reference when filling in the actual final measurements below.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <Label className="text-sm text-gray-500">Expected Height</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.height || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-500">Expected Width</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.width || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-500">Expected Weight</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.weight || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-500">Expected Thickness</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.thickness || 'N/A'}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div>
+              <Label className="text-sm text-gray-500">Category</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.category || 'N/A'}</p>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-500">Material Composition</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.materialComposition || 'N/A'}</p>
             </div>
           </div>
         </CardContent>
@@ -832,6 +1040,16 @@ export default function Complete() {
                 );
               })()}
           </div>
+            <div className="flex gap-3">
+              <Button 
+                onClick={skipIndividualProductDetails}
+                variant="outline"
+                className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                size="lg"
+              >
+                <AlertTriangle className="w-5 h-5 mr-2" />
+                Skip Individual Products
+              </Button>
         <Button 
           onClick={handleCompleteProduction}
               className="bg-green-600 hover:bg-green-700"
@@ -840,6 +1058,7 @@ export default function Complete() {
               <CheckCircle className="w-5 h-5 mr-2" />
           Complete Production
         </Button>
+            </div>
       </div>
         </CardContent>
       </Card>

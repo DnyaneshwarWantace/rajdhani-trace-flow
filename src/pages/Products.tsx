@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProductService } from "@/services";
 import { individualProductService } from "@/services/individualProductService";
 import { ProductRecipeService } from "@/services/productRecipeService";
@@ -18,7 +19,7 @@ import {
 import { IDGenerator } from "@/lib/idGenerator";
 import { QRCodeService, IndividualProductQRData, MainProductQRData } from "@/lib/qrCode";
 import { DropdownService, DropdownOption } from "@/services/dropdownService";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -122,6 +123,7 @@ const statusStyles = {
 
 export default function Products() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -253,17 +255,28 @@ export default function Products() {
   const checkProductsWithRecipes = async (products: Product[]) => {
     const productsWithRecipesSet = new Set<string>();
     
+    // Only check recipes if we have products
+    if (!products || products.length === 0) {
+      setProductsWithRecipes(productsWithRecipesSet);
+      return;
+    }
+    
+    console.log('🔍 Checking recipes for', products.length, 'products...');
+    
     for (const product of products) {
       try {
         const recipe = await getProductRecipe(product.id);
         if (recipe && recipe.recipe_materials && recipe.recipe_materials.length > 0) {
           productsWithRecipesSet.add(product.id);
+          console.log('✅ Found recipe for product:', product.name);
         }
       } catch (error) {
-        console.error(`Error checking recipe for product ${product.id}:`, error);
+        // Silently handle recipe errors - don't spam console
+        console.log(`ℹ️ No recipe found for product ${product.name} (${product.id})`);
       }
     }
     
+    console.log('🔍 Recipe check complete. Products with recipes:', productsWithRecipesSet.size);
     setProductsWithRecipes(productsWithRecipesSet);
   };
   
@@ -328,8 +341,8 @@ export default function Products() {
 
     const loadRawMaterials = async () => {
       try {
-        // Load raw materials from Supabase instead of localStorage
-        const { data, error } = await supabase
+        // Load raw materials from Supabase using admin client to bypass RLS
+        const { data, error } = await supabaseAdmin
           .from('raw_materials')
           .select('*')
           .order('created_at', { ascending: false });
@@ -451,11 +464,11 @@ export default function Products() {
     }
   };
 
-  const handleAddToProductionFromNotification = (notification: any) => {
+  const handleAddToProductionFromNotification = async (notification: any) => {
     if (!notification.relatedData?.productId) return;
     const product = products.find(p => p.id === notification.relatedData.productId);
     if (product) {
-      handleAddToProduction(product);
+      await handleAddToProduction(product);
       handleResolveNotification(notification.id);
     }
   };
@@ -503,78 +516,65 @@ export default function Products() {
     }
 
     try {
-      // Ensure products is a proper array
-      const currentProducts = Array.isArray(products) ? products : [];
-      console.log("Current products before adding duplicate:", currentProducts);
-      console.log("Duplicate product to add:", duplicateProduct);
+      console.log("Creating duplicate product in database:", duplicateProduct);
       
-      // Add the duplicated product to the products array
-      const updatedProducts = [...currentProducts, duplicateProduct];
-      console.log("Updated products after adding duplicate:", updatedProducts);
+      // Create the duplicate product in the database using ProductService
+      const result = await ProductService.createProduct({
+        id: duplicateProduct.id,
+        name: duplicateProduct.name,
+        category: duplicateProduct.category,
+        color: duplicateProduct.color,
+        pattern: duplicateProduct.pattern,
+        unit: duplicateProduct.unit,
+        individual_stock_tracking: duplicateProduct.individualStockTracking,
+        min_stock_level: 0,
+        max_stock_level: 1000,
+        base_quantity: duplicateProduct.quantity,
+        qr_code: duplicateProduct.qrCode,
+        weight: duplicateProduct.weight,
+        thickness: duplicateProduct.thickness,
+        width: duplicateProduct.width,
+        height: duplicateProduct.height,
+        image_url: duplicateProduct.imageUrl
+      });
+
+      if (result.error) {
+        console.error("Error creating duplicate product:", result.error);
+        return;
+      }
+
+      console.log("✅ Duplicate product created successfully:", result.data);
       
-      // Ensure we're saving a clean array
-      const cleanProducts = updatedProducts.filter(p => p && typeof p === 'object' && p.id);
-      console.log("Clean products to save:", cleanProducts);
-      
-      setProducts(cleanProducts);
-      replaceStorage('rajdhani_products', cleanProducts);
+      // Refresh the products list to show the new duplicate
+      const updatedResult = await ProductService.getProducts();
+      if (updatedResult.data) {
+        setProducts(updatedResult.data);
+      }
 
       // Generate individual products if quantity > 0 and individual stock tracking is enabled
       if (duplicateProduct.quantity > 0 && duplicateProduct.individualStockTracking) {
-        const individualProducts = getFromStorage('rajdhani_individual_products') || [];
-        const newIndividualProducts = [];
+        console.log(`Generating ${duplicateProduct.quantity} individual products for ${duplicateProduct.name}`);
         
         // Get current date
         const currentDate = new Date().toISOString().split('T')[0];
         
         // Generate individual products for each quantity
         for (let i = 0; i < duplicateProduct.quantity; i++) {
-          const individualProduct: IndividualProduct = {
-            id: IDGenerator.generateIndividualProductId(),
-            qrCode: generateQRCode(),
-            productId: duplicateProduct.id,
-            productName: duplicateProduct.name,
-            color: duplicateProduct.color,
-            pattern: duplicateProduct.pattern,
-            weight: duplicateProduct.weight,
-            thickness: duplicateProduct.thickness,
-            width: duplicateProduct.width,
-            height: duplicateProduct.height,
-            materialsUsed: duplicateProduct.materialsUsed || [],
-            qualityGrade: "A", // Default quality grade
-            status: "available",
-            location: '', // Location will be set when individual products are created in production
-            addedDate: currentDate,
-            notes: `Auto-generated from ${duplicateProduct.name}`,
-            finalWeight: duplicateProduct.weight,
-            finalThickness: duplicateProduct.thickness,
-            finalWidth: duplicateProduct.width,
-            finalHeight: duplicateProduct.height,
-            finalQualityGrade: "A",
-            productionDate: currentDate,
-            completionDate: currentDate
-          };
-          
-          newIndividualProducts.push(individualProduct);
-        }
-        
-        // Save individual products to database
-        for (const individualProduct of newIndividualProducts) {
           try {
             const { error } = await ProductService.createIndividualProduct({
               product_id: duplicateProduct.id,
-              production_date: individualProduct.productionDate || new Date().toISOString().split('T')[0],
-              final_weight: individualProduct.finalWeight,
-              final_thickness: individualProduct.finalThickness,
-              quality_grade: individualProduct.qualityGrade as 'A+' | 'A' | 'B' | 'C',
-              location: individualProduct.location,
-              production_notes: individualProduct.notes
+              production_date: currentDate,
+              final_weight: duplicateProduct.weight,
+              final_thickness: duplicateProduct.thickness,
+              quality_grade: 'A' as 'A+' | 'A' | 'B' | 'C',
+              location: '',
+              production_notes: `Auto-generated from ${duplicateProduct.name}`
             });
             
             if (error) {
               console.error('Error creating individual product:', error);
             } else {
-              console.log('✅ Individual product created successfully:', individualProduct.productName);
+              console.log(`✅ Individual product ${i + 1} created successfully`);
             }
           } catch (err) {
             console.error('Error creating individual product:', err);
@@ -611,20 +611,23 @@ export default function Products() {
           cost: material.cost_per_unit || 0
         }));
         setProductMaterials(recipeMaterials);
-        console.log('Loaded existing recipe for product:', product.name, recipeMaterials);
+        console.log('✅ Loaded existing recipe for product:', product.name, recipeMaterials);
       } else {
         // No existing recipe, use product's materialsUsed if available
         if (product.materialsUsed && product.materialsUsed.length > 0) {
           setProductMaterials(product.materialsUsed);
+          console.log('ℹ️ Using product materialsUsed for:', product.name);
         } else {
           setProductMaterials([]);
+          console.log('ℹ️ No materials found for product:', product.name);
         }
       }
     } catch (error) {
-      console.error('Error loading recipe for product:', error);
+      console.log('ℹ️ No recipe found for product:', product.name, '(this is normal)');
       // Fallback to product's materialsUsed
       if (product.materialsUsed && product.materialsUsed.length > 0) {
         setProductMaterials(product.materialsUsed);
+        console.log('ℹ️ Using product materialsUsed as fallback for:', product.name);
       } else {
         setProductMaterials([]);
       }
@@ -764,7 +767,7 @@ export default function Products() {
           verificationAttempts++;
           console.log(`Verification attempt ${verificationAttempts}/${maxVerificationAttempts}...`);
 
-          const { data, error } = await supabase
+          const { data, error } = await supabaseAdmin
             .from('products')
             .select('id, name')
             .eq('id', productId)
@@ -851,7 +854,7 @@ export default function Products() {
 
       // Final verification that the product still exists just before creating individual products
       console.log(`🔍 Final verification that product ${productId} exists before creating individual products...`);
-      const { data: finalVerifyProduct, error: finalVerifyError } = await supabase
+      const { data: finalVerifyProduct, error: finalVerifyError } = await supabaseAdmin
         .from('products')
         .select('id, name')
         .eq('id', productId)
@@ -969,14 +972,19 @@ export default function Products() {
         
         console.log('Mapped materials for recipe:', mappedMaterials);
         
-        const recipe = createRecipeFromMaterials(
-          productId,
-          product.name,
-          mappedMaterials,
-          'admin'
-        );
-        await saveProductRecipe(recipe);
-        console.log('Recipe saved for product:', product.name, recipe);
+        try {
+          const recipe = createRecipeFromMaterials(
+            productId,
+            product.name,
+            mappedMaterials,
+            'admin'
+          );
+          await saveProductRecipe(recipe);
+          console.log('✅ Recipe saved for product:', product.name, recipe);
+        } catch (error) {
+          console.error('❌ Error saving recipe for product:', product.name, error);
+          // Don't fail the entire product creation if recipe saving fails
+        }
       }
 
       // Update local state
@@ -1371,7 +1379,7 @@ export default function Products() {
   };
 
   // Handle adding product to production
-  const handleAddToProduction = (product: Product) => {
+  const handleAddToProduction = async (product: Product) => {
     console.log('Adding product to production:', product);
     
     // Update product status to "in-production"
@@ -1381,22 +1389,58 @@ export default function Products() {
     setProducts(updatedProducts);
     replaceStorage('rajdhani_products', updatedProducts);
     
-    // Get all individual stock details for this product
-    const productIndividualStocks = product.individual_products || [];
+    // Check user role - only production and admin users can navigate to production pages
+    if (user?.role === 'production' || user?.role === 'admin') {
+      // Get all individual stock details for this product
+      const productIndividualStocks = product.individual_products || [];
 
-    // Create complete product data with individual stock details
-    const completeProductData = {
-      ...product,
-      status: "in-production" as const,
-      individualStocks: productIndividualStocks
-    };
+      // Create complete product data with individual stock details
+      const completeProductData = {
+        ...product,
+        status: "in-production" as const,
+        individualStocks: productIndividualStocks
+      };
 
-    console.log('Navigating to production with data:', completeProductData);
-    navigate('/production/new-batch', { 
-      state: { 
-        selectedProduct: completeProductData
+      console.log('Navigating to production with data:', completeProductData);
+      navigate('/production/new-batch', { 
+        state: { 
+          selectedProduct: completeProductData
+        }
+      });
+    } else {
+      // For inventory users, send notification to production team
+      try {
+        const notification = await NotificationService.createNotification({
+          type: 'production_request',
+          title: 'Production Request',
+          message: `Product "${product.name}" has been requested for production by ${user?.name || 'Inventory Manager'}. Please add this product to the production queue.`,
+          module: 'production',
+          priority: 'medium',
+          status: 'unread',
+          related_id: product.id,
+          related_data: {
+            productId: product.id,
+            productName: product.name,
+            category: product.category,
+            requestedBy: user?.name || 'Inventory Manager',
+            requestedByRole: user?.role || 'inventory',
+            requestedAt: new Date().toISOString()
+          },
+          created_by: user?.id || 'system'
+        });
+
+        if (notification.data) {
+          console.log('✅ Production request notification sent:', notification.data);
+          alert(`✅ Product "${product.name}" has been sent to production queue. The production team will be notified and handle the manufacturing process.`);
+        } else {
+          console.error('❌ Failed to send notification:', notification.error);
+          alert(`⚠️ Product "${product.name}" status updated, but notification to production team failed. Please contact the production manager directly.`);
+        }
+      } catch (error) {
+        console.error('❌ Error sending production request notification:', error);
+        alert(`⚠️ Product "${product.name}" status updated, but notification to production team failed. Please contact the production manager directly.`);
       }
-    });
+    }
   };
 
   // Handle showing QR code for main product
@@ -1427,7 +1471,6 @@ export default function Products() {
       product_name: product.name,
       description: product.notes || '',
       category: product.category,
-      base_price: 0, // Pricing will be set manually per order
       total_quantity: product.quantity || productIndividualStocks.length,
       available_quantity: availableCount,
       recipe: {
@@ -2573,7 +2616,7 @@ export default function Products() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleAddToProduction(product)}
+                                onClick={async () => await handleAddToProduction(product)}
                                 className="border-blue-500 text-blue-600 hover:bg-blue-50"
                               >
                                 <Play className="w-4 h-4" />
@@ -2765,7 +2808,7 @@ export default function Products() {
                                 {hasIndividualStock(product.id) ? (
                                 <Button 
                                   size="sm" 
-                                  onClick={() => handleAddToProduction(product)}
+                                  onClick={async () => await handleAddToProduction(product)}
                                   className="bg-orange-600 hover:bg-orange-700"
                                 >
                                   <Factory className="w-4 h-4 mr-1" />
@@ -2859,7 +2902,7 @@ export default function Products() {
                             <Button
                               size="sm"
                               className="bg-orange-600 hover:bg-orange-700"
-                              onClick={() => handleAddToProductionFromNotification(notification)}
+                              onClick={async () => await handleAddToProductionFromNotification(notification)}
                             >
                               <ArrowRight className="w-3 h-3 mr-1" />
                               Add to Production
@@ -3379,7 +3422,7 @@ export default function Products() {
                 <div className="text-sm text-muted-foreground">
                   <p><strong>Product:</strong> {selectedQRProduct.name}</p>
                   <p><strong>Category:</strong> {selectedQRProduct.category}</p>
-                  <p><strong>Available Stock:</strong> {getAvailablePieces(selectedQRProduct.id)} pieces</p>
+                  <p><strong>Available Stock:</strong> {getAvailablePieces(selectedQRProduct.id)} {selectedQRProduct.unit}</p>
                 </div>
                 
                 <QRCodeDisplay

@@ -167,13 +167,8 @@ export default function ProductDetail() {
   }, [productId]);
 
   const getAvailablePieces = (productId: string) => {
-    if (product && product.individualStockTracking === false) {
-      return product.quantity || 0;
-    }
-    
-    return (individualProducts || []).filter(ind => 
-      ind?.productId === productId && ind?.status === "available"
-    ).length;
+    // Use the same simple logic as Products page - just return product.quantity
+    return product?.quantity || 0;
   };
 
   if (loading) {
@@ -315,7 +310,7 @@ export default function ProductDetail() {
               onClick={() => navigate(`/product-stock/${product.id}`)}
             >
                     <Eye className="w-5 h-5 mr-2" />
-                    View Individual Stock ({getAvailablePieces(product.id)} pieces)
+                    View Individual Stock ({getAvailablePieces(product.id)} {product.unit})
             </Button>
                 </CardContent>
               </Card>
@@ -531,63 +526,6 @@ export default function ProductDetail() {
                 </CardContent>
               </Card>
 
-              {/* Individual Stock Details */}
-                {individualProducts.length > 0 && (
-                  <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                        <Hash className="w-5 h-5" />
-                    Individual Stock Details ({individualProducts.length} pieces)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                      <div className="space-y-3 max-h-80 overflow-y-auto">
-                        {individualProducts.map((stock) => (
-                          <div key={stock.id} className="p-4 bg-slate-50 rounded-lg border">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <span className="text-slate-500">ID:</span>
-                                <p className="font-medium">{stock.id.slice(0, 8)}...</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">QR Code:</span>
-                                <p className="font-medium">{stock.qrCode}</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Weight:</span>
-                                <p className="font-medium">{stock.finalWeight}</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Dimensions:</span>
-                                <p className="font-medium">{stock.finalWidth} × {stock.finalHeight}</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Thickness:</span>
-                                <p className="font-medium">{stock.finalThickness}</p>
-                              </div>
-                              <div>
-                                <span className="text-slate-500">Quality:</span>
-                                <Badge variant={stock.qualityGrade === "A+" ? "default" : "secondary"} className="ml-1">
-                                {stock.qualityGrade}
-                              </Badge>
-                            </div>
-                              <div>
-                                <span className="text-slate-500">Status:</span>
-                                <Badge variant={stock.status === "available" ? "default" : "secondary"} className="ml-1">
-                                {stock.status}
-                              </Badge>
-                            </div>
-                              <div>
-                                <span className="text-slate-500">Inspector:</span>
-                                <p className="font-medium">{stock.inspector}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                </CardContent>
-              </Card>
-                )}
             </TabsContent>
           </Tabs>
           </div>

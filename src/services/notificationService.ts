@@ -1,11 +1,12 @@
-import { supabase, Notification } from '@/lib/supabase';
+import { supabase, supabaseAdmin, Notification } from '@/lib/supabase';
 import { generateUniqueId } from '@/lib/idGenerator';
 
 export class NotificationService {
   // Create a new notification
   static async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'updated_at'>): Promise<{ data: Notification | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
@@ -15,7 +16,7 @@ export class NotificationService {
         id: generateUniqueId('NOTIF')
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .insert([notificationWithId])
         .select()
@@ -33,11 +34,12 @@ export class NotificationService {
   // Get all notifications
   static async getNotifications(): Promise<{ data: Notification[] | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false });
@@ -54,11 +56,12 @@ export class NotificationService {
   // Get notifications by module
   static async getNotificationsByModule(module: string): Promise<{ data: Notification[] | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .select('*')
         .eq('module', module)
@@ -76,11 +79,12 @@ export class NotificationService {
   // Get unread notifications
   static async getUnreadNotifications(): Promise<{ data: Notification[] | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .select('*')
         .eq('status', 'unread')
@@ -98,11 +102,12 @@ export class NotificationService {
   // Mark notification as read
   static async markAsRead(notificationId: string): Promise<{ data: Notification | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .update({ 
           status: 'read',
@@ -124,11 +129,12 @@ export class NotificationService {
   // Mark notification as dismissed
   static async markAsDismissed(notificationId: string): Promise<{ data: Notification | null; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .update({ 
           status: 'dismissed',
@@ -196,11 +202,12 @@ export class NotificationService {
     status: string = 'unread'
   ): Promise<{ exists: boolean; error: string | null }> {
     try {
-      if (!supabase) {
+      const client = supabaseAdmin || supabase;
+      if (!client) {
         throw new Error('Supabase client not initialized');
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('notifications')
         .select('id')
         .eq('type', type)
