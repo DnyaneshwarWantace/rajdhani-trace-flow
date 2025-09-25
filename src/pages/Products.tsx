@@ -668,7 +668,7 @@ export default function Products() {
         p.id === selectedProduct.id ? selectedProduct : p
       );
       setProducts(updatedProducts);
-      replaceStorage('rajdhani_products', updatedProducts);
+      // Products are saved to Supabase database only
 
       // Reset form and close dialog
       setSelectedProduct(null);
@@ -1387,7 +1387,7 @@ export default function Products() {
       p.id === product.id ? { ...p, status: "in-production" as const } : p
     );
     setProducts(updatedProducts);
-    replaceStorage('rajdhani_products', updatedProducts);
+    // Products are saved to Supabase database only
     
     // Check user role - only production and admin users can navigate to production pages
     if (user?.role === 'production' || user?.role === 'admin') {

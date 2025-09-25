@@ -50,11 +50,25 @@ export class IDGenerator {
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
-
+    
     // Get next sequence number for today
     const sequence = this.getNextSequence('QR', dateStr);
-
+    
     return `QR-${dateStr}-${sequence.toString().padStart(3, '0')}`;
+  }
+
+  // Generate Waste ID: WASTE-YYMMDD-XXX
+  static generateWasteId(): string {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    // Get next sequence number for today
+    const sequence = this.getNextSequence('WASTE', dateStr);
+    
+    return `WASTE-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Customer ID: CUST-XXX (simple sequential, no date)

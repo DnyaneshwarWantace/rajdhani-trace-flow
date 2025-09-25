@@ -79,6 +79,10 @@ class IndividualProductService {
 
       // Use admin client to bypass RLS
       const client = supabaseAdmin || supabase;
+      
+      console.log('🔍 Creating individual product with client:', client ? 'configured' : 'null');
+      console.log('🔍 Data being inserted:', data);
+      
       const { data: result, error } = await client
         .from('individual_products')
         .insert([data])
@@ -86,11 +90,13 @@ class IndividualProductService {
         .single();
 
       if (error) {
+        console.error('❌ Database error creating individual product:', error);
         handleSupabaseError(error);
         return { data: null, error: error.message };
       }
 
-      console.log('✅ Individual product created successfully:', result?.product_name || result?.qr_code);
+      console.log('✅ Individual product created successfully in database:', result);
+      console.log('✅ Database returned:', result?.product_name || result?.qr_code);
       return { data: result, error: null };
     } catch (error) {
       console.error('Error creating individual product:', error);

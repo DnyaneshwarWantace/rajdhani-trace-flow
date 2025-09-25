@@ -141,9 +141,12 @@ export default function NewBatch() {
   const handleCreateProduction = () => {
     if (!selectedProduct) return;
 
+    // Generate unique production batch ID to avoid reusing completed flows
+    const productionBatchId = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     const productionProduct: ProductionProduct = {
-      id: selectedProduct.id, // Use actual product ID instead of generating new one
-      productId: selectedProduct.id,
+      id: productionBatchId, // Use unique batch ID instead of product ID
+      productId: selectedProduct.id, // Keep reference to original product
       productName: selectedProduct.name,
       category: selectedProduct.category,
       color: selectedProduct.color,
@@ -179,7 +182,8 @@ export default function NewBatch() {
     console.log('Complete product data to save:', completeProductData);
 
     // Navigate directly to production detail page for planning
-    navigate(`/production-detail/${productionProduct.id}`);
+    // Pass the actual product ID, not the batch ID
+    navigate(`/production-detail/${selectedProduct.id}`);
   };
 
   return (

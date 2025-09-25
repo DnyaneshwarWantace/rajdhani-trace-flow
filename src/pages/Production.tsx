@@ -210,8 +210,9 @@ export default function Production() {
 
           let status: 'planning' | 'active' | 'completed' = 'planning';
 
-          // Only mark as completed if individual products exist (meaning the final step is truly done)
-          if (individualProducts && individualProducts.length > 0) {
+          // Only mark as completed if ALL steps are completed AND individual products exist
+          const allStepsCompleted = hasSteps && completedSteps === steps.length;
+          if (individualProducts && individualProducts.length > 0 && allStepsCompleted) {
             status = 'completed';
           } else if (inProgressSteps > 0 || completedSteps > 0 || hasSteps) {
             status = 'active';

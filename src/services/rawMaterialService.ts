@@ -374,15 +374,15 @@ export class RawMaterialService {
 
       // Record consumption
       const consumptionRecord = {
-        production_batch_id: consumptionData.production_batch_id,
-        production_step_id: consumptionData.production_step_id || null,
+        id: `MAT_CONSUME_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate unique ID
+        production_product_id: consumptionData.production_batch_id, // Use production_product_id as per schema
         material_id: consumptionData.material_id,
-        individual_product_id: consumptionData.individual_product_id || null,
-        consumed_quantity: consumptionData.consumed_quantity,
-        waste_quantity: consumptionData.waste_quantity || 0,
-        consumption_date: new Date().toISOString(),
-        operator: consumptionData.operator || 'admin',
-        notes: consumptionData.notes?.trim() || null
+        material_name: material.name, // Add material name as required by schema
+        quantity_used: consumptionData.consumed_quantity, // Use quantity_used as per schema
+        unit: material.unit, // Add unit as required by schema
+        cost_per_unit: material.cost_per_unit, // Add cost_per_unit as required by schema
+        total_cost: consumptionData.consumed_quantity * material.cost_per_unit, // Calculate total cost
+        consumed_at: new Date().toISOString() // Use consumed_at as per schema
       };
 
       const { error: consumptionError } = await supabase

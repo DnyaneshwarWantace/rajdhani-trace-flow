@@ -533,16 +533,19 @@ export default function ProductionDetail() {
     try {
       // Save material consumption to Supabase
       if (updatedProduct.materialsConsumed && updatedProduct.materialsConsumed.length > 0) {
-        // First, clear existing material consumption for this product
+        // Use the batch ID from production flow if available, otherwise use product ID
+        const batchId = productionFlow?.production_product_id || updatedProduct.id;
+        
+        // First, clear existing material consumption for this batch/product
         await supabase
           .from('material_consumption')
           .delete()
-          .eq('production_product_id', updatedProduct.id);
+          .eq('production_product_id', batchId);
 
         // Then insert updated material consumption with custom IDs
         const materialConsumptionData = updatedProduct.materialsConsumed.map((material, index) => ({
           id: `MAT_CONSUME_${Date.now()}_${index}`,
-          production_product_id: updatedProduct.id,
+          production_product_id: batchId, // Use batch ID instead of product ID
           material_id: material.materialId,
           material_name: material.materialName,
           quantity_used: material.quantity,
@@ -845,7 +848,12 @@ export default function ProductionDetail() {
     }
     
     // Navigate to dynamic flow page after machine selection
-    navigate(`/production/${productId}/dynamic-flow`);
+    // Use the batch ID from the production flow, not the product ID
+    if (productionFlow && productionFlow.production_product_id) {
+      navigate(`/production/${productionFlow.production_product_id}/dynamic-flow`);
+    } else {
+      console.error('No production flow found to navigate to dynamic flow');
+    }
     
     // Reset form
     setSelectedMachineId("");
@@ -860,15 +868,43 @@ export default function ProductionDetail() {
       console.log('Adding machine step to flow:', machine, inspector);
       console.log('Production product ID:', productionProduct.id);
 
-      // Get or create production flow
-      let flow = await ProductionFlowService.getProductionFlow(productionProduct.id);
+      let flow = productionFlow; // Use existing flow if available
       
+      // Only create a new production flow if one doesn't exist
       if (!flow) {
+        // Generate unique production batch ID to avoid reusing completed flows
+        const productionBatchId = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        console.log('Creating new production flow with batch ID:', productionBatchId);
+        
         // Create new production flow
         flow = await ProductionFlowService.createProductionFlow({
-          production_product_id: productionProduct.id,
-          flow_name: `${productionProduct.productName} Production Flow`
+          production_product_id: productionBatchId, // Use unique batch ID instead of product ID
+          flow_name: `${productionProduct.productName} Production Flow - Batch ${productionBatchId}`
         });
+        
+        // Store the flow in state for navigation
+        setProductionFlow(flow);
+        console.log('✅ New production flow created and stored in state');
+      } else {
+        console.log('✅ Using existing production flow:', flow.id);
+      }
+
+      // Update any existing material consumption records to use the batch ID
+      if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
+        console.log('Updating material consumption records to use batch ID:', flow.production_product_id);
+        
+        // Update existing material consumption records to use batch ID
+        const { error: updateError } = await supabase
+          .from('material_consumption')
+          .update({ production_product_id: flow.production_product_id })
+          .eq('production_product_id', productionProduct.id);
+        
+        if (updateError) {
+          console.error('Error updating material consumption records:', updateError);
+        } else {
+          console.log('✅ Updated material consumption records to use batch ID');
+        }
       }
 
       // Add machine step to flow
@@ -896,15 +932,43 @@ export default function ProductionDetail() {
     try {
       console.log('Skipping machine operations and going to waste generation');
 
-      // Get or create production flow
-      let flow = await ProductionFlowService.getProductionFlow(productionProduct.id);
+      let flow = productionFlow; // Use existing flow if available
       
+      // Only create a new production flow if one doesn't exist
       if (!flow) {
+        // Generate unique production batch ID to avoid reusing completed flows
+        const productionBatchId = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        console.log('Creating new production flow with batch ID:', productionBatchId);
+        
         // Create new production flow
         flow = await ProductionFlowService.createProductionFlow({
-          production_product_id: productionProduct.id,
-          flow_name: `${productionProduct.productName} Production Flow`
+          production_product_id: productionBatchId, // Use unique batch ID instead of product ID
+          flow_name: `${productionProduct.productName} Production Flow - Batch ${productionBatchId}`
         });
+        
+        // Store the flow in state for navigation
+        setProductionFlow(flow);
+        console.log('✅ New production flow created and stored in state');
+      } else {
+        console.log('✅ Using existing production flow:', flow.id);
+      }
+
+      // Update any existing material consumption records to use the batch ID
+      if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
+        console.log('Updating material consumption records to use batch ID:', flow.production_product_id);
+        
+        // Update existing material consumption records to use batch ID
+        const { error: updateError } = await supabase
+          .from('material_consumption')
+          .update({ production_product_id: flow.production_product_id })
+          .eq('production_product_id', productionProduct.id);
+        
+        if (updateError) {
+          console.error('Error updating material consumption records:', updateError);
+        } else {
+          console.log('✅ Updated material consumption records to use batch ID');
+        }
       }
 
       // Create a completed machine step to represent skipped machine operations
@@ -931,7 +995,12 @@ export default function ProductionDetail() {
     }
 
     // Navigate to waste generation page
-    navigate(`/production/${productId}/waste-generation`);
+    // Use the batch ID from the production flow, not the product ID
+    if (productionFlow && productionFlow.production_product_id) {
+      navigate(`/production/${productionFlow.production_product_id}/waste-generation`);
+    } else {
+      console.error('No production flow found to navigate to waste generation');
+    }
     setShowMachineSelectionPopup(false);
   };
 
@@ -1020,7 +1089,12 @@ export default function ProductionDetail() {
     
     // Navigate to individual product details page without changing status
     // Status will be changed to "completed" only when individual products are finalized
-    navigate(`/production/complete/${productionProduct.id}`);
+    // Use the production batch ID from the flow, not the product ID
+    if (productionFlow && productionFlow.production_product_id) {
+      navigate(`/production/complete/${productionFlow.production_product_id}`);
+    } else {
+      console.error('No production flow found to navigate to complete page');
+    }
   };
 
   if (!productionProduct) {
@@ -1122,15 +1196,30 @@ export default function ProductionDetail() {
               break;
             case 'machine_operation':
               // Navigate to dynamic production flow page
-              navigate(`/production/${productId}/dynamic-flow`);
+              // Use the batch ID from the production flow, not the product ID
+              if (productionFlow && productionFlow.production_product_id) {
+                navigate(`/production/${productionFlow.production_product_id}/dynamic-flow`);
+              } else {
+                console.error('No production flow found to navigate to dynamic flow');
+              }
               break;
             case 'wastage_tracking':
               // Navigate to waste generation page
-              navigate(`/production/${productId}/waste-generation`);
+              // Use the batch ID from the production flow, not the product ID
+              if (productionFlow && productionFlow.production_product_id) {
+                navigate(`/production/${productionFlow.production_product_id}/waste-generation`);
+              } else {
+                console.error('No production flow found to navigate to waste generation');
+              }
               break;
             case 'testing_individual':
               // Navigate to complete/individual details page
-              navigate(`/production/complete/${productId}`);
+              // Use the batch ID from the production flow, not the product ID
+              if (productionFlow && productionFlow.production_product_id) {
+                navigate(`/production/complete/${productionFlow.production_product_id}`);
+              } else {
+                console.error('No production flow found to navigate to complete page');
+              }
               break;
           }
         }}

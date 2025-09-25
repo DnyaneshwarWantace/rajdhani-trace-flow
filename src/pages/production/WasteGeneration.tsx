@@ -14,6 +14,7 @@ import { generateUniqueId } from "@/lib/storageUtils";
 import { RawMaterialService } from "@/services/rawMaterialService";
 import { ProductService } from "@/services/ProductService";
 import { ProductionFlowService } from "@/services/productionFlowService";
+import { WasteManagementService } from "@/services/wasteManagementService";
 import ProductionProgressBar from "@/components/production/ProductionProgressBar";
 import { supabase } from "@/lib/supabase";
 
@@ -117,10 +118,36 @@ export default function WasteGeneration() {
             console.log('🔍 Creating production product from flow data like DynamicProductionFlow does');
 
             // Load material consumption from Supabase
-            const { data: materialsConsumed, error: materialsError } = await supabase
+            // First try with batch ID, then fallback to product ID
+            let { data: materialsConsumed, error: materialsError } = await supabase
               .from('material_consumption')
               .select('*')
               .eq('production_product_id', flow.production_product_id);
+
+            // If no records found with batch ID, try with product ID
+            if (!materialsConsumed || materialsConsumed.length === 0) {
+              console.log('No material consumption found with batch ID, trying with product ID...');
+              const productId = flow.flow_name.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
+              
+              // Get the actual product ID from products table
+              const { data: productData } = await supabase
+                .from('products')
+                .select('id')
+                .eq('name', productId)
+                .single();
+              
+              if (productData) {
+                const { data: fallbackMaterials, error: fallbackError } = await supabase
+                  .from('material_consumption')
+                  .select('*')
+                  .eq('production_product_id', productData.id);
+                
+                if (fallbackMaterials && fallbackMaterials.length > 0) {
+                  materialsConsumed = fallbackMaterials;
+                  console.log('✅ Found material consumption records with product ID:', productData.id);
+                }
+              }
+            }
 
             if (materialsError) {
               console.warn('Error loading materials consumed:', materialsError);
@@ -302,7 +329,7 @@ export default function WasteGeneration() {
             status: material.status || 'in-stock',
             location: material.location,
             batchNumber: material.batch_number
-          }));
+          })) as RawMaterial[];
           setRawMaterials(mappedMaterials);
         }
       } catch (error) {
@@ -397,74 +424,88 @@ export default function WasteGeneration() {
   const completeWasteTracking = async () => {
     if (!productionProduct) return;
     
-    // 1. Deduct consumed materials from raw material inventory
+    // 1. Record material consumption and deduct from raw material inventory
     if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
-      const updatedRawMaterials = rawMaterials.map(material => {
-        const consumed = productionProduct.materialsConsumed.find(cm => cm.materialId === material.id);
-        if (consumed) {
-          const newQuantity = material.currentStock - consumed.quantity;
-          return {
-            ...material,
-            currentStock: Math.max(0, newQuantity),
-            status: newQuantity <= 0 ? "out-of-stock" as const : 
-                    newQuantity <= 10 ? "low-stock" as const : "in-stock" as const
-          };
-        }
-        return material;
-      });
+      console.log('📦 Recording material consumption for production:', productionProduct.id);
       
-      // Update raw materials in Supabase
-      const materialUpdates = productionProduct.materialsConsumed.map(async (consumed) => {
-        const material = rawMaterials.find(m => m.id === consumed.materialId);
-        if (material) {
-          const newQuantity = material.currentStock - consumed.quantity;
-          const newStatus = newQuantity <= 0 ? "out-of-stock" :
-                           newQuantity <= 10 ? "low-stock" : "in-stock";
-
-          return supabase
-            .from('raw_materials')
-            .update({
-              current_stock: Math.max(0, newQuantity),
-              status: newStatus,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', consumed.materialId);
+      // Record each material consumption using the proper service
+      for (const consumed of productionProduct.materialsConsumed) {
+        try {
+          const result = await RawMaterialService.recordMaterialConsumption({
+            production_batch_id: productionProduct.id,
+            material_id: consumed.materialId,
+            consumed_quantity: consumed.quantity,
+            waste_quantity: 0, // No waste in this step, waste is tracked separately
+            operator: 'Admin',
+            notes: `Material consumed during production of ${productionProduct.productName}`
+          });
+          
+          if (result.error) {
+            console.error(`❌ Error recording consumption for ${consumed.materialName}:`, result.error);
+          } else {
+            console.log(`✅ Recorded consumption: ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing material consumption for ${consumed.materialName}:`, error);
         }
-        return null;
-      });
-
-      // Execute all material updates
-      await Promise.all(materialUpdates.filter(update => update !== null));
-
-      // Update local state to reflect changes in UI
-      setRawMaterials(updatedRawMaterials);
-      console.log('✅ Materials deducted from inventory in database');
-      console.log('Updated materials:', updatedRawMaterials.filter(m =>
-        productionProduct.materialsConsumed.some(cm => cm.materialId === m.id)
-      ));
+      }
+      
+      // Reload raw materials to reflect updated stock levels
+      const { data: updatedMaterials } = await RawMaterialService.getRawMaterials();
+      if (updatedMaterials) {
+        const mappedMaterials = updatedMaterials.map((material: any) => ({
+          id: material.id,
+          name: material.name,
+          brand: material.brand || '',
+          category: material.category,
+          currentStock: material.current_stock,
+          unit: material.unit,
+          costPerUnit: material.cost_per_unit,
+          supplier: material.supplier_name || '',
+          supplierId: material.supplier_id || '',
+          status: material.status || 'in-stock',
+          location: material.location,
+          batchNumber: material.batch_number
+        })) as RawMaterial[];
+        setRawMaterials(mappedMaterials);
+        console.log('✅ Raw materials inventory updated');
+      }
     }
     
     // 2. Add waste items to waste management system
     if (productionProduct.wasteGenerated && productionProduct.wasteGenerated.length > 0) {
-      const wasteManagementItems = productionProduct.wasteGenerated.map(waste => ({
-        id: generateUniqueId('WASTE'),
-        materialId: waste.materialId,
-        materialName: waste.materialName,
+      console.log('🗑️ Adding waste items to waste management system...');
+      
+      for (const waste of productionProduct.wasteGenerated) {
+        try {
+          // Check if this waste is from consumed materials or additional waste
+          const isFromConsumedMaterial = productionProduct.materialsConsumed?.some(
+            consumed => consumed.materialId === waste.materialId
+          );
+          
+          const result = await WasteManagementService.createWasteItem({
+            material_id: waste.materialId,
+            material_name: waste.materialName,
         quantity: waste.quantity,
         unit: waste.unit,
-        wasteType: waste.wasteType,
-        canBeReused: waste.canBeReused,
-        notes: waste.notes,
-        productionId: productionProduct.id,
-        productName: productionProduct.productName,
-        generatedAt: new Date().toISOString(),
-        status: waste.canBeReused ? 'available_for_reuse' : 'disposed'
-      }));
+            waste_type: waste.wasteType,
+            can_be_reused: waste.canBeReused,
+            production_batch_id: productionProduct.id,
+            production_product_id: productionProduct.id,
+            notes: `${waste.notes || ''} ${isFromConsumedMaterial ? '(From consumed material)' : '(Additional waste - not deducted from inventory)'}`
+          });
+          
+          if (result.error) {
+            console.error(`❌ Error creating waste item for ${waste.materialName}:`, result.error);
+          } else {
+            console.log(`✅ Added waste item: ${waste.quantity} ${waste.unit} of ${waste.materialName} (${waste.wasteType})`);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing waste item ${waste.materialName}:`, error);
+        }
+      }
       
-      // TODO: Save waste management data to Supabase
-      console.log('Waste management items to save:', wasteManagementItems);
-      console.log('✅ Waste items prepared for waste management system');
-      console.log('Final waste data structure:', wasteManagementItems);
+      console.log('✅ All waste items added to waste management system');
     }
     
     // 3. Mark waste generation step as completed
@@ -511,6 +552,85 @@ export default function WasteGeneration() {
 
     try {
       console.log('Skipping waste generation for flow:', productionFlow.id);
+      
+      // 1. Deduct consumed materials from raw material inventory (even when skipping waste)
+      if (productionProduct && productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
+        console.log('📦 Recording material consumption for production (skipping waste):', productionProduct.id);
+        
+        // Record each material consumption using the proper service
+        for (const consumed of productionProduct.materialsConsumed) {
+          try {
+            const result = await RawMaterialService.recordMaterialConsumption({
+              production_batch_id: productionProduct.id,
+              material_id: consumed.materialId,
+              consumed_quantity: consumed.quantity,
+              waste_quantity: 0, // No waste when skipping
+              operator: 'Admin',
+              notes: `Material consumed during production of ${productionProduct.productName} (waste generation skipped)`
+            });
+            
+            if (result.error) {
+              console.error(`❌ Error recording consumption for ${consumed.materialName}:`, result.error);
+            } else {
+              console.log(`✅ Recorded consumption: ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error processing material consumption for ${consumed.materialName}:`, error);
+          }
+        }
+        
+        // Reload raw materials to reflect updated stock levels
+        const { data: updatedMaterials } = await RawMaterialService.getRawMaterials();
+        if (updatedMaterials) {
+          const mappedMaterials = updatedMaterials.map((material: any) => ({
+            id: material.id,
+            name: material.name,
+            brand: material.brand || '',
+            category: material.category,
+            currentStock: material.current_stock,
+            unit: material.unit,
+            costPerUnit: material.cost_per_unit,
+            supplier: material.supplier_name || '',
+            supplierId: material.supplier_id || '',
+            status: material.status || 'in-stock',
+            location: material.location,
+            batchNumber: material.batch_number
+          })) as RawMaterial[];
+          setRawMaterials(mappedMaterials);
+          console.log('✅ Raw materials inventory updated (waste skipped)');
+        }
+      }
+      
+      // 2. Handle any additional waste items (even when skipping, user might have added some)
+      if (productionProduct.wasteGenerated && productionProduct.wasteGenerated.length > 0) {
+        console.log('🗑️ Adding additional waste items to waste management system (skipping mode)...');
+        
+        for (const waste of productionProduct.wasteGenerated) {
+          try {
+            const result = await WasteManagementService.createWasteItem({
+              material_id: waste.materialId,
+              material_name: waste.materialName,
+              quantity: waste.quantity,
+              unit: waste.unit,
+              waste_type: waste.wasteType,
+              can_be_reused: waste.canBeReused,
+              production_batch_id: productionProduct.id,
+              production_product_id: productionProduct.id,
+              notes: `${waste.notes || ''} (Additional waste - not deducted from inventory, waste generation skipped)`
+            });
+            
+            if (result.error) {
+              console.error(`❌ Error creating waste item for ${waste.materialName}:`, result.error);
+            } else {
+              console.log(`✅ Added waste item: ${waste.quantity} ${waste.unit} of ${waste.materialName} (${waste.wasteType})`);
+            }
+          } catch (error) {
+            console.error(`❌ Error processing waste item ${waste.materialName}:`, error);
+          }
+        }
+        
+        console.log('✅ Additional waste items added to waste management system');
+      }
       
       // Find the waste tracking step
       let wasteStep = productionSteps.find(step => step.stepType === 'wastage_tracking');

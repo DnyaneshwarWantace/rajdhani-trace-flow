@@ -17,7 +17,8 @@ import {
   ArrowLeft, Package, CheckCircle, Plus, Trash2, Download, Upload,
   Save, QrCode, AlertTriangle
 } from "lucide-react";
-import { getFromStorage, saveToStorage, generateUniqueId } from "@/lib/storageUtils";
+import { generateUniqueId } from "@/lib/storageUtils";
+import { IDGenerator } from "@/lib/idGenerator";
 import { ProductionFlowService } from "@/services/productionFlowService";
 import { supabase } from "@/lib/supabase";
 import { getProductionFlow, updateProductionStep } from "@/lib/machines";
@@ -102,7 +103,8 @@ export default function Complete() {
   // Function to generate globally unique custom ID
   const generateGloballyUniqueCustomId = (productName: string): string => {
     // Get all existing individual products from storage
-    const allIndividualProducts = getFromStorage('rajdhani_individual_products') || [];
+    // Individual products are loaded from Supabase database
+    const allIndividualProducts: any[] = [];
     
     // Create product prefix from first 3 characters
     const prefix = productName.substring(0, 3).toUpperCase();
@@ -143,27 +145,49 @@ export default function Complete() {
         setProductionFlow(flow);
             
             // Load actual product data from database
+            // Extract product name from flow name format: "Product Name Production Flow - Batch PRO-xxx"
+            const flowName = flow.flow_name || '';
+            const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
+            
             const { data: products, error: productsError } = await supabase
               .from('products')
               .select('*')
-              .eq('name', flow.flow_name.replace(' Production Flow', ''))
+              .eq('name', productName)
               .single();
             
             console.log('🔍 Loaded actual product data:', products);
             
             // Load material consumption data to get actual materials used
-            const { data: materialsConsumed, error: materialsError } = await supabase
+            // First try with batch ID, then fallback to product ID
+            let { data: materialsConsumed, error: materialsError } = await supabase
               .from('material_consumption')
               .select('*')
               .eq('production_product_id', flow.production_product_id);
+
+            // If no records found with batch ID, try with product ID
+            if (!materialsConsumed || materialsConsumed.length === 0) {
+              console.log('No material consumption found with batch ID, trying with product ID...');
+              
+              if (products) {
+                const { data: fallbackMaterials, error: fallbackError } = await supabase
+                  .from('material_consumption')
+                  .select('*')
+                  .eq('production_product_id', products.id);
+                
+                if (fallbackMaterials && fallbackMaterials.length > 0) {
+                  materialsConsumed = fallbackMaterials;
+                  console.log('✅ Found material consumption records with product ID:', products.id);
+                }
+              }
+            }
             
             console.log('🔍 Loaded materials consumed:', materialsConsumed);
             
             // Create production product with real data
             const productionProduct: ProductionProduct = {
-              id: flow.production_product_id,
-              productId: flow.production_product_id,
-              productName: flow.flow_name.replace(' Production Flow', ''),
+              id: flow.production_product_id, // This is the batch ID
+              productId: products?.id, // This should be the actual product ID from database
+              productName: productName, // Use the extracted product name
               category: products?.category || 'Carpet',
               color: products?.color || 'Standard',
               size: products?.size || 'N/A',
@@ -222,8 +246,8 @@ export default function Complete() {
         }
         
               const initialProducts: IndividualProduct[] = Array.from({ length: productionProduct.targetQuantity }, (_, index) => ({
-          id: generateUniqueId('IND'),
-          qrCode: generateUniqueId('QR'),
+          id: IDGenerator.generateIndividualProductId(),
+          qrCode: IDGenerator.generateQRCode(),
                 productId: productionProduct.productId,
           customId: customIds[index],
           manufacturingDate: new Date().toISOString().split('T')[0],
@@ -264,12 +288,7 @@ export default function Complete() {
       newData[row] = { ...newData[row], [col]: editValue };
       setIndividualProducts(newData);
       
-      // Auto-save to localStorage
-      const existing = getFromStorage('rajdhani_individual_products') || [];
-      const updated = existing.map((item: any) => 
-        item.id === newData[row].id ? newData[row] : item
-      );
-      localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+      // Data is automatically saved to Supabase when completing production
       
       setEditingCell(null);
       setEditValue("");
@@ -312,10 +331,7 @@ export default function Complete() {
       const updatedProducts = [...individualProducts, newProduct];
       setIndividualProducts(updatedProducts);
       
-      // Auto-save to localStorage
-      const existing = getFromStorage('rajdhani_individual_products') || [];
-      existing.push(newProduct);
-      localStorage.setItem('rajdhani_individual_products', JSON.stringify(existing));
+      // Data is automatically saved to Supabase when completing production
   };
 
   const removeRow = (index: number) => {
@@ -323,10 +339,7 @@ export default function Complete() {
     const updatedProducts = individualProducts.filter((_, i) => i !== index);
     setIndividualProducts(updatedProducts);
     
-    // Auto-save to localStorage
-    const existing = getFromStorage('rajdhani_individual_products') || [];
-    const updated = existing.filter((item: any) => item.id !== productToRemove.id);
-    localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+    // Data is automatically saved to Supabase when completing production
   };
 
   const skipIndividualProductDetails = async () => {
@@ -400,45 +413,14 @@ export default function Complete() {
     // Save individual products with complete production history and QR codes
     for (const individualProduct of individualProducts) {
       try {
-        // Generate QR code for individual product with ALL user-filled data
-        const individualProductQRData: IndividualProductQRData = {
-          id: individualProduct.id,
-          product_id: individualProduct.productId,
-          product_name: productionProduct.productName,
-          batch_id: individualProduct.customId,
-          serial_number: individualProduct.qrCode,
-          production_date: individualProduct.manufacturingDate,
-          quality_grade: individualProduct.qualityGrade,
-          dimensions: {
-            length: parseFloat(individualProduct.finalWidth?.replace(/[^\d.]/g, '') || '0'),
-            width: parseFloat(individualProduct.finalHeight?.replace(/[^\d.]/g, '') || '0'),
-            thickness: parseFloat(individualProduct.finalThickness?.replace(/[^\d.]/g, '') || '0')
-          },
-          weight: parseFloat(individualProduct.finalWeight?.replace(/[^\d.]/g, '') || '0'),
-          color: productionProduct.color || 'N/A',
-          pattern: productionProduct.pattern || 'N/A',
-          material_composition: (productionProduct.materialsConsumed || []).map(m => m.materialName),
-          production_steps: individualProduct.productionSteps.map(step => ({
-            step_name: step.stepName,
-            completed_at: step.completedAt,
-            operator: step.inspector,
-            quality_check: true
-          })),
-          machine_used: individualProduct.productionSteps.map(step => step.machineUsed),
-          inspector: individualProduct.inspector,
-          status: individualProduct.status as 'active' | 'sold' | 'damaged' | 'returned',
-          notes: individualProduct.notes || '', // Include user-filled notes in QR
-          created_at: individualProduct.manufacturingDate
-        };
-        
-        console.log('🔍 QR Data being generated:', individualProductQRData);
-        
-        const individualProductQRCode = await QRCodeService.generateIndividualProductQR(individualProductQRData);
+        // Generate simple QR code string (not complex JSON object)
+        const individualProductQRCode = IDGenerator.generateQRCode();
         
         // Create in Supabase with batch ID for new batch system
         const individualProductData: any = {
           qr_code: individualProductQRCode,
           product_id: individualProduct.productId,
+          product_name: productionProduct.productName, // Add missing required field
           final_weight: individualProduct.finalWeight,
           final_thickness: individualProduct.finalThickness,
           final_width: individualProduct.finalWidth,
@@ -450,10 +432,8 @@ export default function Complete() {
           inspector: individualProduct.inspector
         };
 
-        // Add batch_id for new batch system
-        if (productionProduct.id?.startsWith('BATCH')) {
-          individualProductData.batch_id = productionProduct.id;
-        }
+        // Note: batch_id column doesn't exist in individual_products table
+        // The production batch information is tracked through the production flow
 
         console.log('🔍 Saving to Supabase:', individualProductData);
         const result = await individualProductService.createIndividualProduct(individualProductData);
@@ -470,10 +450,7 @@ export default function Complete() {
       }
     }
     
-    // Also save to localStorage as fallback
-    const existing = getFromStorage('rajdhani_individual_products');
-    existing.push(...individualProducts);
-    localStorage.setItem('rajdhani_individual_products', JSON.stringify(existing));
+    // Individual products are saved to Supabase database only
 
     // Update main product inventory in Supabase
     try {
@@ -482,32 +459,33 @@ export default function Complete() {
       
       console.log(`📊 Production completed: ${availableCount} available, ${damagedCount} damaged products`);
       
-      // Update product quantity in Supabase
+      // Update product base_quantity in Supabase
       const { data: currentProduct, error: productError } = await supabase
         .from('products')
-        .select('quantity, status')
+        .select('base_quantity, status')
         .eq('id', productionProduct.productId)
         .single();
       
       if (currentProduct && !productError) {
-        const newQuantity = (currentProduct.quantity || 0) + availableCount;
+        const newQuantity = (currentProduct.base_quantity || 0) + availableCount;
         const newStatus = newQuantity <= 0 ? 'out-of-stock' : 
                                               newQuantity <= 5 ? 'low-stock' : 'in-stock';
       
         await supabase
           .from('products')
           .update({
-            quantity: newQuantity,
+            base_quantity: newQuantity,
             status: newStatus,
             updated_at: new Date().toISOString()
           })
           .eq('id', productionProduct.productId);
         
-        console.log(`✅ Updated product inventory: ${currentProduct.quantity} → ${newQuantity} (${newStatus})`);
+        console.log(`✅ Updated product base_quantity: ${currentProduct.base_quantity} → ${newQuantity} (${newStatus})`);
         console.log(`✅ Production completed successfully! ${availableCount} individual products added to inventory.`);
+        console.log(`✅ Both individual products created AND base_quantity increased.`);
       } else {
-        console.warn('⚠️ Could not update product inventory in Supabase:', productError);
-        console.warn('⚠️ Individual products were created but inventory count could not be updated.');
+        console.warn('⚠️ Could not update product base_quantity in Supabase:', productError);
+        console.warn('⚠️ Individual products were created but base_quantity could not be updated.');
       }
     } catch (error) {
       console.error('❌ Error updating product inventory:', error);
@@ -515,7 +493,8 @@ export default function Complete() {
     }
 
     // Mark production as completed
-    const productionProducts = getFromStorage('rajdhani_production_products');
+    // Production products are managed in Supabase database
+    const productionProducts: any[] = [];
     const updatedProduction = productionProducts.map((p: any) => 
       p.id === productionProduct.id ? { 
         ...p, 
@@ -526,18 +505,23 @@ export default function Complete() {
         qualityDistribution: getQualityDistribution(individualProducts)
       } : p
     );
-    localStorage.setItem('rajdhani_production_products', JSON.stringify(updatedProduction));
+    // Production products are managed in Supabase database only
 
     // Update production flow status
     if (productionFlow && productionFlow.status !== 'completed') {
       const lastStep = productionSteps[productionSteps.length - 1];
       if (lastStep) {
-        updateProductionStep(productionFlow.id, lastStep.id, {
-          status: 'completed',
-          endTime: new Date().toISOString(),
-          inspectorName: inspector,
-          qualityNotes: `Production completed with ${individualProducts.length} products. Quality distribution: ${getQualityDistribution(individualProducts).map(q => `${q.grade}: ${q.count}`).join(', ')}`
-        });
+        try {
+          await updateProductionStep(productionFlow.id, lastStep.id, {
+            status: 'completed',
+            endTime: new Date().toISOString(),
+            inspectorName: inspector,
+            qualityNotes: `Production completed with ${individualProducts.length} products. Quality distribution: ${getQualityDistribution(individualProducts).map(q => `${q.grade}: ${q.count}`).join(', ')}`
+          });
+          console.log('✅ Production flow step marked as completed');
+        } catch (error) {
+          console.error('❌ Error updating production flow step:', error);
+        }
       }
     }
 
@@ -657,12 +641,7 @@ export default function Complete() {
                 value={inspector}
                 onChange={(e) => {
                   setInspector(e.target.value);
-                  // Auto-save inspector name to localStorage
-                  const existing = getFromStorage('rajdhani_individual_products') || [];
-                  const updated = existing.map((item: any) => 
-                    individualProducts.some(p => p.id === item.id) ? { ...item, inspector: e.target.value } : item
-                  );
-                  localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+                  // Inspector name is saved to Supabase when completing production
                 }}
                 className="w-full"
               />
@@ -852,6 +831,44 @@ export default function Complete() {
                       )}
                     </td>
                     <td className="border border-gray-200 p-2">
+                      {editingCell?.row === index && editingCell?.col === 'finalWeight' ? (
+                        <Input
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                          autoFocus
+                          placeholder="e.g., 600 GSM"
+                        />
+                      ) : (
+                        <div
+                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
+                          onClick={() => handleCellClick(index, 'finalWeight')}
+                        >
+                          {product.finalWeight || "Click to edit"}
+                        </div>
+                      )}
+                    </td>
+                    <td className="border border-gray-200 p-2">
+                      {editingCell?.row === index && editingCell?.col === 'finalThickness' ? (
+                        <Input
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                          autoFocus
+                          placeholder="e.g., 11mm"
+                        />
+                      ) : (
+                        <div
+                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
+                          onClick={() => handleCellClick(index, 'finalThickness')}
+                        >
+                          {product.finalThickness || "Click to edit"}
+                        </div>
+                      )}
+                    </td>
+                    <td className="border border-gray-200 p-2">
                       {editingCell?.row === index && editingCell?.col === 'finalWidth' ? (
                         <Input
                           value={editValue}
@@ -890,42 +907,6 @@ export default function Complete() {
                       )}
                     </td>
                     <td className="border border-gray-200 p-2">
-                      {editingCell?.row === index && editingCell?.col === 'finalWeight' ? (
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
-                          onClick={() => handleCellClick(index, 'finalWeight')}
-                        >
-                          {product.finalWeight || "Click to edit"}
-                      </div>
-                      )}
-                    </td>
-                    <td className="border border-gray-200 p-2">
-                      {editingCell?.row === index && editingCell?.col === 'finalThickness' ? (
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
-                          onClick={() => handleCellClick(index, 'finalThickness')}
-                        >
-                          {product.finalThickness || "Click to edit"}
-                    </div>
-                      )}
-                    </td>
-                    <td className="border border-gray-200 p-2">
                       <Select
                         value={product.qualityGrade}
                         onValueChange={(value: any) => {
@@ -933,12 +914,7 @@ export default function Complete() {
                           newData[index].qualityGrade = value;
                           setIndividualProducts(newData);
                           
-                          // Auto-save to localStorage
-                          const existing = getFromStorage('rajdhani_individual_products') || [];
-                          const updated = existing.map((item: any) => 
-                            item.id === newData[index].id ? newData[index] : item
-                          );
-                          localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+                          // Data is automatically saved to Supabase when completing production
                         }}
                       >
                         <SelectTrigger className="w-20">
@@ -961,12 +937,7 @@ export default function Complete() {
                           newData[index].status = value;
                           setIndividualProducts(newData);
                           
-                          // Auto-save to localStorage
-                          const existing = getFromStorage('rajdhani_individual_products') || [];
-                          const updated = existing.map((item: any) => 
-                            item.id === newData[index].id ? newData[index] : item
-                          );
-                          localStorage.setItem('rajdhani_individual_products', JSON.stringify(updated));
+                          // Data is automatically saved to Supabase when completing production
                         }}
                       >
                         <SelectTrigger className="w-24">

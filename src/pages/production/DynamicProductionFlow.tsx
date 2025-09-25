@@ -82,6 +82,8 @@ export default function DynamicProductionFlow() {
 
   const [selectedMachineId, setSelectedMachineId] = useState('');
   const [inspectorName, setInspectorName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -102,63 +104,93 @@ export default function DynamicProductionFlow() {
 
   const loadInitialData = async () => {
     try {
-      console.log('🔍 Loading production data for ID:', productId);
+      setIsLoading(true);
+      console.log('🔍 Loading production data for batch ID:', productId);
 
-      // Load production flow from Supabase first
+      // Load production flow from Supabase using the batch ID
+      console.log('🔍 Calling ProductionFlowService.getProductionFlow with batch ID:', productId);
       const flow = await ProductionFlowService.getProductionFlow(productId);
       console.log('🔍 Production flow loaded:', flow);
+      console.log('🔍 Flow type:', typeof flow, 'Flow is null?', flow === null);
 
       if (!flow) {
-        console.warn('⚠️ No production flow found for productId:', productId, '- continuing with localStorage data');
-        // Continue with localStorage data even if no flow is found
+        console.error('❌ No production flow found for batch ID:', productId);
+        setIsLoading(false);
+        return;
       }
 
-      // Load from localStorage first
-      const savedProductions = JSON.parse(localStorage.getItem('rajdhani_productions') || '{}');
-      const savedProduction = savedProductions[productId];
+      setProductionFlow(flow);
 
-      if (savedProduction) {
-        console.log('✅ Found saved production data:', savedProduction);
-        const { production, productDetails } = savedProduction;
+      // Extract product information from the flow name
+      // Flow name format: "Product Name Production Flow - Batch PRO-xxx"
+      const flowName = flow.flow_name || '';
+      const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
+      
+      console.log('🔍 Extracted product name from flow:', productName);
 
-        // Create production product from saved data
-        const productionProduct = {
-          id: productId, // Use the production ID
-          productId: production.productId || productDetails.id,
-          productName: productDetails.name || production.productName,
-          category: productDetails.category || production.category,
-          color: productDetails.color || production.color || 'N/A',
-          size: productDetails.size || production.size || 'N/A',
-          pattern: productDetails.pattern || production.pattern || 'N/A',
-          targetQuantity: production.targetQuantity || 1,
-          priority: production.priority || 'normal' as const,
-          status: production.status || 'active' as const,
-          expectedCompletion: production.expectedCompletion || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: production.createdAt || new Date().toISOString(),
-          materialsConsumed: [],
-          wasteGenerated: [],
-          expectedProduct: {
-            name: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
-            category: 'Carpet',
-            height: 'N/A',
-            width: 'N/A',
-            weight: 'N/A',
-            thickness: 'N/A',
-            materialComposition: 'N/A',
-            qualityGrade: 'A'
-          },
-          notes: ''
-        };
-        setProductionProduct(productionProduct);
-        setProductionFlow(flow);
+      // Load the actual product data from database using the product name
+      // We need to find the product by name since we only have the batch ID
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('name', productName)
+        .limit(1);
+
+      if (productsError) {
+        console.error('❌ Error loading product data:', productsError);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!products || products.length === 0) {
+        console.error('❌ No product found with name:', productName);
+        setIsLoading(false);
+        return;
+      }
+
+      const productData = products[0];
+      console.log('✅ Found product data:', productData);
+
+      // Create production product from flow and product data
+      const productionProduct = {
+        id: productId, // Use the batch ID
+        productId: productData.id, // Use the actual product ID
+        productName: productData.name,
+        category: productData.category,
+        color: productData.color || 'N/A',
+        size: productData.size || 'N/A',
+        pattern: productData.pattern || 'N/A',
+        targetQuantity: 1, // Default quantity
+        priority: 'normal' as const,
+        status: 'active' as const,
+        expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: flow.created_at || new Date().toISOString(),
+        materialsConsumed: [],
+        wasteGenerated: [],
+        expectedProduct: {
+          name: productData.name,
+          category: productData.category,
+          height: productData.height || 'N/A',
+          width: productData.width || 'N/A',
+          weight: productData.weight || 'N/A',
+          thickness: productData.thickness || 'N/A',
+          materialComposition: 'N/A',
+          qualityGrade: 'A'
+        },
+        notes: ''
+      };
+      
+      setProductionProduct(productionProduct);
+      console.log('✅ Created production product from flow and database data:', productionProduct);
 
         // Load production steps for this flow
-        console.log('Loading production steps for flow_id:', flow.id);
-        const { data: steps, error: stepsError } = await supabase
-          .from('production_flow_steps')
-          .select('*')
-          .eq('flow_id', flow.id)
-          .order('step_order', { ascending: true });
+        if (flow) {
+          console.log('Loading production steps for flow_id:', flow.id);
+          const { data: steps, error: stepsError } = await supabase
+            .from('production_flow_steps')
+            .select('*')
+            .eq('flow_id', flow.id)
+            .order('step_order', { ascending: true });
         
         console.log('Production steps query result:', { steps, stepsError });
         
@@ -168,7 +200,7 @@ export default function DynamicProductionFlow() {
           const { data: stepsFallback, error: fallbackError } = await supabase
             .from('production_flow_steps')
             .select('*')
-            .eq('flow_id', flow.id);
+            .eq('flow_id', flow?.id);
           
           console.log('Fallback query result:', { stepsFallback, fallbackError });
           
@@ -211,45 +243,15 @@ export default function DynamicProductionFlow() {
 
           setProductionSteps(transformedSteps);
         }
-      } else {
-        // No saved production data, create from flow data
-        console.log('No saved production data, creating from flow data');
-        const productionProduct = {
-          id: productId,
-          productId: flow.production_product_id,
-          productName: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
-          category: 'Carpet',
-          color: 'Standard',
-          size: 'N/A',
-          pattern: 'N/A',
-          targetQuantity: 1,
-          priority: 'normal' as const,
-          status: 'active' as const,
-          expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          createdAt: flow.created_at || new Date().toISOString(),
-          materialsConsumed: [],
-          wasteGenerated: [],
-          expectedProduct: {
-            name: flow?.flow_name?.replace(' Production Flow', '') || 'Unknown Product',
-            category: 'Carpet',
-            height: 'N/A',
-            width: 'N/A',
-            weight: 'N/A',
-            thickness: 'N/A',
-            materialComposition: 'N/A',
-            qualityGrade: 'A'
-          },
-          notes: ''
-        };
-        setProductionProduct(productionProduct);
-        setProductionFlow(flow);
-      }
+        } // Close the if (flow) block
     } catch (error) {
       console.error('Error loading production flow:', error);
+    } finally {
+      // Load machines from Supabase
+      await loadMachines();
+      setIsLoading(false);
+      console.log('✅ Initial data loading completed');
     }
-
-    // Load machines from Supabase
-    await loadMachines();
   };
 
   const loadMachines = async () => {
@@ -259,6 +261,17 @@ export default function DynamicProductionFlow() {
     } catch (error) {
       console.error('Error loading machines:', error);
       setMachines([]);
+    }
+  };
+
+  // Manual refresh function for debugging
+  const manualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    setIsRefreshing(true);
+    try {
+      await loadInitialData();
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -385,8 +398,8 @@ export default function DynamicProductionFlow() {
         notes: getMachineDescription(selectedMachine.name)
       });
 
-      // Reload steps from Supabase
-      await loadProductionSteps();
+      // Reload entire flow data to ensure everything is up to date
+      await loadInitialData();
 
       setSelectedMachineId('');
       setInspectorName('');
@@ -400,6 +413,33 @@ export default function DynamicProductionFlow() {
 
   const updateStepStatus = async (stepId: string, newStatus: 'pending' | 'in_progress' | 'completed') => {
     try {
+      // Find the current step
+      const currentStep = productionSteps.find(step => step.id === stepId);
+      if (!currentStep) {
+        console.error('Step not found:', stepId);
+        return;
+      }
+
+      // Validate step progression
+      if (newStatus === 'in_progress') {
+        // Check if previous steps are completed
+        const previousSteps = productionSteps.filter(step => step.stepNumber < currentStep.stepNumber);
+        const incompletePreviousSteps = previousSteps.filter(step => step.status !== 'completed');
+        
+        if (incompletePreviousSteps.length > 0) {
+          alert(`⚠️ Cannot start this step. Please complete the previous steps first:\n${incompletePreviousSteps.map(s => s.name).join(', ')}`);
+          return;
+        }
+      }
+
+      if (newStatus === 'completed') {
+        // Check if the step is currently in progress
+        if (currentStep.status !== 'in_progress') {
+          alert(`⚠️ Cannot complete this step. Please start the step first.`);
+          return;
+        }
+      }
+
       // Update in Supabase
       await ProductionFlowService.updateFlowStep(stepId, {
         status: newStatus === 'in_progress' ? 'in_progress' : newStatus === 'completed' ? 'completed' : 'pending',
@@ -407,8 +447,8 @@ export default function DynamicProductionFlow() {
         end_time: newStatus === 'completed' ? new Date().toISOString() : undefined
       });
 
-      // Reload steps from Supabase
-      await loadProductionSteps();
+      // Reload entire flow data to ensure everything is up to date
+      await loadInitialData();
 
       console.log('Step status updated:', { stepId, newStatus });
     } catch (error) {
@@ -522,14 +562,33 @@ export default function DynamicProductionFlow() {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Production
         </Button>
-        <Button variant="outline" onClick={loadProductionSteps} className="ml-auto">
-          <RefreshCw className="w-4 h-4 mr-2" />
+        <Button variant="outline" onClick={loadProductionSteps} className="ml-auto" disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh Steps
+        </Button>
+        <Button variant="outline" onClick={manualRefresh} className="ml-2" disabled={isRefreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Debug Refresh
         </Button>
       </div>
 
-      {/* Progress Overview */}
-      <Card>
+      {/* Loading State */}
+      {isLoading && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+              <span className="text-lg font-medium">Loading production flow...</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main Content - only show when not loading */}
+      {!isLoading && (
+        <>
+          {/* Progress Overview */}
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Factory className="w-5 h-5" />
@@ -847,6 +906,8 @@ export default function DynamicProductionFlow() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+        </>
+      )}
     </div>
   );
 }

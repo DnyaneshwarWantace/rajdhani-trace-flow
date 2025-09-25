@@ -28,6 +28,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { RawMaterialService } from "@/services/rawMaterialService";
 import { NotificationService } from "@/services/notificationService";
+import { WasteManagementService } from "@/services/wasteManagementService";
 import { useToast } from "@/hooks/use-toast";
 import { getFromStorage, fixNestedArray, markNotificationAsRead, resolveNotification } from "@/lib/storageUtils";
 
@@ -492,38 +493,32 @@ const supabaseStorage = {
     }
   },
 
-  // Waste Management functions - DISABLED (table doesn't exist)
-  // async getWasteManagement(): Promise<WasteItem[]> {
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from('waste_management')
-  //       .select('*')
-  //       .order('generated_at', { ascending: false });
-
-  //     if (error) throw error;
-  //     return data || [];
-  //   } catch (error) {
-  //     console.error('Error fetching waste management:', error);
-  //     return [];
-  //   }
-  // },
-
-  // async updateWasteManagement(wasteData: WasteItem[]): Promise<void> {
-  //   try {
-  //     // Delete existing data and insert new data
-  //     await supabase.from('waste_management').delete().neq('id', '');
-
-  //     if (wasteData.length > 0) {
-  //       const { error } = await supabase
-  //         .from('waste_management')
-  //         .insert(wasteData);
-
-  //       if (error) throw error;
-  //     }
-  //   } catch (error) {
-  //     console.error('Error updating waste management:', error);
-  //   }
-  // },
+  // Waste Management functions
+  async getWasteManagement(): Promise<WasteItem[]> {
+    try {
+      const { data, error } = await WasteManagementService.getWasteItems();
+      if (error) {
+        console.error('Error fetching waste management:', error);
+        return [];
+      }
+      // Map service WasteItem to local WasteItem interface
+      const mappedData = (data || []).map((item: any) => ({
+        id: item.id,
+        productionId: item.production_batch_id || item.production_product_id || '',
+        productName: item.material_name || '',
+        wasteType: item.waste_type || 'scrap',
+        quantity: item.quantity || 0,
+        unit: item.unit || '',
+        generatedAt: item.generated_at || new Date().toISOString(),
+        status: item.can_be_reused ? 'available_for_reuse' as const : 'added_to_inventory' as const,
+        addedAt: item.returned_at || undefined
+      }));
+      return mappedData;
+    } catch (error) {
+      console.error('Error fetching waste management:', error);
+      return [];
+    }
+  },
 
   // Settings functions
   async getSettings(): Promise<Settings> {
@@ -832,8 +827,8 @@ export default function Materials() {
   // Get waste recovery count for the dashboard
   const getWasteRecoveryCount = async () => {
     try {
-      // TODO: Implement when waste_management table is created
-      return 0;
+      const { data: stats } = await WasteManagementService.getWasteStats();
+      return stats?.byStatus.returned || 0;
     } catch (error) {
       console.error('Error getting waste recovery count:', error);
       return 0;
@@ -1396,69 +1391,30 @@ export default function Materials() {
   // Handle waste management operations
   const handleReturnToInventory = async (waste: WasteItem) => {
     try {
-      // TODO: Implement when waste_management table is created
-      // For now, just add the material to inventory
+      const result = await WasteManagementService.returnWasteToInventory(waste.id);
+      
+      if (result.success) {
+        // Reload raw materials and trigger waste data refresh
+        const updatedMaterials = await supabaseStorage.getAll();
+        setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
+        setWasteRecoveryRefresh(prev => prev + 1);
 
-      // Find existing material with same name or create new one
-      const existingMaterial = rawMaterials.find(m =>
-        m.name.toLowerCase() === waste.productName.toLowerCase()
-      );
-
-      if (existingMaterial) {
-        // Update existing material stock
-        const updatedMaterial = {
-          ...existingMaterial,
-          currentStock: existingMaterial.currentStock + waste.quantity,
-          lastRestocked: new Date().toISOString()
-        };
-        updatedMaterial.status = calculateMaterialStatus(updatedMaterial);
-        updatedMaterial.totalValue = updatedMaterial.currentStock * updatedMaterial.costPerUnit;
-
-        await supabaseStorage.update(existingMaterial.id, updatedMaterial);
+        toast({
+          title: "✅ Material Returned to Inventory",
+          description: `${waste.quantity} ${waste.unit} of ${waste.productName} has been returned to inventory.`,
+        });
       } else {
-        // Create new material from waste
-        const newMaterial = {
-          name: waste.productName,
-          brand: "Recovered",
-          category: "Waste Recovery",
-          batchNumber: generateUniqueId('RECOVERED'),
-          currentStock: waste.quantity,
-          unit: waste.unit,
-          minThreshold: 10,
-          maxCapacity: 1000,
-          reorderPoint: 10,
-          lastRestocked: new Date().toISOString(),
-          dailyUsage: 0,
-          status: "in-stock" as RawMaterial['status'],
-          supplier: "Waste Recovery",
-          supplierId: generateUniqueId('SUP'),
-          costPerUnit: 0,
-          totalValue: 0,
-          qualityGrade: "B",
-          imageUrl: "",
-          materialsUsed: [],
-          supplierPerformance: 75
-        };
-
-        newMaterial.status = calculateMaterialStatus(newMaterial as RawMaterial) as RawMaterial['status'];
-        await supabaseStorage.add(newMaterial as Omit<RawMaterial, 'id'>);
+        toast({
+          title: "❌ Error",
+          description: result.error || "Failed to return material to inventory.",
+          variant: "destructive",
+        });
       }
-
-      // Refresh materials and waste data
-      const updatedMaterials = await supabaseStorage.getAll();
-      setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
-      setWasteRecoveryRefresh(prev => prev + 1);
-
-      toast({
-        title: "Waste Recovered",
-        description: `${waste.quantity} ${waste.unit} of ${waste.productName} returned to inventory.`,
-      });
-
     } catch (error) {
       console.error('Error returning waste to inventory:', error);
       toast({
-        title: "Error",
-        description: "Failed to return waste to inventory",
+        title: "❌ Error",
+        description: "Failed to return material to inventory.",
         variant: "destructive",
       });
     }
@@ -3164,10 +3120,11 @@ function WasteRecoveryTab({
     const loadWasteData = async () => {
       setLoading(true);
       try {
-        // TODO: Implement when waste_management table is created
-        setWasteData([]);
+        const wasteData = await supabaseStorage.getWasteManagement();
+        setWasteData(wasteData);
       } catch (error) {
         console.error('Error loading waste data:', error);
+        setWasteData([]);
       } finally {
         setLoading(false);
       }

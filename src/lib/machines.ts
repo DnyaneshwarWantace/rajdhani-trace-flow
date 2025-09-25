@@ -332,35 +332,49 @@ export const updateProductionStep = async (
   updates: Partial<ProductionStep>
 ): Promise<ProductionFlow | null> => {
   try {
-    const { data: flow, error: fetchError } = await supabase
-      .from('production_flows')
-      .select('*')
-      .eq('id', flowId)
-      .single();
-
-    if (fetchError) throw fetchError;
-    if (!flow) return null;
-
-    const stepIndex = flow.steps.findIndex((s: ProductionStep) => s.id === stepId);
-    if (stepIndex === -1) return null;
-
-    flow.steps[stepIndex] = {
-      ...flow.steps[stepIndex],
-      ...updates,
+    // Map interface fields to database column names
+    const dbUpdates: any = {
+      updated_at: new Date().toISOString()
     };
+    
+    // Map interface fields to database columns
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime;
+    if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
+    if (updates.inspectorName !== undefined) dbUpdates.inspector_name = updates.inspectorName;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.qualityNotes !== undefined) dbUpdates.quality_notes = updates.qualityNotes;
 
-    const { data: updatedFlow, error: updateError } = await supabase
-      .from('production_flows')
-      .update({
-        steps: flow.steps,
-        updatedAt: new Date().toISOString()
-      })
-      .eq('id', flowId)
+    // Update the step directly in the production_flow_steps table
+    const { data: updatedStep, error: updateError } = await supabase
+      .from('production_flow_steps')
+      .update(dbUpdates)
+      .eq('id', stepId)
+      .eq('flow_id', flowId)
       .select()
       .single();
 
-    if (updateError) throw updateError;
-    return updatedFlow;
+    if (updateError) {
+      console.error('Error updating production step:', updateError);
+      return null;
+    }
+
+    // Fetch the updated flow with steps
+    const { data: flow, error: fetchError } = await supabase
+      .from('production_flows')
+      .select(`
+        *,
+        production_flow_steps (*)
+      `)
+      .eq('id', flowId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching updated flow:', fetchError);
+      return null;
+    }
+
+    return flow;
   } catch (error) {
     console.error('Error updating production step:', error);
     return null;
