@@ -343,7 +343,10 @@ export const updateProductionStep = async (
     if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
     if (updates.inspectorName !== undefined) dbUpdates.inspector_name = updates.inspectorName;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
-    if (updates.qualityNotes !== undefined) dbUpdates.quality_notes = updates.qualityNotes;
+    // Only include quality_notes if the column exists (will be added via SQL script)
+    if (updates.qualityNotes !== undefined) {
+      dbUpdates.quality_notes = updates.qualityNotes;
+    }
 
     // Update the step directly in the production_flow_steps table
     const { data: updatedStep, error: updateError } = await supabase

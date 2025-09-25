@@ -515,13 +515,43 @@ export default function Complete() {
           await updateProductionStep(productionFlow.id, lastStep.id, {
             status: 'completed',
             endTime: new Date().toISOString(),
-            inspectorName: inspector,
-            qualityNotes: `Production completed with ${individualProducts.length} products. Quality distribution: ${getQualityDistribution(individualProducts).map(q => `${q.grade}: ${q.count}`).join(', ')}`
+            inspectorName: inspector
           });
           console.log('✅ Production flow step marked as completed');
         } catch (error) {
           console.error('❌ Error updating production flow step:', error);
         }
+      }
+
+      // Update the production flow status to completed
+      try {
+        console.log('🔍 Updating production flow status to completed for flow ID:', productionFlow.id);
+        console.log('🔍 Current production flow status:', productionFlow.status);
+        console.log('🔍 Production flow data:', productionFlow);
+        
+        const { data: updateData, error: updateError } = await supabase
+          .from('production_flows')
+          .update({
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', productionFlow.id)
+          .select();
+        
+        if (updateError) {
+          console.error('❌ Error updating production flow status:', updateError);
+        } else {
+          console.log('✅ Production flow status updated to completed:', updateData);
+          
+          // Also update the local state
+          setProductionFlow(prev => ({
+            ...prev,
+            status: 'completed',
+            updated_at: new Date().toISOString()
+          }));
+        }
+      } catch (error) {
+        console.error('❌ Error updating production flow status:', error);
       }
     }
 

@@ -190,19 +190,76 @@ export default function Production() {
           // Check if individual products have been created for this flow
           let individualProducts: any[] = [];
           try {
-            const { data, error } = await supabase
+            console.log('🔍 Checking individual products for flow:', flow.id);
+            console.log('🔍 Flow production_product_id:', flow.production_product_id);
+            
+            // First try with the batch ID (production_product_id)
+            const { data: batchData, error: batchError } = await supabase
               .from('individual_products')
-              .select('id')
+              .select('id, product_id')
               .eq('product_id', flow.production_product_id);
-
-            if (error) {
-              // Only log non-expected errors (suppress table not found errors)
-              if (error.code !== '42P01' && error.code !== 'PGRST116') {
-                console.warn('Error checking individual products:', error);
-              }
-              individualProducts = [];
+            
+            console.log('🔍 Batch ID query result:', { data: batchData, error: batchError });
+            
+            if (!batchError && batchData && batchData.length > 0) {
+              individualProducts = batchData;
+              console.log('🔍 Found individual products using batch ID:', individualProducts.length);
             } else {
-              individualProducts = data || [];
+              // Fallback: Extract product name from flow name and find by product name
+              const flowName = flow.flow_name || '';
+              const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
+              
+              console.log('🔍 Flow name:', flowName);
+              console.log('🔍 Extracted product name:', productName);
+              
+              // Get the actual product ID from the products table
+              const { data: productData } = await supabase
+                .from('products')
+                .select('id')
+                .eq('name', productName)
+                .single();
+              
+              console.log('🔍 Product data found:', productData);
+              
+              if (productData) {
+                const { data, error } = await supabase
+                  .from('individual_products')
+                  .select('id, product_id')
+                  .eq('product_id', productData.id);
+                
+                console.log('🔍 Product ID query result:', { data, error });
+                
+                if (!error && data && data.length > 0) {
+                  individualProducts = data;
+                  console.log('🔍 Found individual products using product ID:', individualProducts.length);
+                }
+              }
+            }
+            
+            // If still no individual products found, try a broader search
+            if (individualProducts.length === 0) {
+              console.log('🔍 No individual products found, trying broader search...');
+              
+              // Get all individual products and check if any match
+              const { data: allProducts, error: allError } = await supabase
+                .from('individual_products')
+                .select('id, product_id, product_name')
+                .limit(100);
+              
+              if (!allError && allProducts) {
+                console.log('🔍 All individual products:', allProducts);
+                
+                // Check if any individual product has a product_id that matches our flow's production_product_id
+                const matchingProducts = allProducts.filter(p => 
+                  p.product_id === flow.production_product_id || 
+                  p.product_name === flow.flow_name?.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0]
+                );
+                
+                if (matchingProducts.length > 0) {
+                  individualProducts = matchingProducts;
+                  console.log('🔍 Found matching individual products:', matchingProducts.length);
+                }
+              }
             }
           } catch (error) {
             console.warn('Individual products table may not exist:', error);
@@ -212,10 +269,26 @@ export default function Production() {
 
           // Only mark as completed if ALL steps are completed AND individual products exist
           const allStepsCompleted = hasSteps && completedSteps === steps.length;
-          if (individualProducts && individualProducts.length > 0 && allStepsCompleted) {
+          
+          console.log('🔍 Status calculation for flow:', flow.id);
+          console.log('🔍 Flow status from database:', flow.status);
+          console.log('🔍 hasSteps:', hasSteps, 'completedSteps:', completedSteps, 'totalSteps:', steps.length);
+          console.log('🔍 allStepsCompleted:', allStepsCompleted);
+          console.log('🔍 individualProducts.length:', individualProducts.length);
+          console.log('🔍 inProgressSteps:', inProgressSteps);
+          
+          // Check if flow status is already completed in database
+          if (flow.status === 'completed') {
             status = 'completed';
+            console.log('🔍 Status set to: completed (from database flow status)');
+          } else if (individualProducts && individualProducts.length > 0 && allStepsCompleted) {
+            status = 'completed';
+            console.log('🔍 Status set to: completed (from steps and individual products)');
           } else if (inProgressSteps > 0 || completedSteps > 0 || hasSteps) {
             status = 'active';
+            console.log('🔍 Status set to: active');
+          } else {
+            console.log('🔍 Status set to: planning');
           }
 
           // Try to get actual product data using production ID directly
