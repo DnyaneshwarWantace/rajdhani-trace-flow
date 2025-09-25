@@ -121,7 +121,7 @@ export default function WasteGeneration() {
             const { data: materialsConsumed, error: materialsError } = await supabase
               .from('material_consumption')
               .select('*')
-              .eq('production_batch_id', flow.production_product_id);
+              .eq('production_product_id', flow.production_product_id);
 
             if (materialsError) {
               console.warn('Error loading materials consumed:', materialsError);

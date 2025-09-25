@@ -63,7 +63,12 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true
+          }}
+        >
           <div className="flex h-screen bg-background">
             <Sidebar className="hidden md:flex" />
             <main className="flex-1 overflow-auto min-w-0 w-full md:w-auto">

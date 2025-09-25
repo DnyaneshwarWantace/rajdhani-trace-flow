@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, TrendingDown, Package, AlertTriangle, Recycle, ShoppingCart, History, Upload, Image, X, Download, FileSpreadsheet, CheckCircle, AlertCircle, Clock, RotateCcw, Trash2, Bell } from "lucide-react";
+import { Plus, Search, TrendingDown, Package, AlertTriangle, Recycle, ShoppingCart, History, Upload, Image, X, Download, FileSpreadsheet, CheckCircle, AlertCircle, Clock, RotateCcw, Trash2, Bell, RefreshCw } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { RawMaterialService } from "@/services/rawMaterialService";
@@ -745,15 +745,36 @@ export default function Materials() {
     }
   };
 
+  // Load raw materials data
+  const loadRawMaterials = async () => {
+    try {
+      const materials = await supabaseStorage.getAll();
+      const uniqueMaterials = removeDuplicateBatchNumbers(materials);
+      setRawMaterials(uniqueMaterials);
+      console.log('✅ Raw materials data refreshed');
+      
+      // Show success message
+      toast({
+        title: "Stock Refreshed",
+        description: "Raw materials inventory has been updated with latest stock levels.",
+      });
+    } catch (error) {
+      console.error('Error loading raw materials:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh materials data",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Initialize and load data from Supabase
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
         // Load raw materials
-        const materials = await supabaseStorage.getAll();
-        const uniqueMaterials = removeDuplicateBatchNumbers(materials);
-        setRawMaterials(uniqueMaterials);
+        await loadRawMaterials();
 
         // Load notifications for materials module
         const { data: materialNotifications, error: notificationError } = await NotificationService.getNotificationsByModule('materials');
@@ -1626,6 +1647,16 @@ export default function Materials() {
           </div>
 
           <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={loadRawMaterials}
+              disabled={loading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Refreshing...' : 'Refresh Stock'}
+            </Button>
+            
             <Dialog open={isImportInventoryOpen} onOpenChange={setIsImportInventoryOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -2605,29 +2636,98 @@ export default function Materials() {
             />
           </TabsContent>
 
-          <TabsContent value="analytics">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
+          <TabsContent value="analytics" className="space-y-6">
+            {/* Key Metrics Overview */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-lg bg-blue-50 p-3">
+                      <Package className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-700">Total Materials</p>
+                      <p className="text-2xl font-bold text-black">{rawMaterials.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-lg bg-green-50 p-3">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-700">In Stock</p>
+                      <p className="text-2xl font-bold text-black">
+                        {rawMaterials.filter(m => m.status === 'in-stock').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-lg bg-yellow-50 p-3">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-700">Low Stock</p>
+                      <p className="text-2xl font-bold text-black">
+                        {rawMaterials.filter(m => m.status === 'low-stock').length}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <div className="w-12 h-12 rounded-lg bg-purple-50 p-3">
+                      <TrendingDown className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-700">Total Value</p>
+                      <p className="text-2xl font-bold text-black">
+                        ₹{rawMaterials.reduce((sum, m) => sum + (m.totalValue || 0), 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Stock Status Distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white border border-gray-200">
                 <CardHeader>
-                  <CardTitle>Stock Distribution</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-black">Stock Status Distribution</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {categories.map(category => {
-                      const categoryMaterials = rawMaterials.filter(m => m.category === category);
-                      const totalValue = categoryMaterials.reduce((sum, m) => sum + m.totalValue, 0);
-
+                    {['in-stock', 'low-stock', 'out-of-stock', 'overstock'].map(status => {
+                      const count = rawMaterials.filter(m => m.status === status).length;
+                      const percentage = rawMaterials.length > 0 ? Math.round((count / rawMaterials.length) * 100) : 0;
+                      const color = status === 'in-stock' ? 'bg-green-500' : 
+                                   status === 'low-stock' ? 'bg-yellow-500' : 
+                                   status === 'out-of-stock' ? 'bg-red-500' : 'bg-blue-500';
+                      
                       return (
-                        <div key={category} className="flex items-center justify-between p-3 border rounded">
-                          <div>
-                            <div className="font-medium">{category}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {categoryMaterials.length} materials
-                            </div>
+                        <div key={status} className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-700 capitalize">{status.replace('-', ' ')}</span>
+                            <span className="font-medium text-black">{count} ({percentage}%)</span>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium">₹{totalValue.toFixed(2)}</div>
-                            <div className="text-sm text-muted-foreground">Total Value</div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${color} transition-all duration-1000 ease-out`}
+                              style={{ width: `${percentage}%` }}
+                            />
                           </div>
                         </div>
                       );
@@ -2636,9 +2736,45 @@ export default function Materials() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="bg-white border border-gray-200">
                 <CardHeader>
-                  <CardTitle>Top Suppliers</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-black">Category Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {categories.map(category => {
+                      const categoryMaterials = rawMaterials.filter(m => m.category === category);
+                      const totalValue = categoryMaterials.reduce((sum, m) => sum + (m.totalValue || 0), 0);
+                      const lowStockCount = categoryMaterials.filter(m => m.status === 'low-stock' || m.status === 'out-of-stock').length;
+
+                      return (
+                        <div key={category} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                          <div>
+                            <div className="font-medium text-black">{category}</div>
+                            <div className="text-sm text-gray-500">
+                              {categoryMaterials.length} materials
+                              {lowStockCount > 0 && (
+                                <span className="text-red-600 ml-2">• {lowStockCount} low stock</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium text-black">₹{totalValue.toLocaleString()}</div>
+                            <div className="text-sm text-gray-500">Total Value</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Supplier Performance & Material Consumption */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-black">Supplier Performance</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -2646,24 +2782,250 @@ export default function Materials() {
                       const supplierMaterials = rawMaterials.filter(m => m.supplier === supplier);
                       const totalValue = supplierMaterials.reduce((sum, m) => sum + (m.totalValue || 0), 0);
                       const avgPerformance = supplierMaterials.reduce((sum, m) => sum + (m.supplierPerformance || 0), 0) / supplierMaterials.length;
+                      const lowStockCount = supplierMaterials.filter(m => m.status === 'low-stock' || m.status === 'out-of-stock').length;
 
                       return (
-                        <div key={`supplier-${index}-${supplier}`} className="flex items-center justify-between p-3 border rounded">
-                          <div>
-                            <div className="font-medium">{supplier}</div>
-                            <div className="text-sm text-muted-foreground">
+                        <div key={`supplier-${index}-${supplier}`} className="p-4 border border-gray-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-black">{supplier}</div>
+                            <div className="text-sm text-gray-500">
                               {supplierMaterials.length} materials
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium">₹{totalValue.toFixed(2)}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Performance: {avgPerformance.toFixed(1)}%
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="text-gray-500">Total Value</div>
+                              <div className="font-medium text-black">₹{totalValue.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Performance</div>
+                              <div className={`font-medium ${avgPerformance >= 80 ? 'text-green-600' : avgPerformance >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {avgPerformance.toFixed(1)}%
+                              </div>
+                            </div>
+                          </div>
+                          {lowStockCount > 0 && (
+                            <div className="mt-2 text-xs text-red-600">
+                              ⚠️ {lowStockCount} materials need restocking
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-black">Material Consumption Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {rawMaterials
+                      .filter(m => m.materialsUsed && m.materialsUsed.length > 0)
+                      .slice(0, 5)
+                      .map(material => {
+                        const totalConsumed = material.materialsUsed.reduce((sum, usage) => sum + usage.consumedQuantity, 0);
+                        const totalWaste = material.materialsUsed.reduce((sum, usage) => sum + (usage.wasteQuantity || 0), 0);
+                        const efficiency = totalConsumed > 0 ? Math.round(((totalConsumed - totalWaste) / totalConsumed) * 100) : 100;
+
+                        return (
+                          <div key={material.id} className="p-3 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="font-medium text-black">{material.name}</div>
+                              <div className="text-sm text-gray-500">
+                                {material.materialsUsed.length} uses
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-sm">
+                              <div>
+                                <div className="text-gray-500">Consumed</div>
+                                <div className="font-medium text-black">{totalConsumed} {material.unit}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500">Waste</div>
+                                <div className="font-medium text-red-600">{totalWaste} {material.unit}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500">Efficiency</div>
+                                <div className={`font-medium ${efficiency >= 90 ? 'text-green-600' : efficiency >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                  {efficiency}%
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {rawMaterials.filter(m => m.materialsUsed && m.materialsUsed.length > 0).length === 0 && (
+                      <div className="text-center py-8 text-gray-500">
+                        <Package className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                        <p>No consumption data available</p>
+                        <p className="text-sm">Materials will show consumption data after being used in production</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Low Stock Alerts & Reorder Recommendations */}
+            <Card className="bg-white border border-gray-200">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold text-black flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-orange-600" />
+                  Low Stock Alerts & Reorder Recommendations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-4 font-medium text-gray-700">Material</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Current Stock</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Min Threshold</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Daily Usage</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Days Left</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Recommended Order</th>
+                        <th className="text-left p-4 font-medium text-gray-700">Supplier</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rawMaterials
+                        .filter(m => m.status === 'low-stock' || m.status === 'out-of-stock')
+                        .sort((a, b) => {
+                          const aDaysLeft = a.dailyUsage > 0 ? Math.floor(a.currentStock / a.dailyUsage) : 0;
+                          const bDaysLeft = b.dailyUsage > 0 ? Math.floor(b.currentStock / b.dailyUsage) : 0;
+                          return aDaysLeft - bDaysLeft;
+                        })
+                        .map(material => {
+                          const daysLeft = material.dailyUsage > 0 ? Math.floor(material.currentStock / material.dailyUsage) : 0;
+                          const recommendedOrder = Math.max(material.reorderPoint - material.currentStock, material.dailyUsage * 30);
+
+                          return (
+                            <tr key={material.id} className="border-b hover:bg-gray-50">
+                              <td className="p-4">
+                                <div>
+                                  <div className="font-medium text-black">{material.name}</div>
+                                  <div className="text-sm text-gray-500">{material.category}</div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className={`font-medium ${material.status === 'out-of-stock' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                  {material.currentStock} {material.unit}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-gray-700">{material.minThreshold} {material.unit}</div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-gray-700">{material.dailyUsage} {material.unit}/day</div>
+                              </td>
+                              <td className="p-4">
+                                <div className={`font-medium ${daysLeft <= 7 ? 'text-red-600' : daysLeft <= 14 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                  {daysLeft} days
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="font-medium text-blue-600">
+                                  {recommendedOrder} {material.unit}
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="text-gray-700">{material.supplier}</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {rawMaterials.filter(m => m.status === 'low-stock' || m.status === 'out-of-stock').length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-gray-500">
+                            <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-600" />
+                            <h3 className="text-lg font-medium mb-2">All Materials Well Stocked!</h3>
+                            <p>No low stock alerts at this time.</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Cost Analysis */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-black">Cost Analysis by Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {categories.map(category => {
+                      const categoryMaterials = rawMaterials.filter(m => m.category === category);
+                      const totalValue = categoryMaterials.reduce((sum, m) => sum + (m.totalValue || 0), 0);
+                      const avgCostPerUnit = categoryMaterials.length > 0 ? 
+                        categoryMaterials.reduce((sum, m) => sum + (m.costPerUnit || 0), 0) / categoryMaterials.length : 0;
+
+                      return (
+                        <div key={category} className="p-4 border border-gray-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium text-black">{category}</div>
+                            <div className="text-sm text-gray-500">
+                              {categoryMaterials.length} materials
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="text-gray-500">Total Value</div>
+                              <div className="font-medium text-black">₹{totalValue.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500">Avg Cost/Unit</div>
+                              <div className="font-medium text-black">₹{avgCostPerUnit.toFixed(2)}</div>
                             </div>
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white border border-gray-200">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold text-black">Inventory Valuation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-gray-700">Total Inventory Value</span>
+                        <span className="text-2xl font-bold text-black">
+                          ₹{rawMaterials.reduce((sum, m) => sum + (m.totalValue || 0), 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Based on current stock levels and unit costs
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 border border-gray-200 rounded-lg">
+                        <div className="text-sm text-gray-500">High Value Items</div>
+                        <div className="text-lg font-medium text-black">
+                          {rawMaterials.filter(m => (m.totalValue || 0) > 10000).length}
+                        </div>
+                        <div className="text-xs text-gray-500">Above ₹10,000</div>
+                      </div>
+                      <div className="p-3 border border-gray-200 rounded-lg">
+                        <div className="text-sm text-gray-500">Low Value Items</div>
+                        <div className="text-lg font-medium text-black">
+                          {rawMaterials.filter(m => (m.totalValue || 0) <= 1000).length}
+                        </div>
+                        <div className="text-xs text-gray-500">Below ₹1,000</div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

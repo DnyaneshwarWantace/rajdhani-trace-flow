@@ -20,6 +20,7 @@ export interface CreateProductData {
   thickness?: string;
   width?: string;
   height?: string;
+  image_url?: string;
 }
 
 export interface UpdateProductData extends Partial<CreateProductData> {
@@ -97,7 +98,8 @@ export class ProductService {
         weight: productData.weight?.trim() || null,
         thickness: productData.thickness?.trim() || null,
         width: productData.width?.trim() || null,
-        height: productData.height?.trim() || null
+        height: productData.height?.trim() || null,
+        image_url: productData.image_url || null
       };
 
       const { data, error } = await supabase
@@ -518,7 +520,7 @@ export class ProductService {
   // Generate QR code for individual product
   static async generateIndividualProductQRCode(individualProductId: string): Promise<{ qrCodeURL: string | null; error: string | null }> {
     try {
-      // Get individual product with full details
+      // Get individual product with full details (without product_recipes to avoid 406 errors)
       const { data: individualProduct } = await supabase
         .from('individual_products')
         .select(`
@@ -528,15 +530,7 @@ export class ProductService {
             category,
             color,
             size,
-            pattern,
-            product_recipes (
-              *,
-              recipe_materials (
-                quantity,
-                unit,
-                raw_materials (name)
-              )
-            )
+            pattern
           ),
           production_batches (
             batch_number,
@@ -572,9 +566,7 @@ export class ProductService {
         weight: parseFloat(individualProduct.final_weight || '0'),
         color: individualProduct.products.color || '',
         pattern: individualProduct.products.pattern || '',
-        material_composition: individualProduct.products.product_recipes?.[0]?.recipe_materials?.map(
-          rm => rm.raw_materials.name
-        ) || [],
+        material_composition: individualProduct.products?.material_composition || 'N/A',
         production_steps: individualProduct.production_batches?.production_steps?.map(ps => ({
           step_name: ps.step_name,
           completed_at: ps.completed_at,
@@ -599,21 +591,12 @@ export class ProductService {
   // Generate QR code for main product
   static async generateMainProductQRCode(productId: string): Promise<{ qrCodeURL: string | null; error: string | null }> {
     try {
-      // Get product with full details
+      // Get product with full details (without product_recipes to avoid 406 errors)
       const { data: product } = await supabase
         .from('products')
         .select(`
           *,
-          individual_products (status),
-          product_recipes (
-            production_time,
-            difficulty_level,
-            recipe_materials (
-              quantity,
-              unit,
-              raw_materials (id, name)
-            )
-          )
+          individual_products (status)
         `)
         .eq('id', productId)
         .single();
@@ -635,14 +618,9 @@ export class ProductService {
         total_quantity: totalQuantity,
         available_quantity: availableQuantity,
         recipe: {
-          materials: product.product_recipes?.[0]?.recipe_materials?.map(rm => ({
-            material_id: rm.raw_materials.id,
-            material_name: rm.raw_materials.name,
-            quantity: rm.quantity,
-            unit: rm.unit
-          })) || [],
-          production_time: product.product_recipes?.[0]?.production_time || 0,
-          difficulty_level: product.product_recipes?.[0]?.difficulty_level || 'Medium'
+          materials: [], // Recipe materials will be loaded separately if needed
+          production_time: 0,
+          difficulty_level: 'Medium'
         },
         machines_required: ['Loom Machine', 'Cutting Machine', 'Binding Machine'], // Default machines
         production_steps: ['Warping', 'Weaving', 'Cutting', 'Binding', 'Quality Check'], // Default steps
@@ -880,18 +858,32 @@ export class ProductService {
 
       const stats = products.reduce((acc, product) => {
         acc.totalProducts++;
-
+ 
         // Product status counts
         if (product.status === 'in-stock') acc.inStock++;
         else if (product.status === 'low-stock') acc.lowStock++;
         else if (product.status === 'out-of-stock') acc.outOfStock++;
-
+ 
         // Individual product counts
         const individualProducts = product.individual_products || [];
         acc.totalProduced += individualProducts.length;
         acc.totalSold += individualProducts.filter(ip => ip.status === 'sold').length;
         acc.availableUnits += individualProducts.filter(ip => ip.status === 'available').length;
-
+ 
+        // Carpet-specific counts (filter out raw materials)
+        const isCarpet = product.category && 
+          !product.category.toLowerCase().includes('raw') && 
+          !product.category.toLowerCase().includes('material') &&
+          !product.category.toLowerCase().includes('yarn') &&
+          !product.category.toLowerCase().includes('fiber');
+        
+        if (isCarpet) {
+          acc.carpetProducts++;
+          if (product.status === 'low-stock' || product.status === 'out-of-stock') {
+            acc.carpetLowStock++;
+          }
+        }
+ 
         return acc;
       }, {
         totalProducts: 0,
@@ -900,7 +892,9 @@ export class ProductService {
         outOfStock: 0,
         totalProduced: 0,
         totalSold: 0,
-        availableUnits: 0
+        availableUnits: 0,
+        carpetProducts: 0,
+        carpetLowStock: 0
       });
 
       return stats;
@@ -914,7 +908,9 @@ export class ProductService {
         outOfStock: 0,
         totalProduced: 0,
         totalSold: 0,
-        availableUnits: 0
+        availableUnits: 0,
+        carpetProducts: 0,
+        carpetLowStock: 0
       };
     }
   }

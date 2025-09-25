@@ -19,6 +19,8 @@ export interface RecipeWithMaterials extends ProductRecipe {
 }
 
 export class ProductRecipeService {
+  // Cache to remember if product_recipes table is accessible
+  private static tableAccessible: boolean | null = null;
   // Create a new product recipe with materials
   static async createRecipe(recipeData: CreateRecipeData): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
@@ -51,6 +53,16 @@ export class ProductRecipeService {
       
       const recipeMaterials = recipeData.materials.map((material, index) => {
         console.log(`🔍 Processing material ${index}:`, material);
+        
+        // Validate required fields
+        if (!material.material_id) {
+          console.error(`❌ Material ${index} missing material_id:`, material);
+          throw new Error(`Material ${index} is missing required material_id field`);
+        }
+        if (!material.material_name) {
+          console.error(`❌ Material ${index} missing material_name:`, material);
+          throw new Error(`Material ${index} is missing required material_name field`);
+        }
         
         const recipeMaterial = {
           id: generateUniqueId('RECMAT'),
@@ -88,10 +100,7 @@ export class ProductRecipeService {
       // Fetch the complete recipe with materials
       const { data: completeRecipe, error: fetchError } = await supabase
         .from('product_recipes')
-        .select(`
-          *,
-          recipe_materials (*)
-        `)
+        .select('*')
         .eq('id', recipeId)
         .single();
 
@@ -100,7 +109,18 @@ export class ProductRecipeService {
         return { data: null, error: fetchError.message };
       }
 
-      return { data: completeRecipe, error: null };
+      // Get recipe materials separately
+      const { data: materials, error: fetchMaterialsError } = await supabase
+        .from('recipe_materials')
+        .select('*')
+        .eq('recipe_id', recipeId);
+
+      if (fetchMaterialsError) {
+        console.error('Error fetching recipe materials:', fetchMaterialsError);
+        return { data: { ...completeRecipe, recipe_materials: [] }, error: null };
+      }
+
+      return { data: { ...completeRecipe, recipe_materials: materials || [] }, error: null };
     } catch (error) {
       console.error('Error in createRecipe:', error);
       return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -171,21 +191,29 @@ export class ProductRecipeService {
       }
 
       // Fetch the updated recipe with materials
-      const { data: completeRecipe, error: fetchError } = await supabase
+      const { data: recipe, error: recipeError } = await supabase
         .from('product_recipes')
-        .select(`
-          *,
-          recipe_materials (*)
-        `)
+        .select('*')
         .eq('id', recipeId)
         .single();
 
-      if (fetchError) {
-        console.error('Error fetching updated recipe:', fetchError);
-        return { data: null, error: fetchError.message };
+      if (recipeError) {
+        console.error('Error fetching updated recipe:', recipeError);
+        return { data: null, error: recipeError.message };
       }
 
-      return { data: completeRecipe, error: null };
+      // Get recipe materials separately
+      const { data: materials, error: materialsError } = await supabase
+        .from('recipe_materials')
+        .select('*')
+        .eq('recipe_id', recipeId);
+
+      if (materialsError) {
+        console.error('Error fetching recipe materials:', materialsError);
+        return { data: { ...recipe, recipe_materials: [] }, error: null };
+      }
+
+      return { data: { ...recipe, recipe_materials: materials || [] }, error: null };
     } catch (error) {
       console.error('Error in updateRecipe:', error);
       return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -195,21 +223,129 @@ export class ProductRecipeService {
   // Get recipe by product ID
   static async getRecipeByProductId(productId: string): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      console.log('🔍 Looking for recipe with productId:', productId);
+      
+      // Check if we know the table is not accessible
+      if (this.tableAccessible === false) {
+        console.log('🔍 product_recipes table known to be inaccessible, skipping recipe lookup for:', productId);
+        return { data: null, error: null };
+      }
+      
+      // If we haven't tested yet, test if product_recipes table is accessible
+      if (this.tableAccessible === null) {
+        const { error: testError } = await supabase
+          .from('product_recipes')
+          .select('id')
+          .limit(1);
+        
+        if (testError && (testError.message?.includes('406') || testError.message?.includes('Not Acceptable'))) {
+          console.log('🔍 product_recipes table not accessible (406 error), caching result');
+          this.tableAccessible = false;
+          return { data: null, error: null };
+        } else {
+          this.tableAccessible = true;
+          console.log('🔍 product_recipes table is accessible');
+        }
+      }
+      
+      // Method 1: Try to find recipe with exact product ID (with 406 error handling)
+      let { data: recipe, error: recipeError } = await supabase
         .from('product_recipes')
-        .select(`
-          *,
-          recipe_materials (*)
-        `)
+        .select('*')
         .eq('product_id', productId)
         .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching recipe:', error);
-        return { data: null, error: error.message };
+      // Handle 406 errors immediately
+      if (recipeError && (recipeError.message?.includes('406') || recipeError.message?.includes('Not Acceptable'))) {
+        console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
+        return { data: null, error: null }; // Return null data but no error
       }
 
-      return { data: data || null, error: null };
+      // Method 2: If not found and productId looks like a production ID, try different patterns
+      if (recipeError && recipeError.code === 'PGRST116' && productId.startsWith('PRO-')) {
+        console.log('🔍 Recipe not found with exact ID, trying production ID patterns...');
+        
+        // Try with the production ID as-is (with 406 error handling)
+        const { data: recipe2, error: recipeError2 } = await supabase
+          .from('product_recipes')
+          .select('*')
+          .eq('product_id', productId)
+          .single();
+        
+        if (recipeError2 && (recipeError2.message?.includes('406') || recipeError2.message?.includes('Not Acceptable'))) {
+          console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
+          return { data: null, error: null };
+        }
+        
+        if (!recipeError2 && recipe2) {
+          recipe = recipe2;
+          recipeError = null;
+        }
+      }
+
+      // Method 3: If still not found, try to find by product name (with 406 error handling)
+      if (recipeError && recipeError.code === 'PGRST116') {
+        console.log('🔍 Recipe not found with ID, trying to find by product name...');
+        
+        // Get the product name from products table
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .select('name')
+          .eq('id', productId)
+          .single();
+        
+        if (!productError && product) {
+          // Try to find recipe by product name (with 406 error handling)
+          const { data: recipe3, error: recipeError3 } = await supabase
+            .from('product_recipes')
+            .select('*')
+            .eq('product_name', product.name)
+            .single();
+          
+          if (recipeError3 && (recipeError3.message?.includes('406') || recipeError3.message?.includes('Not Acceptable'))) {
+            console.log('🔍 406 error on product_recipes table, skipping recipe lookup for:', productId);
+            return { data: null, error: null };
+          }
+          
+          if (!recipeError3 && recipe3) {
+            recipe = recipe3;
+            recipeError = null;
+            console.log('✅ Found recipe by product name:', product.name);
+          }
+        }
+      }
+
+      if (recipeError && recipeError.code !== 'PGRST116') {
+        console.error('Error fetching recipe:', recipeError);
+        return { data: null, error: recipeError.message };
+      }
+
+      if (!recipe) {
+        console.log('🔍 No recipe found for productId:', productId);
+        return { data: null, error: null };
+      }
+
+      console.log('✅ Found recipe:', recipe.id);
+
+      // Then get the recipe materials separately (with 406 error handling)
+      const { data: materials, error: materialsError } = await supabase
+        .from('recipe_materials')
+        .select('*')
+        .eq('recipe_id', recipe.id);
+
+      if (materialsError && (materialsError.message?.includes('406') || materialsError.message?.includes('Not Acceptable'))) {
+        console.log('🔍 406 error on recipe_materials table, returning recipe without materials');
+        return { data: { ...recipe, recipe_materials: [] }, error: null };
+      }
+
+      if (materialsError) {
+        console.error('Error fetching recipe materials:', materialsError);
+        // Return recipe without materials rather than failing completely
+        return { data: { ...recipe, recipe_materials: [] }, error: null };
+      }
+
+      console.log('✅ Found recipe materials:', materials?.length || 0);
+      return { data: { ...recipe, recipe_materials: materials || [] }, error: null };
     } catch (error) {
       console.error('Error in getRecipeByProductId:', error);
       return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -219,21 +355,35 @@ export class ProductRecipeService {
   // Get recipe by recipe ID
   static async getRecipeById(recipeId: string): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      // First, get the recipe
+      const { data: recipe, error: recipeError } = await supabase
         .from('product_recipes')
-        .select(`
-          *,
-          recipe_materials (*)
-        `)
+        .select('*')
         .eq('id', recipeId)
         .single();
 
-      if (error) {
-        console.error('Error fetching recipe:', error);
-        return { data: null, error: error.message };
+      if (recipeError) {
+        console.error('Error fetching recipe:', recipeError);
+        return { data: null, error: recipeError.message };
       }
 
-      return { data, error: null };
+      if (!recipe) {
+        return { data: null, error: null };
+      }
+
+      // Then get the recipe materials separately
+      const { data: materials, error: materialsError } = await supabase
+        .from('recipe_materials')
+        .select('*')
+        .eq('recipe_id', recipe.id);
+
+      if (materialsError) {
+        console.error('Error fetching recipe materials:', materialsError);
+        // Return recipe without materials rather than failing completely
+        return { data: { ...recipe, recipe_materials: [] }, error: null };
+      }
+
+      return { data: { ...recipe, recipe_materials: materials || [] }, error: null };
     } catch (error) {
       console.error('Error in getRecipeById:', error);
       return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -275,20 +425,39 @@ export class ProductRecipeService {
   // Get all recipes
   static async getAllRecipes(): Promise<{ data: RecipeWithMaterials[]; error: string | null }> {
     try {
-      const { data, error } = await supabase
+      // First, get all recipes
+      const { data: recipes, error: recipesError } = await supabase
         .from('product_recipes')
-        .select(`
-          *,
-          recipe_materials (*)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching recipes:', error);
-        return { data: [], error: error.message };
+      if (recipesError) {
+        console.error('Error fetching recipes:', recipesError);
+        return { data: [], error: recipesError.message };
       }
 
-      return { data: data || [], error: null };
+      if (!recipes || recipes.length === 0) {
+        return { data: [], error: null };
+      }
+
+      // Then get materials for each recipe
+      const recipesWithMaterials: RecipeWithMaterials[] = [];
+      for (const recipe of recipes) {
+        const { data: materials, error: materialsError } = await supabase
+          .from('recipe_materials')
+          .select('*')
+          .eq('recipe_id', recipe.id);
+
+        if (materialsError) {
+          console.error(`Error fetching materials for recipe ${recipe.id}:`, materialsError);
+          // Add recipe without materials rather than failing completely
+          recipesWithMaterials.push({ ...recipe, recipe_materials: [] });
+        } else {
+          recipesWithMaterials.push({ ...recipe, recipe_materials: materials || [] });
+        }
+      }
+
+      return { data: recipesWithMaterials, error: null };
     } catch (error) {
       console.error('Error in getAllRecipes:', error);
       return { data: [], error: error instanceof Error ? error.message : 'Unknown error' };

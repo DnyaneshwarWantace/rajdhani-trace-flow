@@ -735,7 +735,8 @@ export default function Products() {
           weight: product.weight,
           thickness: product.thickness,
           width: product.width,
-          height: product.height
+          height: product.height,
+          image_url: product.imageUrl
         });
         
         if (error) {
@@ -1224,11 +1225,26 @@ export default function Products() {
   // Handle image upload
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log('Image upload triggered, file:', file);
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size should be less than 5MB');
+        return;
+      }
+      
       setSelectedImage(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        const result = e.target?.result as string;
+        console.log('Image preview generated, length:', result.length);
+        setImagePreview(result);
       };
       reader.readAsDataURL(file);
     }
@@ -2232,14 +2248,20 @@ export default function Products() {
                               </Button>
                             </div>
                           ) : (
-                            <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
+                            <div 
+                              className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
+                              onClick={() => document.getElementById('product-image')?.click()}
+                            >
                               <Image className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                               <p className="text-sm text-muted-foreground mb-2">Click to upload product image</p>
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => document.getElementById('product-image')?.click()}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  document.getElementById('product-image')?.click();
+                                }}
                               >
                                 <Upload className="w-4 h-4 mr-2" />
                                 Choose Image

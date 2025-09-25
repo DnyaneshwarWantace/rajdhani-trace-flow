@@ -140,7 +140,7 @@ export class OrderService {
       const orderItems = orderData.items.map(item => ({
         id: `ORDITEM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         order_id: order.id,
-        product_id: item.product_id || null,
+        product_id: item.product_type === 'raw_material' ? null : (item.product_id || null),
         product_name: item.product_name.trim(),
         product_type: item.product_type,
         quantity: item.quantity,
@@ -162,15 +162,16 @@ export class OrderService {
         return { data: null, error: handleSupabaseError(itemsError) };
       }
 
-      // Handle individual product assignments
+      // Handle individual product assignments and workflow advancement
+      let hasIndividualProducts = false;
       if (createdItems) {
         for (let i = 0; i < createdItems.length; i++) {
           const item = createdItems[i];
           const originalItem = orderData.items[i];
 
           if (originalItem.selected_individual_products && originalItem.selected_individual_products.length > 0) {
-            // Individual products will be tracked via order_id in individual_products table
-
+            hasIndividualProducts = true;
+            
             // Mark individual products as reserved
             await supabase
               .from('individual_products')
@@ -182,6 +183,19 @@ export class OrderService {
               .in('id', originalItem.selected_individual_products);
           }
         }
+      }
+
+      // If individual products are selected, advance workflow to skip individual product details step
+      if (hasIndividualProducts) {
+        await supabase
+          .from('orders')
+          .update({
+            workflow_step: 'ready', // Skip individual product details step
+            status: 'ready' // Mark as ready since products are already selected
+          })
+          .eq('id', order.id);
+        
+        console.log('✅ Order workflow advanced to "ready" - individual products already selected');
       }
 
       // Update customer order statistics if customer exists
@@ -505,7 +519,7 @@ export class OrderService {
     }
   }
 
-  // Mark individual products as sold when order is dispatched/delivered
+  // Mark individual products as sold and deduct raw material stock when order is dispatched/delivered
   private static async markIndividualProductsAsSold(orderId: string): Promise<void> {
     try {
       // Get all individual products associated with this order with product_id
@@ -562,8 +576,90 @@ export class OrderService {
 
         console.log(`✅ Marked ${productIds.length} individual products as sold for order ${orderId}`);
       }
+
+      // Handle raw material stock deduction for raw material orders
+      await this.deductRawMaterialStock(orderId);
+
     } catch (error) {
       console.error('Error marking individual products as sold:', error);
+    }
+  }
+
+  // Deduct raw material stock when raw materials are sold in orders
+  private static async deductRawMaterialStock(orderId: string): Promise<void> {
+    try {
+      // Get all order items that are raw materials
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', orderId)
+        .eq('product_type', 'raw_material');
+
+      if (orderItems && orderItems.length > 0) {
+        console.log(`🔍 Found ${orderItems.length} raw material items in order ${orderId}`);
+
+        for (const item of orderItems) {
+          console.log(`🔍 Processing raw material order item:`, {
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price
+          });
+
+          // Find ALL raw materials with this name (not just the most recent)
+          const { data: rawMaterials } = await supabase
+            .from('raw_materials')
+            .select('*')
+            .eq('name', item.product_name)
+            .order('current_stock', { ascending: false }); // Get materials with highest stock first
+
+          if (rawMaterials && rawMaterials.length > 0) {
+            console.log(`🔍 Found ${rawMaterials.length} raw materials with name "${item.product_name}"`);
+            
+            let remainingQuantity = item.quantity || 0;
+            
+            // Deduct from materials with stock, starting with highest stock
+            for (const material of rawMaterials) {
+              if (remainingQuantity <= 0) break;
+              
+              const currentStock = material.current_stock || 0;
+              if (currentStock <= 0) continue; // Skip materials with no stock
+              
+              const deductAmount = Math.min(remainingQuantity, currentStock);
+              const newStock = currentStock - deductAmount;
+              remainingQuantity -= deductAmount;
+
+              console.log(`🔍 Deducting ${deductAmount} units from material ${material.name} (ID: ${material.id}) - Stock: ${currentStock} → ${newStock}`);
+
+              // Update the raw material stock
+              const { error: updateError } = await supabase
+                .from('raw_materials')
+                .update({
+                  current_stock: newStock,
+                  status: newStock <= 0 ? 'out-of-stock' : 
+                         newStock <= (material.min_threshold || 10) ? 'low-stock' : 'in-stock',
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', material.id);
+
+              if (updateError) {
+                console.error(`❌ Error updating raw material ${material.name} stock:`, updateError);
+              } else {
+                console.log(`✅ Successfully deducted ${deductAmount} units from ${material.name} (${currentStock} → ${newStock})`);
+              }
+            }
+            
+            if (remainingQuantity > 0) {
+              console.warn(`⚠️ Could not fully fulfill order for "${item.product_name}". Remaining quantity: ${remainingQuantity} units`);
+            }
+          } else {
+            console.warn(`⚠️ Raw material "${item.product_name}" not found in inventory`);
+          }
+        }
+      } else {
+        console.log(`🔍 No raw material items found in order ${orderId}`);
+      }
+    } catch (error) {
+      console.error('Error deducting raw material stock:', error);
     }
   }
 
@@ -691,6 +787,8 @@ export class OrderService {
     delivered: number;
     cancelled: number;
     totalRevenue: number;
+    paidAmount: number;
+    outstandingAmount: number;
     averageOrderValue: number;
   }> {
     try {
@@ -717,13 +815,24 @@ export class OrderService {
         delivered: 0,
         cancelled: 0,
         totalRevenue: 0,
+        paidAmount: 0,
+        outstandingAmount: 0,
         averageOrderValue: 0
       };
 
       const stats = orders.reduce((acc, order) => {
         acc.total++;
         acc[order.status as keyof typeof acc]++;
-        acc.totalRevenue += order.paid_amount || 0;
+        
+        // Revenue calculations
+        const totalAmount = order.total_amount || 0;
+        const paidAmount = order.paid_amount || 0;
+        const outstandingAmount = totalAmount - paidAmount;
+        
+        acc.totalRevenue += totalAmount;
+        acc.paidAmount += paidAmount;
+        acc.outstandingAmount += outstandingAmount;
+        
         return acc;
       }, {
         total: 0,
@@ -735,6 +844,8 @@ export class OrderService {
         delivered: 0,
         cancelled: 0,
         totalRevenue: 0,
+        paidAmount: 0,
+        outstandingAmount: 0,
         averageOrderValue: 0
       });
 
@@ -755,6 +866,8 @@ export class OrderService {
         delivered: 0,
         cancelled: 0,
         totalRevenue: 0,
+        paidAmount: 0,
+        outstandingAmount: 0,
         averageOrderValue: 0
       };
     }

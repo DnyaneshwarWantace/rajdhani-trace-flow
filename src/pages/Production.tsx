@@ -131,10 +131,14 @@ export default function Production() {
             const { data, error } = await supabase
               .from('individual_products')
               .select('id')
-              .eq('production_batch_id', flow.production_product_id);
+              .eq('product_id', flow.production_product_id);
 
             if (error) {
-              console.warn('Error checking individual products (table may not exist):', error);
+              // Only log non-expected errors (suppress table not found errors)
+              if (error.code !== '42P01' && error.code !== 'PGRST116') {
+                console.warn('Error checking individual products:', error);
+              }
+              individualProducts = [];
             } else {
               individualProducts = data || [];
             }
@@ -151,29 +155,54 @@ export default function Production() {
             status = 'active';
           }
 
-          // Try to get actual product data
+          // Try to get actual product data using production ID directly
           let productData = null;
           try {
-            const { data: products } = await supabase
+            // First check if product exists to avoid 406 errors
+            const { data: products, error: productError } = await supabase
               .from('products')
-              .select('*')
-              .eq('id', flow.production_product_id.replace('PRO-', '').replace('PROD_', ''))
-              .single();
-            productData = products;
+              .select('id')
+              .eq('id', flow.production_product_id)
+              .limit(1);
+
+            if (!productError && products && products.length > 0) {
+              // Product exists, fetch full data
+              const { data: fullProduct, error: fullError } = await supabase
+                .from('products')
+                .select('*')
+                .eq('id', flow.production_product_id)
+                .single();
+              
+              if (!fullError) {
+                productData = fullProduct;
+              }
+            }
+            // If product doesn't exist, productData remains null (no error logging needed)
           } catch (error) {
-            console.log('Product not found, using flow data');
+            // Silently handle expected errors for non-existent products
+            productData = null;
           }
 
           // Get material consumption data
           let materialsConsumed = [];
           try {
-            const { data: materials } = await supabase
+            const { data: materials, error: materialsError } = await supabase
               .from('material_consumption')
               .select('*')
-              .eq('production_batch_id', flow.production_product_id);
-            materialsConsumed = materials || [];
+              .eq('production_product_id', flow.production_product_id);
+            
+            if (materialsError) {
+              // Only log non-expected errors (suppress column not found errors)
+              if (materialsError.code !== '42703') {
+                console.warn('Error fetching material consumption:', materialsError);
+              }
+              materialsConsumed = [];
+            } else {
+              materialsConsumed = materials || [];
+            }
           } catch (error) {
-            console.log('No materials found');
+            console.warn('Error fetching material consumption:', error);
+            materialsConsumed = [];
           }
 
           return {

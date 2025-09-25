@@ -109,6 +109,13 @@ export default function NewOrder() {
     notes: "",
     paidAmount: 0
   });
+
+  // GST Management State
+  const [gstSettings, setGstSettings] = useState({
+    rate: 18, // Default 18% GST
+    isIncluded: true // Whether GST is included in pricing
+  });
+
   const [showProductionAlert, setShowProductionAlert] = useState(false);
   const [productionAlertItem, setProductionAlertItem] = useState<OrderItem | null>(null);
   const [showIndividualProductSelection, setShowIndividualProductSelection] = useState(false);
@@ -632,8 +639,8 @@ export default function NewOrder() {
 
     // Calculate order totals for validation
     const subtotal = calculateTotal();
-    const gstRate = 18;
-    const gstAmount = (subtotal * gstRate) / 100;
+    const gstRate = gstSettings.rate;
+    const gstAmount = gstSettings.isIncluded ? (subtotal * gstRate) / 100 : 0;
     const totalAmount = subtotal + gstAmount;
 
     // Payment is now optional - no validation required
@@ -642,8 +649,8 @@ export default function NewOrder() {
     try {
       // Calculate order totals with GST
       const subtotal = calculateTotal();
-      const gstRate = 18; // 18% GST
-      const gstAmount = (subtotal * gstRate) / 100;
+      const gstRate = gstSettings.rate;
+      const gstAmount = gstSettings.isIncluded ? (subtotal * gstRate) / 100 : 0;
       const totalAmount = subtotal + gstAmount;
       const paidAmount = orderDetails.paidAmount || 0;
       const outstandingAmount = totalAmount - paidAmount;
@@ -1305,6 +1312,73 @@ export default function NewOrder() {
 
 
 
+      {/* GST Management */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calculator className="w-5 h-5" />
+            GST Settings
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* GST Rate Input */}
+            <div className="space-y-2">
+              <Label htmlFor="gst-rate">GST Rate (%)</Label>
+              <Input
+                id="gst-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={gstSettings.rate}
+                onChange={(e) => {
+                  const rate = parseFloat(e.target.value) || 0;
+                  setGstSettings(prev => ({ 
+                    ...prev, 
+                    rate: rate
+                  }));
+                }}
+                placeholder="Enter GST percentage (e.g., 18)"
+              />
+            </div>
+
+            {/* GST Include/Exclude Toggle */}
+            <div className="space-y-2">
+              <Label>GST Status</Label>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant={gstSettings.isIncluded ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGstSettings(prev => ({ ...prev, isIncluded: true }))}
+                >
+                  Include GST
+                </Button>
+                <Button
+                  variant={!gstSettings.isIncluded ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGstSettings(prev => ({ ...prev, isIncluded: false }))}
+                >
+                  Exclude GST
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* GST Preview */}
+          <div className="mt-4 p-3 bg-muted rounded-lg">
+            <div className="text-sm text-muted-foreground">
+              <strong>Current GST:</strong> {gstSettings.isIncluded ? `${gstSettings.rate}%` : 'Excluded (0%)'}
+              {gstSettings.isIncluded && (
+                <span className="ml-2">
+                  (₹{((calculateTotal() * gstSettings.rate) / 100).toLocaleString()})
+                </span>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Order Summary */}
       <Card>
         <CardHeader>
@@ -1317,12 +1391,12 @@ export default function NewOrder() {
               <span>₹{calculateTotal().toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span>GST (18%):</span>
-              <span>₹{((calculateTotal() * 18) / 100).toLocaleString()}</span>
+              <span>GST ({gstSettings.rate}%):</span>
+              <span>₹{gstSettings.isIncluded ? ((calculateTotal() * gstSettings.rate) / 100).toLocaleString() : '0'}</span>
             </div>
             <div className="flex justify-between font-medium text-lg border-t pt-2">
               <span>Total Amount:</span>
-              <span className="text-primary">₹{(calculateTotal() + (calculateTotal() * 18) / 100).toLocaleString()}</span>
+              <span className="text-primary">₹{(calculateTotal() + (gstSettings.isIncluded ? (calculateTotal() * gstSettings.rate) / 100 : 0)).toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span>Paid Amount:</span>

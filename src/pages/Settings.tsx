@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Settings, Clock, Construction, Bell } from 'lucide-react';
+import { Settings as SettingsIcon, Clock, Construction, Bell } from 'lucide-react';
 
 export default function Settings() {
   return (
@@ -37,7 +37,7 @@ export default function Settings() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
             <div className="p-4 border rounded-lg bg-muted/50">
-              <Settings className="w-8 h-8 text-primary mx-auto mb-2" />
+              <SettingsIcon className="w-8 h-8 text-primary mx-auto mb-2" />
               <h3 className="font-semibold mb-1">System Settings</h3>
               <p className="text-sm text-muted-foreground">
                 Configure system-wide preferences and application behavior
@@ -53,7 +53,7 @@ export default function Settings() {
             </div>
             
             <div className="p-4 border rounded-lg bg-muted/50">
-              <Settings className="w-8 h-8 text-primary mx-auto mb-2" />
+              <SettingsIcon className="w-8 h-8 text-primary mx-auto mb-2" />
               <h3 className="font-semibold mb-1">User Preferences</h3>
               <p className="text-sm text-muted-foreground">
                 Customize your personal dashboard and interface settings
@@ -75,7 +75,7 @@ export default function Settings() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Settings className="w-5 h-5" />
+              <SettingsIcon className="w-5 h-5" />
               Current System Status
             </CardTitle>
           </CardHeader>
@@ -106,7 +106,7 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button variant="outline" className="w-full justify-start" disabled>
-              <Settings className="w-4 h-4 mr-2" />
+              <SettingsIcon className="w-4 h-4 mr-2" />
               System Configuration
             </Button>
             <Button variant="outline" className="w-full justify-start" disabled>
@@ -114,7 +114,7 @@ export default function Settings() {
               Notification Settings
             </Button>
             <Button variant="outline" className="w-full justify-start" disabled>
-              <Settings className="w-4 h-4 mr-2" />
+              <SettingsIcon className="w-4 h-4 mr-2" />
               User Preferences
             </Button>
           </CardContent>

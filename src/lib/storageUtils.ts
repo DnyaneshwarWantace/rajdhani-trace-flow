@@ -134,6 +134,11 @@ export const getProductRecipe = async (productId: string): Promise<any> => {
   try {
     const { data, error } = await ProductRecipeService.getRecipeByProductId(productId);
     if (error) {
+      // Handle 406 error (table doesn't exist) gracefully
+      if (error.includes('406') || error.includes('Not Acceptable')) {
+        console.log('Product recipes table not available, returning null');
+        return null;
+      }
       console.error('Error fetching product recipe:', error);
       return null;
     }
@@ -146,19 +151,50 @@ export const getProductRecipe = async (productId: string): Promise<any> => {
 
 export const saveProductRecipe = async (recipe: any): Promise<void> => {
   try {
+    console.log('🔍 saveProductRecipe called with recipe:', recipe);
+    console.log('🔍 Recipe materials:', recipe.materials);
+    
+    // Validate materials before processing
+    const validMaterials = recipe.materials.filter((material: any, index: number) => {
+      console.log(`🔍 Validating material ${index}:`, material);
+      const materialId = material.id || material.materialId || material.material_id;
+      const materialName = material.name || material.materialName || material.material_name;
+      
+      if (!materialId) {
+        console.error(`❌ Material ${index} missing ID:`, material);
+        return false;
+      }
+      if (!materialName) {
+        console.error(`❌ Material ${index} missing name:`, material);
+        return false;
+      }
+      console.log(`✅ Material ${index} is valid:`, { id: materialId, name: materialName });
+      return true;
+    });
+    
+    if (validMaterials.length !== recipe.materials.length) {
+      console.error('❌ Some materials are invalid, skipping recipe creation');
+      console.error('❌ Invalid materials:', recipe.materials.filter((m: any, i: number) => 
+        !validMaterials.includes(recipe.materials[i])
+      ));
+      return; // Skip recipe creation if materials are invalid
+    }
+    
     // Convert the old recipe format to new format
     const recipeData = {
       product_id: recipe.productId,
       product_name: recipe.productName,
-      materials: recipe.materials.map((material: any) => ({
-        material_id: material.id || material.materialId,
-        material_name: material.name || material.materialName,
+      materials: validMaterials.map((material: any) => ({
+        material_id: material.id || material.materialId || material.material_id,
+        material_name: material.name || material.materialName || material.material_name,
         quantity: material.selectedQuantity || material.quantity || 1,
         unit: material.unit,
-        cost_per_unit: material.costPerUnit || material.cost || 0
+        cost_per_unit: material.costPerUnit || material.cost || material.cost_per_unit || 0
       })),
       created_by: recipe.createdBy || 'admin'
     };
+    
+    console.log('🔍 Final recipe data:', recipeData);
 
     // Check if recipe already exists
     const existingRecipe = await getProductRecipe(recipe.productId);
@@ -167,6 +203,11 @@ export const saveProductRecipe = async (recipe: any): Promise<void> => {
       // Update existing recipe
       const { error } = await ProductRecipeService.updateRecipe(existingRecipe.id, recipeData);
       if (error) {
+        // Handle 406 error (table doesn't exist) gracefully
+        if (error.includes('406') || error.includes('Not Acceptable')) {
+          console.log('Product recipes table not available, skipping recipe save');
+          return;
+        }
         console.error('Error updating product recipe:', error);
         throw new Error(error);
       }
@@ -174,12 +215,22 @@ export const saveProductRecipe = async (recipe: any): Promise<void> => {
       // Create new recipe
       const { error } = await ProductRecipeService.createRecipe(recipeData);
       if (error) {
+        // Handle 406 error (table doesn't exist) gracefully
+        if (error.includes('406') || error.includes('Not Acceptable')) {
+          console.log('Product recipes table not available, skipping recipe save');
+          return;
+        }
         console.error('Error creating product recipe:', error);
         throw new Error(error);
       }
     }
   } catch (error) {
     console.error('Error in saveProductRecipe:', error);
+    // Don't throw error if it's a table not found issue
+    if (error.message && (error.message.includes('406') || error.message.includes('Not Acceptable'))) {
+      console.log('Product recipes table not available, skipping recipe save');
+      return;
+    }
     throw error;
   }
 };

@@ -1,67 +1,71 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { Header } from "@/components/layout/Header";
-import { StatsCard } from "@/components/dashboard/StatsCard";
-import { RecentActivity } from "@/components/dashboard/RecentActivity";
-import { ProductionOverview } from "@/components/dashboard/ProductionOverview";
-import { InventoryAlerts } from "@/components/dashboard/InventoryAlerts";
-import { RealTimeDashboard } from "@/components/dashboard/RealTimeDashboard";
-import {
-  Package,
-  ShoppingCart,
-  Factory,
-  Users,
-  DollarSign,
-  AlertTriangle,
-  TrendingUp,
-  RefreshCw
-} from "lucide-react";
+import { ModernStatsGrid } from "@/components/dashboard/ModernStatsGrid";
+import { InteractiveCharts } from "@/components/dashboard/InteractiveCharts";
+import { RealtimeMetrics } from "@/components/dashboard/RealtimeMetrics";
+import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
+import { PerformanceMetrics } from "@/components/dashboard/PerformanceMetrics";
+import { BusinessInsights } from "@/components/dashboard/BusinessInsights";
+import { RefreshCw, Zap, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  CustomerService,
   OrderService,
   ProductService,
   RawMaterialService,
+  CustomerService,
   ProductionService
 } from "@/services";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [stats, setStats] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Fetch all statistics from Supabase
+      // Fetch all data in parallel for maximum performance
       const [
         orderStats,
         productStats,
         materialStats,
         customerStats,
-        productionStats
+        productionStats,
+        recentOrders,
+        recentProducts
       ] = await Promise.all([
         OrderService.getOrderStats(),
         ProductService.getProductStats(),
         RawMaterialService.getInventoryStats(),
         CustomerService.getCustomerStats(),
-        ProductionService.getProductionStats()
+        ProductionService.getProductionStats(),
+        OrderService.getOrders({ limit: 10 }),
+        ProductService.getProducts({ limit: 8 })
       ]);
 
-      setStats({
-        orders: orderStats,
-        products: productStats,
-        materials: materialStats,
-        customers: customerStats,
-        production: productionStats
+      setDashboardData({
+        stats: {
+          orders: orderStats,
+          products: productStats,
+          materials: materialStats,
+          customers: customerStats,
+          production: productionStats
+        },
+        recentOrders: recentOrders.data || [],
+        recentProducts: recentProducts.data || []
       });
+
+      setLastRefresh(new Date());
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       toast({
         title: "Error",
-        description: "Failed to load dashboard data. Using local storage fallback.",
+        description: "Failed to load dashboard data. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -71,138 +75,156 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex-1 space-y-6 p-6">
-        <Header
-          title="Dashboard"
-          subtitle="Loading real-time overview..."
-        />
-        <div className="grid gap-6 md:grid-cols-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="animate-pulse">
-              <div className="h-32 bg-gray-200 rounded-lg"></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        duration: 0.6
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5 }
+    }
+  };
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      {/* Mobile-optimized header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <Header
-          title="Dashboard"
-          subtitle="Real-time overview of your operations"
-        />
-        <Button
-          onClick={fetchDashboardData}
-          variant="outline"
-          size="sm"
-          className="gap-2 w-full sm:w-auto"
-        >
-          <RefreshCw className="h-4 w-4" />
-          <span className="sm:hidden">Refresh Data</span>
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
-      </div>
+    <div className="min-h-screen bg-white">
+      <motion.div
+        className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants}>
+          <Header
+            title="Business Dashboard"
+            subtitle="Real-time insights for carpets and raw materials business"
+            searchPlaceholder="Search orders, products, customers..."
+            actions={
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600">
+                  <Zap className="h-3 w-3 text-green-500" />
+                  Live Data
+                </div>
+                <Button
+                  onClick={fetchDashboardData}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </span>
+                </Button>
+              </div>
+            }
+          />
+        </motion.div>
 
-      {/* Key Metrics - Mobile responsive grid */}
-      <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatsCard
-          title="Active Orders"
-          value={stats?.orders?.total || 0}
-          description={`${stats?.orders?.pending || 0} pending orders`}
-          icon={ShoppingCart}
-          trend={{
-            value: stats?.orders?.delivered ? Math.round((stats.orders.delivered / stats.orders.total) * 100) : 0,
-            isPositive: true
-          }}
-          color="text-orders"
-        />
-        <StatsCard
-          title="Available Products"
-          value={stats?.products?.availableUnits || 0}
-          description={`${stats?.products?.lowStock || 0} low stock alerts`}
-          icon={Package}
-          trend={{
-            value: stats?.products?.lowStock || 0,
-            isPositive: (stats?.products?.lowStock || 0) === 0
-          }}
-          color="text-inventory"
-        />
+        {loading && !dashboardData ? (
+          <motion.div
+            className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+            variants={containerVariants}
+          >
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <motion.div
+                key={i}
+                className="h-32 bg-white rounded-xl shadow-sm border border-gray-200 animate-pulse"
+                variants={itemVariants}
+              />
+            ))}
+          </motion.div>
+        ) : (
+          <>
+            {/* Modern Stats Grid */}
+            <motion.div variants={itemVariants}>
+              <ModernStatsGrid
+                data={dashboardData?.stats}
+                loading={loading}
+              />
+            </motion.div>
 
-        <StatsCard
-          title="Raw Materials"
-          value={stats?.materials?.totalMaterials || 0}
-          description={`${stats?.materials?.lowStock || 0} need reordering`}
-          icon={Factory}
-          trend={{
-            value: stats?.materials?.outOfStock || 0,
-            isPositive: (stats?.materials?.outOfStock || 0) === 0
-          }}
-          color="text-materials"
-        />
-      </div>
+            {/* Charts and Metrics Row */}
+            <motion.div
+              className="grid gap-6 lg:grid-cols-12"
+              variants={itemVariants}
+            >
+              <div className="lg:col-span-8">
+                <InteractiveCharts
+                  data={dashboardData}
+                  loading={loading}
+                />
+              </div>
+              <div className="lg:col-span-4">
+                <RealtimeMetrics
+                  data={dashboardData?.stats}
+                  loading={loading}
+                />
+              </div>
+            </motion.div>
 
-      {/* Secondary Metrics - Mobile responsive grid */}
-      <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        <StatsCard
-          title="Monthly Revenue"
-          value={`₹${((stats?.orders?.totalRevenue || 0) / 100000).toFixed(1)}L`}
-          description="from completed orders"
-          icon={DollarSign}
-          trend={{ value: 15, isPositive: true }}
-          color="text-success"
-        />
-        <StatsCard
-          title="Total Customers"
-          value={stats?.customers?.total || 0}
-          description={`${stats?.customers?.active || 0} active customers`}
-          icon={Users}
-          trend={{
-            value: stats?.customers?.active ? Math.round((stats.customers.active / stats.customers.total) * 100) : 0,
-            isPositive: true
-          }}
-          color="text-primary"
-        />
+            {/* Activity Feed and Performance */}
+            <motion.div
+              className="grid gap-6 lg:grid-cols-12"
+              variants={itemVariants}
+            >
+              <div className="lg:col-span-7">
+                <ActivityFeed
+                  orders={dashboardData?.recentOrders || []}
+                  products={dashboardData?.recentProducts || []}
+                  loading={loading}
+                />
+              </div>
+              <div className="lg:col-span-5">
+                <PerformanceMetrics
+                  data={dashboardData?.stats}
+                  loading={loading}
+                />
+              </div>
+            </motion.div>
 
-        <StatsCard
-          title="Production Efficiency"
-          value={`${stats?.production?.efficiency || 0}%`}
-          description={`${stats?.production?.inProgress || 0} batches in progress`}
-          icon={TrendingUp}
-          trend={{
-            value: stats?.production?.efficiency || 0,
-            isPositive: (stats?.production?.efficiency || 0) >= 80
-          }}
-          color="text-production"
-        />
-      </div>
+            {/* Business Insights */}
+            <motion.div variants={itemVariants}>
+              <BusinessInsights
+                data={dashboardData}
+                loading={loading}
+              />
+            </motion.div>
 
-      {/* Main Content Grid - Mobile responsive layout */}
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 xl:grid-cols-12">
-        <div className="xl:col-span-5">
-          <RecentActivity />
-        </div>
-        <div className="xl:col-span-7">
-          <ProductionOverview />
-        </div>
-      </div>
-
-      {/* Real-Time Dashboard Section */}
-      <div className="w-full">
-        <RealTimeDashboard />
-      </div>
-
-      {/* Bottom Section - Full Width */}
-      <div className="w-full">
-        <InventoryAlerts />
-      </div>
+            {/* Footer Info */}
+            <motion.div
+              className="flex items-center justify-between text-xs text-gray-500 pt-4"
+              variants={itemVariants}
+            >
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-3 w-3" />
+                Last updated: {lastRefresh.toLocaleTimeString()}
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                System Online
+              </div>
+            </motion.div>
+          </>
+        )}
+      </motion.div>
     </div>
   );
 }
