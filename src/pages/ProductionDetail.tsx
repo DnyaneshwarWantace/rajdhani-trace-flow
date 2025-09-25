@@ -846,15 +846,7 @@ export default function ProductionDetail() {
         "success"
       );
     }
-    
-    // Navigate to dynamic flow page after machine selection
-    // Use the batch ID from the production flow, not the product ID
-    if (productionFlow && productionFlow.production_product_id) {
-      navigate(`/production/${productionFlow.production_product_id}/dynamic-flow`);
-    } else {
-      console.error('No production flow found to navigate to dynamic flow');
-    }
-    
+
     // Reset form
     setSelectedMachineId("");
     setInspectorName("");
@@ -920,6 +912,11 @@ export default function ProductionDetail() {
 
       console.log('✅ Machine step added successfully:', newStep);
       showNotification("Success", `Machine step "${machine.name}" added to production flow`, "success");
+
+      // Navigate to dynamic flow page after successfully adding machine
+      if (flow && flow.production_product_id) {
+        navigate(`/production/${flow.production_product_id}/dynamic-flow`);
+      }
     } catch (error) {
       console.error('Error adding machine step to flow:', error);
       showNotification("Error", "Failed to add machine step to flow", "error");
@@ -989,17 +986,14 @@ export default function ProductionDetail() {
       }
 
       showNotification("Success", "Machine operations skipped and marked as completed", "success");
+
+      // Navigate to waste generation page after successfully skipping
+      if (flow && flow.production_product_id) {
+        navigate(`/production/${flow.production_product_id}/waste-generation`);
+      }
     } catch (error) {
       console.error('Error creating skipped machine step:', error);
       showNotification("Warning", "Skipped to waste generation but couldn't update flow status", "warning");
-    }
-
-    // Navigate to waste generation page
-    // Use the batch ID from the production flow, not the product ID
-    if (productionFlow && productionFlow.production_product_id) {
-      navigate(`/production/${productionFlow.production_product_id}/waste-generation`);
-    } else {
-      console.error('No production flow found to navigate to waste generation');
     }
     setShowMachineSelectionPopup(false);
   };
