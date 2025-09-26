@@ -142,6 +142,8 @@ export default function Products() {
   const [selectedQRProduct, setSelectedQRProduct] = useState<Product | null>(null);
   const [selectedQRIndividualProduct, setSelectedQRIndividualProduct] = useState<IndividualProduct | null>(null);
   const [productsWithRecipes, setProductsWithRecipes] = useState<Set<string>>(new Set());
+  const [isAddingToProduction, setIsAddingToProduction] = useState<string | null>(null);
+  const [isDuplicatingProduct, setIsDuplicatingProduct] = useState<string | null>(null);
 
   // Dynamic dropdown state - now using database options
   const [dropdownOptions, setDropdownOptions] = useState<{
@@ -490,20 +492,30 @@ export default function Products() {
 
 
   // Handle adding new product
-  const handleDuplicateProduct = (product: Product) => {
+  const handleDuplicateProduct = async (product: Product) => {
     console.log("Original product being duplicated:", product);
     
-    // Create a copy of the product with new ID and QR code
-    const duplicatedProduct: Product = {
-      ...product,
-      id: IDGenerator.generateProductId(),
-      qrCode: generateQRCode(),
-    };
+    // Set loading state for this specific product
+    setIsDuplicatingProduct(product.id);
     
-    console.log("Duplicated product:", duplicatedProduct);
-    
-    setDuplicateProduct(duplicatedProduct);
-    setIsDuplicateProductOpen(true);
+    try {
+      // Create a copy of the product with new ID and QR code
+      const duplicatedProduct: Product = {
+        ...product,
+        id: IDGenerator.generateProductId(),
+        qrCode: generateQRCode(),
+      };
+      
+      console.log("Duplicated product:", duplicatedProduct);
+      
+      setDuplicateProduct(duplicatedProduct);
+      setIsDuplicateProductOpen(true);
+    } catch (error) {
+      console.error("Error preparing duplicate product:", error);
+    } finally {
+      // Clear loading state
+      setIsDuplicatingProduct(null);
+    }
   };
 
   const handleSaveDuplicateProduct = async () => {
@@ -513,6 +525,12 @@ export default function Products() {
     if (!duplicateProduct.name || !duplicateProduct.category || !duplicateProduct.unit) {
       console.error("Please fill in all required fields: Name, Category, and Unit");
       return;
+    }
+
+    // Set loading state for the original product being duplicated
+    const originalProduct = products.find(p => p.name === duplicateProduct.name && p.id !== duplicateProduct.id);
+    if (originalProduct) {
+      setIsDuplicatingProduct(originalProduct.id);
     }
 
     try {
@@ -591,6 +609,9 @@ export default function Products() {
       console.log("Product duplicated successfully:", duplicateProduct.name);
     } catch (error) {
       console.error("Error duplicating product:", error);
+    } finally {
+      // Clear loading state
+      setIsDuplicatingProduct(null);
     }
   };
 
@@ -1382,15 +1403,19 @@ export default function Products() {
   const handleAddToProduction = async (product: Product) => {
     console.log('Adding product to production:', product);
     
-    // Update product status to "in-production"
-    const updatedProducts = products.map(p => 
-      p.id === product.id ? { ...p, status: "in-production" as const } : p
-    );
-    setProducts(updatedProducts);
-    // Products are saved to Supabase database only
+    // Set loading state for this specific product
+    setIsAddingToProduction(product.id);
     
-    // Check user role - only production and admin users can navigate to production pages
-    if (user?.role === 'production' || user?.role === 'admin') {
+    try {
+      // Update product status to "in-production"
+      const updatedProducts = products.map(p => 
+        p.id === product.id ? { ...p, status: "in-production" as const } : p
+      );
+      setProducts(updatedProducts);
+      // Products are saved to Supabase database only
+      
+      // Check user role - only production and admin users can navigate to production pages
+      if (user?.role === 'production' || user?.role === 'admin') {
       // Get all individual stock details for this product
       const productIndividualStocks = product.individual_products || [];
 
@@ -1440,6 +1465,13 @@ export default function Products() {
         console.error('❌ Error sending production request notification:', error);
         alert(`⚠️ Product "${product.name}" status updated, but notification to production team failed. Please contact the production manager directly.`);
       }
+    }
+    } catch (error) {
+      console.error('❌ Error adding product to production:', error);
+      alert(`⚠️ Failed to add product "${product.name}" to production. Please try again.`);
+    } finally {
+      // Clear loading state
+      setIsAddingToProduction(null);
     }
   };
 
@@ -2606,11 +2638,16 @@ export default function Products() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handleDuplicateProduct(product)}
+                                onClick={async () => await handleDuplicateProduct(product)}
                                 className="border-green-500 text-green-600 hover:bg-green-50"
                                 title="Duplicate Product"
+                                disabled={isDuplicatingProduct === product.id}
                               >
-                                <Copy className="w-4 h-4" />
+                                {isDuplicatingProduct === product.id ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
                               </Button>
                               {hasIndividualStock(product.id) && (
                               <Button 
@@ -2618,8 +2655,13 @@ export default function Products() {
                                 size="sm"
                                 onClick={async () => await handleAddToProduction(product)}
                                 className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                                disabled={isAddingToProduction === product.id}
                               >
-                                <Play className="w-4 h-4" />
+                                {isAddingToProduction === product.id ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Play className="w-4 h-4" />
+                                )}
                                 </Button>
                               )}
                             </div>
@@ -2810,9 +2852,14 @@ export default function Products() {
                                   size="sm" 
                                   onClick={async () => await handleAddToProduction(product)}
                                   className="bg-orange-600 hover:bg-orange-700"
+                                  disabled={isAddingToProduction === product.id}
                                 >
-                                  <Factory className="w-4 h-4 mr-1" />
-                                  Produce
+                                  {isAddingToProduction === product.id ? (
+                                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <Factory className="w-4 h-4 mr-1" />
+                                  )}
+                                  {isAddingToProduction === product.id ? 'Adding...' : 'Produce'}
                                 </Button>
                                 ) : (
                                   <span className="text-sm text-muted-foreground">Bulk Product</span>
@@ -2903,9 +2950,14 @@ export default function Products() {
                               size="sm"
                               className="bg-orange-600 hover:bg-orange-700"
                               onClick={async () => await handleAddToProductionFromNotification(notification)}
+                              disabled={isAddingToProduction === notification.relatedData?.productId}
                             >
-                              <ArrowRight className="w-3 h-3 mr-1" />
-                              Add to Production
+                              {isAddingToProduction === notification.relatedData?.productId ? (
+                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <ArrowRight className="w-3 h-3 mr-1" />
+                              )}
+                              {isAddingToProduction === notification.relatedData?.productId ? 'Adding...' : 'Add to Production'}
                             </Button>
                             ) : (
                               <span className="text-sm text-muted-foreground">Bulk Product</span>
@@ -3180,8 +3232,18 @@ export default function Products() {
               <Button variant="outline" onClick={() => setIsDuplicateProductOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveDuplicateProduct}>
-                Save as New Product
+              <Button 
+                onClick={handleSaveDuplicateProduct}
+                disabled={isDuplicatingProduct !== null}
+              >
+                {isDuplicatingProduct ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Save as New Product'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
