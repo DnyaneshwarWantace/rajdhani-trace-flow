@@ -1,5 +1,5 @@
 import { supabase, supabaseAdmin, handleSupabaseError, Customer } from '@/lib/supabase';
-import { generateUniqueId } from '@/lib/idGenerator';
+import { generateUniqueId, IDGenerator } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 
 export interface CreateCustomerData {
@@ -50,8 +50,8 @@ export class CustomerService {
         return { data: null, error: 'A customer with this email already exists' };
       }
 
-      // Generate meaningful customer ID
-      const customerId = generateUniqueId('CUST');
+      // Generate globally unique customer ID
+      const customerId = await IDGenerator.generateUniqueCustomerId();
 
       // Prepare customer data for insertion
       const newCustomer = {
@@ -303,9 +303,12 @@ export class CustomerService {
     averageOrderValue: number;
   }> {
     try {
-      const { data: customers } = await supabase
+      const { data: customers, error } = await supabase
         .from('customers')
         .select('status, customer_type, total_value, total_orders');
+
+      console.log('🔍 CustomerService.getCustomerStats - Raw data:', customers);
+      console.log('🔍 CustomerService.getCustomerStats - Error:', error);
 
       if (!customers) return {
         total: 0,

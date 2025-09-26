@@ -85,7 +85,10 @@ export class ProductionService {
         }
       }
 
-      // Generate batch number
+      // Generate globally unique batch ID
+      const batchId = await IDGenerator.generateUniqueProductionBatchId();
+      
+      // Generate batch number (for display purposes)
       const batchNumber = this.generateBatchNumber();
 
       // Prepare batch data

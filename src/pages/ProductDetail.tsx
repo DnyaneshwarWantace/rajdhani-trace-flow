@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ProductService } from "@/services/ProductService";
 import { ProductRecipeService } from "@/services/productRecipeService";
 import { supabase } from "@/lib/supabase";
+import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -207,35 +208,21 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="max-w-7xl mx-auto p-6 space-y-8">
+    <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
+      <Header title="Product Details" />
+      
+      <div className="space-y-6">
         {/* Header */}
-      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/products')} className="shadow-sm">
+          <Button variant="outline" onClick={() => navigate('/products')} className="shadow-sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Products
           </Button>
           <div>
-              <h1 className="text-3xl font-bold text-slate-900">{product.name}</h1>
-              <p className="text-slate-600 mt-1">Product Information & Specifications</p>
+            <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
+            <p className="text-muted-foreground mt-1">Product Information & Specifications</p>
           </div>
         </div>
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm" className="shadow-sm">
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
-            <Button variant="outline" size="sm" className="shadow-sm">
-              <Heart className="w-4 h-4 mr-2" />
-              Save
-          </Button>
-            <Button size="sm" className="shadow-sm">
-            <Edit className="w-4 h-4 mr-2" />
-            Edit Product
-          </Button>
-        </div>
-      </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
           {/* Left Column - Product Image & Basic Info */}

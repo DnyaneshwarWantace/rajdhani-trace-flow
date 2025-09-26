@@ -57,9 +57,9 @@ export interface CreateIndividualProductData {
 class IndividualProductService {
   async createIndividualProduct(data: CreateIndividualProductData) {
     try {
-      // Generate meaningful ID if not provided
+      // Generate globally unique ID if not provided
       if (!data.id) {
-        data.id = IDGenerator.generateIndividualProductId();
+        data.id = await IDGenerator.generateUniqueIndividualProductId();
       }
       
       // Generate QR code if not provided

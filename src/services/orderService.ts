@@ -1,5 +1,5 @@
 import { supabase, supabaseAdmin, handleSupabaseError, Order, OrderItem } from '@/lib/supabase';
-import { generateUniqueId } from '@/lib/idGenerator';
+import { generateUniqueId, IDGenerator } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { CustomerService } from './customerService';
 import { NotificationService } from './notificationService';
@@ -94,11 +94,11 @@ export class OrderService {
       const gstAmount = ((subtotal - discountAmount) * gstRate) / 100;
       const totalAmount = subtotal + gstAmount - discountAmount;
 
-      // Generate order number
+      // Generate globally unique order ID
+      const orderId = await IDGenerator.generateUniqueOrderId();
+      
+      // Generate order number (for display purposes)
       const orderNumber = this.generateOrderNumber();
-
-      // Generate unique order ID
-      const orderId = `ORD_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Prepare order data
       const newOrder = {
@@ -852,7 +852,10 @@ export class OrderService {
         query = query.lte('order_date', dateTo);
       }
 
-      const { data: orders } = await query;
+      const { data: orders, error } = await query;
+
+      console.log('🔍 OrderService.getOrderStats - Raw data:', orders);
+      console.log('🔍 OrderService.getOrderStats - Error:', error);
 
       if (!orders) return {
         total: 0,

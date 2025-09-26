@@ -839,7 +839,7 @@ export default function Products() {
       for (let i = 0; i < product.quantity; i++) {
         // Add a small delay to ensure unique IDs
         await new Promise(resolve => setTimeout(resolve, 10));
-        const individualProductId = IDGenerator.generateIndividualProductId();
+        const individualProductId = await IDGenerator.generateUniqueIndividualProductId();
         const serialNumber = `${product.name.replace(/\s+/g, '').substring(0, 6).toUpperCase()}-${String(i + 1).padStart(3, '0')}`;
         
         const individualProduct: IndividualProduct = {

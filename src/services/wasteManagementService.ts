@@ -34,7 +34,7 @@ export class WasteManagementService {
   static async createWasteItem(data: CreateWasteItemData): Promise<{ data: WasteItem | null; error: string | null }> {
     try {
       const wasteItem = {
-        id: IDGenerator.generateWasteId(),
+        id: await IDGenerator.generateUniqueWasteId(),
         material_id: data.material_id || null,
         material_name: data.material_name,
         quantity: data.quantity,

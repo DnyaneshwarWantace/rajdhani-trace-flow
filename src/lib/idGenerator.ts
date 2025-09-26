@@ -124,6 +124,180 @@ export class IDGenerator {
     }
   }
 
+  // Helper method to generate globally unique IDs by checking database
+  private static async generateUniqueId(prefix: string, tableName: string, dateStr: string): Promise<string> {
+    let sequence = 1;
+    let newId = `${prefix}-${dateStr}-${sequence.toString().padStart(3, '0')}`;
+    
+    // Import supabase dynamically to avoid circular dependencies
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      // Keep generating IDs until we find one that doesn't exist
+      while (true) {
+        const { data, error } = await supabase
+          .from(tableName)
+          .select('id')
+          .eq('id', newId)
+          .single();
+        
+        // If no data found, the ID is unique
+        if (error && error.code === 'PGRST116') {
+          break;
+        }
+        
+        // If we found data, the ID exists, try next sequence
+        sequence++;
+        newId = `${prefix}-${dateStr}-${sequence.toString().padStart(3, '0')}`;
+        
+        // Safety check to prevent infinite loops
+        if (sequence > 999) {
+          console.warn(`⚠️ Reached maximum sequence for ${prefix} today, using timestamp fallback`);
+          newId = `${prefix}-${dateStr}-${Date.now().toString().slice(-3)}`;
+          break;
+        }
+      }
+    }
+    
+    return newId;
+  }
+
+  // Generate globally unique Individual Product ID by checking database
+  static async generateUniqueIndividualProductId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('IPD', 'individual_products', dateStr);
+  }
+
+  // Generate globally unique Product ID by checking database
+  static async generateUniqueProductId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('PRO', 'products', dateStr);
+  }
+
+  // Generate globally unique Order ID by checking database
+  static async generateUniqueOrderId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('ORD', 'orders', dateStr);
+  }
+
+  // Generate globally unique Customer ID by checking database
+  static async generateUniqueCustomerId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('CUST', 'customers', dateStr);
+  }
+
+  // Generate globally unique Raw Material ID by checking database
+  static async generateUniqueRawMaterialId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('RM', 'raw_materials', dateStr);
+  }
+
+  // Generate globally unique Production Flow ID by checking database
+  static async generateUniqueProductionFlowId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('FLOW', 'production_flows', dateStr);
+  }
+
+  // Generate globally unique Production Batch ID by checking database
+  static async generateUniqueProductionBatchId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('BATCH', 'production_batches', dateStr);
+  }
+
+  // Generate globally unique Waste ID by checking database
+  static async generateUniqueWasteId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('WASTE', 'waste_management', dateStr);
+  }
+
+  // Generate globally unique Recipe ID by checking database
+  static async generateUniqueRecipeId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('RECIPE', 'product_recipes', dateStr);
+  }
+
+  // Generate globally unique Recipe Material ID by checking database
+  static async generateUniqueRecipeMaterialId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('RECMAT', 'recipe_materials', dateStr);
+  }
+
+  // Generate globally unique Purchase Order ID by checking database
+  static async generateUniquePurchaseOrderId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('PO', 'purchase_orders', dateStr);
+  }
+
+  // Generate globally unique Supplier ID by checking database
+  static async generateUniqueSupplierId(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    return this.generateUniqueId('SUP', 'suppliers', dateStr);
+  }
+
   // Parse ID to get information
   static parseId(id: string): { type: string; date: string; sequence: number } | null {
     const match = id.match(/^([A-Z]+)-(\d{6})-(\d{3})$/);

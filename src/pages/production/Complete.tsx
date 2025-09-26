@@ -246,8 +246,8 @@ export default function Complete() {
                 customIds.push(generateGloballyUniqueCustomId(productionProduct.productName));
         }
         
-              const initialProducts: IndividualProduct[] = Array.from({ length: productionProduct.targetQuantity }, (_, index) => ({
-          id: IDGenerator.generateIndividualProductId(),
+              const initialProducts: IndividualProduct[] = await Promise.all(Array.from({ length: productionProduct.targetQuantity }, async (_, index) => ({
+          id: await IDGenerator.generateUniqueIndividualProductId(),
           qrCode: IDGenerator.generateQRCode(),
                 productId: productionProduct.productId,
           customId: customIds[index],
@@ -262,7 +262,7 @@ export default function Complete() {
           inspectorId: generateUniqueId('INSP'),
           productionSteps: completedSteps,
           notes: ""
-        }));
+        })));
         setIndividualProducts(initialProducts);
             }
           } else {

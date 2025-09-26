@@ -80,8 +80,8 @@ export class RawMaterialService {
       // Calculate total value
       const totalValue = materialData.current_stock * materialData.cost_per_unit;
 
-      // Generate meaningful ID if not provided
-      const materialId = materialData.id || IDGenerator.generateRawMaterialId();
+      // Generate globally unique ID if not provided
+      const materialId = materialData.id || await IDGenerator.generateUniqueRawMaterialId();
 
       // Prepare material data
       const newMaterial = {
@@ -485,9 +485,12 @@ export class RawMaterialService {
     averageValue: number;
   }> {
     try {
-      const { data: materials } = await supabase
+      const { data: materials, error } = await supabase
         .from('raw_materials')
         .select('status, total_value');
+
+      console.log('🔍 RawMaterialService.getInventoryStats - Raw data:', materials);
+      console.log('🔍 RawMaterialService.getInventoryStats - Error:', error);
 
       if (!materials) return {
         totalMaterials: 0,

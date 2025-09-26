@@ -582,6 +582,144 @@ const statusStyles = {
   "in-transit": "bg-orange-100 text-orange-800 border-orange-200"
 };
 
+// Waste Recovery Tab Component
+const WasteRecoveryTab = ({
+  wasteRecoveryRefresh,
+  onReturnToInventory
+}: {
+  wasteRecoveryRefresh: number;
+  onReturnToInventory: (waste: WasteItem) => void;
+}) => {
+  const [wasteData, setWasteData] = useState<WasteItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadWasteData = async () => {
+      setLoading(true);
+      try {
+        const wasteData = await supabaseStorage.getWasteManagement();
+        setWasteData(wasteData);
+      } catch (error) {
+        console.error('Error loading waste data:', error);
+        setWasteData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadWasteData();
+  }, [wasteRecoveryRefresh]);
+
+  if (loading) {
+    return <div className="text-center py-8">Loading waste recovery data...</div>;
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Recycle className="w-5 h-5" />
+            Waste Recovery Management
+          </CardTitle>
+          <CardDescription>
+            Recover reusable materials from production waste and return them to inventory
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {wasteData.length === 0 ? (
+            <div className="text-center py-8">
+              <Recycle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                No waste data found
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Waste materials from production will appear here for recovery.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Material</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Quantity</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Waste Type</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Product Info</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Generated</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {wasteData.map((waste) => (
+                    <tr key={waste.id} className="border-b hover:bg-muted/50">
+                      <td className="p-3">
+                        <Badge variant={
+                          waste.status === 'available_for_reuse' ? 'default' :
+                          waste.status === 'added_to_inventory' ? 'outline' : 'secondary'
+                        }>
+                          {waste.status === 'available_for_reuse' ? 'Reusable' :
+                           waste.status === 'added_to_inventory' ? 'Added' : 'Disposed'}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{waste.productName}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {waste.quantity} {waste.unit}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{waste.quantity}</div>
+                        <div className="text-sm text-muted-foreground">{waste.unit}</div>
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm">{waste.wasteType}</div>
+                      </td>
+                      <td className="p-3">
+                        <div className="text-sm font-medium">{waste.productName}</div>
+                        <div className="text-xs text-muted-foreground">Production: {waste.productionId}</div>
+                        <div className="text-xs text-blue-600">Waste Type: {waste.wasteType}</div>
+                      </td>
+                      <td className="p-3 text-sm text-muted-foreground">
+                        <div>{new Date(waste.generatedAt).toLocaleDateString()}</div>
+                        <div className="text-xs">{new Date(waste.generatedAt).toLocaleTimeString()}</div>
+                        {waste.addedAt && (
+                          <div className="text-xs text-green-600 mt-1">
+                            Added: {new Date(waste.addedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {waste.status === 'available_for_reuse' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onReturnToInventory(waste)}
+                            className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300"
+                          >
+                            <Package className="w-4 h-4 mr-1" />
+                            Return to Inventory
+                          </Button>
+                        )}
+                        {waste.status === 'added_to_inventory' && (
+                          <div className="text-sm text-green-600 font-medium">
+                            ✓ Added
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+};
+
 export default function Materials() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1617,10 +1755,10 @@ export default function Materials() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
       <Header title="Raw Materials" />
-
-      <div className="max-w-7xl mx-auto mt-8">
+      
+      <div className="space-y-6">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">Raw Materials</h1>
@@ -3126,143 +3264,5 @@ export default function Materials() {
         </Dialog>
       </div>
     </div>
-  );
-}
-
-// Waste Recovery Tab Component
-function WasteRecoveryTab({
-  wasteRecoveryRefresh,
-  onReturnToInventory
-}: {
-  wasteRecoveryRefresh: number;
-  onReturnToInventory: (waste: WasteItem) => void;
-}) {
-  const [wasteData, setWasteData] = useState<WasteItem[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadWasteData = async () => {
-      setLoading(true);
-      try {
-        const wasteData = await supabaseStorage.getWasteManagement();
-        setWasteData(wasteData);
-      } catch (error) {
-        console.error('Error loading waste data:', error);
-        setWasteData([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadWasteData();
-  }, [wasteRecoveryRefresh]);
-
-  if (loading) {
-    return <div className="text-center py-8">Loading waste recovery data...</div>;
-  }
-
-  return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Recycle className="w-5 h-5" />
-            Waste Recovery Management
-          </CardTitle>
-          <CardDescription>
-            Recover reusable materials from production waste and return them to inventory
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {wasteData.length === 0 ? (
-            <div className="text-center py-8">
-              <Recycle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                No waste data found
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Waste materials from production will appear here for recovery.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3">Status</th>
-                    <th className="text-left p-3">Material</th>
-                    <th className="text-left p-3">Quantity</th>
-                    <th className="text-left p-3">Waste Type</th>
-                    <th className="text-left p-3">Product Info</th>
-                    <th className="text-left p-3">Generated</th>
-                    <th className="text-left p-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {wasteData.map((waste) => (
-                    <tr key={waste.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3">
-                        <Badge variant={
-                          waste.status === 'available_for_reuse' ? 'default' :
-                          waste.status === 'added_to_inventory' ? 'outline' : 'secondary'
-                        }>
-                          {waste.status === 'available_for_reuse' ? 'Reusable' :
-                           waste.status === 'added_to_inventory' ? 'Added' : 'Disposed'}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-medium">{waste.productName}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {waste.quantity} {waste.unit}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-medium">{waste.quantity}</div>
-                        <div className="text-sm text-muted-foreground">{waste.unit}</div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm">{waste.wasteType}</div>
-                      </td>
-                      <td className="p-3">
-                        <div className="text-sm font-medium">{waste.productName}</div>
-                        <div className="text-xs text-muted-foreground">Production: {waste.productionId}</div>
-                        <div className="text-xs text-blue-600">Waste Type: {waste.wasteType}</div>
-                      </td>
-                      <td className="p-3 text-sm text-muted-foreground">
-                        <div>{new Date(waste.generatedAt).toLocaleDateString()}</div>
-                        <div className="text-xs">{new Date(waste.generatedAt).toLocaleTimeString()}</div>
-                        {waste.addedAt && (
-                          <div className="text-xs text-green-600 mt-1">
-                            Added: {new Date(waste.addedAt).toLocaleDateString()}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-3">
-                        {waste.status === 'available_for_reuse' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onReturnToInventory(waste)}
-                            className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300"
-                          >
-                            <Package className="w-4 h-4 mr-1" />
-                            Return to Inventory
-                          </Button>
-                        )}
-                        {waste.status === 'added_to_inventory' && (
-                          <div className="text-sm text-green-600 font-medium">
-                            ✓ Added
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </>
   );
 }

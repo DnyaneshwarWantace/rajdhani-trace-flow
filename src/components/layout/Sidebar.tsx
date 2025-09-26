@@ -45,23 +45,30 @@ const sidebarItems: SidebarItem[] = [
     title: "Order Management",
     icon: ShoppingCart,
     href: "/orders",
-    color: "text-orders",
+    color: "text-blue-600",
     roles: ['admin', 'orders'],
     permission: 'orders.read'
   },
   {
-    title: "Inventory System",
+    title: "Customers",
+    icon: Users,
+    href: "/customers",
+    color: "text-indigo-600",
+    roles: ['admin', 'orders']
+  },
+  {
+    title: "Products",
     icon: Package,
-    href: "/inventory",
-    color: "text-inventory",
-    roles: ['admin', 'inventory'],
-    permission: 'inventory.read'
+    href: "/products",
+    color: "text-green-600",
+    roles: ['admin', 'inventory', 'production', 'raw_material'],
+    permission: 'products.read'
   },
   {
     title: "Production",
     icon: Factory,
     href: "/production",
-    color: "text-production",
+    color: "text-orange-600",
     roles: ['admin', 'production'],
     permission: 'production.read'
   },
@@ -69,30 +76,15 @@ const sidebarItems: SidebarItem[] = [
     title: "Raw Materials",
     icon: Factory,
     href: "/materials",
-    color: "text-materials",
+    color: "text-amber-600",
     roles: ['admin', 'raw_material'],
     permission: 'raw_material.read'
-  },
-  {
-    title: "Products",
-    icon: Package,
-    href: "/products",
-    color: "text-products",
-    roles: ['admin', 'inventory', 'production', 'raw_material'],
-    permission: 'products.read'
-  },
-  {
-    title: "QR Scanner",
-    icon: QrCode,
-    href: "/qr-scanner",
-    color: "text-purple-600",
-    roles: ['admin', 'inventory', 'production']
   },
   {
     title: "Manage Stock",
     icon: AlertTriangle,
     href: "/manage-stock",
-    color: "text-warning",
+    color: "text-red-600",
     roles: ['admin', 'inventory'],
     permission: 'inventory.write'
   },
@@ -100,35 +92,29 @@ const sidebarItems: SidebarItem[] = [
     title: "Analytics",
     icon: BarChart3,
     href: "/analytics",
-    color: "text-accent",
+    color: "text-purple-600",
     roles: ['admin']
   },
   {
-    title: "Customers",
-    icon: Users,
-    href: "/customers",
-    color: "text-muted-foreground",
-    roles: ['admin', 'orders']
+    title: "Inventory System",
+    icon: Package,
+    href: "/inventory",
+    color: "text-emerald-600",
+    roles: ['admin', 'inventory'],
+    permission: 'inventory.read'
+  },
+  {
+    title: "QR Scanner",
+    icon: QrCode,
+    href: "/qr-scanner",
+    color: "text-cyan-600",
+    roles: ['admin', 'inventory', 'production']
   },
   {
     title: "Settings",
     icon: Settings,
     href: "/settings",
-    color: "text-muted-foreground",
-    roles: ['admin']
-  },
-  {
-    title: "Data Initializer",
-    icon: Settings,
-    href: "/data-initializer",
-    color: "text-green-600",
-    roles: ['admin']
-  },
-  {
-    title: "Backend Test",
-    icon: Cog,
-    href: "/backend-test",
-    color: "text-blue-600",
+    color: "text-gray-600",
     roles: ['admin']
   }
 ];
@@ -219,20 +205,23 @@ export function Sidebar({ className }: SidebarProps) {
               <Button
                 variant={isActive ? "secondary" : "ghost"}
                 className={cn(
-                  "w-full text-left transition-all",
+                  "w-full text-left transition-all duration-200 group",
                   isCollapsed ? "h-10 md:h-12 justify-center px-0" : "h-10 md:h-12 justify-start",
-                  isActive && "bg-primary/10 text-primary hover:bg-primary/15",
-                  !isActive && "hover:bg-muted"
+                  isActive && "bg-primary/10 text-primary hover:bg-primary/20 shadow-sm",
+                  !isActive && "hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 )}
                 title={isCollapsed ? item.title : undefined}
               >
                 <Icon className={cn(
-                  "h-4 w-4 md:h-5 md:w-5 flex-shrink-0",
+                  "h-4 w-4 md:h-5 md:w-5 flex-shrink-0 transition-colors duration-200",
                   isActive ? "text-primary" : item.color,
+                  !isActive && "group-hover:text-slate-700 dark:group-hover:text-slate-300",
                   !isCollapsed && "mr-2 md:mr-3"
                 )} />
                 {!isCollapsed && (
-                  <span className="font-medium text-sm md:text-base truncate">{item.title}</span>
+                  <span className="font-medium text-sm md:text-base truncate transition-colors duration-200 group-hover:text-slate-900 dark:group-hover:text-slate-100">
+                    {item.title}
+                  </span>
                 )}
               </Button>
             </Link>
@@ -256,18 +245,21 @@ export function Sidebar({ className }: SidebarProps) {
           variant="ghost"
           onClick={logout}
           className={cn(
-            "w-full text-left transition-all",
+            "w-full text-left transition-all duration-200 group",
             isCollapsed ? "h-10 md:h-12 justify-center px-0" : "h-10 md:h-12 justify-start",
-            "hover:bg-destructive/10 hover:text-destructive"
+            "hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950 dark:hover:text-red-400"
           )}
           title={isCollapsed ? "Logout" : undefined}
         >
           <LogOut className={cn(
-            "h-4 w-4 md:h-5 md:w-5 flex-shrink-0",
+            "h-4 w-4 md:h-5 md:w-5 flex-shrink-0 transition-colors duration-200",
+            "group-hover:text-red-600 dark:group-hover:text-red-400",
             !isCollapsed && "mr-2 md:mr-3"
           )} />
           {!isCollapsed && (
-            <span className="font-medium text-sm md:text-base">Logout</span>
+            <span className="font-medium text-sm md:text-base transition-colors duration-200 group-hover:text-red-600 dark:group-hover:text-red-400">
+              Logout
+            </span>
           )}
         </Button>
 

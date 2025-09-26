@@ -84,8 +84,8 @@ export class ProductService {
         return { data: null, error: 'A product with the same name and specifications already exists' };
       }
 
-      // Generate meaningful ID if not provided
-      const productId = productData.id || IDGenerator.generateProductId();
+      // Generate globally unique ID if not provided
+      const productId = productData.id || await IDGenerator.generateUniqueProductId();
 
       // Prepare product data
       const newProduct = {
@@ -879,13 +879,16 @@ export class ProductService {
     availableUnits: number;
   }> {
     try {
-      const { data: products } = await supabase
+      const { data: products, error } = await supabase
         .from('products')
         .select(`
           status,
           category,
           individual_products (status)
         `);
+
+      console.log('🔍 ProductService.getProductStats - Raw data:', products);
+      console.log('🔍 ProductService.getProductStats - Error:', error);
 
       if (!products) return {
         totalProducts: 0,

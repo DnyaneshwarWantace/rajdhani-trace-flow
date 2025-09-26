@@ -18,31 +18,48 @@ interface ModernStatsGridProps {
 }
 
 export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
-  // Calculate real metrics from data
-  const totalOrders = data?.stats?.orders?.total || 0;
-  const completedOrders = (data?.stats?.orders?.delivered || 0) + (data?.stats?.orders?.dispatched || 0);
-  const pendingOrders = data?.stats?.orders?.pending || 0;
-  const inProductionOrders = data?.stats?.orders?.inProduction || 0;
+  // Debug: Log the data structure
+  console.log('🔍 ModernStatsGrid - Received data:', data);
+  console.log('🔍 ModernStatsGrid - Stats structure:', data?.stats);
+  
+  // Calculate real metrics from data - handle both direct and nested structures
+  const ordersData = data?.stats?.orders || data?.orders || {};
+  const productsData = data?.stats?.products || data?.products || {};
+  const materialsData = data?.stats?.materials || data?.materials || {};
+  const customersData = data?.stats?.customers || data?.customers || {};
+  
+  const totalOrders = ordersData.total || 0;
+  const completedOrders = (ordersData.delivered || 0) + (ordersData.dispatched || 0);
+  const pendingOrders = ordersData.pending || 0;
+  const inProductionOrders = ordersData.inProduction || 0;
   
   // Real revenue from completed orders with full payment
-  const totalRevenue = data?.stats?.orders?.totalRevenue || 0;
-  const paidAmount = data?.stats?.orders?.paidAmount || 0;
-  const outstandingAmount = data?.stats?.orders?.outstandingAmount || 0;
+  const totalRevenue = ordersData.totalRevenue || 0;
+  const paidAmount = ordersData.paidAmount || 0;
+  const outstandingAmount = ordersData.outstandingAmount || 0;
   
   // Products and materials
-  const totalProducts = data?.stats?.products?.totalProducts || 0;
-  const lowStockProducts = data?.stats?.products?.lowStock || 0;
+  const totalProducts = productsData.totalProducts || 0;
+  const lowStockProducts = productsData.lowStock || 0;
   
   // Raw materials count
-  const rawMaterials = data?.stats?.materials?.totalMaterials || 0;
-  const materialsLowStock = data?.stats?.materials?.lowStock || 0;
+  const rawMaterials = materialsData.totalMaterials || 0;
+  const materialsLowStock = materialsData.lowStock || 0;
   
   // Production efficiency based on completed vs total orders
   const productionEfficiency = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
   
   // Customer metrics
-  const totalCustomers = data?.stats?.customers?.total || 0;
-  const activeCustomers = data?.stats?.customers?.active || 0;
+  const totalCustomers = customersData.total || 0;
+  const activeCustomers = customersData.active || 0;
+  
+  // Debug: Log calculated values
+  console.log('🔍 ModernStatsGrid - Calculated values:');
+  console.log('Total Orders:', totalOrders);
+  console.log('Total Products:', totalProducts);
+  console.log('Raw Materials:', rawMaterials);
+  console.log('Total Revenue:', totalRevenue);
+  console.log('Total Customers:', totalCustomers);
 
   const stats = [
     {

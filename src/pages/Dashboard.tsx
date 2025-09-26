@@ -47,6 +47,14 @@ export default function Dashboard() {
         ProductService.getProducts({ limit: 8 })
       ]);
 
+      // Debug: Log the stats data
+      console.log('📊 Dashboard Stats Debug:');
+      console.log('Orders:', orderStats);
+      console.log('Products:', productStats);
+      console.log('Materials:', materialStats);
+      console.log('Customers:', customerStats);
+      console.log('Production:', productionStats);
+
       setDashboardData({
         stats: {
           orders: orderStats,
@@ -111,31 +119,30 @@ export default function Dashboard() {
       >
         {/* Header */}
         <motion.div variants={itemVariants}>
-          <Header
-            title="Business Dashboard"
-            subtitle="Real-time insights for carpets and raw materials business"
-            searchPlaceholder="Search orders, products, customers..."
-            actions={
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600">
-                  <Zap className="h-3 w-3 text-green-500" />
-                  Live Data
-                </div>
-                <Button
-                  onClick={fetchDashboardData}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-                  disabled={loading}
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">
-                    {loading ? 'Refreshing...' : 'Refresh'}
-                  </span>
-                </Button>
+          <div className="flex items-center justify-between">
+            <Header
+              title="Business Dashboard"
+              subtitle="Real-time insights for carpets and raw materials business"
+            />
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600">
+                <Zap className="h-3 w-3 text-green-500" />
+                Live Data
               </div>
-            }
-          />
+              <Button
+                onClick={fetchDashboardData}
+                variant="outline"
+                size="sm"
+                className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">
+                  {loading ? 'Refreshing...' : 'Refresh'}
+                </span>
+              </Button>
+            </div>
+          </div>
         </motion.div>
 
         {loading && !dashboardData ? (
