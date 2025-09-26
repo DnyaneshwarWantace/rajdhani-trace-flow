@@ -42,7 +42,6 @@ interface ProductionProduct {
   productName: string;
   category: string;
   color: string;
-  size: string;
   pattern: string;
   targetQuantity: number;
   priority: "normal" | "high" | "urgent";
@@ -198,7 +197,7 @@ export default function Production() {
               .from('individual_products')
               .select('id, product_id')
               .eq('product_id', flow.production_product_id);
-            
+
             console.log('🔍 Batch ID query result:', { data: batchData, error: batchError });
             
             if (!batchError && batchData && batchData.length > 0) {
@@ -291,31 +290,31 @@ export default function Production() {
             console.log('🔍 Status set to: planning');
           }
 
-          // Try to get actual product data using production ID directly
+          // Try to get actual product data by extracting product name from flow name
           let productData = null;
           try {
-            // First check if product exists to avoid 406 errors
+            // Extract product name from flow name
+            // Flow name format: "Product Name Production Flow - Batch PRO-xxx"
+            const flowName = flow.flow_name || '';
+            const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
+            
+            console.log('🔍 Extracting product name from flow:', productName);
+            
+            // Find the actual product by name
             const { data: products, error: productError } = await supabase
               .from('products')
-              .select('id')
-              .eq('id', flow.production_product_id)
+              .select('*')
+              .eq('name', productName)
               .limit(1);
 
             if (!productError && products && products.length > 0) {
-              // Product exists, fetch full data
-              const { data: fullProduct, error: fullError } = await supabase
-                .from('products')
-                .select('*')
-                .eq('id', flow.production_product_id)
-                .single();
-              
-              if (!fullError) {
-                productData = fullProduct;
-              }
+              productData = products[0];
+              console.log('✅ Found product data for Production page:', productData);
+            } else {
+              console.log('❌ No product found with name:', productName);
             }
-            // If product doesn't exist, productData remains null (no error logging needed)
           } catch (error) {
-            // Silently handle expected errors for non-existent products
+            console.error('Error loading product data for Production page:', error);
             productData = null;
           }
 
@@ -347,7 +346,6 @@ export default function Production() {
             productName: productData?.name || flow.flow_name.replace(' Production Flow', '') || `Production Item ${flow.production_product_id}`,
             category: productData?.category || 'Carpet',
             color: productData?.color || 'Standard',
-            size: productData ? `${productData.height || 'N/A'} x ${productData.width || 'N/A'}` : 'N/A',
             pattern: productData?.pattern || 'N/A',
             targetQuantity: 1, // Default quantity
             priority: 'normal' as const,
@@ -943,8 +941,20 @@ function ProductionCard({
             <p className="font-medium">{product.color}</p>
           </div>
           <div>
-            <span className="text-gray-500">Size:</span>
-            <p className="font-medium">{product.size}</p>
+            <span className="text-gray-500">Height:</span>
+            <p className="font-medium">{product.expectedProduct?.height || 'N/A'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500">Width:</span>
+            <p className="font-medium">{product.expectedProduct?.width || 'N/A'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500">Thickness:</span>
+            <p className="font-medium">{product.expectedProduct?.thickness || 'N/A'}</p>
+          </div>
+          <div>
+            <span className="text-gray-500">Weight:</span>
+            <p className="font-medium">{product.expectedProduct?.weight || 'N/A'}</p>
           </div>
           <div>
             <span className="text-gray-500">Quantity:</span>

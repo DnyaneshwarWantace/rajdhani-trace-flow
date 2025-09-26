@@ -93,6 +93,7 @@ export default function Complete() {
   const [showValidationPopup, setShowValidationPopup] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Array<{index: number, productId: string, missingFields: string[]}>>([]);
   const [showCompletionPopup, setShowCompletionPopup] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [completionSummary, setCompletionSummary] = useState<{
     totalProducts: number;
     available: number;
@@ -378,9 +379,24 @@ export default function Complete() {
   };
 
   const handleCompleteProduction = async () => {
-    // Validate all required fields are filled (excluding optional fields like notes)
-    const requiredFields = ['finalWeight', 'finalThickness', 'finalWidth', 'finalHeight', 'qualityGrade'];
-    const fieldLabels = {
+    // Prevent multiple clicks
+    if (isCompleting) {
+      console.log('⚠️ Production completion already in progress');
+      return;
+    }
+
+    // Check if there are any individual products to complete
+    if (individualProducts.length === 0) {
+      console.log('⚠️ No individual products to complete');
+      return;
+    }
+
+    setIsCompleting(true);
+    
+    try {
+      // Validate all required fields are filled (excluding optional fields like notes)
+      const requiredFields = ['finalWeight', 'finalThickness', 'finalWidth', 'finalHeight', 'qualityGrade'];
+      const fieldLabels = {
       'finalWeight': 'Final Weight', 
       'finalThickness': 'Final Thickness',
       'finalWidth': 'Final Width',
@@ -407,6 +423,7 @@ export default function Complete() {
     if (errors.length > 0) {
       setValidationErrors(errors);
       setShowValidationPopup(true);
+      setIsCompleting(false); // Reset loading state on validation error
       return;
     }
 
@@ -563,6 +580,13 @@ export default function Complete() {
       averageQuality: calculateAverageQualityGrade(individualProducts)
     });
     setShowCompletionPopup(true);
+    
+    } catch (error) {
+      console.error('❌ Error completing production:', error);
+      // Show error notification or handle error appropriately
+    } finally {
+      setIsCompleting(false); // Always reset loading state
+    }
   };
 
   const calculateAverageQualityGrade = (products: IndividualProduct[]): string => {
@@ -1053,11 +1077,21 @@ export default function Complete() {
               </Button>
         <Button 
           onClick={handleCompleteProduction}
-              className="bg-green-600 hover:bg-green-700"
-              size="lg"
+          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          size="lg"
+          disabled={isCompleting || individualProducts.length === 0}
         >
+          {isCompleting ? (
+            <>
+              <div className="w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Completing...
+            </>
+          ) : (
+            <>
               <CheckCircle className="w-5 h-5 mr-2" />
-          Complete Production
+              Complete Production
+            </>
+          )}
         </Button>
             </div>
       </div>

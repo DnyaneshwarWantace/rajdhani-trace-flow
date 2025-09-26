@@ -1283,6 +1283,7 @@ export default function NewOrder() {
               type="date"
               value={orderDetails.expectedDelivery}
               onChange={(e) => setOrderDetails(prev => ({ ...prev, expectedDelivery: e.target.value }))}
+              min={new Date().toISOString().split('T')[0]}
             />
           </div>
           <div>
@@ -1561,85 +1562,25 @@ export default function NewOrder() {
           <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Package className="w-5 h-5" />
-              Select Specific Pieces - {currentOrderItem?.product_name}
+              Available Individual Pieces - {currentOrderItem?.product_name}
             </DialogTitle>
             <DialogDescription>
-              Choose which specific pieces to include in this order. Oldest stock is shown first.
+              View available individual pieces for this product. Individual piece selection will be done in the next step after order acceptance.
             </DialogDescription>
           </DialogHeader>
           
           {currentOrderItem && (
             <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
               {/* Summary */}
-              <div className="flex-shrink-0 flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              <div className="flex-shrink-0 flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="text-sm">
-                  {(() => {
-                    const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                    const selectedCount = latestOrderItem?.selectedIndividualProducts?.length || currentOrderItem.selectedIndividualProducts?.length || 0;
-                    const required = currentOrderItem.quantity;
-                    const needed = Math.max(0, required - selectedCount);
-
-                    return (
-                      <>
-                        <span className="font-medium">Selected: {selectedCount}</span>
-                        <span className="text-muted-foreground ml-2">out of {required} required</span>
-                        {needed > 0 && (
-                    <span className="text-orange-600 ml-2 font-medium">
-                            (Need {needed} more)
-                    </span>
-                  )}
-                      </>
-                    );
-                  })()}
+                  <span className="font-medium">Order Quantity: {currentOrderItem.quantity} pieces</span>
+                  <span className="text-blue-600 ml-2 font-medium">• View Only - Selection will be done after order acceptance</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-sm text-muted-foreground">
                     Available: {getAvailableIndividualProducts(currentOrderItem.product_id || '').length} pieces
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (currentOrderItem) {
-                        console.log('🗑️ Clear All button clicked for:', currentOrderItem.id);
-
-                        // Update order items state
-                      setOrderItems(items => items.map(item => {
-                        if (item.id === currentOrderItem.id) {
-                          return { ...item, selectedIndividualProducts: [] };
-                        }
-                        return item;
-                      }));
-
-                        // Immediately update currentOrderItem
-                      setCurrentOrderItem(prev => prev ? { ...prev, selectedIndividualProducts: [] } : null);
-                      }
-                    }}
-                    className="text-xs"
-                    disabled={!currentOrderItem || (() => {
-                      const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                      const selectedCount = latestOrderItem?.selectedIndividualProducts?.length || currentOrderItem.selectedIndividualProducts?.length || 0;
-                      return selectedCount === 0;
-                    })()}
-                  >
-                    Clear All ({(() => {
-                      const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                      return latestOrderItem?.selectedIndividualProducts?.length || currentOrderItem.selectedIndividualProducts?.length || 0;
-                    })()})
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (currentOrderItem && currentOrderItem.quantity > 0) {
-                        autoSelectOldestPieces(currentOrderItem.id, currentOrderItem.quantity);
-                      }
-                    }}
-                    className="text-xs"
-                    disabled={!currentOrderItem || currentOrderItem.quantity <= 0 || getAvailableIndividualProducts(currentOrderItem?.product_id || '').length === 0}
-                  >
-                    Auto-Select Oldest ({Math.min(currentOrderItem?.quantity || 0, getAvailableIndividualProducts(currentOrderItem?.product_id || '').length)})
-                  </Button>
                 </div>
               </div>
 
@@ -1649,7 +1590,6 @@ export default function NewOrder() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                       <tr>
-                        <th className="px-3 py-2 text-left font-medium text-gray-700 border-r">Select</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-700 border-r">ID</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-700 border-r">QR Code</th>
                         <th className="px-3 py-2 text-left font-medium text-gray-700 border-r">Manufactured</th>
@@ -1662,7 +1602,7 @@ export default function NewOrder() {
                     <tbody>
                       {getAvailableIndividualProducts(currentOrderItem.product_id || '').length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
+                          <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
                             <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p>No individual products available</p>
                             <p className="text-xs mt-1">Individual pieces will appear here when available in inventory</p>
@@ -1670,42 +1610,13 @@ export default function NewOrder() {
                         </tr>
                       ) : (
                         getAvailableIndividualProducts(currentOrderItem.product_id || '').map((product) => {
-                          // Get the most up-to-date order item from the main state
-                          const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                          const selectedProducts = latestOrderItem?.selectedIndividualProducts || currentOrderItem.selectedIndividualProducts || [];
-
-                          const isSelected = selectedProducts.some(p => p.id === product.id);
-                          const isDisabled = !isSelected && selectedProducts.length >= currentOrderItem.quantity;
 
                   
                   return (
                             <tr
                       key={product.id} 
-                              className={`hover:bg-gray-50 transition-colors ${
-                                isSelected ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-                              } ${isDisabled ? 'opacity-50' : ''}`}
+                              className="hover:bg-gray-50 transition-colors"
                             >
-                              <td className="px-3 py-2 border-r">
-                                <input
-                                  key={`${product.id}-${isSelected}-${selectedProducts.length}`}
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={(e) => {
-                                    e.stopPropagation();
-                        if (!isDisabled) {
-                                      console.log('🎯 Checkbox clicked:', {
-                                        productId: product.id,
-                                        currentChecked: isSelected,
-                                        newState: !isSelected,
-                                        selectedProducts: selectedProducts.map(p => p.id)
-                                      });
-                          handleIndividualProductSelection(currentOrderItem.id, product, !isSelected);
-                        }
-                      }}
-                                  disabled={isDisabled}
-                                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                                />
-                              </td>
                               <td className="px-3 py-2 border-r font-mono text-xs">{product.id}</td>
                               <td className="px-3 py-2 border-r">
                                 {product.qrCode ? (
@@ -1756,21 +1667,6 @@ export default function NewOrder() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowIndividualProductSelection(false)}>
               Close
-            </Button>
-            <Button 
-              onClick={() => setShowIndividualProductSelection(false)}
-              disabled={(() => {
-                if (!currentOrderItem) return true;
-                const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                const selectedCount = latestOrderItem?.selectedIndividualProducts?.length || currentOrderItem.selectedIndividualProducts?.length || 0;
-                return selectedCount !== currentOrderItem.quantity;
-              })()}
-            >
-              Confirm Selection ({(() => {
-                if (!currentOrderItem) return 0;
-                const latestOrderItem = orderItems.find(item => item.id === currentOrderItem.id);
-                return latestOrderItem?.selectedIndividualProducts?.length || currentOrderItem.selectedIndividualProducts?.length || 0;
-              })()} pieces)
             </Button>
           </DialogFooter>
         </DialogContent>

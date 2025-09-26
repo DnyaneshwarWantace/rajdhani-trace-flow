@@ -380,21 +380,7 @@ export default function WasteGeneration() {
 
     updateProductionProduct(updatedProduct);
     
-    // Update production flow if wastage step is active
-    ProductionFlowService.getProductionFlow(productionProduct.id).then(flow => {
-      if (flow) {
-        const wastageStep = productionSteps.find(s => s.step_type === 'wastage_tracking' && s.status === 'in_progress');
-        if (wastageStep) {
-          // Auto-complete wastage step when waste is added
-          ProductionFlowService.updateFlowStep(wastageStep.id, {
-            status: 'completed',
-            end_time: new Date().toISOString(),
-            inspector_name: 'Admin',
-            notes: `Wastage recorded: ${updatedProduct.wasteGenerated.length} items`
-          });
-        }
-      }
-    });
+    // Don't auto-complete the waste step - user must explicitly choose to complete or skip
     
     // Reset form
     setNewWaste({
@@ -725,6 +711,19 @@ export default function WasteGeneration() {
         subtitle="Track waste generated during production process"
       />
 
+      {/* Status Alert */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="w-6 h-6 text-amber-600" />
+          <div>
+            <h4 className="font-medium text-amber-800">Waste Tracking In Progress</h4>
+            <p className="text-sm text-amber-700 mt-1">
+              You must either complete waste tracking or skip this step to proceed to individual product creation.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Production Progress Bar */}
       <ProductionProgressBar
         currentStep="wastage_tracking"
@@ -982,6 +981,7 @@ export default function WasteGeneration() {
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-4">
+
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium">Complete Waste Tracking</h3>

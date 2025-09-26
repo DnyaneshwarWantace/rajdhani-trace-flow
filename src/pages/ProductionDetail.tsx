@@ -512,11 +512,7 @@ export default function ProductionDetail() {
         );
       } else {
         console.log('✅ Product recipe saved to database:', recipeMaterialsData);
-        showNotification(
-          "Success", 
-          `Product recipe saved with ${recipeMaterials.length} materials`, 
-          "success"
-        );
+        // Success notification will be shown after all operations complete
       }
     } catch (error) {
       console.error('Error saving product recipe:', error);
@@ -575,11 +571,7 @@ export default function ProductionDetail() {
           );
         } else {
           console.log('✅ Material consumption saved to database:', materialData);
-          showNotification(
-            "Success", 
-            `Material consumption saved for ${materialConsumptionData.length} materials`, 
-            "success"
-          );
+          // Success notification will be shown after all operations complete
         }
 
         // Also save as recipe for future reference
@@ -742,10 +734,10 @@ export default function ProductionDetail() {
     
     // Production flow functionality removed
     
-    // Show success notification
+    // Show single comprehensive success notification
     showNotification(
-      `✅ ${availableMaterials.length} Material${availableMaterials.length > 1 ? 's' : ''} Added`,
-      `Materials with sufficient stock have been added to production.`,
+      "✅ Materials Added",
+      `${availableMaterials.length} material${availableMaterials.length > 1 ? 's' : ''} successfully added to production`,
       'success'
     );
     

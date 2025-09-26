@@ -83,7 +83,6 @@ export default function DynamicProductionFlow() {
   const [selectedMachineId, setSelectedMachineId] = useState('');
   const [inspectorName, setInspectorName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -264,16 +263,6 @@ export default function DynamicProductionFlow() {
     }
   };
 
-  // Manual refresh function for debugging
-  const manualRefresh = async () => {
-    console.log('🔄 Manual refresh triggered');
-    setIsRefreshing(true);
-    try {
-      await loadInitialData();
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
 
   const loadProductionSteps = async () => {
     if (!productionFlow) {
@@ -398,8 +387,22 @@ export default function DynamicProductionFlow() {
         notes: getMachineDescription(selectedMachine.name)
       });
 
-      // Reload entire flow data to ensure everything is up to date
-      await loadInitialData();
+      // Update local state with new step instead of reloading entire data
+      const newStepData: ProductionStep = {
+        id: newStep.id,
+        stepNumber: productionSteps.length + 1,
+        name: selectedMachine.name,
+        description: getMachineDescription(selectedMachine.name),
+        machineId: selectedMachineId,
+        machineName: selectedMachine.name,
+        status: 'pending' as const,
+        startTime: undefined,
+        endTime: undefined,
+        inspector: inspectorName.trim(),
+        stepType: 'machine_operation' as const
+      };
+      
+      setProductionSteps(prevSteps => [...prevSteps, newStepData]);
 
       setSelectedMachineId('');
       setInspectorName('');
@@ -447,8 +450,19 @@ export default function DynamicProductionFlow() {
         end_time: newStatus === 'completed' ? new Date().toISOString() : undefined
       });
 
-      // Reload entire flow data to ensure everything is up to date
-      await loadInitialData();
+      // Update local state instead of reloading entire data
+      setProductionSteps(prevSteps => 
+        prevSteps.map(step => 
+          step.id === stepId 
+            ? {
+                ...step,
+                status: newStatus,
+                startTime: newStatus === 'in_progress' ? new Date().toISOString() : step.startTime,
+                endTime: newStatus === 'completed' ? new Date().toISOString() : step.endTime
+              }
+            : step
+        )
+      );
 
       console.log('Step status updated:', { stepId, newStatus });
     } catch (error) {
@@ -561,14 +575,6 @@ export default function DynamicProductionFlow() {
         <Button variant="outline" onClick={() => navigate('/production')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Production
-        </Button>
-        <Button variant="outline" onClick={loadProductionSteps} className="ml-auto" disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh Steps
-        </Button>
-        <Button variant="outline" onClick={manualRefresh} className="ml-2" disabled={isRefreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Debug Refresh
         </Button>
       </div>
 

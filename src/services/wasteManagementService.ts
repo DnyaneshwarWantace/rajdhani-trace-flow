@@ -11,11 +11,8 @@ export interface WasteItem {
   can_be_reused: boolean;
   production_batch_id?: string;
   production_product_id?: string;
-  generated_at: string;
   notes?: string;
-  status: 'pending' | 'processed' | 'returned_to_inventory' | 'disposed';
-  processed_at?: string;
-  processed_by?: string;
+  status: 'available_for_reuse' | 'added_to_inventory' | 'disposed';
   created_at: string;
   updated_at: string;
 }
@@ -46,9 +43,8 @@ export class WasteManagementService {
         can_be_reused: data.can_be_reused || false,
         production_batch_id: data.production_batch_id || null,
         production_product_id: data.production_product_id || null,
-        generated_at: new Date().toISOString(),
         notes: data.notes || null,
-        status: 'pending' as const,
+        status: 'available_for_reuse' as const,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -81,7 +77,7 @@ export class WasteManagementService {
       const { data, error } = await client
         .from('waste_management')
         .select('*')
-        .order('generated_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error fetching waste items:', error);
@@ -98,7 +94,7 @@ export class WasteManagementService {
   // Update waste item status
   static async updateWasteItemStatus(
     wasteId: string, 
-    status: 'pending' | 'processed' | 'returned_to_inventory' | 'disposed',
+    status: 'available_for_reuse' | 'added_to_inventory' | 'disposed',
     processedBy?: string
   ): Promise<{ data: WasteItem | null; error: string | null }> {
     try {
@@ -106,11 +102,6 @@ export class WasteManagementService {
         status,
         updated_at: new Date().toISOString()
       };
-
-      if (status !== 'pending') {
-        updateData.processed_at = new Date().toISOString();
-        updateData.processed_by = processedBy || 'Admin';
-      }
 
       const client = supabaseAdmin || supabase;
       const { data, error } = await client
@@ -154,6 +145,7 @@ export class WasteManagementService {
 
       // Find the corresponding raw material
       if (wasteItem.material_id) {
+        console.log('🔍 Finding raw material with ID:', wasteItem.material_id);
         const { data: material, error: materialError } = await client
           .from('raw_materials')
           .select('*')
@@ -161,10 +153,14 @@ export class WasteManagementService {
           .single();
 
         if (material && !materialError) {
+          console.log('📦 Found material:', material.name, 'Current stock:', material.current_stock);
           // Add waste quantity back to material stock
           const newStock = material.current_stock + wasteItem.quantity;
           const newStatus = newStock <= 0 ? 'out-of-stock' :
                            newStock <= 10 ? 'low-stock' : 'in-stock';
+
+          console.log('➕ Adding waste quantity:', wasteItem.quantity, 'to material stock');
+          console.log('📊 New stock will be:', newStock, 'Status:', newStatus);
 
           const { error: updateError } = await client
             .from('raw_materials')
@@ -176,19 +172,25 @@ export class WasteManagementService {
             .eq('id', wasteItem.material_id);
 
           if (updateError) {
-            console.error('Error updating material stock:', updateError);
+            console.error('❌ Error updating material stock:', updateError);
             return { success: false, error: 'Failed to update material stock' };
+          } else {
+            console.log('✅ Material stock updated successfully');
           }
+        } else {
+          console.error('❌ Material not found or error:', materialError);
+          return { success: false, error: 'Raw material not found' };
         }
+      } else {
+        console.error('❌ No material_id found in waste item');
+        return { success: false, error: 'No material ID found in waste item' };
       }
 
       // Update waste item status
       const { error: statusError } = await client
         .from('waste_management')
         .update({
-          status: 'returned_to_inventory',
-          processed_at: new Date().toISOString(),
-          processed_by: 'Admin',
+          status: 'added_to_inventory',
           updated_at: new Date().toISOString()
         })
         .eq('id', wasteId);
@@ -227,9 +229,8 @@ export class WasteManagementService {
           excess: data?.filter(item => item.waste_type === 'excess').reduce((sum, item) => sum + item.quantity, 0) || 0
         },
         byStatus: {
-          pending: data?.filter(item => item.status === 'pending').length || 0,
-          processed: data?.filter(item => item.status === 'processed').length || 0,
-          returned: data?.filter(item => item.status === 'returned_to_inventory').length || 0,
+          available_for_reuse: data?.filter(item => item.status === 'available_for_reuse').length || 0,
+          added_to_inventory: data?.filter(item => item.status === 'added_to_inventory').length || 0,
           disposed: data?.filter(item => item.status === 'disposed').length || 0
         }
       };

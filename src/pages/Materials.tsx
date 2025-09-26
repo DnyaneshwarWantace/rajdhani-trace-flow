@@ -496,11 +496,13 @@ const supabaseStorage = {
   // Waste Management functions
   async getWasteManagement(): Promise<WasteItem[]> {
     try {
+      console.log('🔍 Fetching waste management data...');
       const { data, error } = await WasteManagementService.getWasteItems();
       if (error) {
         console.error('Error fetching waste management:', error);
         return [];
       }
+      console.log('📊 Raw waste data from service:', data);
       // Map service WasteItem to local WasteItem interface
       const mappedData = (data || []).map((item: any) => ({
         id: item.id,
@@ -509,10 +511,11 @@ const supabaseStorage = {
         wasteType: item.waste_type || 'scrap',
         quantity: item.quantity || 0,
         unit: item.unit || '',
-        generatedAt: item.generated_at || new Date().toISOString(),
-        status: item.can_be_reused ? 'available_for_reuse' as const : 'added_to_inventory' as const,
-        addedAt: item.returned_at || undefined
+        generatedAt: item.created_at || new Date().toISOString(),
+        status: item.status || (item.can_be_reused ? 'available_for_reuse' as const : 'added_to_inventory' as const),
+        addedAt: item.updated_at || undefined
       }));
+      console.log('✅ Mapped waste data:', mappedData);
       return mappedData;
     } catch (error) {
       console.error('Error fetching waste management:', error);
@@ -598,6 +601,7 @@ export default function Materials() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null);
   const [wasteRecoveryRefresh, setWasteRecoveryRefresh] = useState(0);
+  const [wasteRecoveryCount, setWasteRecoveryCount] = useState(0);
   const [inventoryImagePreview, setInventoryImagePreview] = useState<string>("");
   const [imagePreview, setImagePreview] = useState<string>("");
 
@@ -761,6 +765,9 @@ export default function Materials() {
           console.log('📢 Loaded material notifications:', unreadNotifications.length);
         }
 
+        // Load waste recovery count
+        await loadWasteRecoveryCount();
+
         // Load settings (custom categories, units, etc.)
         const settingsData = await supabaseStorage.getSettings();
         setSettings(settingsData);
@@ -828,10 +835,24 @@ export default function Materials() {
   const getWasteRecoveryCount = async () => {
     try {
       const { data: stats } = await WasteManagementService.getWasteStats();
-      return stats?.byStatus.returned || 0;
+      // Count items that are available for reuse (can be returned to inventory)
+      return stats?.byStatus.available_for_reuse || 0;
     } catch (error) {
       console.error('Error getting waste recovery count:', error);
       return 0;
+    }
+  };
+
+  // Load waste recovery count
+  const loadWasteRecoveryCount = async () => {
+    try {
+      console.log('🔍 Loading waste recovery count...');
+      const count = await getWasteRecoveryCount();
+      console.log('📊 Waste recovery count:', count);
+      setWasteRecoveryCount(count);
+    } catch (error) {
+      console.error('Error loading waste recovery count:', error);
+      setWasteRecoveryCount(0);
     }
   };
 
@@ -1398,6 +1419,9 @@ export default function Materials() {
         const updatedMaterials = await supabaseStorage.getAll();
         setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
         setWasteRecoveryRefresh(prev => prev + 1);
+        
+        // Update waste recovery count
+        await loadWasteRecoveryCount();
 
         toast({
           title: "✅ Material Returned to Inventory",
@@ -2363,7 +2387,7 @@ export default function Materials() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="inventory">Inventory</TabsTrigger>
             <TabsTrigger value="waste-recovery">
-              Waste Recovery (0)
+              Waste Recovery ({wasteRecoveryCount})
             </TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="notifications" className="text-xs sm:text-sm">
