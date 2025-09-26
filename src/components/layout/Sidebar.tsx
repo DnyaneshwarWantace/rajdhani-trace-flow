@@ -18,90 +18,118 @@ import {
 } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth, UserRole } from "@/contexts/AuthContext";
 
 interface SidebarProps {
   className?: string;
 }
 
-const sidebarItems = [
+interface SidebarItem {
+  title: string;
+  icon: any;
+  href: string;
+  color: string;
+  roles: UserRole[];
+  permission?: string;
+}
+
+const sidebarItems: SidebarItem[] = [
   {
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/",
-    color: "text-primary"
+    color: "text-primary",
+    roles: ['admin', 'production', 'inventory', 'raw_material', 'orders']
   },
   {
     title: "Order Management",
     icon: ShoppingCart,
     href: "/orders",
-    color: "text-orders"
+    color: "text-orders",
+    roles: ['admin', 'orders'],
+    permission: 'orders.read'
   },
   {
     title: "Inventory System",
     icon: Package,
     href: "/inventory",
-    color: "text-inventory"
+    color: "text-inventory",
+    roles: ['admin', 'inventory'],
+    permission: 'inventory.read'
   },
   {
     title: "Production",
     icon: Factory,
     href: "/production",
-    color: "text-production"
+    color: "text-production",
+    roles: ['admin', 'production'],
+    permission: 'production.read'
   },
   {
     title: "Raw Materials",
     icon: Factory,
     href: "/materials",
-    color: "text-materials"
+    color: "text-materials",
+    roles: ['admin', 'raw_material'],
+    permission: 'raw_material.read'
   },
   {
     title: "Products",
     icon: Package,
     href: "/products",
-    color: "text-products"
+    color: "text-products",
+    roles: ['admin', 'inventory', 'production', 'raw_material'],
+    permission: 'products.read'
   },
   {
     title: "QR Scanner",
     icon: QrCode,
     href: "/qr-scanner",
-    color: "text-purple-600"
+    color: "text-purple-600",
+    roles: ['admin', 'inventory', 'production']
   },
   {
     title: "Manage Stock",
     icon: AlertTriangle,
     href: "/manage-stock",
-    color: "text-warning"
+    color: "text-warning",
+    roles: ['admin', 'inventory'],
+    permission: 'inventory.write'
   },
   {
     title: "Analytics",
     icon: BarChart3,
     href: "/analytics",
-    color: "text-accent"
+    color: "text-accent",
+    roles: ['admin']
   },
   {
     title: "Customers",
     icon: Users,
     href: "/customers",
-    color: "text-muted-foreground"
+    color: "text-muted-foreground",
+    roles: ['admin', 'orders']
   },
   {
     title: "Settings",
     icon: Settings,
     href: "/settings",
-    color: "text-muted-foreground"
+    color: "text-muted-foreground",
+    roles: ['admin']
   },
   {
     title: "Data Initializer",
     icon: Settings,
     href: "/data-initializer",
-    color: "text-green-600"
+    color: "text-green-600",
+    roles: ['admin']
   },
   {
     title: "Backend Test",
     icon: Cog,
     href: "/backend-test",
-    color: "text-blue-600"
+    color: "text-blue-600",
+    roles: ['admin']
   }
 ];
 
@@ -109,7 +137,20 @@ export function Sidebar({ className }: SidebarProps) {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, hasPermission, logout } = useAuth();
+
+  // Filter sidebar items based on user role and permissions
+  const filteredSidebarItems = sidebarItems.filter(item => {
+    if (!user) return false;
+    
+    // Check if user role is allowed for this item
+    const hasRoleAccess = item.roles.includes(user.role);
+    
+    // Check specific permission if required
+    const hasSpecificPermission = item.permission ? hasPermission(item.permission) : true;
+    
+    return hasRoleAccess && hasSpecificPermission;
+  });
 
   // Auto-collapse on mobile
   useEffect(() => {
@@ -144,6 +185,11 @@ export function Sidebar({ className }: SidebarProps) {
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-primary">Rajdhani Carpet</h1>
                 <p className="text-xs md:text-sm text-muted-foreground">ERP System</p>
+                {user && (
+                  <p className="text-xs text-primary font-medium capitalize">
+                    {user.role.replace('_', ' ')} User
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -164,7 +210,7 @@ export function Sidebar({ className }: SidebarProps) {
 
       {/* Navigation */}
       <nav className={cn("flex-1 space-y-1 md:space-y-2", isCollapsed ? "p-1 md:p-2" : "p-2 md:p-4")}>
-        {sidebarItems.map((item) => {
+        {filteredSidebarItems.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
 

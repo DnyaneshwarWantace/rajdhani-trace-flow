@@ -19,30 +19,30 @@ interface ModernStatsGridProps {
 
 export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
   // Calculate real metrics from data
-  const totalOrders = data?.orders?.total || 0;
-  const completedOrders = (data?.orders?.delivered || 0) + (data?.orders?.dispatched || 0);
-  const pendingOrders = data?.orders?.pending || 0;
-  const inProductionOrders = data?.orders?.inProduction || 0;
+  const totalOrders = data?.stats?.orders?.total || 0;
+  const completedOrders = (data?.stats?.orders?.delivered || 0) + (data?.stats?.orders?.dispatched || 0);
+  const pendingOrders = data?.stats?.orders?.pending || 0;
+  const inProductionOrders = data?.stats?.orders?.inProduction || 0;
   
   // Real revenue from completed orders with full payment
-  const totalRevenue = data?.orders?.totalRevenue || 0;
-  const paidAmount = data?.orders?.paidAmount || 0;
-  const outstandingAmount = data?.orders?.outstandingAmount || 0;
+  const totalRevenue = data?.stats?.orders?.totalRevenue || 0;
+  const paidAmount = data?.stats?.orders?.paidAmount || 0;
+  const outstandingAmount = data?.stats?.orders?.outstandingAmount || 0;
   
-  // Only carpets (products) - filter out raw materials
-  const carpetProducts = data?.products?.carpetProducts || 0;
-  const carpetLowStock = data?.products?.carpetLowStock || 0;
+  // Products and materials
+  const totalProducts = data?.stats?.products?.totalProducts || 0;
+  const lowStockProducts = data?.stats?.products?.lowStock || 0;
   
   // Raw materials count
-  const rawMaterials = data?.materials?.totalMaterials || 0;
-  const materialsLowStock = data?.materials?.lowStock || 0;
+  const rawMaterials = data?.stats?.materials?.totalMaterials || 0;
+  const materialsLowStock = data?.stats?.materials?.lowStock || 0;
   
   // Production efficiency based on completed vs total orders
   const productionEfficiency = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
   
   // Customer metrics
-  const totalCustomers = data?.customers?.total || 0;
-  const activeCustomers = data?.customers?.active || 0;
+  const totalCustomers = data?.stats?.customers?.total || 0;
+  const activeCustomers = data?.stats?.customers?.active || 0;
 
   const stats = [
     {
@@ -57,15 +57,15 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
       trendUp: true
     },
     {
-      id: "carpets",
-      title: "Carpet Products",
-      value: carpetProducts,
-      subtitle: `${carpetLowStock} low stock`,
+      id: "products",
+      title: "Total Products",
+      value: totalProducts,
+      subtitle: `${lowStockProducts} low stock`,
       icon: Package,
       color: "text-green-600",
       bgColor: "bg-green-50",
-      trend: carpetLowStock,
-      trendUp: carpetLowStock === 0
+      trend: lowStockProducts,
+      trendUp: lowStockProducts === 0
     },
     {
       id: "materials",
@@ -125,14 +125,7 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
+    visible: { opacity: 1, y: 0 }
   };
 
   return (

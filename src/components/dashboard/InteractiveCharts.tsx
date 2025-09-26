@@ -9,16 +9,18 @@ interface InteractiveChartsProps {
 }
 
 export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
-  const orders = data?.orders || {};
-  const products = data?.products || {};
-  const materials = data?.materials || {};
-  const customers = data?.customers || {};
+  const orders = data?.stats?.orders || {};
+  const products = data?.stats?.products || {};
+  const materials = data?.stats?.materials || {};
+  const customers = data?.stats?.customers || {};
 
   // Order status distribution
   const orderStatusData = [
     { name: "Pending", value: orders.pending || 0, color: "bg-yellow-500" },
-    { name: "In Production", value: orders.inProduction || 0, color: "bg-blue-500" },
-    { name: "Ready", value: orders.ready || 0, color: "bg-purple-500" },
+    { name: "Accepted", value: orders.accepted || 0, color: "bg-blue-500" },
+    { name: "In Production", value: orders.inProduction || 0, color: "bg-purple-500" },
+    { name: "Ready", value: orders.ready || 0, color: "bg-indigo-500" },
+    { name: "Dispatched", value: orders.dispatched || 0, color: "bg-orange-500" },
     { name: "Delivered", value: orders.delivered || 0, color: "bg-green-500" },
     { name: "Cancelled", value: orders.cancelled || 0, color: "bg-red-500" }
   ];
@@ -26,13 +28,16 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
   // Revenue breakdown
   const revenueData = [
     { name: "Paid Amount", value: orders.paidAmount || 0, color: "bg-green-500" },
-    { name: "Outstanding", value: orders.outstandingAmount || 0, color: "bg-orange-500" }
+    { name: "Outstanding", value: orders.outstandingAmount || 0, color: "bg-orange-500" },
+    { name: "Total Revenue", value: orders.totalRevenue || 0, color: "bg-blue-500" }
   ];
 
   // Product vs Materials
   const inventoryData = [
-    { name: "Carpet Products", value: products.carpetProducts || 0, color: "bg-blue-500" },
-    { name: "Raw Materials", value: materials.totalMaterials || 0, color: "bg-orange-500" }
+    { name: "Total Products", value: products.totalProducts || 0, color: "bg-blue-500" },
+    { name: "Available Units", value: products.availableUnits || 0, color: "bg-green-500" },
+    { name: "Raw Materials", value: materials.totalMaterials || 0, color: "bg-orange-500" },
+    { name: "Materials in Stock", value: materials.inStock || 0, color: "bg-purple-500" }
   ];
 
   const containerVariants = {

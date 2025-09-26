@@ -15,9 +15,9 @@ export interface User {
 
 export const ROLE_PERMISSIONS = {
   admin: ['*'],
-  production: ['production.read', 'production.write'],
-  inventory: ['inventory.read', 'inventory.write'],
-  raw_material: ['raw_material.read', 'raw_material.write'],
+  production: ['production.read', 'production.write', 'products.read'],
+  inventory: ['inventory.read', 'inventory.write', 'products.read'],
+  raw_material: ['raw_material.read', 'raw_material.write', 'products.read'],
   orders: ['orders.read', 'orders.write']
 };
 

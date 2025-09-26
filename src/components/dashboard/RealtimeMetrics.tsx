@@ -17,14 +17,14 @@ interface RealtimeMetricsProps {
 }
 
 export function RealtimeMetrics({ data, loading }: RealtimeMetricsProps) {
-  const orders = data?.orders || {};
-  const products = data?.products || {};
-  const materials = data?.materials || {};
+  const orders = data?.stats?.orders || {};
+  const products = data?.stats?.products || {};
+  const materials = data?.stats?.materials || {};
 
   // Calculate real-time metrics
   const pendingOrders = orders.pending || 0;
   const inProductionOrders = orders.inProduction || 0;
-  const lowStockProducts = products.carpetLowStock || 0;
+  const lowStockProducts = products.lowStock || 0;
   const lowStockMaterials = materials.lowStock || 0;
   const totalAlerts = lowStockProducts + lowStockMaterials;
 

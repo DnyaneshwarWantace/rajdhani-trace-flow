@@ -18,9 +18,9 @@ interface PerformanceMetricsProps {
 }
 
 export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
-  const orders = data?.orders || {};
-  const products = data?.products || {};
-  const materials = data?.materials || {};
+  const orders = data?.stats?.orders || {};
+  const products = data?.stats?.products || {};
+  const materials = data?.stats?.materials || {};
 
   // Calculate performance metrics
   const totalOrders = orders.total || 0;
@@ -31,9 +31,9 @@ export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
   const paidAmount = orders.paidAmount || 0;
   const paymentRate = totalRevenue > 0 ? Math.round((paidAmount / totalRevenue) * 100) : 0;
   
-  const carpetProducts = products.carpetProducts || 0;
-  const carpetLowStock = products.carpetLowStock || 0;
-  const inventoryHealth = carpetProducts > 0 ? Math.round(((carpetProducts - carpetLowStock) / carpetProducts) * 100) : 100;
+  const totalProducts = products.totalProducts || 0;
+  const lowStockProducts = products.lowStock || 0;
+  const inventoryHealth = totalProducts > 0 ? Math.round(((totalProducts - lowStockProducts) / totalProducts) * 100) : 100;
   
   const rawMaterials = materials.totalMaterials || 0;
   const materialsLowStock = materials.lowStock || 0;
