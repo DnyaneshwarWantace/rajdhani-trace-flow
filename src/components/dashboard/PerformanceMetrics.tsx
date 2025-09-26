@@ -61,9 +61,9 @@ export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
       trendUp: paymentRate >= 80
     },
     {
-      title: "Carpet Inventory Health",
+      title: "Product Inventory Health",
       value: `${inventoryHealth}%`,
-      description: `${carpetProducts - carpetLowStock} of ${carpetProducts} products in good stock`,
+      description: `${totalProducts - lowStockProducts} of ${totalProducts} products in good stock`,
       icon: Package,
       color: inventoryHealth >= 80 ? "text-green-600" : inventoryHealth >= 60 ? "text-yellow-600" : "text-red-600",
       bgColor: inventoryHealth >= 80 ? "bg-green-50" : inventoryHealth >= 60 ? "bg-yellow-50" : "bg-red-50",
@@ -94,14 +94,7 @@ export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
+    visible: { opacity: 1, y: 0 }
   };
 
   const ProgressBar = ({ value, color, bgColor }: { value: number, color: string, bgColor: string }) => (
