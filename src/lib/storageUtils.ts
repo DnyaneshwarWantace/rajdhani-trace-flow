@@ -184,9 +184,11 @@ export const saveProductRecipe = async (recipe: any): Promise<void> => {
     const recipeData = {
       product_id: recipe.productId,
       product_name: recipe.productName,
+      base_unit: recipe.baseUnit || recipe.base_unit || 'unit', // Base unit for the recipe
       materials: validMaterials.map((material: any) => ({
         material_id: material.id || material.materialId || material.material_id,
         material_name: material.name || material.materialName || material.material_name,
+        material_type: material.material_type || 'raw_material', // Ensure material_type is set
         quantity: material.selectedQuantity || material.quantity || 1,
         unit: material.unit,
         cost_per_unit: material.costPerUnit || material.cost || material.cost_per_unit || 0
@@ -235,7 +237,7 @@ export const saveProductRecipe = async (recipe: any): Promise<void> => {
   }
 };
 
-export const createRecipeFromMaterials = (productId: string, productName: string, materials: any[], createdBy: string = 'admin'): any => {
+export const createRecipeFromMaterials = async (productId: string, productName: string, baseUnit: string, materials: any[], createdBy: string = 'admin'): Promise<any> => {
   console.log('🔍 Creating recipe from materials:', { productId, productName, materials });
   console.log('🔍 Materials array length:', materials.length);
   console.log('🔍 Each material details:', materials.map((m, i) => ({ index: i, material: m })));
@@ -265,12 +267,15 @@ export const createRecipeFromMaterials = (productId: string, productName: string
   }
 
   const recipeData = {
-    id: generateUniqueId('RECIPE'),
+    id: await generateUniqueId('RECIPE'),
     productId,
     productName,
+    baseUnit, // Base unit for the recipe
     materials: validMaterials.map(material => ({
       material_id: material.id,
       material_name: material.name,
+      material_type: material.material_type || 'raw_material', // Default to raw_material for backward compatibility
+      quantity: material.selectedQuantity || material.quantity || 1, // Quantity for 1 base unit
       unit: material.unit || 'piece',
       cost_per_unit: material.cost_per_unit || 0
     })),

@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/select";
 import { 
   ArrowLeft, Package, Search, Plus, Calendar, AlertTriangle,
-  Factory, Clock, CheckCircle
+  Factory, Clock, CheckCircle, Filter, X, ChevronDown, ChevronUp
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
-import { ProductService } from "@/services/ProductService";
+import ProductService from "@/services/api/productService";
+import { ProductionService } from "@/services/api/productionService";
+import { DropdownService } from "@/services/api/dropdownService";
 
 interface ProductMaterial {
   materialName: string;
@@ -35,7 +37,6 @@ interface IndividualProduct {
   materialsUsed: ProductMaterial[];
   finalDimensions: string;
   finalWeight: string;
-  finalThickness: string;
   finalPileHeight: string;
   qualityGrade: string;
   inspector: string;
@@ -48,11 +49,11 @@ interface Product {
   qrCode: string;
   name: string;
   category: string;
+  subcategory?: string;
   color: string;
   size: string;
-  height?: string;
+  length?: string;
   width?: string;
-  thickness?: string;
   pattern: string;
   quantity: number;
   unit: string;
@@ -98,20 +99,80 @@ export default function NewBatch() {
   const [expectedCompletion, setExpectedCompletion] = useState("");
   const [notes, setNotes] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [priorityOptions, setPriorityOptions] = useState<string[]>([]);
+  
+  // Filter states
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>("all");
+  const [selectedColor, setSelectedColor] = useState<string>("all");
+  const [selectedPattern, setSelectedPattern] = useState<string>("all");
+  const [selectedLength, setSelectedLength] = useState<string>("all");
+  const [selectedWidth, setSelectedWidth] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(true);
+
+  // Load priority options (MongoDB dropdowns)
+  const loadPriorityOptions = async () => {
+    try {
+      const prodDropdowns = await DropdownService.getProductionDropdownData();
+      const options = prodDropdowns?.priorities?.filter((o: any) => o.is_active !== false).map((o: any) => o.value) || [];
+      // Map backend enum to UI values: medium -> normal; low is optional
+      const mapped = options.map((v: string) => (v === 'medium' ? 'normal' : v));
+      const unique = Array.from(new Set(mapped));
+      // Maintain UI order preference
+      const order = ['normal', 'high', 'urgent', 'low'];
+      const sorted = unique.sort((a, b) => order.indexOf(a) - order.indexOf(b)).filter(v => ['normal','high','urgent'].includes(v));
+      if (sorted.length) {
+        setPriorityOptions(sorted);
+        // Ensure current priority is valid
+        if (!sorted.includes(priority)) setPriority('normal');
+        return;
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+    // Fallback hardcoded
+    setPriorityOptions(['normal', 'high', 'urgent']);
+  };
 
   useEffect(() => {
-    // Load products from Supabase
+    // Load products from MongoDB service
     const loadProducts = async () => {
       try {
         const response = await ProductService.getProducts();
-        const products = response.data || [];
-        setProducts(products);
+        const apiProducts = response.data || [];
+        const normalized: Product[] = apiProducts.map((p: any) => ({
+          id: p.id,
+          qrCode: p.qr_code || '',
+          name: p.name || '',
+          category: p.category || '',
+          subcategory: p.subcategory || '',
+          color: p.color || '',
+          size: p.size || '',
+          length: p.length || p.dimensions?.length || '',
+          width: p.width || p.dimensions?.width || '',
+          pattern: p.pattern || '',
+          quantity: (p.current_stock ?? p.base_quantity ?? 0),
+          unit: p.unit || 'pcs',
+          expiryDate: p.expiry_date || undefined,
+          materialsUsed: [],
+          totalCost: p.total_cost || 0,
+          sellingPrice: p.selling_price || 0,
+          status: p.status || 'in-stock',
+          location: p.location || '',
+          createdAt: p.created_at || new Date().toISOString(),
+          updatedAt: p.updated_at || new Date().toISOString(),
+          individualStocks: [],
+          individualStockTracking: p.individual_stock_tracking !== false,
+        }));
+        setProducts(normalized);
       } catch (error) {
         console.error('Error loading products:', error);
         setProducts([]);
       }
     };
+    
     loadProducts();
+    loadPriorityOptions();
 
     // Check if a product was pre-selected from the inventory page
     if (location.state?.selectedProduct) {
@@ -119,18 +180,131 @@ export default function NewBatch() {
     }
   }, [location.state]);
 
+  // Get unique values for filters
+  const getUniqueCategories = () => {
+    const categories = new Set<string>();
+    products.forEach(p => {
+      if (p.category && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        categories.add(p.category);
+      }
+    });
+    return Array.from(categories).sort();
+  };
+
+  const getUniqueColors = () => {
+    const colors = new Set<string>();
+    products.forEach(p => {
+      if (p.color && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        colors.add(p.color);
+      }
+    });
+    return Array.from(colors).sort();
+  };
+
+  const getUniquePatterns = () => {
+    const patterns = new Set<string>();
+    products.forEach(p => {
+      if (p.pattern && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        patterns.add(p.pattern);
+      }
+    });
+    return Array.from(patterns).sort();
+  };
+
+  const getUniqueLengths = () => {
+    const lengths = new Set<string>();
+    products.forEach(p => {
+      if (p.length && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        lengths.add(p.length);
+      }
+    });
+    return Array.from(lengths).sort();
+  };
+
+  const getUniqueWidths = () => {
+    const widths = new Set<string>();
+    products.forEach(p => {
+      if (p.width && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        widths.add(p.width);
+      }
+    });
+    return Array.from(widths).sort();
+  };
+
+  const getUniqueSubcategories = () => {
+    const subcategories = new Set<string>();
+    products.forEach(p => {
+      if (p.subcategory && p.category !== "Raw Material" && p.individualStockTracking !== false) {
+        subcategories.add(p.subcategory);
+      }
+    });
+    return Array.from(subcategories).sort();
+  };
+
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedCategory("all");
+    setSelectedSubcategory("all");
+    setSelectedColor("all");
+    setSelectedPattern("all");
+    setSelectedLength("all");
+    setSelectedWidth("all");
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (searchTerm) count++;
+    if (selectedCategory !== "all") count++;
+    if (selectedSubcategory !== "all") count++;
+    if (selectedColor !== "all") count++;
+    if (selectedPattern !== "all") count++;
+    if (selectedLength !== "all") count++;
+    if (selectedWidth !== "all") count++;
+    return count;
+  };
+
   const filteredProducts = products.filter(product => {
-    // Filter by search term
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
     // Only show products that are meant for production:
     // 1. Not raw materials (category should not be "Raw Material")
     // 2. Should have individual stock tracking (products that need to be produced)
     const isProductionProduct = product.category !== "Raw Material" && 
                                product.individualStockTracking !== false;
     
-    return matchesSearch && isProductionProduct;
+    if (!isProductionProduct) return false;
+
+    // Filter by search term
+    const matchesSearch = !searchTerm || 
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.subcategory && product.subcategory.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      product.color.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.pattern.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filter by category
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
+    
+    // Filter by subcategory
+    const matchesSubcategory = selectedSubcategory === "all" || (product.subcategory && product.subcategory === selectedSubcategory);
+    
+    // Filter by color
+    const matchesColor = selectedColor === "all" || product.color === selectedColor;
+    
+    // Filter by pattern
+    const matchesPattern = selectedPattern === "all" || product.pattern === selectedPattern;
+    
+    // Filter by length (exact match or starts with)
+    const matchesLength = selectedLength === "all" || 
+      product.length === selectedLength || 
+      (product.length && product.length.startsWith(selectedLength.split(' ')[0]));
+    
+    // Filter by width (exact match or starts with)
+    const matchesWidth = selectedWidth === "all" || 
+      product.width === selectedWidth || 
+      (product.width && product.width.startsWith(selectedWidth.split(' ')[0]));
+    
+    return matchesSearch && matchesCategory && matchesSubcategory && matchesColor && matchesPattern && 
+           matchesLength && matchesWidth;
   });
 
   const handleProductSelect = (product: Product) => {
@@ -138,7 +312,7 @@ export default function NewBatch() {
     setTargetQuantity(1);
   };
 
-  const handleCreateProduction = () => {
+  const handleCreateProduction = async () => {
     if (!selectedProduct) return;
 
     // Generate unique production batch ID to avoid reusing completed flows
@@ -168,8 +342,23 @@ export default function NewBatch() {
       notes
     };
 
-    // TODO: Save to production products in Supabase
-    console.log('Production product to save:', productionProduct);
+    // Create production batch in MongoDB
+    const mappedPriority = priority === 'normal' ? 'medium' : priority; // map to backend enum
+    const { data: createdBatch, error } = await ProductionService.createProductionBatch({
+      product_id: selectedProduct.id,
+      product_name: selectedProduct.name,
+      batch_size: targetQuantity,
+      unit: selectedProduct.unit || 'pieces',
+      status: 'planned',
+      priority: mappedPriority as any,
+      planned_end_date: expectedCompletion ? new Date(expectedCompletion).toISOString() : undefined,
+      notes
+    });
+    if (error) {
+      console.error('Error creating production batch:', error);
+      alert('Failed to create production batch. Please try again.');
+      return;
+    }
 
     // Save complete product data with individual stock details for auto-filling
     const completeProductData = {
@@ -178,12 +367,18 @@ export default function NewBatch() {
       addedToProductionAt: new Date().toISOString()
     };
     
-    // TODO: Save complete product data to Supabase
-    console.log('Complete product data to save:', completeProductData);
+    // Get the batch ID from created batch (use the ID returned from the API)
+    const batchId = createdBatch?.id || productionBatchId;
+    console.log('✅ Created production batch with ID:', batchId, 'batch_size:', targetQuantity);
 
     // Navigate directly to production detail page for planning
-    // Pass the actual product ID, not the batch ID
-    navigate(`/production-detail/${selectedProduct.id}`);
+    // Pass the actual product ID, batch ID, and target quantity
+    navigate(`/production-detail/${selectedProduct.id}`, {
+      state: { 
+        targetQuantity,
+        batchId: batchId // Pass batch ID so ProductionDetail can find the correct batch
+      }
+    });
   };
 
   return (
@@ -220,48 +415,245 @@ export default function NewBatch() {
         {/* Product Selection */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5" />
-              Select Product
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Select Product
+                  {getActiveFiltersCount() > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {filteredProducts.length} of {products.filter(p => p.category !== "Raw Material" && p.individualStockTracking !== false).length}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center gap-2"
+                >
+                  <Filter className="w-4 h-4" />
+                  Filters
+                  {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </Button>
+              </div>
             </CardHeader>
           <CardContent className="space-y-4">
+            {/* Search Bar */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                placeholder="Search products..."
+              <Input
+                placeholder="Search by name, category, color, or pattern..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
-                />
-              </div>
-
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredProducts.map((product) => (
-                <div
-                  key={product.id}
-                  onClick={() => handleProductSelect(product)}
-                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                    selectedProduct?.id === product.id
-                      ? 'border-production bg-production/5'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
+              />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setSearchTerm("")}
                 >
-                  <div className="flex items-center justify-between">
-              <div>
-                      <h4 className="font-medium">{product.name}</h4>
-                      <p className="text-sm text-gray-500">
-                        {product.category} • {product.color} • {product.height || 'N/A'} x {product.width || 'N/A'} x {product.thickness || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant={product.quantity > 0 ? "default" : "destructive"}>
-                        {product.quantity} {product.unit}
-                      </Badge>
+                  <X className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+
+            {/* Advanced Filters */}
+            {showFilters && (
+              <div className="space-y-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-sm">Advanced Filters</h4>
+                  {getActiveFiltersCount() > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="text-xs h-7"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Clear All ({getActiveFiltersCount()})
+                    </Button>
+                  )}
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {/* Category Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Category</Label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {getUniqueCategories().map(category => (
+                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Subcategory Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Subcategory</Label>
+                    <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Subcategories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Subcategories</SelectItem>
+                        {getUniqueSubcategories().map(subcategory => (
+                          <SelectItem key={subcategory} value={subcategory}>{subcategory}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Color Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Color</Label>
+                    <Select value={selectedColor} onValueChange={setSelectedColor}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Colors" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Colors</SelectItem>
+                        {getUniqueColors().map(color => (
+                          <SelectItem key={color} value={color}>{color}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Pattern Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Pattern</Label>
+                    <Select value={selectedPattern} onValueChange={setSelectedPattern}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Patterns" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Patterns</SelectItem>
+                        {getUniquePatterns().map(pattern => (
+                          <SelectItem key={pattern} value={pattern}>{pattern}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Length Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Length</Label>
+                    <Select value={selectedLength} onValueChange={setSelectedLength}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Lengths" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Lengths</SelectItem>
+                        {getUniqueLengths().map(length => (
+                          <SelectItem key={length} value={length}>{length}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Width Filter */}
+                  <div>
+                    <Label className="text-xs text-gray-600 mb-1">Width</Label>
+                    <Select value={selectedWidth} onValueChange={setSelectedWidth}>
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue placeholder="All Widths" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Widths</SelectItem>
+                        {getUniqueWidths().map(width => (
+                          <SelectItem key={width} value={width}>{width}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* Products List */}
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No products found</p>
+                  {getActiveFiltersCount() > 0 && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="mt-2"
+                    >
+                      Clear filters to see all products
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                filteredProducts.map((product) => (
+                  <div
+                    key={product.id}
+                    onClick={() => handleProductSelect(product)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                      selectedProduct?.id === product.id
+                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                        : 'border-gray-200 hover:border-gray-400 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
+                          {selectedProduct?.id === product.id && (
+                            <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 mb-2">
+                          <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">{product.color}</Badge>
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700">{product.pattern}</Badge>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+                          <div>
+                            <span className="font-medium">Length:</span> {product.length || 'N/A'}
+                          </div>
+                          <div>
+                            <span className="font-medium">Width:</span> {product.width || 'N/A'}
+                          </div>
+                          <div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <Badge 
+                          variant={product.quantity > 0 ? "default" : "destructive"}
+                          className="text-xs font-medium"
+                        >
+                          {product.quantity} Products
+                        </Badge>
+                        {product.status && (
+                          <Badge 
+                            variant={
+                              product.status === 'in-stock' ? 'default' :
+                              product.status === 'low-stock' ? 'secondary' : 'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            {product.status === 'in-stock' ? 'In Stock' :
+                             product.status === 'low-stock' ? 'Low Stock' : 'Out of Stock'}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-              </div>
-              ))}
+                ))
+              )}
               </div>
           </CardContent>
         </Card>
@@ -290,10 +682,9 @@ export default function NewBatch() {
                     <div><span className="text-gray-500">Name:</span> {selectedProduct.name}</div>
                     <div><span className="text-gray-500">Category:</span> {selectedProduct.category}</div>
                     <div><span className="text-gray-500">Color:</span> {selectedProduct.color}</div>
-                    <div><span className="text-gray-500">Height:</span> {selectedProduct.height || 'N/A'}</div>
+                    <div><span className="text-gray-500">Length:</span> {selectedProduct.length || 'N/A'}</div>
                     <div><span className="text-gray-500">Width:</span> {selectedProduct.width || 'N/A'}</div>
-                    <div><span className="text-gray-500">Thickness:</span> {selectedProduct.thickness || 'N/A'}</div>
-                    <div><span className="text-gray-500">Current Stock:</span> {selectedProduct.quantity} {selectedProduct.unit}</div>
+                    <div><span className="text-gray-500">Current Stock:</span> {selectedProduct.quantity} Products</div>
                     <div><span className="text-gray-500">Location:</span> {selectedProduct.location}</div>
               </div>
               </div>
@@ -304,10 +695,16 @@ export default function NewBatch() {
                     <Label htmlFor="quantity">Target Quantity</Label>
                 <Input
                       id="quantity"
-                  type="number"
+                  type="text"
                       value={targetQuantity}
-                      onChange={(e) => setTargetQuantity(Number(e.target.value))}
-                      min="1"
+                      onChange={(e) => {
+                        // Allow only numbers and leading zeros
+                        const value = e.target.value;
+                        if (value === '' || /^\d+$/.test(value)) {
+                          setTargetQuantity(Number(value) || 1);
+                        }
+                      }}
+                      placeholder="1"
                 />
               </div>
 
@@ -318,9 +715,11 @@ export default function NewBatch() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="normal">Normal</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
+                    {priorityOptions.map(option => (
+                      <SelectItem key={option} value={option}>
+                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

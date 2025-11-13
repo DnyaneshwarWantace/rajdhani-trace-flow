@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Storage - Rajdhani</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #1a202c;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .status {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .status.info {
+            background: #ebf8ff;
+            border-left: 4px solid #3182ce;
+            color: #2c5282;
+            display: block;
+        }
+        
+        .status.success {
+            background: #f0fff4;
+            border-left: 4px solid #38a169;
+            color: #276749;
+        }
+        
+        .status.warning {
+            background: #fffaf0;
+            border-left: 4px solid #ed8936;
+            color: #7c2d12;
+        }
+        
+        .info-box {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .info-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .info-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .info-list li {
+            padding: 8px 0;
+            color: #4a5568;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .info-list li::before {
+            content: "✓";
+            color: #48bb78;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 12px;
+        }
+        
+        .button-danger {
+            background: #f56565;
+            color: white;
+        }
+        
+        .button-danger:hover {
+            background: #e53e3e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+        }
+        
+        .button-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .storage-info {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .storage-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            color: #4a5568;
+        }
+        
+        .storage-count {
+            font-weight: 600;
+            color: #2d3748;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Clear All Storage Data</h1>
+        <p class="subtitle">Rajdhani Trace Flow - Reset to Fresh State</p>
+        
+        <div class="status info" id="infoStatus">
+            <strong>⚠️ Important:</strong> This will clear ALL localStorage data including old users, products, orders, and other cached data. You'll start fresh with MongoDB authentication.
+        </div>
+        
+        <div class="status success" id="successStatus" style="display: none;">
+            <strong>✅ Success!</strong> All storage data has been cleared. Click "Go to Login" to proceed.
+        </div>
+        
+        <div class="info-box">
+            <div class="info-title">What will be cleared:</div>
+            <ul class="info-list">
+                <li>Old localStorage users (admin, production manager, etc.)</li>
+                <li>Cached authentication tokens</li>
+                <li>User preferences and settings</li>
+                <li>Any temporary data or cache</li>
+            </ul>
+        </div>
+        
+        <div class="info-box">
+            <div class="info-title">After clearing:</div>
+            <ul class="info-list">
+                <li>You'll be redirected to the login page</li>
+                <li>Login with: admin@rajdhani.com / admin123</li>
+                <li>All data is now in MongoDB (products, orders still safe!)</li>
+                <li>Create new users from Settings → Users</li>
+            </ul>
+        </div>
+        
+        <div class="storage-info" id="storageInfo">
+            <div class="storage-item">
+                <span>LocalStorage Items:</span>
+                <span class="storage-count" id="localStorageCount">-</span>
+            </div>
+            <div class="storage-item">
+                <span>SessionStorage Items:</span>
+                <span class="storage-count" id="sessionStorageCount">-</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <button class="button button-danger" id="clearBtn" onclick="clearAllStorage()">
+                🗑️ Clear All Storage Data
+            </button>
+            <button class="button button-primary" id="loginBtn" onclick="goToLogin()" style="display: none;">
+                🔐 Go to Login Page
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // Update storage counts
+        function updateStorageInfo() {
+            document.getElementById('localStorageCount').textContent = localStorage.length;
+            document.getElementById('sessionStorageCount').textContent = sessionStorage.length;
+        }
+        
+        // Clear all storage
+        function clearAllStorage() {
+            const btn = document.getElementById('clearBtn');
+            const loginBtn = document.getElementById('loginBtn');
+            const infoStatus = document.getElementById('infoStatus');
+            const successStatus = document.getElementById('successStatus');
+            
+            btn.disabled = true;
+            btn.textContent = '🔄 Clearing...';
+            
+            setTimeout(() => {
+                // Clear localStorage
+                localStorage.clear();
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                
+                // Clear cookies (auth tokens, etc.)
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                
+                // Update UI
+                updateStorageInfo();
+                infoStatus.style.display = 'none';
+                successStatus.style.display = 'block';
+                btn.style.display = 'none';
+                loginBtn.style.display = 'block';
+                
+                console.log('✅ All storage cleared successfully!');
+            }, 500);
+        }
+        
+        // Go to login page
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+        
+        // Initialize
+        updateStorageInfo();
+    </script>
+</body>
+</html>
+

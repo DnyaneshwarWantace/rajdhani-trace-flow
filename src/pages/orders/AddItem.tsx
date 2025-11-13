@@ -33,7 +33,6 @@ const defaultFields: ProductField[] = [
   { id: 'dimensions', name: 'Dimensions (LxW)', type: 'text', required: true, value: '' },
   { id: 'color', name: 'Color', type: 'color', required: true, value: '#000000' },
   { id: 'gsm', name: 'GSM', type: 'number', required: true, value: 0 },
-  { id: 'thickness', name: 'Thickness (mm)', type: 'number', required: true, value: 0 },
   { id: 'weaveType', name: 'Weave Type', type: 'select', options: ['Hand Tufted', 'Hand Knotted', 'Machine Made', 'Flat Weave'], required: true, value: '' },
   { id: 'material', name: 'Material', type: 'select', options: ['Wool', 'Cotton', 'Silk', 'Jute', 'Synthetic'], required: true, value: '' },
   { id: 'price', name: 'Unit Price (₹)', type: 'number', required: true, value: 0 },

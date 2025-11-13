@@ -1,0 +1,29 @@
+# RAW MATERIALS TEMPLATE - Fill this sheet second (after suppliers)
+# Each row = One raw material item
+# Required fields: Material Name, Category, Unit, Supplier Name, Cost Per Unit
+# IMPORTANT: Supplier Name must exactly match the Company Name from SUPPLIERS sheet
+
+Material Name,Brand Name,Category,Current Stock,Unit,Min Stock Level,Max Storage Capacity,Reorder Point,Supplier Name,Cost Per Unit,Batch Number,Quality Grade,Image URL
+"Premium Cotton Yarn","Premium Cotton","Yarn",500,kg,50,1000,100,"Textile Suppliers Ltd",450,"BATCH-001","A+",""
+"Pure Silk Fabric","Luxury Silk","Fabric",200,meters,20,500,40,"Fabric World Industries",1200,"BATCH-002","A",""
+"Reactive Dye Blue","Chemical Dyes","Dye",150,liters,15,300,30,"Textile Suppliers Ltd",350,"BATCH-003","A",""
+"Polyester Thread 40s","Strong Thread","Thread",300,kg,30,600,60,"Fabric World Industries",280,"BATCH-004","A",""
+"Backing Cloth","Strong Back","Fabric",400,sqm,40,800,80,"Textile Suppliers Ltd",85,"BATCH-005","A",""
+"Wool Fiber","Natural Wool","Fiber",250,kg,25,500,50,"Fabric World Industries",650,"BATCH-006","A+",""
+"Chemical Coating","Protective Coat","Coating",100,liters,10,200,20,"Textile Suppliers Ltd",450,"BATCH-007","A",""
+"Adhesive Glue","Strong Bond","Adhesive",80,kg,8,160,16,"Fabric World Industries",320,"BATCH-008","A",""
+
+# INSTRUCTIONS:
+# 1. Material Name: Name of the raw material (REQUIRED)
+# 2. Brand Name: Brand/manufacturer name
+# 3. Category: Choose from: Yarn, Dye, Chemical, Fabric, Thread, Fiber, Coating, Adhesive, Other (REQUIRED)
+# 4. Current Stock: How much you have right now (numbers only)
+# 5. Unit: Choose from: kg, meters, liters, sqm, pieces, tons, gallons, pounds, yards (REQUIRED)
+# 6. Min Stock Level: Minimum quantity before reordering
+# 7. Max Storage Capacity: Maximum you can store
+# 8. Reorder Point: When to order more (usually same as min stock level)
+# 9. Supplier Name: Must exactly match Company Name from SUPPLIERS sheet (REQUIRED)
+# 10. Cost Per Unit: Price per unit in rupees (REQUIRED)
+# 11. Batch Number: Batch or lot number
+# 12. Quality Grade: Choose from: A+, A, B, C, D
+# 13. Image URL: Link to product image (optional)

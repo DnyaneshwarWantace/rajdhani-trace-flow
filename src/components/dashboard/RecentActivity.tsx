@@ -13,53 +13,7 @@ interface Activity {
   user?: string;
 }
 
-const activities: Activity[] = [
-  {
-    id: "1",
-    type: "order",
-    title: "New Order Received",
-    description: "Order #ORD-2024-001 - Red Carpet 4x6ft (Qty: 50)",
-    time: "2 minutes ago",
-    status: "pending",
-    user: "Customer Portal"
-  },
-  {
-    id: "2",
-    type: "production",
-    title: "Production Completed",
-    description: "Batch #PROD-2024-045 - Blue Carpet completed (98/100 pieces)",
-    time: "15 minutes ago",
-    status: "completed",
-    user: "Production Team"
-  },
-  {
-    id: "3",
-    type: "inventory",
-    title: "Low Stock Alert",
-    description: "Cotton Yarn inventory below threshold (45 rolls remaining)",
-    time: "1 hour ago",
-    status: "alert",
-    user: "System"
-  },
-  {
-    id: "4",
-    type: "material",
-    title: "Material Received",
-    description: "Red Dye - 50 liters added to inventory",
-    time: "2 hours ago",
-    status: "completed",
-    user: "Warehouse Team"
-  },
-  {
-    id: "5",
-    type: "production",
-    title: "Production Started",
-    description: "Batch #PROD-2024-046 - Green Carpet production initiated",
-    time: "3 hours ago",
-    status: "in-progress",
-    user: "Production Team"
-  }
-];
+const activities: Activity[] = [];
 
 const statusColors = {
   completed: "bg-success text-success-foreground",

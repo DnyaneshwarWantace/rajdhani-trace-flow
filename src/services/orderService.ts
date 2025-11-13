@@ -16,6 +16,13 @@ export interface CreateOrderData {
   paid_amount?: number;
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   special_instructions?: string;
+  // Delivery address to be stored with the order
+  delivery_address?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }
 
 export interface CreateOrderItemData {
@@ -121,7 +128,9 @@ export class OrderService {
         workflow_step: 'accept',
         priority: orderData.priority || 'medium',
         special_instructions: orderData.special_instructions?.trim() || null,
-        created_by: 'admin'
+        created_by: 'admin',
+        // Store delivery address with the order
+        delivery_address: orderData.delivery_address || null
       };
 
       // Create order in database

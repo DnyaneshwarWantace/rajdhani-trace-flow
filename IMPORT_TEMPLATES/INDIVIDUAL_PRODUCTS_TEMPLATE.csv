@@ -1,0 +1,6 @@
+product_name,quantity,production_date,quality_grade,location,notes
+"Premium Carpet 6x9",10,"2024-01-15","A","Warehouse A","High quality batch"
+"Luxury Rug 8x10",5,"2024-01-16","A+","Warehouse B","Premium silk batch"
+"Traditional Mat 3x5",20,"2024-01-17","A","Warehouse A","Traditional design batch"
+"Office Carpet 12x15",8,"2024-01-18","A","Warehouse C","Durable office batch"
+"Kids Play Mat 4x6",15,"2024-01-19","A","Warehouse B","Colorful play batch"

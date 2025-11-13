@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
+import { DropdownService } from "@/services/api/dropdownService";
+import { PurchaseOrderService } from "@/services/api/purchaseOrderService";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,10 +29,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, TrendingDown, Package, AlertTriangle, Recycle, ShoppingCart, History, Upload, Image, X, Download, FileSpreadsheet, CheckCircle, AlertCircle, Clock, RotateCcw, Trash2, Bell } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { RawMaterialService } from "@/services/rawMaterialService";
-import { NotificationService } from "@/services/notificationService";
+import { rawMaterialService } from "@/services/rawMaterialService";
+import MongoDBNotificationService from "@/services/api/notificationService";
 import { WasteManagementService } from "@/services/wasteManagementService";
+import WasteService from "@/services/api/wasteService";
 import { useToast } from "@/hooks/use-toast";
 import { getFromStorage, fixNestedArray, markNotificationAsRead, resolveNotification } from "@/lib/storageUtils";
 
@@ -55,7 +59,7 @@ const generateUniqueId = (prefix: string): string => {
  *
  * 3. "Restock" (Manage Stock page):
  *    - Only when order is delivered
- *    - Checks ALL fields: name, brand, category, supplier, price, quality, unit
+ *    - Checks ALL fields: name, type, category, supplier, price, quality, unit
  *    - If EXACT match found = RESTOCK (update existing)
  *    - If ANY field different = NEW MATERIAL (create new entry)
  *
@@ -66,7 +70,7 @@ const generateUniqueId = (prefix: string): string => {
 interface RawMaterial {
   id: string;
   name: string;
-  brand: string;
+  type: string;
   category: string;
   currentStock: number;
   unit: string;
@@ -82,6 +86,7 @@ interface RawMaterial {
   totalValue: number;
   batchNumber: string;
   qualityGrade?: string;
+  color?: string;
   imageUrl?: string;
   materialsUsed: MaterialConsumption[];
   supplierPerformance: number;
@@ -104,7 +109,7 @@ interface MaterialPurchase {
   id: string;
   materialId: string;
   materialName: string;
-  materialBrand?: string;
+  materialType?: string;
   materialCategory?: string;
   materialBatchNumber?: string;
   supplierId: string;
@@ -142,437 +147,35 @@ interface WasteItem {
   id: string;
   productionId: string;
   productName: string;
+  materialType?: 'raw_material' | 'product'; // Track if it's a raw material or product
   wasteType: string;
   quantity: number;
   unit: string;
   generatedAt: string;
-  status: 'available_for_reuse' | 'added_to_inventory';
+  status: 'available_for_reuse' | 'added_to_inventory' | 'disposed' | 'reused';
   addedAt?: string;
 }
 
 interface Settings {
   customCategories: string[];
   customUnits: string[];
+  defaultThresholds: {
+    min: number;
+    max: number;
+    reorder: number;
+  };
+  notifications: {
+    lowStock: boolean;
+    reorder: boolean;
+    expiry: boolean;
+  };
   lastStockUpdate: {
     timestamp: string;
     user: string;
   } | null;
 }
 
-// Supabase utility functions to replace rawMaterialsStorage
-const supabaseStorage = {
-  // Raw Materials functions
-  async getAll(): Promise<RawMaterial[]> {
-    try {
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      // Map database field names to UI interface field names
-      const mappedData = (data || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        brand: item.brand || '',
-        category: item.category,
-        currentStock: parseFloat(item.current_stock) || 0,
-        unit: item.unit,
-        minThreshold: parseFloat(item.min_threshold) || 0,
-        maxCapacity: parseFloat(item.max_capacity) || 0,
-        reorderPoint: parseFloat(item.reorder_point) || 0,
-        lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-        dailyUsage: parseFloat(item.daily_usage) || 0,
-        status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-        supplier: item.supplier_name || '',
-        supplierId: item.supplier_id || '',
-        costPerUnit: parseFloat(item.cost_per_unit) || 0,
-        totalValue: parseFloat(item.total_value) || 0,
-        batchNumber: item.batch_number || '',
-        qualityGrade: item.quality_grade,
-        imageUrl: item.image_url,
-        materialsUsed: [],
-        supplierPerformance: parseFloat(item.supplier_performance) || 0
-      }));
-      
-      return mappedData;
-    } catch (error) {
-      console.error('Error fetching raw materials:', error);
-      return [];
-    }
-  },
-
-  async add(material: Omit<RawMaterial, 'id'>): Promise<RawMaterial> {
-    try {
-      // Map UI field names to database field names
-      const dbMaterial = {
-        name: material.name,
-        brand: material.brand,
-        category: material.category,
-        current_stock: material.currentStock,
-        unit: material.unit,
-        min_threshold: material.minThreshold,
-        max_capacity: material.maxCapacity,
-        reorder_point: material.reorderPoint,
-        last_restocked: material.lastRestocked,
-        daily_usage: material.dailyUsage,
-        status: material.status,
-        supplier_name: material.supplier,
-        supplier_id: material.supplierId,
-        cost_per_unit: material.costPerUnit,
-        total_value: material.totalValue,
-        batch_number: material.batchNumber,
-        quality_grade: material.qualityGrade,
-        image_url: material.imageUrl,
-        supplier_performance: material.supplierPerformance,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .insert(dbMaterial)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Map the returned data back to UI format
-      return {
-        id: data.id,
-        name: data.name,
-        brand: data.brand || '',
-        category: data.category,
-        currentStock: parseFloat(data.current_stock) || 0,
-        unit: data.unit,
-        minThreshold: parseFloat(data.min_threshold) || 0,
-        maxCapacity: parseFloat(data.max_capacity) || 0,
-        reorderPoint: parseFloat(data.reorder_point) || 0,
-        lastRestocked: data.last_restocked || new Date().toISOString().split('T')[0],
-        dailyUsage: parseFloat(data.daily_usage) || 0,
-        status: data.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-        supplier: data.supplier_name || '',
-        supplierId: data.supplier_id || '',
-        costPerUnit: parseFloat(data.cost_per_unit) || 0,
-        totalValue: parseFloat(data.total_value) || 0,
-        batchNumber: data.batch_number || '',
-        qualityGrade: data.quality_grade,
-        imageUrl: data.image_url,
-        materialsUsed: [],
-        supplierPerformance: parseFloat(data.supplier_performance) || 0
-      };
-    } catch (error) {
-      console.error('Error adding raw material:', error);
-      throw error;
-    }
-  },
-
-  async update(id: string, updates: Partial<RawMaterial>): Promise<RawMaterial> {
-    try {
-      // Map UI field names to database field names
-      const dbUpdates: any = {
-        updated_at: new Date().toISOString()
-      };
-      
-      if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.brand !== undefined) dbUpdates.brand = updates.brand;
-      if (updates.category !== undefined) dbUpdates.category = updates.category;
-      if (updates.currentStock !== undefined) dbUpdates.current_stock = updates.currentStock;
-      if (updates.unit !== undefined) dbUpdates.unit = updates.unit;
-      if (updates.minThreshold !== undefined) dbUpdates.min_threshold = updates.minThreshold;
-      if (updates.maxCapacity !== undefined) dbUpdates.max_capacity = updates.maxCapacity;
-      if (updates.reorderPoint !== undefined) dbUpdates.reorder_point = updates.reorderPoint;
-      if (updates.lastRestocked !== undefined) dbUpdates.last_restocked = updates.lastRestocked;
-      if (updates.dailyUsage !== undefined) dbUpdates.daily_usage = updates.dailyUsage;
-      if (updates.status !== undefined) dbUpdates.status = updates.status;
-      if (updates.supplier !== undefined) dbUpdates.supplier_name = updates.supplier;
-      if (updates.supplierId !== undefined) dbUpdates.supplier_id = updates.supplierId;
-      if (updates.costPerUnit !== undefined) dbUpdates.cost_per_unit = updates.costPerUnit;
-      if (updates.totalValue !== undefined) dbUpdates.total_value = updates.totalValue;
-      if (updates.batchNumber !== undefined) dbUpdates.batch_number = updates.batchNumber;
-      if (updates.qualityGrade !== undefined) dbUpdates.quality_grade = updates.qualityGrade;
-      if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl;
-      if (updates.supplierPerformance !== undefined) dbUpdates.supplier_performance = updates.supplierPerformance;
-
-      const { data, error } = await supabase
-        .from('raw_materials')
-        .update(dbUpdates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Map the returned data back to UI format
-      return {
-        id: data.id,
-        name: data.name,
-        brand: data.brand || '',
-        category: data.category,
-        currentStock: parseFloat(data.current_stock) || 0,
-        unit: data.unit,
-        minThreshold: parseFloat(data.min_threshold) || 0,
-        maxCapacity: parseFloat(data.max_capacity) || 0,
-        reorderPoint: parseFloat(data.reorder_point) || 0,
-        lastRestocked: data.last_restocked || new Date().toISOString().split('T')[0],
-        dailyUsage: parseFloat(data.daily_usage) || 0,
-        status: data.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-        supplier: data.supplier_name || '',
-        supplierId: data.supplier_id || '',
-        costPerUnit: parseFloat(data.cost_per_unit) || 0,
-        totalValue: parseFloat(data.total_value) || 0,
-        batchNumber: data.batch_number || '',
-        qualityGrade: data.quality_grade,
-        imageUrl: data.image_url,
-        materialsUsed: [],
-        supplierPerformance: parseFloat(data.supplier_performance) || 0
-      };
-    } catch (error) {
-      console.error('Error updating raw material:', error);
-      throw error;
-    }
-  },
-
-  async delete(id: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('raw_materials')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error deleting raw material:', error);
-      throw error;
-    }
-  },
-
-  async needsInitialization(): Promise<boolean> {
-    try {
-      const { count, error } = await supabase
-        .from('raw_materials')
-        .select('*', { count: 'exact', head: true });
-
-      if (error) throw error;
-      return count === 0;
-    } catch (error) {
-      console.error('Error checking initialization:', error);
-      return true;
-    }
-  },
-
-  // Purchase Orders functions
-  async getPurchaseOrders(): Promise<MaterialPurchase[]> {
-    try {
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching purchase orders:', error);
-      return [];
-    }
-  },
-
-  async addPurchaseOrder(order: Omit<MaterialPurchase, 'id'>): Promise<MaterialPurchase> {
-    try {
-      // Store material details in notes as JSON, but keep user notes separate
-      const materialDetails = {
-        materialName: order.materialName,
-        materialBrand: order.materialBrand || 'Unknown',
-        materialCategory: order.materialCategory || 'Other',
-        materialBatchNumber: order.materialBatchNumber || `BATCH-${Date.now()}`,
-        quantity: order.quantity,
-        unit: order.unit,
-        costPerUnit: order.costPerUnit,
-        minThreshold: order.minThreshold || 100,
-        maxCapacity: order.maxCapacity || 1000,
-        qualityGrade: order.qualityGrade || 'A',
-        isRestock: order.isRestock || false,
-        userNotes: order.notes || '' // Store user notes separately
-      };
-
-      // Map interface fields to database schema fields
-      const dbOrder = {
-        id: generateUniqueId('PO'),
-        order_number: `PO-${Date.now()}`,
-        supplier_id: null, // Set to null since we're not managing suppliers properly
-        supplier_name: order.supplierName,
-        order_date: order.purchaseDate.split('T')[0], // Convert to date format
-        expected_delivery: order.expectedDelivery,
-        status: order.status === 'ordered' ? 'pending' : order.status,
-        total_amount: order.totalCost,
-        notes: materialDetails.userNotes || '', // Store only user notes
-        material_details: materialDetails // Store material details in proper column
-      };
-
-      const { data, error } = await supabase
-        .from('purchase_orders')
-        .insert(dbOrder)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Map database response back to interface format
-      return {
-        id: data.id,
-        materialId: order.materialId,
-        materialName: order.materialName,
-        supplierId: data.supplier_id,
-        supplierName: data.supplier_name,
-        quantity: order.quantity,
-        unit: order.unit,
-        costPerUnit: order.costPerUnit,
-        totalCost: data.total_amount,
-        purchaseDate: data.order_date,
-        expectedDelivery: data.expected_delivery,
-        status: data.status,
-        inspector: order.inspector,
-        inspectionDate: order.inspectionDate,
-        notes: data.notes
-      };
-    } catch (error) {
-      console.error('Error adding purchase order:', error);
-      throw error;
-    }
-  },
-
-  // Suppliers functions
-  async getSuppliers(): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching suppliers:', error);
-      return [];
-    }
-  },
-
-  // Notifications functions
-  async getNotifications(): Promise<any[]> {
-    try {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('module', 'materials')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return [];
-    }
-  },
-
-  async addNotification(notification: any): Promise<void> {
-    try {
-      const newNotification = {
-        ...notification,
-        id: generateUniqueId('NOTIF'),
-        created_at: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('notifications')
-        .insert(newNotification);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error adding notification:', error);
-    }
-  },
-
-  // Waste Management functions
-  async getWasteManagement(): Promise<WasteItem[]> {
-    try {
-      console.log('🔍 Fetching waste management data...');
-      const { data, error } = await WasteManagementService.getWasteItems();
-      if (error) {
-        console.error('Error fetching waste management:', error);
-        return [];
-      }
-      console.log('📊 Raw waste data from service:', data);
-      // Map service WasteItem to local WasteItem interface
-      const mappedData = (data || []).map((item: any) => ({
-        id: item.id,
-        productionId: item.production_batch_id || item.production_product_id || '',
-        productName: item.material_name || '',
-        wasteType: item.waste_type || 'scrap',
-        quantity: item.quantity || 0,
-        unit: item.unit || '',
-        generatedAt: item.created_at || new Date().toISOString(),
-        status: item.status || (item.can_be_reused ? 'available_for_reuse' as const : 'added_to_inventory' as const),
-        addedAt: item.updated_at || undefined
-      }));
-      console.log('✅ Mapped waste data:', mappedData);
-      return mappedData;
-    } catch (error) {
-      console.error('Error fetching waste management:', error);
-      return [];
-    }
-  },
-
-  // Settings functions
-  async getSettings(): Promise<Settings> {
-    try {
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('*')
-        .eq('key', 'materials_settings')
-        .single();
-
-      if (error && error.code !== 'PGRST116' && error.code !== 'PGRST205') {
-        console.warn('Settings table not found, using defaults:', error);
-      }
-
-      if (data?.value) {
-        return JSON.parse(data.value);
-      }
-
-      return {
-        customCategories: [],
-        customUnits: [],
-        lastStockUpdate: null
-      };
-    } catch (error) {
-      console.warn('Error fetching settings, using defaults:', error);
-      return {
-        customCategories: [],
-        customUnits: [],
-        lastStockUpdate: null
-      };
-    }
-  },
-
-  async updateSettings(settings: Settings): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({
-          key: 'materials_settings',
-          value: JSON.stringify(settings),
-          updated_at: new Date().toISOString()
-        });
-
-      if (error && error.code !== 'PGRST205') {
-        console.warn('Settings table not found, settings not saved:', error);
-      }
-    } catch (error) {
-      console.warn('Error updating settings:', error);
-    }
-  }
-};
+// MongoDB service is now used instead of Supabase
 
 const statusStyles = {
   "in-stock": "bg-success text-success-foreground",
@@ -597,8 +200,61 @@ const WasteRecoveryTab = ({
     const loadWasteData = async () => {
       setLoading(true);
       try {
-        const wasteData = await supabaseStorage.getWasteManagement();
-        setWasteData(wasteData);
+        // Load waste data from MongoDB
+        const { data: wasteItems } = await WasteService.getAllWaste();
+        console.log(`✅ Loaded ${wasteItems?.length || 0} waste items from MongoDB`);
+        
+        // Map MongoDB waste data to WasteItem interface
+        const mappedWaste: WasteItem[] = (wasteItems || []).map((item: any) => {
+          // Debug: Log the actual item data
+          console.log('🔍 Waste item from backend:', {
+            id: item.id,
+            waste_type: item.waste_type,
+            can_be_reused: item.can_be_reused,
+            waste_category: item.waste_category,
+            status: item.status,
+            added_at: item.added_at,
+            material_name: item.material_name
+          });
+
+          // Determine status correctly:
+          // - If can_be_reused is true AND hasn't been added yet (no added_at), status = 'available_for_reuse'
+          // - If has been added (has added_at or status is 'added_to_inventory' or 'reused'), status = 'added_to_inventory'
+          // - Otherwise (can_be_reused is false and not added), status = 'disposed'
+          let status: 'available_for_reuse' | 'added_to_inventory' | 'disposed' | 'reused';
+          
+          // Check if already added to inventory
+          const isAdded = item.added_at || item.status === 'added_to_inventory' || item.status === 'reused';
+          
+          if (isAdded) {
+            status = 'added_to_inventory';
+          } else {
+            // Check if can be reused - check both can_be_reused field and waste_category
+            const canBeReused = item.can_be_reused === true || item.can_be_reused === 'true' || item.waste_category === 'reusable';
+            if (canBeReused) {
+              status = 'available_for_reuse';
+            } else {
+              status = 'disposed';
+            }
+          }
+          
+          console.log('✅ Mapped status:', status, 'for item:', item.id);
+          
+          return {
+            id: item.id,
+            productionId: item.production_batch_id || item.batch_id || '',
+            productName: item.material_name || '',
+            materialType: item.material_type || 'raw_material', // Include material type
+            wasteType: WasteService.mapWasteTypeToDisplay(item.waste_type || ''),
+            quantity: item.quantity || 0,
+            unit: item.unit || '',
+            generatedAt: item.created_at || item.generation_date || new Date().toISOString(),
+            status: status,
+            addedAt: item.added_at || (status === 'added_to_inventory' ? item.updated_at : null)
+          };
+        });
+        
+        setWasteData(mappedWaste);
       } catch (error) {
         console.error('Error loading waste data:', error);
         setWasteData([]);
@@ -678,6 +334,9 @@ const WasteRecoveryTab = ({
                       </td>
                       <td className="p-3">
                         <div className="text-sm font-medium">{waste.productName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {waste.materialType === 'product' ? '📦 Product' : '🔧 Raw Material'}
+                        </div>
                         <div className="text-xs text-muted-foreground">Production: {waste.productionId}</div>
                         <div className="text-xs text-blue-600">Waste Type: {waste.wasteType}</div>
                       </td>
@@ -724,9 +383,26 @@ export default function Materials() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { hasPageAccess } = useAuth();
+  
+  // Check page permission
+  const hasMaterialsAccess = hasPageAccess('materials');
+  
+  // Redirect if no access
+  useEffect(() => {
+    if (!hasMaterialsAccess) {
+      navigate('/access-denied', { state: { pageName: 'Materials' } });
+    }
+  }, [hasMaterialsAccess, navigate]);
+  
+  // Don't render if no permission
+  if (!hasMaterialsAccess) {
+    return null;
+  }
 
   // State management
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -745,7 +421,7 @@ export default function Materials() {
 
   const [newMaterial, setNewMaterial] = useState({
     name: "",
-    brand: "",
+    type: "other",
     category: "",
     currentStock: "",
     unit: "",
@@ -754,12 +430,13 @@ export default function Materials() {
     supplier: "",
     costPerUnit: "",
     expectedDelivery: "",
+    color: "NA",
     imageUrl: ""
   });
 
   const [newInventoryMaterial, setNewInventoryMaterial] = useState({
     name: "",
-    brand: "",
+    type: "other",
     category: "",
     currentStock: "",
     unit: "",
@@ -767,19 +444,34 @@ export default function Materials() {
     maxCapacity: "",
     supplier: "",
     costPerUnit: "",
+    color: "NA",
     imageUrl: ""
   });
 
   // Dynamic dropdown states
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
-  const [customUnits, setCustomUnits] = useState<string[]>([]);
+  const [materialCategories, setMaterialCategories] = useState<string[]>([]);
+  const [materialUnits, setMaterialUnits] = useState<string[]>([]);
+  const [materialTypes, setMaterialTypes] = useState<string[]>([]);
+  const [materialColors, setMaterialColors] = useState<string[]>([]);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [showAddUnit, setShowAddUnit] = useState(false);
+  const [showAddColor, setShowAddColor] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newUnitName, setNewUnitName] = useState("");
+  const [newColorName, setNewColorName] = useState("");
   const [settings, setSettings] = useState<Settings>({
     customCategories: [],
     customUnits: [],
+    defaultThresholds: {
+      min: 10,
+      max: 1000,
+      reorder: 50
+    },
+    notifications: {
+      lowStock: true,
+      reorder: true,
+      expiry: true
+    },
     lastStockUpdate: null
   });
 
@@ -797,7 +489,7 @@ export default function Materials() {
   const [selectedRestockMaterial, setSelectedRestockMaterial] = useState<RawMaterial | null>(null);
   const [restockForm, setRestockForm] = useState({
     supplier: "",
-    brand: "",
+    type: "",
     quantity: "",
     costPerUnit: "",
     expectedDelivery: "",
@@ -831,8 +523,14 @@ export default function Materials() {
   // Handle notification actions
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      await markNotificationAsRead(notificationId);
+      // Update notification status in MongoDB - change status to 'read'
+      await MongoDBNotificationService.updateNotification(notificationId, { 
+        status: 'read'
+      });
+      
+      // Remove from local state
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
       toast({
         title: "Notification marked as read",
         description: "The notification has been marked as read.",
@@ -849,8 +547,14 @@ export default function Materials() {
 
   const handleResolveNotification = async (notificationId: string) => {
     try {
-      await resolveNotification(notificationId);
+      // Update notification status in MongoDB to 'dismissed' (resolved)
+      await MongoDBNotificationService.updateNotification(notificationId, { 
+        status: 'dismissed'
+      });
+      
+      // Remove from local state
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
       toast({
         title: "Notification resolved",
         description: "The notification has been resolved and removed.",
@@ -867,8 +571,16 @@ export default function Materials() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await Promise.all(notifications.map(n => markNotificationAsRead(n.id)));
+      // Update all notifications in MongoDB - change status to 'read'
+      await Promise.all(notifications.map(n => 
+        MongoDBNotificationService.updateNotification(n.id, { 
+          status: 'read'
+        })
+      ));
+      
+      // Clear local state
       setNotifications([]);
+      
       toast({
         title: "All notifications marked as read",
         description: "All material notifications have been marked as read.",
@@ -883,18 +595,65 @@ export default function Materials() {
     }
   };
 
-  // Initialize and load data from Supabase
+  // Initialize and load data from MongoDB
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
-        // Load raw materials
-        const materials = await supabaseStorage.getAll();
-        const uniqueMaterials = removeDuplicateBatchNumbers(materials);
+        // Load raw materials from MongoDB
+        const materialsResponse = await rawMaterialService.getRawMaterials();
+        if (materialsResponse.success && materialsResponse.data) {
+          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+          
+          // Map MongoDB data to UI format
+          const mappedMaterials = materials.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            type: item.type || '',
+            category: item.category,
+            currentStock: parseFloat(item.current_stock) || 0,
+            unit: item.unit,
+            minThreshold: parseFloat(item.min_threshold) || 0,
+            maxCapacity: parseFloat(item.max_capacity) || 0,
+            reorderPoint: parseFloat(item.reorder_point) || 0,
+            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+            dailyUsage: parseFloat(item.daily_usage) || 0,
+            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+            supplier: item.supplier_name || '',
+            supplierId: item.supplier_id || '',
+            costPerUnit: parseFloat(item.cost_per_unit) || 0,
+            totalValue: parseFloat(item.total_value) || 0,
+            batchNumber: item.batch_number || '',
+            qualityGrade: item.quality_grade,
+            color: item.color,
+            imageUrl: item.image_url,
+            materialsUsed: [],
+            supplierPerformance: parseFloat(item.supplier_performance) || 0
+          }));
+          
+          const uniqueMaterials = removeDuplicateBatchNumbers(mappedMaterials);
         setRawMaterials(uniqueMaterials);
+          console.log('✅ Loaded', uniqueMaterials.length, 'raw materials from MongoDB');
+        } else {
+          console.error('Error loading raw materials:', materialsResponse.error);
+          toast({
+            title: "Error",
+            description: "Failed to load raw materials from database",
+            variant: "destructive",
+          });
+        }
+
+        // Load suppliers from MongoDB
+        const suppliersResponse = await rawMaterialService.getSuppliers();
+        if (suppliersResponse.success && suppliersResponse.data) {
+          setSuppliers(suppliersResponse.data);
+          console.log('✅ Loaded', suppliersResponse.data.length, 'suppliers from MongoDB');
+        } else {
+          console.error('Error loading suppliers:', suppliersResponse.error);
+        }
 
         // Load notifications for materials module
-        const { data: materialNotifications, error: notificationError } = await NotificationService.getNotificationsByModule('materials');
+        const { data: materialNotifications, error: notificationError } = await MongoDBNotificationService.getNotificationsByModule('materials');
         if (notificationError) {
           console.error('Error loading material notifications:', notificationError);
         } else {
@@ -907,10 +666,26 @@ export default function Materials() {
         await loadWasteRecoveryCount();
 
         // Load settings (custom categories, units, etc.)
-        const settingsData = await supabaseStorage.getSettings();
+        // Settings will be loaded from MongoDB later
+        const settingsData: Settings = {
+          customCategories: [],
+          customUnits: [],
+          defaultThresholds: {
+            min: 10,
+            max: 1000,
+            reorder: 50
+          },
+          notifications: {
+            lowStock: true,
+            reorder: true,
+            expiry: true
+          },
+          lastStockUpdate: null
+        };
         setSettings(settingsData);
-        setCustomCategories(settingsData.customCategories || []);
-        setCustomUnits(settingsData.customUnits || []);
+
+        // Load material dropdowns from database
+        await loadMaterialDropdowns();
 
         // Process any pre-filled order data from navigation
         if (location.state?.prefillOrder) {
@@ -945,9 +720,40 @@ export default function Materials() {
     const handleFocus = async () => {
       console.log('🔄 Refreshing materials data on page focus');
       try {
-        const materials = await supabaseStorage.getAll();
-        const uniqueMaterials = removeDuplicateBatchNumbers(materials);
+        // Load materials from MongoDB
+        const materialsResponse = await rawMaterialService.getRawMaterials();
+        if (materialsResponse.success && materialsResponse.data) {
+          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+          
+          // Map MongoDB data to UI format
+          const mappedMaterials = materials.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            type: item.type || '',
+            category: item.category,
+            currentStock: parseFloat(item.current_stock) || 0,
+            unit: item.unit,
+            minThreshold: parseFloat(item.min_threshold) || 0,
+            maxCapacity: parseFloat(item.max_capacity) || 0,
+            reorderPoint: parseFloat(item.reorder_point) || 0,
+            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+            dailyUsage: parseFloat(item.daily_usage) || 0,
+            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+            supplier: item.supplier_name || '',
+            supplierId: item.supplier_id || '',
+            costPerUnit: parseFloat(item.cost_per_unit) || 0,
+            totalValue: parseFloat(item.total_value) || 0,
+            batchNumber: item.batch_number || '',
+            qualityGrade: item.quality_grade,
+            color: item.color,
+            imageUrl: item.image_url,
+            materialsUsed: [],
+            supplierPerformance: parseFloat(item.supplier_performance) || 0
+          }));
+          
+          const uniqueMaterials = removeDuplicateBatchNumbers(mappedMaterials);
         setRawMaterials(uniqueMaterials);
+        }
       } catch (error) {
         console.error('Error refreshing materials data:', error);
       }
@@ -995,37 +801,7 @@ export default function Materials() {
   };
 
   // Update settings in Supabase
-  const updateCustomCategories = async (newCategories: string[]) => {
-    try {
-      const updatedSettings = { ...settings, customCategories: newCategories };
-      await supabaseStorage.updateSettings(updatedSettings);
-      setSettings(updatedSettings);
-      setCustomCategories(newCategories);
-    } catch (error) {
-      console.error('Error updating custom categories:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update custom categories",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const updateCustomUnits = async (newUnits: string[]) => {
-    try {
-      const updatedSettings = { ...settings, customUnits: newUnits };
-      await supabaseStorage.updateSettings(updatedSettings);
-      setSettings(updatedSettings);
-      setCustomUnits(newUnits);
-    } catch (error) {
-      console.error('Error updating custom units:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update custom units",
-        variant: "destructive",
-      });
-    }
-  };
+  // Note: Custom categories and units are now managed through the DropdownMaster system
 
   const updateLastStockUpdate = async (timestamp: string, user: string = 'admin') => {
     try {
@@ -1033,7 +809,7 @@ export default function Materials() {
         ...settings,
         lastStockUpdate: { timestamp, user }
       };
-      await supabaseStorage.updateSettings(updatedSettings);
+      // Settings will be updated via MongoDB service later
       setSettings(updatedSettings);
     } catch (error) {
       console.error('Error updating last stock update:', error);
@@ -1051,7 +827,7 @@ export default function Materials() {
   // Get filtered materials
   const filteredMaterials = rawMaterials.filter(material => {
     const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         material.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         material.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          material.supplier.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "all" || material.category === categoryFilter;
     const matchesStatus = statusFilter === "all" || material.status === statusFilter;
@@ -1070,16 +846,65 @@ export default function Materials() {
   const categories = [...new Set(rawMaterials.map(m => m.category))];
   const units = [...new Set(rawMaterials.map(m => m.unit))];
 
-  // Get all available categories (default + custom)
-  const getAllCategories = () => {
-    const defaultCategories = ["Yarn", "Dye", "Chemical", "Fabric", "Other"];
-    return [...defaultCategories, ...customCategories];
+  // Load material categories and units from MongoDB
+  const loadMaterialDropdowns = async () => {
+    try {
+      // Load material categories from MongoDB
+      const categoriesResponse = await rawMaterialService.getDropdownOptions('material_category');
+      if (categoriesResponse.success && categoriesResponse.data) {
+        setMaterialCategories(categoriesResponse.data.map(c => c.value));
+        console.log('✅ Loaded material categories from MongoDB:', categoriesResponse.data.length);
+      } else {
+        console.error('Error loading material categories:', categoriesResponse.error);
+        setMaterialCategories([]);
+      }
+
+      // Load material units from MongoDB
+      const unitsResponse = await rawMaterialService.getDropdownOptions('material_unit');
+      if (unitsResponse.success && unitsResponse.data) {
+        setMaterialUnits(unitsResponse.data.map(u => u.value));
+        console.log('✅ Loaded material units from MongoDB:', unitsResponse.data.length);
+      } else {
+        console.error('Error loading material units:', unitsResponse.error);
+        setMaterialUnits([]);
+      }
+
+      // Load material types from MongoDB
+      const typesResponse = await rawMaterialService.getDropdownOptions('material_type');
+      if (typesResponse.success && typesResponse.data) {
+        setMaterialTypes(typesResponse.data.map(t => t.value));
+        console.log('✅ Loaded material types from MongoDB:', typesResponse.data.length);
+      } else {
+        console.error('Error loading material types:', typesResponse.error);
+        setMaterialTypes([]);
+      }
+
+      // Load material colors from MongoDB
+      const colorsResponse = await rawMaterialService.getDropdownOptions('material_color');
+      if (colorsResponse.success && colorsResponse.data) {
+        setMaterialColors(colorsResponse.data.map(c => c.value));
+        console.log('✅ Loaded material colors from MongoDB:', colorsResponse.data.length);
+      } else {
+        console.error('Error loading material colors:', colorsResponse.error);
+        setMaterialColors([]);
+      }
+    } catch (error) {
+      console.error('Error loading material dropdowns:', error);
+    }
   };
 
-  // Get all available units (default + custom)
+  // Get all available categories from database
+  const getAllCategories = () => {
+    return materialCategories;
+  };
+
+  // Get all available units from database
   const getAllUnits = () => {
-    const defaultUnits = ["rolls", "liters", "kg", "sqm", "pieces"];
-    return [...defaultUnits, ...customUnits];
+    return materialUnits;
+  };
+
+  const getAllColors = () => {
+    return materialColors;
   };
 
   // Get available suppliers for restocking based on material category
@@ -1089,7 +914,7 @@ export default function Materials() {
       .filter(m => m.category === materialCategory)
       .map(m => ({
         name: m.supplier,
-        brand: m.brand,
+        type: m.type,
         costPerUnit: m.costPerUnit,
         unit: m.unit,
         materialName: m.name
@@ -1104,7 +929,7 @@ export default function Materials() {
       .filter(m => m.name.toLowerCase() === materialName.toLowerCase())
       .map(m => ({
         name: m.supplier,
-        brand: m.brand,
+        type: m.type,
         costPerUnit: m.costPerUnit,
         unit: m.unit,
         materialName: m.name
@@ -1117,6 +942,17 @@ export default function Materials() {
     );
 
     return uniqueSuppliers;
+  };
+
+  // Get all available suppliers from database
+  const getAllAvailableSuppliers = () => {
+    return suppliers.map(supplier => ({
+      name: supplier.name,
+      id: supplier.id,
+      contact_person: supplier.contact_person,
+      email: supplier.email,
+      phone: supplier.phone
+    }));
   };
 
   // Handle image upload
@@ -1155,25 +991,120 @@ export default function Materials() {
     setNewInventoryMaterial({ ...newInventoryMaterial, imageUrl: "" });
   };
 
-  // Handle adding new category
-  const handleAddCategory = () => {
-    if (newCategoryName.trim() && !customCategories.includes(newCategoryName.trim())) {
-      const updatedCategories = [...customCategories, newCategoryName.trim()];
-      setCustomCategories(updatedCategories);
-      setNewInventoryMaterial({...newInventoryMaterial, category: newCategoryName.trim()});
-      setNewCategoryName("");
-      setShowAddCategory(false);
+  // Handle adding new category to database
+  const handleAddCategory = async () => {
+    if (newCategoryName.trim() && !materialCategories.includes(newCategoryName.trim())) {
+      try {
+        const { success, error } = await DropdownService.addOption(
+          'material_category',
+          newCategoryName.trim(),
+          materialCategories.length + 1
+        );
+
+        if (!success) {
+          console.error('Error adding material category:', error);
+          toast({
+            title: "Error",
+            description: "Failed to add category. Please try again.",
+            variant: "destructive"
+          });
+        } else {
+          // Reload categories from database
+          await loadMaterialDropdowns();
+          setNewInventoryMaterial({...newInventoryMaterial, category: newCategoryName.trim()});
+          setNewCategoryName("");
+          setShowAddCategory(false);
+          toast({
+            title: "Category Added",
+            description: `"${newCategoryName.trim()}" has been added to the database.`,
+          });
+        }
+      } catch (error) {
+        console.error('Error adding material category:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add category. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  // Handle adding new unit
-  const handleAddUnit = () => {
-    if (newUnitName.trim() && !customUnits.includes(newUnitName.trim())) {
-      const updatedUnits = [...customUnits, newUnitName.trim()];
-      setCustomUnits(updatedUnits);
-      setNewInventoryMaterial({...newInventoryMaterial, unit: newUnitName.trim()});
-      setNewUnitName("");
-      setShowAddUnit(false);
+  // Handle adding new unit to database
+  const handleAddUnit = async () => {
+    if (newUnitName.trim() && !materialUnits.includes(newUnitName.trim())) {
+      try {
+        const { success, error } = await DropdownService.addOption(
+          'material_unit',
+          newUnitName.trim(),
+          materialUnits.length + 1
+        );
+
+        if (!success) {
+          console.error('Error adding material unit:', error);
+          toast({
+            title: "Error",
+            description: "Failed to add unit. Please try again.",
+            variant: "destructive"
+          });
+        } else {
+          // Reload units from database
+          await loadMaterialDropdowns();
+          setNewInventoryMaterial({...newInventoryMaterial, unit: newUnitName.trim()});
+          setNewUnitName("");
+          setShowAddUnit(false);
+          toast({
+            title: "Unit Added",
+            description: `"${newUnitName.trim()}" has been added to the database.`,
+          });
+        }
+      } catch (error) {
+        console.error('Error adding material unit:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add unit. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // Handle adding new color to database
+  const handleAddColor = async () => {
+    if (newColorName.trim() && !materialColors.includes(newColorName.trim())) {
+      try {
+        const { success, error } = await DropdownService.addOption(
+          'material_color',
+          newColorName.trim(),
+          materialColors.length + 1
+        );
+
+        if (!success) {
+          console.error('Error adding material color:', error);
+          toast({
+            title: "Error",
+            description: "Failed to add color. Please try again.",
+            variant: "destructive"
+          });
+        } else {
+          // Reload colors from database
+          await loadMaterialDropdowns();
+          setNewInventoryMaterial({...newInventoryMaterial, color: newColorName.trim()});
+          setNewColorName("");
+          setShowAddColor(false);
+          toast({
+            title: "Color Added",
+            description: `"${newColorName.trim()}" has been added to the database.`,
+          });
+        }
+      } catch (error) {
+        console.error('Error adding material color:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add color. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -1199,7 +1130,7 @@ export default function Materials() {
       // Create new material with 0 stock and in-transit status
       const materialData = {
         name: newMaterial.name,
-        brand: newMaterial.brand,
+        type: newMaterial.type,
         category: newMaterial.category,
         batchNumber: generateUniqueId('BATCH'),
         currentStock: 0, // Orders start with 0 stock
@@ -1221,9 +1152,9 @@ export default function Materials() {
       };
 
       // Add to Supabase using RawMaterialService
-      const result = await RawMaterialService.createRawMaterial({
+      const result = await rawMaterialService.createRawMaterial({
         name: newMaterial.name,
-        brand: newMaterial.brand,
+        type: newMaterial.type,
         category: newMaterial.category,
         current_stock: 0, // Orders start with 0 stock
         unit: newMaterial.unit,
@@ -1234,6 +1165,7 @@ export default function Materials() {
         supplier_name: newMaterial.supplier,
         cost_per_unit: parseFloat(newMaterial.costPerUnit) || 0,
         batch_number: generateUniqueId('BATCH'),
+        color: newMaterial.type === 'color' ? newMaterial.color : 'NA',
         image_url: newMaterial.imageUrl
       });
 
@@ -1241,7 +1173,7 @@ export default function Materials() {
         throw new Error(result.error);
       }
 
-      const addedMaterial = result.data;
+      const addedMaterial = Array.isArray(result.data) ? result.data[0] : result.data;
 
       // Create purchase order with the material details
       const orderData: Omit<MaterialPurchase, 'id'> = {
@@ -1259,7 +1191,7 @@ export default function Materials() {
         inspector: "",
         inspectionDate: "",
         notes: orderDetails.notes,
-        materialBrand: newMaterial.brand,
+        materialType: newMaterial.type,
         materialCategory: newMaterial.category,
         materialBatchNumber: generateUniqueId('BATCH'),
         minThreshold: parseFloat(newMaterial.minThreshold) || 10,
@@ -1268,21 +1200,91 @@ export default function Materials() {
         isRestock: false
       };
 
-      // Add to material orders storage
-      await supabaseStorage.addPurchaseOrder(orderData);
+      // Create purchase order in MongoDB
+      const { data: purchaseOrder, error: orderError } = await PurchaseOrderService.createPurchaseOrder({
+        id: generateUniqueId('PO'),
+        order_number: `PO-${Date.now()}`,
+        supplier_id: addedMaterial.supplier_id,
+        supplier_name: newMaterial.supplier,
+        order_date: new Date().toISOString(),
+        expected_delivery: newMaterial.expectedDelivery,
+        total_amount: orderQuantity * (parseFloat(newMaterial.costPerUnit) || 0),
+        status: 'pending',
+        notes: orderDetails.notes,
+        material_details: {
+          materialName: newMaterial.name,
+          materialBrand: newMaterial.type,
+          materialCategory: newMaterial.category,
+          materialBatchNumber: generateUniqueId('BATCH'),
+          quantity: orderQuantity,
+          unit: newMaterial.unit,
+          costPerUnit: parseFloat(newMaterial.costPerUnit) || 0,
+          minThreshold: parseFloat(newMaterial.minThreshold) || 10,
+          maxCapacity: parseFloat(newMaterial.maxCapacity) || 1000,
+          qualityGrade: "A"
+        }
+      });
+
+      if (orderError) {
+        console.error('Error creating purchase order:', orderError);
+        toast({
+          title: "Warning",
+          description: "Material created but purchase order failed. Please check Manage Stock page.",
+          variant: "destructive",
+        });
+      }
 
       // Update last stock update
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const updatedMaterials = await supabaseStorage.getAll();
-      setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
+      const materialsResponse = await rawMaterialService.getRawMaterials();
+      if (materialsResponse.success && materialsResponse.data) {
+        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+        
+        // Map MongoDB data to UI format
+        const mappedMaterials = materials.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type || '',
+          category: item.category,
+          currentStock: parseFloat(item.current_stock) || 0,
+          unit: item.unit,
+          minThreshold: parseFloat(item.min_threshold) || 0,
+          maxCapacity: parseFloat(item.max_capacity) || 0,
+          reorderPoint: parseFloat(item.reorder_point) || 0,
+          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+          dailyUsage: parseFloat(item.daily_usage) || 0,
+          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+          supplier: item.supplier_name || '',
+          supplierId: item.supplier_id || '',
+          costPerUnit: parseFloat(item.cost_per_unit) || 0,
+          totalValue: parseFloat(item.total_value) || 0,
+          batchNumber: item.batch_number || '',
+          qualityGrade: item.quality_grade,
+          color: item.color,
+          imageUrl: item.image_url,
+          materialsUsed: [],
+          supplierPerformance: parseFloat(item.supplier_performance) || 0
+        }));
+        
+        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
+      }
 
       // Reset forms and close dialog
       setNewMaterial({
-        name: "", brand: "", category: "", currentStock: "",
-        unit: "", minThreshold: "", maxCapacity: "", supplier: "", costPerUnit: "",
-        expectedDelivery: "", imageUrl: ""
+        name: "",
+        type: "other",
+        category: "",
+        currentStock: "",
+        unit: "",
+        minThreshold: "",
+        maxCapacity: "",
+        supplier: "",
+        costPerUnit: "",
+        expectedDelivery: "",
+        color: "NA",
+        imageUrl: ""
       });
       setOrderDetails({
         quantity: "", unit: "", supplier: "", costPerUnit: "", expectedDelivery: "", notes: ""
@@ -1309,7 +1311,7 @@ export default function Materials() {
     try {
       const inventoryData = {
         name: newInventoryMaterial.name,
-        brand: newInventoryMaterial.brand,
+        type: newInventoryMaterial.type,
         category: newInventoryMaterial.category,
         batchNumber: generateUniqueId('BATCH'), // Auto-generate batch number
         currentStock: parseFloat(newInventoryMaterial.currentStock) || 0,
@@ -1334,9 +1336,9 @@ export default function Materials() {
       inventoryData.status = calculateMaterialStatus(inventoryData as RawMaterial) as RawMaterial['status'];
 
       // Add to Supabase using RawMaterialService
-      const result = await RawMaterialService.createRawMaterial({
+      const result = await rawMaterialService.createRawMaterial({
         name: newInventoryMaterial.name,
-        brand: newInventoryMaterial.brand,
+        type: newInventoryMaterial.type,
         category: newInventoryMaterial.category,
         current_stock: parseFloat(newInventoryMaterial.currentStock) || 0,
         unit: newInventoryMaterial.unit,
@@ -1347,6 +1349,7 @@ export default function Materials() {
         supplier_name: newInventoryMaterial.supplier,
         cost_per_unit: parseFloat(newInventoryMaterial.costPerUnit) || 0,
         batch_number: generateUniqueId('BATCH'), // Auto-generate batch number
+        color: newInventoryMaterial.type === 'color' ? newInventoryMaterial.color : 'NA',
         image_url: newInventoryMaterial.imageUrl
       });
 
@@ -1360,13 +1363,52 @@ export default function Materials() {
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const updatedMaterials = await supabaseStorage.getAll();
-      setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
+      const materialsResponse = await rawMaterialService.getRawMaterials();
+      if (materialsResponse.success && materialsResponse.data) {
+        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+        
+        // Map MongoDB data to UI format
+        const mappedMaterials = materials.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type || '',
+          category: item.category,
+          currentStock: parseFloat(item.current_stock) || 0,
+          unit: item.unit,
+          minThreshold: parseFloat(item.min_threshold) || 0,
+          maxCapacity: parseFloat(item.max_capacity) || 0,
+          reorderPoint: parseFloat(item.reorder_point) || 0,
+          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+          dailyUsage: parseFloat(item.daily_usage) || 0,
+          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+          supplier: item.supplier_name || '',
+          supplierId: item.supplier_id || '',
+          costPerUnit: parseFloat(item.cost_per_unit) || 0,
+          totalValue: parseFloat(item.total_value) || 0,
+          batchNumber: item.batch_number || '',
+          qualityGrade: item.quality_grade,
+          color: item.color,
+          imageUrl: item.image_url,
+          materialsUsed: [],
+          supplierPerformance: parseFloat(item.supplier_performance) || 0
+        }));
+        
+        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
+      }
 
       // Reset form and close dialog
       setNewInventoryMaterial({
-        name: "", brand: "", category: "", currentStock: "",
-        unit: "", minThreshold: "", maxCapacity: "", supplier: "", costPerUnit: "", imageUrl: ""
+        name: "",
+        type: "other",
+        category: "",
+        currentStock: "",
+        unit: "",
+        minThreshold: "",
+        maxCapacity: "",
+        supplier: "",
+        costPerUnit: "",
+        color: "NA",
+        imageUrl: ""
       });
       setIsAddToInventoryOpen(false);
 
@@ -1409,7 +1451,7 @@ export default function Materials() {
         material.name && material.brand && material.category
       ).map(material => ({
         name: material.name,
-        brand: material.brand,
+        type: material.type,
         category: material.category,
         batchNumber: generateUniqueId('BATCH'), // Auto-generate batch number
         currentStock: parseFloat(material.currentStock) || 0,
@@ -1425,6 +1467,7 @@ export default function Materials() {
         costPerUnit: parseFloat(material.costPerUnit) || 0,
         totalValue: (parseFloat(material.currentStock) || 0) * (parseFloat(material.costPerUnit) || 0),
         qualityGrade: material.qualityGrade || "A",
+        color: material.color || 'NA',
         imageUrl: material.imageUrl || "",
         materialsUsed: [],
         supplierPerformance: 85
@@ -1432,9 +1475,9 @@ export default function Materials() {
 
       // Add materials to Supabase using RawMaterialService
       for (const material of validMaterials) {
-        const result = await RawMaterialService.createRawMaterial({
+        const result = await rawMaterialService.createRawMaterial({
           name: material.name,
-          brand: material.brand,
+          type: material.type,
           category: material.category,
           current_stock: material.currentStock,
           unit: material.unit,
@@ -1445,6 +1488,7 @@ export default function Materials() {
           supplier_name: material.supplier,
           cost_per_unit: material.costPerUnit,
           batch_number: material.batchNumber,
+          color: material.type === 'color' ? (material.color || 'NA') : 'NA',
           image_url: material.imageUrl
         });
 
@@ -1457,8 +1501,38 @@ export default function Materials() {
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const updatedMaterials = await supabaseStorage.getAll();
-      setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
+      const materialsResponse = await rawMaterialService.getRawMaterials();
+      if (materialsResponse.success && materialsResponse.data) {
+        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+        
+        // Map MongoDB data to UI format
+        const mappedMaterials = materials.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          type: item.type || '',
+          category: item.category,
+          currentStock: parseFloat(item.current_stock) || 0,
+          unit: item.unit,
+          minThreshold: parseFloat(item.min_threshold) || 0,
+          maxCapacity: parseFloat(item.max_capacity) || 0,
+          reorderPoint: parseFloat(item.reorder_point) || 0,
+          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+          dailyUsage: parseFloat(item.daily_usage) || 0,
+          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+          supplier: item.supplier_name || '',
+          supplierId: item.supplier_id || '',
+          costPerUnit: parseFloat(item.cost_per_unit) || 0,
+          totalValue: parseFloat(item.total_value) || 0,
+          batchNumber: item.batch_number || '',
+          qualityGrade: item.quality_grade,
+          color: item.color,
+          imageUrl: item.image_url,
+          materialsUsed: [],
+          supplierPerformance: parseFloat(item.supplier_performance) || 0
+        }));
+        
+        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
+      }
 
       setIsImportInventoryOpen(false);
       toast({
@@ -1480,69 +1554,159 @@ export default function Materials() {
   const handleAddCustomCategory = async () => {
     if (!newCategoryName.trim()) return;
 
-    const updatedCategories = [...customCategories, newCategoryName.trim()];
-    await updateCustomCategories(updatedCategories);
-    setNewCategoryName("");
-    setShowAddCategory(false);
+    try {
+      const { success, error } = await DropdownService.addOption(
+        'material_category',
+        newCategoryName.trim(),
+        materialCategories.length + 1
+      );
 
-    toast({
-      title: "Category Added",
-      description: `"${newCategoryName}" has been added to custom categories.`,
-    });
+      if (!success) {
+        console.error('Error adding material category:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add category. Please try again.",
+          variant: "destructive"
+        });
+      } else {
+        // Reload categories from database
+        await loadMaterialDropdowns();
+        setNewCategoryName("");
+        setShowAddCategory(false);
+        toast({
+          title: "Category Added",
+          description: `"${newCategoryName}" has been added to the database.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error adding material category:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add category. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Handle adding custom unit
   const handleAddCustomUnit = async () => {
     if (!newUnitName.trim()) return;
 
-    const updatedUnits = [...customUnits, newUnitName.trim()];
-    await updateCustomUnits(updatedUnits);
-    setNewUnitName("");
-    setShowAddUnit(false);
+    try {
+      const { success, error } = await DropdownService.addOption(
+        'material_unit',
+        newUnitName.trim(),
+        materialUnits.length + 1
+      );
 
-    toast({
-      title: "Unit Added",
-      description: `"${newUnitName}" has been added to custom units.`,
-    });
+      if (!success) {
+        console.error('Error adding material unit:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add unit. Please try again.",
+          variant: "destructive"
+        });
+      } else {
+        // Reload units from database
+        await loadMaterialDropdowns();
+        setNewUnitName("");
+        setShowAddUnit(false);
+        toast({
+          title: "Unit Added",
+          description: `"${newUnitName}" has been added to the database.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error adding material unit:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add unit. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
-  // Delete functions for dropdown options
+  // Delete functions for dropdown options (now handled by DropdownMaster)
   const deleteCategory = async (category: string) => {
-    if (confirm(`Are you sure you want to delete the category "${category}"? This will affect all materials using this category.`)) {
-      const updatedCategories = customCategories.filter(c => c !== category);
-      await updateCustomCategories(updatedCategories);
+    try {
+      // Get all material categories to find the option ID
+      const options = await DropdownService.getOptionsByCategory('material_category');
+      const optionToDelete = options.find(option => option.value === category);
       
-      // Reset category if it was selected in any form
-      if (newMaterial.category === category) {
-        setNewMaterial({...newMaterial, category: ""});
+      if (!optionToDelete) {
+    toast({
+          title: "Error",
+          description: "Category not found",
+          variant: "destructive",
+        });
+        return;
       }
-      if (newInventoryMaterial.category === category) {
-        setNewInventoryMaterial({...newInventoryMaterial, category: ""});
-      }
+
+      // Delete the option from MongoDB
+      const { success, error } = await DropdownService.deleteOption(optionToDelete.id);
       
+      if (success) {
+        // Reload categories and update state
+        await loadMaterialDropdowns();
+        toast({
+          title: "Category Deleted",
+          description: `"${category}" has been removed from the database.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to delete category: ${error}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
       toast({
-        title: "Category Deleted",
-        description: `"${category}" has been removed from categories.`,
+        title: "Error",
+        description: "Failed to delete category",
+        variant: "destructive",
       });
     }
   };
 
   const deleteUnit = async (unit: string) => {
-    if (confirm(`Are you sure you want to delete the unit "${unit}"? This will affect all materials using this unit.`)) {
-      const updatedUnits = customUnits.filter(u => u !== unit);
-      await updateCustomUnits(updatedUnits);
+    try {
+      // Get all material units to find the option ID
+      const options = await DropdownService.getOptionsByCategory('material_unit');
+      const optionToDelete = options.find(option => option.value === unit);
       
-      // Reset unit if it was selected in any form
-      if (newMaterial.unit === unit) {
-        setNewMaterial({...newMaterial, unit: ""});
+      if (!optionToDelete) {
+    toast({
+          title: "Error",
+          description: "Unit not found",
+          variant: "destructive",
+        });
+        return;
       }
-      if (newInventoryMaterial.unit === unit) {
-        setNewInventoryMaterial({...newInventoryMaterial, unit: ""});
-      }
+
+      // Delete the option from MongoDB
+      const { success, error } = await DropdownService.deleteOption(optionToDelete.id);
       
+      if (success) {
+        // Reload units and update state
+        await loadMaterialDropdowns();
+        toast({
+          title: "Unit Deleted",
+          description: `"${unit}" has been removed from the database.`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to delete unit: ${error}`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting unit:', error);
       toast({
-        title: "Unit Deleted",
-        description: `"${unit}" has been removed from units.`,
+        title: "Error",
+        description: "Failed to delete unit",
+        variant: "destructive",
       });
     }
   };
@@ -1550,12 +1714,43 @@ export default function Materials() {
   // Handle waste management operations
   const handleReturnToInventory = async (waste: WasteItem) => {
     try {
-      const result = await WasteManagementService.returnWasteToInventory(waste.id);
+      // Use the MongoDB API instead of Supabase
+      const result = await WasteService.returnWasteToInventory(waste.id);
       
       if (result.success) {
         // Reload raw materials and trigger waste data refresh
-        const updatedMaterials = await supabaseStorage.getAll();
-        setRawMaterials(removeDuplicateBatchNumbers(updatedMaterials));
+        const materialsResponse = await rawMaterialService.getRawMaterials();
+        if (materialsResponse.success && materialsResponse.data) {
+          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+          
+          // Map MongoDB data to UI format
+          const mappedMaterials = materials.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            type: item.type || '',
+            category: item.category,
+            currentStock: parseFloat(item.current_stock) || 0,
+            unit: item.unit,
+            minThreshold: parseFloat(item.min_threshold) || 0,
+            maxCapacity: parseFloat(item.max_capacity) || 0,
+            reorderPoint: parseFloat(item.reorder_point) || 0,
+            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+            dailyUsage: parseFloat(item.daily_usage) || 0,
+            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+            supplier: item.supplier_name || '',
+            supplierId: item.supplier_id || '',
+            costPerUnit: parseFloat(item.cost_per_unit) || 0,
+            totalValue: parseFloat(item.total_value) || 0,
+            batchNumber: item.batch_number || '',
+            qualityGrade: item.quality_grade,
+            color: item.color,
+            imageUrl: item.image_url,
+            materialsUsed: [],
+            supplierPerformance: parseFloat(item.supplier_performance) || 0
+          }));
+          
+          setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
+        }
         setWasteRecoveryRefresh(prev => prev + 1);
         
         // Update waste recovery count
@@ -1595,7 +1790,7 @@ export default function Materials() {
       const materialIsOutOfStock = material.status === "out-of-stock";
       setRestockForm({
         supplier: firstSupplier.name,
-        brand: firstSupplier.brand,
+        type: firstSupplier.type,
         quantity: "",
         costPerUnit: firstSupplier.costPerUnit.toString(),
         expectedDelivery: "",
@@ -1606,7 +1801,7 @@ export default function Materials() {
       const materialIsOutOfStock = material.status === "out-of-stock";
       setRestockForm({
         supplier: "",
-        brand: "",
+        type: "",
         quantity: "",
         costPerUnit: "",
         expectedDelivery: "",
@@ -1623,7 +1818,7 @@ export default function Materials() {
       setRestockForm(prev => ({
         ...prev,
         supplier: "new_supplier",
-        brand: "",
+        type: "",
         costPerUnit: ""
       }));
       return;
@@ -1640,14 +1835,14 @@ export default function Materials() {
       setRestockForm(prev => ({
         ...prev,
         supplier: supplierName,
-        brand: selectedSupplier.brand,
+        type: selectedSupplier.type,
         costPerUnit: selectedSupplier.costPerUnit.toString()
       }));
     } else {
       setRestockForm(prev => ({
         ...prev,
         supplier: supplierName,
-        brand: "",
+        type: "",
         costPerUnit: ""
       }));
     }
@@ -1670,7 +1865,7 @@ export default function Materials() {
       const orderData: Omit<MaterialPurchase, 'id'> = {
         materialId: selectedRestockMaterial.id,
         materialName: selectedRestockMaterial.name,
-        materialBrand: restockForm.brand,
+        materialType: restockForm.type,
         materialCategory: selectedRestockMaterial.category,
         materialBatchNumber: generateUniqueId('BATCH'),
         supplierId: generateUniqueId('SUP'),
@@ -1691,14 +1886,13 @@ export default function Materials() {
         isRestock: !orderIsOutOfStock
       };
 
-      // Add to material orders storage
-      await supabaseStorage.addPurchaseOrder(orderData);
+      // Purchase order will be added via MongoDB service later
 
       // Close dialog and reset form
       setIsRestockDialogOpen(false);
       setRestockForm({
         supplier: "",
-        brand: "",
+        type: "",
         quantity: "",
         costPerUnit: "",
         expectedDelivery: "",
@@ -1710,7 +1904,7 @@ export default function Materials() {
         state: {
           prefillOrder: {
             materialName: selectedRestockMaterial.name,
-            materialBrand: restockForm.brand,
+            materialType: restockForm.type,
             materialCategory: selectedRestockMaterial.category,
             materialBatchNumber: generateUniqueId('BATCH'),
             supplier: restockForm.supplier,
@@ -1779,7 +1973,7 @@ export default function Materials() {
                 <DialogHeader>
                   <DialogTitle>Import Inventory from CSV</DialogTitle>
                   <DialogDescription>
-                    Upload a CSV file with material data. Required columns: name, brand, category, currentStock, unit, costPerUnit
+                    Upload a CSV file with material data. Required columns: name, type, category, currentStock, unit, costPerUnit
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -1803,7 +1997,7 @@ export default function Materials() {
                 <DialogHeader>
                   <DialogTitle>Add Material to Inventory</DialogTitle>
                   <DialogDescription>
-                    Add a new raw material directly to your inventory system. This is for adding materials that you already have in stock.
+                    Add a new raw material directly to your stock. This is for adding materials that you already have in stock.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -1866,13 +2060,21 @@ export default function Materials() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="inventorySupplier">Supplier Name *</Label>
-                      <Input
-                        id="inventorySupplier"
+                      <Select
                         value={newInventoryMaterial.supplier}
-                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, supplier: e.target.value})}
-                        placeholder="e.g., ABC Textiles Ltd."
-                        required
-                      />
+                        onValueChange={(value) => setNewInventoryMaterial({...newInventoryMaterial, supplier: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select supplier" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliers.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.name}>
+                              {supplier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div>
                       <Label htmlFor="inventoryCategory">Category *</Label>
@@ -1931,15 +2133,42 @@ export default function Materials() {
                   </div>
 
                     <div>
-                    <Label htmlFor="inventoryBrand">Brand Name *</Label>
-                    <Input
-                      id="inventoryBrand"
-                      value={newInventoryMaterial.brand}
-                      onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, brand: e.target.value})}
-                      placeholder="e.g., TextilePro"
-                      required
-                    />
+                    <Label htmlFor="inventoryType">Material Type *</Label>
+                    <Select
+                      value={newInventoryMaterial.type}
+                      onValueChange={(value) => {
+                        setNewInventoryMaterial({
+                          ...newInventoryMaterial,
+                          type: value,
+                          color: value !== 'color' ? 'NA' : newInventoryMaterial.color
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {materialTypes.map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                    {newInventoryMaterial.type === 'color' && (
+                    <div>
+                      <Label htmlFor="inventoryColor">Color *</Label>
+                      <Input
+                        id="inventoryColor"
+                        value={newInventoryMaterial.color}
+                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, color: e.target.value})}
+                        placeholder="e.g., Red, Blue, Green"
+                        required
+                      />
+                    </div>
+                    )}
 
                     <div>
                       <Label htmlFor="inventoryUnit">Unit *</Label>
@@ -2000,9 +2229,15 @@ export default function Materials() {
                       <Label htmlFor="inventoryCurrentStock">Current Stock *</Label>
                       <Input
                         id="inventoryCurrentStock"
-                        type="number"
+                        type="text"
                         value={newInventoryMaterial.currentStock}
-                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, currentStock: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewInventoryMaterial({...newInventoryMaterial, currentStock: value});
+                          }
+                        }}
                         placeholder="100"
                         required
                       />
@@ -2012,9 +2247,15 @@ export default function Materials() {
                       <Label htmlFor="inventoryMinThreshold">Min Threshold *</Label>
                       <Input
                         id="inventoryMinThreshold"
-                        type="number"
+                        type="text"
                         value={newInventoryMaterial.minThreshold}
-                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, minThreshold: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewInventoryMaterial({...newInventoryMaterial, minThreshold: value});
+                          }
+                        }}
                         placeholder="50"
                         required
                       />
@@ -2024,9 +2265,15 @@ export default function Materials() {
                       <Label htmlFor="inventoryMaxCapacity">Max Capacity *</Label>
                       <Input
                         id="inventoryMaxCapacity"
-                        type="number"
+                        type="text"
                         value={newInventoryMaterial.maxCapacity}
-                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, maxCapacity: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewInventoryMaterial({...newInventoryMaterial, maxCapacity: value});
+                          }
+                        }}
                         placeholder="500"
                         required
                       />
@@ -2037,9 +2284,15 @@ export default function Materials() {
                     <Label htmlFor="inventoryCostPerUnit">Cost/Unit (₹) *</Label>
                       <Input
                       id="inventoryCostPerUnit"
-                        type="number"
+                        type="text"
                         value={newInventoryMaterial.costPerUnit}
-                        onChange={(e) => setNewInventoryMaterial({...newInventoryMaterial, costPerUnit: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewInventoryMaterial({...newInventoryMaterial, costPerUnit: value});
+                          }
+                        }}
                       placeholder="450"
                       required
                       />
@@ -2137,12 +2390,21 @@ export default function Materials() {
                   <div className="grid grid-cols-2 gap-4">
                       <div>
                       <Label htmlFor="supplier">Supplier Name *</Label>
-                        <Input
-                        id="supplier"
+                        <Select
                         value={newMaterial.supplier}
-                        onChange={(e) => setNewMaterial({...newMaterial, supplier: e.target.value})}
-                        placeholder="e.g., ABC Textiles Ltd."
-                        />
+                        onValueChange={(value) => setNewMaterial({...newMaterial, supplier: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers.map((supplier) => (
+                              <SelectItem key={supplier.id} value={supplier.name}>
+                                {supplier.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                       <Label htmlFor="category">Category *</Label>
@@ -2193,18 +2455,39 @@ export default function Materials() {
                               className="flex-1"
                             />
                             <Button type="button" size="sm" onClick={async () => {
-                              if (newCategoryName.trim() && !customCategories.includes(newCategoryName.trim())) {
-                                const updatedCategories = [...customCategories, newCategoryName.trim()];
-                                setCustomCategories(updatedCategories);
-                                setNewMaterial({...newMaterial, category: newCategoryName.trim()});
-                                
-                                // Save to Supabase settings
-                                const updatedSettings = { ...settings, customCategories: updatedCategories };
-                                await supabaseStorage.updateSettings(updatedSettings);
-                                setSettings(updatedSettings);
-                                
-                                setNewCategoryName("");
-                                setShowAddCategory(false);
+                              if (newCategoryName.trim() && !materialCategories.includes(newCategoryName.trim())) {
+                                try {
+                                  const { success, error } = await DropdownService.addOption(
+                                    'material_category',
+                                    newCategoryName.trim(),
+                                    materialCategories.length + 1
+                                  );
+
+                                  if (!success) {
+                                    console.error('Error adding material category:', error);
+                                    toast({
+                                      title: "Error",
+                                      description: "Failed to add category. Please try again.",
+                                      variant: "destructive"
+                                    });
+                                  } else {
+                                    await loadMaterialDropdowns();
+                                    setNewMaterial({...newMaterial, category: newCategoryName.trim()});
+                                    setNewCategoryName("");
+                                    setShowAddCategory(false);
+                                    toast({
+                                      title: "Category Added",
+                                      description: `"${newCategoryName.trim()}" has been added to the database.`,
+                                    });
+                                  }
+                                } catch (error) {
+                                  console.error('Error adding material category:', error);
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to add category. Please try again.",
+                                    variant: "destructive"
+                                  });
+                                }
                               }
                             }}>Add</Button>
                             <Button type="button" size="sm" variant="outline" onClick={() => {setShowAddCategory(false); setNewCategoryName("");}}>Cancel</Button>
@@ -2215,14 +2498,42 @@ export default function Materials() {
                   </div>
 
                       <div>
-                    <Label htmlFor="brand">Brand Name *</Label>
-                    <Input
-                      id="brand"
-                      value={newMaterial.brand}
-                      onChange={(e) => setNewMaterial({...newMaterial, brand: e.target.value})}
-                      placeholder="e.g., TextilePro"
-                    />
+                    <Label htmlFor="type">Material Type *</Label>
+                    <Select
+                      value={newMaterial.type}
+                      onValueChange={(value) => {
+                        setNewMaterial({
+                          ...newMaterial,
+                          type: value,
+                          color: value !== 'color' ? 'NA' : newMaterial.color
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {materialTypes.map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+
+                      {newMaterial.type === 'color' && (
+                      <div>
+                        <Label htmlFor="color">Color *</Label>
+                        <Input
+                          id="color"
+                          value={newMaterial.color}
+                          onChange={(e) => setNewMaterial({...newMaterial, color: e.target.value})}
+                          placeholder="e.g., Red, Blue, Green"
+                          required
+                        />
+                      </div>
+                      )}
 
                     <div>
                     <Label htmlFor="unit">Unit *</Label>
@@ -2273,18 +2584,39 @@ export default function Materials() {
                             className="flex-1"
                           />
                           <Button type="button" size="sm" onClick={async () => {
-                            if (newUnitName.trim() && !customUnits.includes(newUnitName.trim())) {
-                              const updatedUnits = [...customUnits, newUnitName.trim()];
-                              setCustomUnits(updatedUnits);
-                              setNewMaterial({...newMaterial, unit: newUnitName.trim()});
-                              
-                              // Save to Supabase settings
-                              const updatedSettings = { ...settings, customUnits: updatedUnits };
-                              await supabaseStorage.updateSettings(updatedSettings);
-                              setSettings(updatedSettings);
-                              
-                              setNewUnitName("");
-                              setShowAddUnit(false);
+                            if (newUnitName.trim() && !materialUnits.includes(newUnitName.trim())) {
+                              try {
+                                const { success, error } = await DropdownService.addOption(
+                                  'material_unit',
+                                  newUnitName.trim(),
+                                  materialUnits.length + 1
+                                );
+
+                                if (!success) {
+                                  console.error('Error adding material unit:', error);
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to add unit. Please try again.",
+                                    variant: "destructive"
+                                  });
+                                } else {
+                                  await loadMaterialDropdowns();
+                                  setNewMaterial({...newMaterial, unit: newUnitName.trim()});
+                                  setNewUnitName("");
+                                  setShowAddUnit(false);
+                                  toast({
+                                    title: "Unit Added",
+                                    description: `"${newUnitName.trim()}" has been added to the database.`,
+                                  });
+                                }
+                              } catch (error) {
+                                console.error('Error adding material unit:', error);
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to add unit. Please try again.",
+                                  variant: "destructive"
+                                });
+                              }
                             }
                           }}>Add</Button>
                           <Button type="button" size="sm" variant="outline" onClick={() => {setShowAddUnit(false); setNewUnitName("");}}>Cancel</Button>
@@ -2297,9 +2629,15 @@ export default function Materials() {
                       <Label htmlFor="orderStock">Order Stock</Label>
                         <Input
                         id="orderStock"
-                        type="number"
+                        type="text"
                         value={newMaterial.currentStock || ""}
-                        onChange={(e) => setNewMaterial({...newMaterial, currentStock: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewMaterial({...newMaterial, currentStock: value});
+                          }
+                        }}
                         placeholder="100"
                       />
                       <p className="text-xs text-muted-foreground mt-1">Quantity to order for this material</p>
@@ -2308,9 +2646,15 @@ export default function Materials() {
                       <Label htmlFor="minThreshold">Min Threshold</Label>
                       <Input
                         id="minThreshold"
-                          type="number"
+                          type="text"
                           value={newMaterial.minThreshold}
-                          onChange={(e) => setNewMaterial({...newMaterial, minThreshold: e.target.value})}
+                          onChange={(e) => {
+                            // Allow only numbers and leading zeros
+                            const value = e.target.value;
+                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              setNewMaterial({...newMaterial, minThreshold: value});
+                            }
+                          }}
                         placeholder="100"
                         />
                       </div>
@@ -2318,9 +2662,15 @@ export default function Materials() {
                       <Label htmlFor="maxCapacity">Max Capacity</Label>
                         <Input
                         id="maxCapacity"
-                          type="number"
+                          type="text"
                           value={newMaterial.maxCapacity}
-                          onChange={(e) => setNewMaterial({...newMaterial, maxCapacity: e.target.value})}
+                          onChange={(e) => {
+                            // Allow only numbers and leading zeros
+                            const value = e.target.value;
+                            if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              setNewMaterial({...newMaterial, maxCapacity: value});
+                            }
+                          }}
                         placeholder="500"
                         />
                       </div>
@@ -2330,9 +2680,15 @@ export default function Materials() {
                       <Label htmlFor="costPerUnit">Cost/Unit (₹)</Label>
                         <Input
                         id="costPerUnit"
-                          type="number"
+                          type="text"
                           value={newMaterial.costPerUnit}
-                        onChange={(e) => setNewMaterial({...newMaterial, costPerUnit: e.target.value})}
+                        onChange={(e) => {
+                          // Allow only numbers and leading zeros
+                          const value = e.target.value;
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            setNewMaterial({...newMaterial, costPerUnit: value});
+                          }
+                        }}
                         placeholder="450"
                         />
                       </div>
@@ -2548,7 +2904,7 @@ export default function Materials() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <h3 className="font-semibold text-lg mb-1">{material.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{material.brand}</p>
+                        <p className="text-sm text-muted-foreground mb-2">{material.type}</p>
                         <Badge
                           variant="secondary"
                           className={`text-xs ${statusStyles[material.status]}`}
@@ -2673,7 +3029,7 @@ export default function Materials() {
                                 </div>
                             <div>
                                 <div className="font-medium text-foreground">{material.name}</div>
-                              <div className="text-sm text-muted-foreground">{material.brand}</div>
+                              <div className="text-sm text-muted-foreground">{material.type}</div>
                                 </div>
                             </div>
                           </td>
@@ -2926,8 +3282,8 @@ export default function Materials() {
                         <span>{selectedMaterial.name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Brand:</span>
-                        <span>{selectedMaterial.brand}</span>
+                        <span className="text-muted-foreground">Type:</span>
+                        <span>{selectedMaterial.type}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Category:</span>
@@ -2940,6 +3296,10 @@ export default function Materials() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Quality Grade:</span>
                         <span>{selectedMaterial.qualityGrade}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Color:</span>
+                        <span>{selectedMaterial.color || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -3057,7 +3417,7 @@ export default function Materials() {
                   setNewMaterial({
                     ...newMaterial,
                     name: selectedMaterial.name,
-                    brand: selectedMaterial.brand,
+                    type: selectedMaterial.type,
                     category: selectedMaterial.category,
                     unit: selectedMaterial.unit,
                     supplier: selectedMaterial.supplier,
@@ -3122,7 +3482,7 @@ export default function Materials() {
                       <div key={index} className="p-2 border rounded-md text-sm bg-background">
                         <div className="font-medium">{supplier.name}</div>
                         <div className="text-muted-foreground text-xs">
-                          Brand: {supplier.brand} | Cost: ₹{supplier.costPerUnit} | Unit: {supplier.unit}
+                          Type: {supplier.type} | Cost: ₹{supplier.costPerUnit} | Unit: {supplier.unit}
                         </div>
                       </div>
                     ))}
@@ -3145,7 +3505,7 @@ export default function Materials() {
                           <div className="flex flex-col">
                             <span className="font-medium">{supplier.name}</span>
                             <span className="text-xs text-muted-foreground">
-                              {supplier.brand} • ₹{supplier.costPerUnit} • {supplier.unit}
+                              {supplier.type} • ₹{supplier.costPerUnit} • {supplier.unit}
                             </span>
                           </div>
                         </SelectItem>
@@ -3167,17 +3527,17 @@ export default function Materials() {
                   )}
                 </div>
 
-                {/* Brand (Auto-filled based on supplier) */}
+                {/* Type (Auto-filled based on supplier) */}
                 <div>
-                  <Label htmlFor="restockBrand">Brand Name *</Label>
+                  <Label htmlFor="restockType">Material Type *</Label>
                   <Input
-                    id="restockBrand"
-                    value={restockForm.brand}
-                    onChange={(e) => setRestockForm({...restockForm, brand: e.target.value})}
-                    placeholder="Brand will be auto-filled based on supplier"
+                    id="restockType"
+                    value={restockForm.type}
+                    onChange={(e) => setRestockForm({...restockForm, type: e.target.value})}
+                    placeholder="Type will be auto-filled based on supplier"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Brand from selected supplier (editable)
+                    Type from selected supplier (editable)
                   </p>
                 </div>
 
@@ -3186,9 +3546,15 @@ export default function Materials() {
                   <Label htmlFor="restockQuantity">Quantity to Order *</Label>
                   <Input
                     id="restockQuantity"
-                    type="number"
+                    type="text"
                     value={restockForm.quantity}
-                    onChange={(e) => setRestockForm({...restockForm, quantity: e.target.value})}
+                    onChange={(e) => {
+                      // Allow only numbers and leading zeros
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setRestockForm({...restockForm, quantity: value});
+                      }
+                    }}
                     placeholder="Enter quantity to restock"
                     min="1"
                   />
@@ -3202,9 +3568,15 @@ export default function Materials() {
                   <Label htmlFor="restockCostPerUnit">Cost per Unit (₹) *</Label>
                   <Input
                     id="restockCostPerUnit"
-                    type="number"
+                    type="text"
                     value={restockForm.costPerUnit}
-                    onChange={(e) => setRestockForm({...restockForm, costPerUnit: e.target.value})}
+                    onChange={(e) => {
+                      // Allow only numbers and leading zeros
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setRestockForm({...restockForm, costPerUnit: value});
+                      }
+                    }}
                     placeholder="Cost will be auto-filled based on supplier"
                     min="0"
                     step="0.01"

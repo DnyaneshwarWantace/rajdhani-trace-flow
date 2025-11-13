@@ -1,62 +1,83 @@
+import { useState, useEffect } from 'react';
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart, Clock, Target } from "lucide-react";
-
-const analyticsData = {
-  revenue: {
-    current: 2450000,
-    previous: 2100000,
-    growth: 16.7
-  },
-  orders: {
-    current: 156,
-    previous: 142,
-    growth: 9.9
-  },
-  customers: {
-    current: 89,
-    previous: 76,
-    growth: 17.1
-  },
-  production: {
-    current: 1850,
-    previous: 1650,
-    growth: 12.1
-  }
-};
-
-const topProducts = [
-  { name: "Red Premium Carpet 4x6ft", revenue: 675000, orders: 45, growth: 23.5 },
-  { name: "Blue Standard Carpet 6x8ft", revenue: 520000, orders: 32, growth: 15.2 },
-  { name: "Green Luxury Carpet 5x7ft", revenue: 485000, orders: 28, growth: 8.7 },
-  { name: "Beige Classic Rug 3x5ft", revenue: 290000, orders: 22, growth: -5.3 },
-  { name: "Multi-color Runner 2x8ft", revenue: 180000, orders: 18, growth: 12.8 }
-];
-
-const topCustomers = [
-  { name: "Sharma Enterprises", revenue: 375000, orders: 15, type: "Business" },
-  { name: "Royal Interiors", revenue: 290000, orders: 12, type: "Business" },
-  { name: "Modern Living Co.", revenue: 220000, orders: 8, type: "Business" },
-  { name: "Elite Furnishings", revenue: 185000, orders: 7, type: "Business" },
-  { name: "Priya Patel", revenue: 95000, orders: 6, type: "Individual" }
-];
-
-const monthlyData = [
-  { month: "Jan", revenue: 1850000, orders: 125, production: 1400 },
-  { month: "Feb", revenue: 2100000, orders: 142, production: 1650 },
-  { month: "Mar", revenue: 2450000, orders: 156, production: 1850 },
-];
-
-const productionMetrics = {
-  efficiency: 94.5,
-  wasteReduction: 8.2,
-  qualityScore: 96.8,
-  onTimeDelivery: 92.3
-};
+import {
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  Package,
+  Users,
+  ShoppingCart,
+  Target,
+  BarChart3,
+  TrendingUpIcon
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from 'recharts';
+import AnalyticsService, {
+  AnalyticsData,
+  TopProduct,
+  TopCustomer,
+  MonthlyTrend,
+  ProductionMetrics
+} from '@/services/api/analyticsService';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Analytics() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+
+  // Data states
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+  const [monthlyTrends, setMonthlyTrends] = useState<MonthlyTrend[]>([]);
+  const [productionMetrics, setProductionMetrics] = useState<ProductionMetrics | null>(null);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      // Fetch all analytics data in parallel
+      const [analyticsData, products, customers, trends, metrics] = await Promise.all([
+        AnalyticsService.getAnalytics(),
+        AnalyticsService.getTopProducts(5),
+        AnalyticsService.getTopCustomers(5),
+        AnalyticsService.getMonthlyTrends(),
+        AnalyticsService.getProductionMetrics()
+      ]);
+
+      setAnalytics(analyticsData);
+      setTopProducts(products);
+      setTopCustomers(customers);
+      setMonthlyTrends(trends);
+      setProductionMetrics(metrics);
+
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load analytics data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, []);
+
   const formatGrowth = (growth: number) => {
     const isPositive = growth > 0;
     return (
@@ -67,110 +88,193 @@ export default function Analytics() {
     );
   };
 
-  return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex justify-between items-start">
-        <Header 
-          title="Business Analytics" 
+  const formatCurrency = (amount: number) => {
+    if (amount >= 100000) {
+      return `₹${(amount / 100000).toFixed(1)}L`;
+    } else if (amount >= 1000) {
+      return `₹${(amount / 1000).toFixed(1)}K`;
+    }
+    return `₹${amount.toFixed(0)}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 space-y-6 p-6">
+        <Header
+          title="Business Analytics"
           subtitle="Comprehensive insights into your carpet manufacturing business"
         />
-        
-        <div className="flex gap-4">
-          <Select defaultValue="thisMonth">
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="thisWeek">This Week</SelectItem>
-              <SelectItem value="thisMonth">This Month</SelectItem>
-              <SelectItem value="thisQuarter">This Quarter</SelectItem>
-              <SelectItem value="thisYear">This Year</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-24 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 space-y-6 p-6">
+      <Header
+        title="Business Analytics"
+        subtitle="Real-time insights powered by MongoDB"
+      />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">₹{(analyticsData.revenue.current / 100000).toFixed(1)}L</p>
-                {formatGrowth(analyticsData.revenue.growth)}
+                <p className="text-2xl font-bold">{formatCurrency(analytics?.revenue.current || 0)}</p>
+                {formatGrowth(analytics?.revenue.growth || 0)}
               </div>
-              <DollarSign className="w-8 h-8 text-primary" />
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Orders</p>
-                <p className="text-2xl font-bold">{analyticsData.orders.current}</p>
-                {formatGrowth(analyticsData.orders.growth)}
+                <p className="text-2xl font-bold">{analytics?.orders.current || 0}</p>
+                {formatGrowth(analytics?.orders.growth || 0)}
               </div>
-              <ShoppingCart className="w-8 h-8 text-success" />
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <ShoppingCart className="w-6 h-6 text-green-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Active Customers</p>
-                <p className="text-2xl font-bold">{analyticsData.customers.current}</p>
-                {formatGrowth(analyticsData.customers.growth)}
+                <p className="text-2xl font-bold">{analytics?.customers.current || 0}</p>
+                {formatGrowth(analytics?.customers.growth || 0)}
               </div>
-              <Users className="w-8 h-8 text-production" />
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <Users className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        
-        <Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Production Output</p>
-                <p className="text-2xl font-bold">{analyticsData.production.current}</p>
-                {formatGrowth(analyticsData.production.growth)}
+                <p className="text-2xl font-bold">{analytics?.production.current || 0}</p>
+                {formatGrowth(analytics?.production.growth || 0)}
               </div>
-              <Package className="w-8 h-8 text-warning" />
+              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
+                <Package className="w-6 h-6 text-orange-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Monthly Trends Chart */}
+      {monthlyTrends.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUpIcon className="w-5 h-5" />
+              Revenue & Orders Trend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={monthlyTrends}>
+                <defs>
+                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip
+                  formatter={(value: number, name: string) => [
+                    name === 'revenue' ? formatCurrency(value) : value,
+                    name === 'revenue' ? 'Revenue' : 'Orders'
+                  ]}
+                />
+                <Legend />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#3b82f6"
+                  fillOpacity={1}
+                  fill="url(#colorRevenue)"
+                  name="Revenue"
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="orders"
+                  stroke="#10b981"
+                  fillOpacity={1}
+                  fill="url(#colorOrders)"
+                  name="Orders"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Production Efficiency Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Production Performance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-success">{productionMetrics.efficiency}%</div>
-              <p className="text-sm text-muted-foreground">Overall Efficiency</p>
+      {productionMetrics && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              Production Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-3xl font-bold text-green-600">{productionMetrics.efficiency.toFixed(1)}%</div>
+                <p className="text-sm text-muted-foreground mt-1">Overall Efficiency</p>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600">{productionMetrics.qualityScore.toFixed(1)}%</div>
+                <p className="text-sm text-muted-foreground mt-1">Quality Score</p>
+              </div>
+              <div className="text-center p-4 bg-orange-50 rounded-lg">
+                <div className="text-3xl font-bold text-orange-600">{productionMetrics.onTimeDelivery.toFixed(1)}%</div>
+                <p className="text-sm text-muted-foreground mt-1">On-Time Delivery</p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600">{productionMetrics.wasteReduction.toFixed(1)}%</div>
+                <p className="text-sm text-muted-foreground mt-1">Waste Reduction</p>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-production">{productionMetrics.qualityScore}%</div>
-              <p className="text-sm text-muted-foreground">Quality Score</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-warning">{productionMetrics.onTimeDelivery}%</div>
-              <p className="text-sm text-muted-foreground">On-Time Delivery</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-destructive">{productionMetrics.wasteReduction}%</div>
-              <p className="text-sm text-muted-foreground">Waste Reduction</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Products */}
@@ -179,25 +283,31 @@ export default function Analytics() {
             <CardTitle>Top Performing Products</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium">{product.name}</h4>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>₹{(product.revenue / 100000).toFixed(1)}L revenue</span>
-                      <span>{product.orders} orders</span>
+            {topProducts.length > 0 ? (
+              <div className="space-y-4">
+                {topProducts.map((product, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{product.product_name}</h4>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{formatCurrency(product.total_revenue)} revenue</span>
+                        <span>•</span>
+                        <span>{product.total_orders} orders</span>
+                        <span>•</span>
+                        <span>{product.total_quantity} units</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge variant="outline" className="mb-1">
+                    <Badge variant="outline" className="ml-4">
                       #{index + 1}
                     </Badge>
-                    {formatGrowth(product.growth)}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No product data available
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -207,64 +317,59 @@ export default function Analytics() {
             <CardTitle>Top Customers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {topCustomers.map((customer, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <h4 className="font-medium">{customer.name}</h4>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>₹{(customer.revenue / 100000).toFixed(1)}L revenue</span>
-                      <span>{customer.orders} orders</span>
+            {topCustomers.length > 0 ? (
+              <div className="space-y-4">
+                {topCustomers.map((customer, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{customer.customer_name}</h4>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                        <span>{formatCurrency(customer.total_revenue)} revenue</span>
+                        <span>•</span>
+                        <span>{customer.total_orders} orders</span>
+                      </div>
+                    </div>
+                    <div className="text-right ml-4">
+                      <Badge
+                        variant={customer.customer_type === "Business" ? "default" : "outline"}
+                        className="mb-1"
+                      >
+                        {customer.customer_type}
+                      </Badge>
+                      <div className="text-xl font-bold text-primary">#{index + 1}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge 
-                      variant={customer.type === "Business" ? "default" : "outline"}
-                      className="mb-1"
-                    >
-                      {customer.type}
-                    </Badge>
-                    <div className="text-2xl font-bold text-primary">#{index + 1}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No customer data available
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Monthly Trends */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Monthly Trends</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {monthlyData.map((month, index) => (
-              <div key={index} className="grid grid-cols-4 gap-4 p-4 border rounded-lg">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{month.month}</div>
-                  <p className="text-sm text-muted-foreground">Month</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-success">
-                    ₹{(month.revenue / 100000).toFixed(1)}L
-                  </div>
-                  <p className="text-sm text-muted-foreground">Revenue</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-production">{month.orders}</div>
-                  <p className="text-sm text-muted-foreground">Orders</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-warning">{month.production}</div>
-                  <p className="text-sm text-muted-foreground">Production</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Production Chart */}
+      {monthlyTrends.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Production Output Trend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={monthlyTrends}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="production" fill="#f59e0b" name="Production Units" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Key Insights */}
       <Card>
@@ -276,38 +381,38 @@ export default function Analytics() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-success/10 rounded-lg border border-success/20">
-              <h4 className="font-medium text-success mb-2">Strong Performance</h4>
-              <ul className="text-sm space-y-1">
-                <li>• Revenue growth of 16.7% this month</li>
-                <li>• Production efficiency at 94.5%</li>
-                <li>• Quality score maintaining at 96.8%</li>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <h4 className="font-medium text-green-700 mb-2">Strong Performance</h4>
+              <ul className="text-sm space-y-1 text-green-800">
+                <li>• Revenue growth of {analytics?.revenue.growth.toFixed(1)}% this period</li>
+                <li>• Production efficiency at {productionMetrics?.efficiency.toFixed(1)}%</li>
+                <li>• Quality score maintaining at {productionMetrics?.qualityScore.toFixed(1)}%</li>
               </ul>
             </div>
-            
-            <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
-              <h4 className="font-medium text-warning mb-2">Areas for Improvement</h4>
-              <ul className="text-sm space-y-1">
-                <li>• On-time delivery at 92.3% (target: 95%)</li>
-                <li>• Beige Classic Rug showing -5.3% growth</li>
+
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <h4 className="font-medium text-orange-700 mb-2">Areas for Improvement</h4>
+              <ul className="text-sm space-y-1 text-orange-800">
+                <li>• On-time delivery at {productionMetrics?.onTimeDelivery.toFixed(1)}% (target: 95%)</li>
+                <li>• Monitor declining products and adjust inventory</li>
                 <li>• Consider expanding popular product lines</li>
               </ul>
             </div>
-            
-            <div className="p-4 bg-production/10 rounded-lg border border-production/20">
-              <h4 className="font-medium text-production mb-2">Growth Opportunities</h4>
-              <ul className="text-sm space-y-1">
-                <li>• Red Premium Carpet showing 23.5% growth</li>
-                <li>• 17.1% increase in customer acquisition</li>
+
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-medium text-blue-700 mb-2">Growth Opportunities</h4>
+              <ul className="text-sm space-y-1 text-blue-800">
+                <li>• {topProducts[0]?.product_name} showing strong demand</li>
+                <li>• {analytics?.customers.growth.toFixed(1)}% increase in customer acquisition</li>
                 <li>• Potential for premium product expansion</li>
               </ul>
             </div>
-            
-            <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-              <h4 className="font-medium text-destructive mb-2">Action Items</h4>
-              <ul className="text-sm space-y-1">
+
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <h4 className="font-medium text-purple-700 mb-2">Action Items</h4>
+              <ul className="text-sm space-y-1 text-purple-800">
                 <li>• Investigate delivery delays and optimize logistics</li>
-                <li>• Review pricing strategy for declining products</li>
+                <li>• Review pricing strategy for underperforming products</li>
                 <li>• Implement waste reduction initiatives</li>
               </ul>
             </div>

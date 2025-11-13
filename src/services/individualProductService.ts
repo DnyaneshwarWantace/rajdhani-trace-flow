@@ -9,13 +9,11 @@ export interface IndividualProduct {
   color?: string;
   pattern?: string;
   weight?: string;
-  thickness?: string;
   width?: string;
-  height?: string;
+  length?: string;
   final_weight?: string;
-  final_thickness?: string;
   final_width?: string;
-  final_height?: string;
+  final_length?: string;
   quality_grade?: string;
   status?: 'available' | 'sold' | 'damaged' | 'in-production' | 'completed';
   location?: string;
@@ -37,13 +35,11 @@ export interface CreateIndividualProductData {
   color?: string;
   pattern?: string;
   weight?: string;
-  thickness?: string;
   width?: string;
-  height?: string;
+  length?: string;
   final_weight?: string;
-  final_thickness?: string;
   final_width?: string;
-  final_height?: string;
+  final_length?: string;
   quality_grade?: string;
   status?: 'available' | 'sold' | 'damaged' | 'in-production' | 'completed';
   location?: string;
@@ -55,53 +51,101 @@ export interface CreateIndividualProductData {
 }
 
 class IndividualProductService {
-  async createIndividualProduct(data: CreateIndividualProductData) {
-    try {
-      // Generate globally unique ID if not provided
-      if (!data.id) {
-        data.id = await IDGenerator.generateUniqueIndividualProductId();
-      }
-      
-      // Generate QR code if not provided
-      if (!data.qr_code) {
-        data.qr_code = this.generateQRCode(data.product_id, data.batch_number);
-      }
+  async createIndividualProduct(data: CreateIndividualProductData, maxRetries: number = 3) {
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+      try {
+        attempts++;
+        
+        // Generate globally unique ID if not provided or if this is a retry
+        if (!data.id || attempts > 1) {
+          try {
+            data.id = await IDGenerator.generateIndividualProductId();
+          } catch (error) {
+            console.warn('Failed to generate unique ID via database check, using simple method:', error);
+            data.id = IDGenerator.generateIndividualProductIdSimple();
+          }
+        }
+        
+        // Generate QR code if not provided
+        if (!data.qr_code) {
+          data.qr_code = await this.generateQRCode(data.product_id, data.batch_number);
+        }
 
-      // Ensure production_date is provided (required field)
-      if (!data.production_date) {
-        data.production_date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+        // Ensure production_date is provided (required field)
+        if (!data.production_date) {
+          data.production_date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+        }
+
+        // Ensure added_date is set to current date if not provided
+        if (!data.added_date) {
+          data.added_date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
+        }
+
+        // Use admin client to bypass RLS
+        const client = supabaseAdmin || supabase;
+        
+        console.log(`🔍 Creating individual product (attempt ${attempts}/${maxRetries}) with client:`, client ? 'configured' : 'null');
+        console.log('🔍 Data being inserted:', data);
+        
+        const { data: result, error } = await client
+          .from('individual_products')
+          .insert([data])
+          .select('*')
+          .single();
+
+        if (error) {
+          // Check if it's a duplicate key error
+          if (error.code === '23505' && error.message.includes('duplicate key value violates unique constraint')) {
+            console.warn(`⚠️ Duplicate key error on attempt ${attempts}, retrying with new ID...`);
+            
+            if (attempts < maxRetries) {
+              // Add a small delay before retry
+              await new Promise(resolve => setTimeout(resolve, 100 * attempts));
+              continue; // Retry with new ID
+            } else {
+              console.error('❌ Max retries reached for duplicate key error');
+              return { data: null, error: `Failed to create individual product after ${maxRetries} attempts due to duplicate key conflicts` };
+            }
+          }
+          
+          // Check for other constraint violations that might be retryable
+          if (error.code === '23503' && error.message.includes('foreign key constraint')) {
+            console.warn(`⚠️ Foreign key constraint error on attempt ${attempts}, retrying...`);
+            
+            if (attempts < maxRetries) {
+              // Add a longer delay for foreign key constraint errors
+              await new Promise(resolve => setTimeout(resolve, 200 * attempts));
+              continue; // Retry
+            } else {
+              console.error('❌ Max retries reached for foreign key constraint error');
+              return { data: null, error: `Failed to create individual product after ${maxRetries} attempts due to foreign key constraint violations` };
+            }
+          }
+          
+          console.error('❌ Database error creating individual product:', error);
+          handleSupabaseError(error);
+          return { data: null, error: error.message };
+        }
+
+        console.log('✅ Individual product created successfully in database:', result);
+        console.log('✅ Database returned:', result?.product_name || result?.qr_code);
+        return { data: result, error: null };
+        
+      } catch (error) {
+        console.error(`Error creating individual product (attempt ${attempts}):`, error);
+        
+        if (attempts >= maxRetries) {
+          return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+        
+        // Add delay before retry
+        await new Promise(resolve => setTimeout(resolve, 100 * attempts));
       }
-
-      // Ensure added_date is set to current date if not provided
-      if (!data.added_date) {
-        data.added_date = new Date().toISOString().split('T')[0]; // Today's date in YYYY-MM-DD format
-      }
-
-      // Use admin client to bypass RLS
-      const client = supabaseAdmin || supabase;
-      
-      console.log('🔍 Creating individual product with client:', client ? 'configured' : 'null');
-      console.log('🔍 Data being inserted:', data);
-      
-      const { data: result, error } = await client
-        .from('individual_products')
-        .insert([data])
-        .select('*')
-        .single();
-
-      if (error) {
-        console.error('❌ Database error creating individual product:', error);
-        handleSupabaseError(error);
-        return { data: null, error: error.message };
-      }
-
-      console.log('✅ Individual product created successfully in database:', result);
-      console.log('✅ Database returned:', result?.product_name || result?.qr_code);
-      return { data: result, error: null };
-    } catch (error) {
-      console.error('Error creating individual product:', error);
-      return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
     }
+    
+    return { data: null, error: `Failed to create individual product after ${maxRetries} attempts` };
   }
 
   async getIndividualProducts(productId?: string) {
@@ -232,8 +276,8 @@ class IndividualProductService {
   }
 
   // Generate QR code for individual products
-  private generateQRCode(productId: string, batchNumber?: string): string {
-    return IDGenerator.generateQRCode();
+  private async generateQRCode(productId: string, batchNumber?: string): Promise<string> {
+    return await IDGenerator.generateQRCode();
   }
 }
 

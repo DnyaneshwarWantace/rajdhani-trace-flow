@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { cleanupOrderNotifications } from "@/lib/storageUtils";
-import { OrderService } from "@/services/orderService";
+import { MongoDBOrderService } from "@/services/api/orderService";
 import { CustomerService } from "@/services/customerService";
-import { ProductService } from "@/services/ProductService";
+import ProductService, { Product } from "@/services/api/productService";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,22 +12,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Search, Filter, Eye, Edit, MoreHorizontal, Users, Package, 
+  Plus, Search, Filter, Eye, Edit, MoreHorizontal, Users, Package,
   ShoppingCart, Calendar, TrendingUp, AlertTriangle, CheckCircle,
-  Clock, Factory, Truck, DollarSign, UserPlus, QrCode, Star,
-  ArrowRight, ArrowLeft, RefreshCw, Settings, Bell, Target
+  Clock, Factory, Truck, DollarSign, UserPlus, QrCode, Star, MapPin,
+  ArrowLeft
 } from "lucide-react";
 
 interface Customer {
@@ -50,7 +43,6 @@ interface IndividualProduct {
   manufacturingDate: string;
   finalDimensions: string;
   finalWeight: string;
-  finalThickness: string;
   finalPileHeight: string;
   qualityGrade: "A+" | "A" | "B" | "C";
   inspector: string;
@@ -59,21 +51,6 @@ interface IndividualProduct {
   soldDate?: string;
   customerId?: string;
   orderId?: string;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  category: string;
-  color: string;
-  size: string;
-  pattern: string;
-  quantity: number;
-  stock: number; // Add stock property
-  sellingPrice: number;
-  status: "in-stock" | "low-stock" | "out-of-stock";
-  individualProducts: IndividualProduct[];
-  individualStockTracking?: boolean;
 }
 
 interface OrderItem {
@@ -86,6 +63,7 @@ interface OrderItem {
   selectedIndividualProducts: IndividualProduct[];
   qualityGrade: string;
   specifications?: string;
+  unit?: string;
 }
 
 interface Order {
@@ -108,13 +86,19 @@ interface Order {
   paymentMethod: "cash" | "card" | "bank-transfer" | "credit";
   paymentTerms: string;
   dueDate?: string;
-  status: "pending" | "accepted" | "dispatched" | "delivered" | "cancelled";
+  status: "pending" | "accepted" | "in_production" | "ready" | "dispatched" | "delivered" | "cancelled";
   workflowStep: "accept" | "dispatch" | "delivered";
   acceptedAt?: string;
   dispatchedAt?: string;
   deliveredAt?: string;
   notes: string;
-
+  // Delivery address stored with each order
+  delivery_address?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }
 
 
@@ -124,6 +108,8 @@ interface Order {
 const statusStyles = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
   accepted: "bg-blue-100 text-blue-800 border-blue-200",
+  in_production: "bg-purple-100 text-purple-800 border-purple-200",
+  ready: "bg-indigo-100 text-indigo-800 border-indigo-200",
   dispatched: "bg-orange-100 text-orange-800 border-orange-200",
   delivered: "bg-green-100 text-green-800 border-green-200",
   cancelled: "bg-red-100 text-red-800 border-red-200"
@@ -140,13 +126,29 @@ export default function Orders() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { hasPageAccess } = useAuth();
+  
+  // Check page permission
+  const hasOrdersAccess = hasPageAccess('orders');
+  
+  // Redirect if no access
+  useEffect(() => {
+    if (!hasOrdersAccess) {
+      navigate('/access-denied', { state: { pageName: 'Orders' } });
+    }
+  }, [hasOrdersAccess, navigate]);
+  
+  // Don't render if no permission
+  if (!hasOrdersAccess) {
+    return null;
+  }
+  
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
-  const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
 
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -154,17 +156,17 @@ export default function Orders() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
 
-  // Load data from Supabase
+  // Load data from MongoDB
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load orders from Supabase
-        const { data: ordersData, error: ordersError } = await OrderService.getOrders();
+        // Load orders from MongoDB
+        const { data: ordersData, error: ordersError } = await MongoDBOrderService.getOrders();
         if (ordersError) {
           console.error('Error loading orders:', ordersError);
           setOrders([]);
         } else {
-          // Transform Supabase orders to match local interface
+          // Transform MongoDB orders to match local interface
           const transformedOrders: Order[] = (ordersData || []).map(order => ({
             id: order.id,
             orderNumber: order.order_number,
@@ -179,39 +181,40 @@ export default function Orders() {
               productName: item.product_name,
               productType: item.product_type,
               quantity: item.quantity,
-              unitPrice: item.unit_price,
-              totalPrice: item.total_price,
-              selectedIndividualProducts: [], // Will be populated from individual_products if needed
+              unitPrice: parseFloat(item.unit_price),
+              totalPrice: parseFloat(item.total_price),
+              selectedIndividualProducts: item.selected_individual_products || [],
               qualityGrade: item.quality_grade || 'A',
               specifications: item.specifications || ''
             })),
-            subtotal: order.subtotal,
-            gstRate: order.gst_rate,
-            gstAmount: order.gst_amount,
-            discountAmount: order.discount_amount,
-            totalAmount: order.total_amount,
-            paidAmount: order.paid_amount,
-            outstandingAmount: order.outstanding_amount,
-            paymentMethod: "credit" as const, // Default value
-            paymentTerms: "30 days", // Default value
-            dueDate: order.expected_delivery,
-            status: order.status,
-            workflowStep: order.workflow_step || "accept",
+            subtotal: parseFloat(order.subtotal),
+            gstRate: parseFloat(order.gst_rate),
+            gstAmount: parseFloat(order.gst_amount),
+            discountAmount: parseFloat(order.discount_amount),
+            totalAmount: parseFloat(order.total_amount),
+            paidAmount: parseFloat(order.paid_amount),
+            outstandingAmount: parseFloat(order.outstanding_amount),
+            paymentMethod: (order.payment_method || "credit") as "cash" | "card" | "bank-transfer" | "credit",
+            paymentTerms: order.payment_terms || "30 days",
+            dueDate: order.due_date,
+            status: order.status as "pending" | "accepted" | "dispatched" | "delivered" | "cancelled",
+            workflowStep: (order.workflow_step || "accept") as "accept" | "dispatch" | "delivered",
             acceptedAt: order.accepted_at,
             dispatchedAt: order.dispatched_at,
             deliveredAt: order.delivered_at,
-            notes: order.special_instructions || ""
+            notes: order.special_instructions || "",
+            delivery_address: order.delivery_address ? JSON.parse(order.delivery_address) : undefined
           }));
           setOrders(transformedOrders);
         }
 
-        // Load customers from Supabase
+        // Load customers from MongoDB
         const { data: customersData, error: customersError } = await CustomerService.getCustomers();
         if (customersError) {
           console.error('Error loading customers:', customersError);
           setCustomers([]);
         } else {
-          // Transform Supabase customers to match local interface
+          // Transform MongoDB customers to match local interface
           const transformedCustomers: Customer[] = (customersData || []).map(customer => ({
             id: customer.id,
             name: customer.name,
@@ -228,7 +231,7 @@ export default function Orders() {
           setCustomers(transformedCustomers);
         }
         
-        // Load products from Supabase
+        // Load products from MongoDB
         const { data: productsData, error: productsError } = await ProductService.getProducts();
         if (productsError) {
           console.error('Error loading products:', productsError);
@@ -259,7 +262,7 @@ export default function Orders() {
       
       // Check if this product has individual stock tracking
       const product = products.find(p => p.id === item.productId);
-      const hasIndividualStock = product && product.individualStockTracking !== false;
+      const hasIndividualStock = product && product.individual_stock_tracking !== false;
       
       if (!hasIndividualStock) {
         // For bulk products, no individual selection needed
@@ -285,7 +288,7 @@ export default function Orders() {
       
       // Check if this product has individual stock tracking
       const product = products.find(p => p.id === item.productId);
-      const hasIndividualStock = product && product.individualStockTracking !== false;
+      const hasIndividualStock = product && product.individual_stock_tracking !== false;
       
       if (!hasIndividualStock) {
         // For bulk products, no individual selection needed
@@ -303,11 +306,11 @@ export default function Orders() {
     const hasRawMaterials = order.items.some(item => item.productType === 'raw_material');
     const hasBulkProducts = order.items.some(item => {
       const product = products.find(p => p.id === item.productId);
-      return product && product.individualStockTracking === false;
+      return product && product.individual_stock_tracking === false;
     });
     const hasIndividualProducts = order.items.some(item => {
       const product = products.find(p => p.id === item.productId);
-      return product && product.individualStockTracking !== false;
+      return product && product.individual_stock_tracking !== false;
     });
     
     if (canDispatchOrder(order)) {
@@ -345,11 +348,8 @@ export default function Orders() {
     }
 
     try {
-      // Update order status to dispatched using OrderService
-      const { error } = await OrderService.updateOrder(orderId, {
-        status: 'dispatched',
-        workflow_step: 'dispatch'
-      });
+      // Update order status to dispatched using MongoDBOrderService
+      const { error } = await MongoDBOrderService.updateOrderStatus(orderId, 'dispatched');
 
       if (error) {
         toast({
@@ -395,8 +395,8 @@ export default function Orders() {
     if (!order) return;
 
     try {
-      // Deliver order using OrderService
-      const { success, error } = await OrderService.deliverOrder(orderId);
+      // Deliver order using MongoDBOrderService
+      const { success, error } = await MongoDBOrderService.deliverOrder(orderId);
       
       if (error) {
       toast({
@@ -468,7 +468,6 @@ export default function Orders() {
     
     // Filter out orders with missing essential data
     if (!order.orderNumber || !order.customerName || !order.items || order.items.length === 0) {
-      console.log('🚨 Filtering out order with missing data:', order);
       return false;
     }
     
@@ -486,10 +485,11 @@ export default function Orders() {
     const getStatusIcon = (status: string) => {
       switch (status) {
         case "pending": return <Clock className="w-4 h-4" />;
-        case "confirmed": return <CheckCircle className="w-4 h-4" />;
-        case "in-production": return <Factory className="w-4 h-4" />;
-        case "ready-to-ship": return <Truck className="w-4 h-4" />;
-        case "completed": return <CheckCircle className="w-4 h-4" />;
+        case "accepted": return <CheckCircle className="w-4 h-4" />;
+        case "in_production": return <Factory className="w-4 h-4" />;
+        case "ready": return <Truck className="w-4 h-4" />;
+        case "dispatched": return <Truck className="w-4 h-4" />;
+        case "delivered": return <CheckCircle className="w-4 h-4" />;
         case "cancelled": return <AlertTriangle className="w-4 h-4" />;
         default: return <Clock className="w-4 h-4" />;
       }
@@ -501,6 +501,8 @@ export default function Orders() {
         <div className={`absolute top-0 left-0 right-0 h-1 ${
           order.status === "delivered" ? "bg-green-500" :
           order.status === "dispatched" ? "bg-orange-500" :
+          order.status === "ready" ? "bg-indigo-500" :
+          order.status === "in_production" ? "bg-purple-500" :
           order.status === "accepted" ? "bg-blue-500" :
           order.status === "cancelled" ? "bg-red-500" :
           "bg-yellow-500"
@@ -590,8 +592,8 @@ export default function Orders() {
                         <div className={`font-medium ${order.status === 'delivered' ? 'text-xs' : 'text-sm'}`}>{item.productName}</div>
                         <div className={`text-xs text-gray-600 ${order.status === 'delivered' ? 'mt-0' : ''}`}>
                           {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • 
-                          Qty: {item.quantity} • 
-                          ₹{item.unitPrice}/unit
+                          Qty: {item.quantity} {item.unit || 'pieces'} • 
+                          ₹{item.unitPrice}/{item.unit || 'unit'}
                         </div>
                         {item.selectedIndividualProducts && item.selectedIndividualProducts.length > 0 && (
                           <div className={`text-xs text-blue-600 ${order.status === 'delivered' ? 'mt-0' : 'mt-1'}`}>
@@ -607,6 +609,23 @@ export default function Orders() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Delivery Address for Delivered Orders */}
+            {order.status === 'delivered' && order.delivery_address && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="text-sm font-medium text-green-800 mb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Delivered To:
+                </h4>
+                <div className="text-sm text-green-700">
+                  <div className="font-medium">{order.delivery_address.address}</div>
+                  <div className="text-green-600">
+                    {order.delivery_address.city}, {order.delivery_address.state} - {order.delivery_address.pincode}
+                  </div>
+                  <div className="text-xs text-green-600 mt-1">✓ Address preserved from order creation</div>
                 </div>
               </div>
             )}
@@ -822,10 +841,11 @@ export default function Orders() {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="in-production">In Production</SelectItem>
-                  <SelectItem value="ready-to-ship">Ready to Ship</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="in_production">In Production</SelectItem>
+                  <SelectItem value="ready">Ready</SelectItem>
+                  <SelectItem value="dispatched">Dispatched</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
@@ -848,26 +868,14 @@ export default function Orders() {
 
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                // Refresh orders
-              }}
-              className="w-full sm:w-auto"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-
-            <Button
-              onClick={() => setIsNewOrderOpen(true)}
+              onClick={() => navigate('/orders/new')}
               className="w-full sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2" />
               <span className="sm:hidden">Add New Order</span>
               <span className="hidden sm:inline">New Order</span>
             </Button>
-      </div>
+          </div>
         </div>
       </Card>
 
@@ -887,48 +895,13 @@ export default function Orders() {
               ? "Try adjusting your search or filters"
               : "Get started by creating your first order"}
           </p>
-          <Button onClick={() => setIsNewOrderOpen(true)}>
+          <Button onClick={() => navigate('/orders/new')}>
             <Plus className="w-4 h-4 mr-2" />
             Create Order
           </Button>
         </Card>
       )}
 
-      {/* New Order Dialog - This will be implemented in a separate component */}
-      <Dialog open={isNewOrderOpen} onOpenChange={setIsNewOrderOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Create New Order
-            </DialogTitle>
-            <DialogDescription>
-              Create a new customer order with product selection and quality control.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="text-center py-8">
-            <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Order Creation</h3>
-            <p className="text-muted-foreground mb-6">
-              Create new customer orders and manage order details
-            </p>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewOrderOpen(false)}>
-              Close
-            </Button>
-            <Button onClick={() => {
-              setIsNewOrderOpen(false);
-              navigate('/orders/new');
-            }}>
-              <ArrowRight className="w-4 h-4 mr-2" />
-              Go to Order Creation
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       
     </div>

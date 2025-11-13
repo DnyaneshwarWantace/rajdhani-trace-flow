@@ -1,5 +1,5 @@
 import { supabase, supabaseAdmin, handleSupabaseError, ProductionBatch, ProductionStep } from '@/lib/supabase';
-import { generateUniqueId } from '@/lib/idGenerator';
+import { IDGenerator } from '@/lib/idGenerator';
 import { logAudit } from './auditService';
 import { NotificationService } from './notificationService';
 import { ProductService } from './ProductService';
@@ -444,7 +444,6 @@ export class ProductionService {
     actualQuantity: number,
     individualProductsData: Array<{
       final_weight?: string;
-      final_thickness?: string;
       quality_grade?: 'A+' | 'A' | 'B' | 'C';
       inspector?: string;
       production_notes?: string;
@@ -490,7 +489,6 @@ export class ProductionService {
         batch_number: batch.batch_number,
         production_date: manufacturingDate,
         final_weight: productData.final_weight?.trim() || null,
-        final_thickness: productData.final_thickness?.trim() || null,
         quality_grade: productData.quality_grade || 'A',
         inspector: productData.inspector?.trim() || batch.supervisor || batch.operator,
         production_notes: productData.production_notes?.trim() || null

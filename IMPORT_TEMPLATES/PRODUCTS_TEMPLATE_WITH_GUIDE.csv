@@ -1,0 +1,28 @@
+# PRODUCTS TEMPLATE - Fill this sheet third (after suppliers and raw materials)
+# Each row = One finished product
+# Required fields: Product Name, Category
+# Individual products will be automatically created based on Base Quantity
+
+Product Name,Category,Color,Size,Pattern,Base Quantity,Individual Stock Tracking,Min Stock Level,Max Stock Level,Weight,Thickness,Width,Height,Image URL,Notes
+"Premium Carpet 6x9","plain paper print","Red","6x9","Persian Medallion",10,true,5,50,"400 GSM","8mm","6 feet","9 feet","","High quality Persian design carpet"
+"Luxury Rug 8x10","degital print","Blue","8x10","Geometric",5,true,2,25,"500 GSM","10mm","8 feet","10 feet","","Modern geometric pattern rug"
+"Traditional Mat 3x5","backing","Green","3x5","Traditional",20,true,10,100,"300 GSM","5mm","3 feet","5 feet","","Traditional Indian design mat"
+"Office Carpet 12x15","felt","Gray","12x15","Modern",8,true,3,40,"600 GSM","15mm","12 feet","15 feet","","Durable office carpet"
+"Kids Play Mat 4x6","plain paper print","Multi-color","4x6","Abstract",15,true,8,75,"350 GSM","6mm","4 feet","6 feet","","Colorful play mat for children"
+
+# INSTRUCTIONS:
+# 1. Product Name: Name of your finished product (REQUIRED)
+# 2. Category: Choose from: plain paper print, degital print, backing, felt, raw material (REQUIRED)
+# 3. Color: Choose from: Red, Blue, Green, Yellow, Black, White, Brown, Gray, Multi-color, NA
+# 4. Size: Product size (e.g., "6x9", "8x10", "3x5")
+# 5. Pattern: Choose from: Persian Medallion, Geometric, Floral, Abstract, Traditional, Modern, Digital Art, Standard, RD-1009
+# 6. Base Quantity: How many individual pieces you want to create (REQUIRED)
+# 7. Individual Stock Tracking: Write "true" to track each piece separately, "false" for bulk tracking
+# 8. Min Stock Level: Minimum quantity before reordering
+# 9. Max Stock Level: Maximum you can store
+# 10. Weight: Choose from: 400 GSM, 300 GSM, 500 GSM, 700 GSM, 800 GSM, 600 GSM, 2 kg, 5 kg
+# 11. Thickness: Choose from: 5mm, 15 mm, 8mm, 20 mm, 25 mm, 10mm, 11mm, 1.5 cm, 12mm, 2 cm, 15mm, 3 mm
+# 12. Width: Choose from: 5 feet, 6 feet, 10 feet, 15 feet, 1.25 meter, 1.5 m, 1.83 meter, 2 m, 3.05 meter
+# 13. Height: Choose from: 148 feet, 5 feet, 45 meter, 10 feet, 15 feet, 2.5 m, 3 m
+# 14. Image URL: Link to product image (optional)
+# 15. Notes: Any additional information about the product

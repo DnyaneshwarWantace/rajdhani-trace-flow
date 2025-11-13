@@ -18,26 +18,48 @@ interface PerformanceMetricsProps {
 }
 
 export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
-  const orders = data?.stats?.orders || {};
-  const products = data?.stats?.products || {};
-  const materials = data?.stats?.materials || {};
+  console.log('🔍 PerformanceMetrics - Raw data:', data);
+  console.log('🔍 PerformanceMetrics - Data orders:', data?.orders);
+  console.log('🔍 PerformanceMetrics - Data products:', data?.products);
+  console.log('🔍 PerformanceMetrics - Data materials:', data?.materials);
+  
+  const orders = data?.orders || {};
+  const products = data?.products || {};
+  const materials = data?.materials || {};
+  
+  console.log('🔍 PerformanceMetrics - Orders object:', orders);
+  console.log('🔍 PerformanceMetrics - Products object:', products);
+  console.log('🔍 PerformanceMetrics - Materials object:', materials);
 
-  // Calculate performance metrics
-  const totalOrders = orders.total || 0;
-  const completedOrders = (orders.delivered || 0) + (orders.dispatched || 0);
+  // Calculate performance metrics with error handling
+  const totalOrders = orders?.totalOrders || 0;
+  const completedOrders = orders?.completedOrders || 0;
   const completionRate = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
   
-  const totalRevenue = orders.totalRevenue || 0;
-  const paidAmount = orders.paidAmount || 0;
+  const totalRevenue = orders?.totalRevenue || 0;
+  const paidAmount = orders?.paidAmount || 0;
   const paymentRate = totalRevenue > 0 ? Math.round((paidAmount / totalRevenue) * 100) : 0;
   
-  const totalProducts = products.totalProducts || 0;
-  const lowStockProducts = products.lowStock || 0;
-  const inventoryHealth = totalProducts > 0 ? Math.round(((totalProducts - lowStockProducts) / totalProducts) * 100) : 100;
+  const totalProducts = products?.total_products || 0;
+  const lowStockProducts = products?.low_stock_products || 0;
+  const outOfStockProducts = products?.out_of_stock_products || 0;
+  const inventoryHealth = totalProducts > 0 ? Math.round(((totalProducts - lowStockProducts - outOfStockProducts) / totalProducts) * 100) : 100;
   
-  const rawMaterials = materials.totalMaterials || 0;
-  const materialsLowStock = materials.lowStock || 0;
+  const rawMaterials = materials?.totalMaterials || 0;
+  const materialsLowStock = materials?.lowStockMaterials || 0;
   const materialHealth = rawMaterials > 0 ? Math.round(((rawMaterials - materialsLowStock) / rawMaterials) * 100) : 100;
+
+  console.log('🔍 PerformanceMetrics - Calculated values:');
+  console.log('Total Orders:', totalOrders);
+  console.log('Completed Orders:', completedOrders);
+  console.log('Completion Rate:', completionRate);
+  console.log('Total Revenue:', totalRevenue);
+  console.log('Paid Amount:', paidAmount);
+  console.log('Payment Rate:', paymentRate);
+  console.log('Total Products:', totalProducts);
+  console.log('Inventory Health:', inventoryHealth);
+  console.log('Raw Materials:', rawMaterials);
+  console.log('Material Health:', materialHealth);
 
   const metrics = [
     {
@@ -63,7 +85,7 @@ export function PerformanceMetrics({ data, loading }: PerformanceMetricsProps) {
     {
       title: "Product Inventory Health",
       value: `${inventoryHealth}%`,
-      description: `${totalProducts - lowStockProducts} of ${totalProducts} products in good stock`,
+      description: `${totalProducts - lowStockProducts - outOfStockProducts} of ${totalProducts} products in good stock`,
       icon: Package,
       color: inventoryHealth >= 80 ? "text-green-600" : inventoryHealth >= 60 ? "text-yellow-600" : "text-red-600",
       bgColor: inventoryHealth >= 80 ? "bg-green-50" : inventoryHealth >= 60 ? "bg-yellow-50" : "bg-red-50",

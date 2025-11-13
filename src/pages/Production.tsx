@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,12 +29,12 @@ import {
   Truck, AlertTriangle
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
-import { ProductService } from "@/services/ProductService";
-import { MachineService } from "@/services/machineService";
-import { ProductionFlowService } from "@/services/productionFlowService";
-import { ProductionService } from "@/services/productionService";
-import { NotificationService } from "@/services/notificationService";
-import { supabase } from "@/lib/supabase";
+import ProductService from "@/services/api/productService";
+import IndividualProductService from "@/services/api/individualProductService";
+import { ProductionService } from "@/services/api/productionService";
+import { MachineService, Machine } from "@/services/api/machineService";
+import MaterialConsumptionService from "@/services/api/materialConsumptionService";
+import MongoDBNotificationService from "@/services/api/notificationService";
 import { Loading } from "@/components/ui/loading";
 
 interface ProductionProduct {
@@ -47,6 +48,7 @@ interface ProductionProduct {
   priority: "normal" | "high" | "urgent";
   status: "planning" | "active" | "completed";
   expectedCompletion: string;
+  completionDate?: string; // Actual completion date
   createdAt: string;
   materialsConsumed: MaterialConsumption[];
   wasteGenerated: WasteItem[];
@@ -68,7 +70,7 @@ interface WasteItem {
   materialName: string;
   quantity: number;
   unit: string;
-  wasteType: "scrap" | "defective" | "excess";
+  wasteType: string;
   canBeReused: boolean;
   notes: string;
 }
@@ -76,16 +78,37 @@ interface WasteItem {
 interface ExpectedProduct {
   name: string;
   category: string;
-  height: string;
+  length: string;
   width: string;
   weight: string;
-  thickness: string;
   materialComposition: string;
   qualityGrade: string;
 }
 
 export default function Production() {
   const navigate = useNavigate();
+  const { hasPageAccess } = useAuth();
+  
+  // Check page permission
+  const hasProductionAccess = hasPageAccess('production');
+  
+  // Redirect if no access
+  useEffect(() => {
+    if (!hasProductionAccess) {
+      navigate('/access-denied', { state: { pageName: 'Production' } });
+    }
+  }, [hasProductionAccess, navigate]);
+  
+  // Don't render if no permission
+  if (!hasProductionAccess) {
+    return null;
+  }
+  
+  // Ensure navigate is available
+  if (!navigate) {
+    console.error('Navigate function is not available');
+    return <div>Error: Navigation not available</div>;
+  }
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
@@ -99,7 +122,7 @@ export default function Production() {
   // Load notifications for production requests
   const loadNotifications = async () => {
     try {
-      const { data: productionNotifications, error } = await NotificationService.getNotificationsByModule('production');
+      const { data: productionNotifications, error } = await MongoDBNotificationService.getNotificationsByModule('production');
       if (error) {
         console.error('Error loading production notifications:', error);
         return;
@@ -133,8 +156,10 @@ export default function Production() {
         }
       });
       
-      // Mark notification as read
-      await NotificationService.markAsRead(notification.id);
+      // Mark notification as read - change status to 'read'
+      await MongoDBNotificationService.updateNotification(notification.id, {
+        status: 'read'
+      });
       
       // Reload notifications
       await loadNotifications();
@@ -148,7 +173,10 @@ export default function Production() {
   // Handle dismissing notification
   const handleDismissNotification = async (notificationId: string) => {
     try {
-      await NotificationService.markAsDismissed(notificationId);
+      // Mark notification as dismissed - change status to 'dismissed'
+      await MongoDBNotificationService.updateNotification(notificationId, {
+        status: 'dismissed'
+      });
       await loadNotifications();
       console.log('✅ Notification dismissed:', notificationId);
     } catch (error) {
@@ -159,212 +187,166 @@ export default function Production() {
   // Load production products from production_flows table
   useEffect(() => {
     const loadProductionProducts = async () => {
+      let timeoutId: NodeJS.Timeout;
+      
       try {
         setIsLoading(true);
+        
+        // Add timeout to prevent infinite loading
+        timeoutId = setTimeout(() => {
+          console.warn('Production loading timeout - forcing loading to stop');
+          setIsLoading(false);
+        }, 10000); // 10 second timeout
 
-        // Load directly from production_flows table since that's where your data is
-        const { data: flows, error } = await supabase
-          .from('production_flows')
-          .select(`
-            *,
-            production_flow_steps (*)
-          `);
+        // Load production batches from MongoDB
+        const { data: batches, error } = await ProductionService.getProductionBatches();
 
         if (error) {
-          console.error('Error loading production flows:', error);
+          console.error('Error loading production batches:', error);
           setProductionProducts([]);
           return;
         }
 
-        console.log('Loaded production flows:', flows);
+        console.log('Loaded production batches:', batches);
 
-        // Transform production flows to production products format
-        const productionProducts = await Promise.all((flows || []).map(async (flow: any) => {
-          // Calculate status based on flow steps AND individual products
-          const steps = flow.production_flow_steps || [];
-          const hasSteps = steps.length > 0;
-          const completedSteps = steps.filter((s: any) => s.status === 'completed').length;
-          const inProgressSteps = steps.filter((s: any) => s.status === 'in_progress').length;
+        // Transform production batches to production products format
+        const productionProducts = await Promise.all((batches || []).map(async (batch: any) => {
+          // Get product details
+          let productName = 'Unknown Product';
+          let category = 'Unknown';
+          let color = 'Unknown';
+          let pattern = 'Unknown';
+          let length = 'N/A';
+          let width = 'N/A';
+          let weight = 'N/A';
+          // Use batch_size as the target quantity (what the user requested to produce)
+          let productBaseQuantity = batch.batch_size || batch.planned_quantity || 1;
 
-          // Check if individual products have been created for this flow
-          let individualProducts: any[] = [];
           try {
-            console.log('🔍 Checking individual products for flow:', flow.id);
-            console.log('🔍 Flow production_product_id:', flow.production_product_id);
-            
-            // First try with the batch ID (production_product_id)
-            const { data: batchData, error: batchError } = await supabase
-              .from('individual_products')
-              .select('id, product_id')
-              .eq('product_id', flow.production_product_id);
-
-            console.log('🔍 Batch ID query result:', { data: batchData, error: batchError });
-            
-            if (!batchError && batchData && batchData.length > 0) {
-              individualProducts = batchData;
-              console.log('🔍 Found individual products using batch ID:', individualProducts.length);
-            } else {
-              // Fallback: Extract product name from flow name and find by product name
-              const flowName = flow.flow_name || '';
-              const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
-              
-              console.log('🔍 Flow name:', flowName);
-              console.log('🔍 Extracted product name:', productName);
-              
-              // Get the actual product ID from the products table
-              const { data: productData } = await supabase
-                .from('products')
-                .select('id')
-                .eq('name', productName)
-                .single();
-              
-              console.log('🔍 Product data found:', productData);
-              
+            if (batch.product_id) {
+              const { data: productData } = await ProductService.getProductById(batch.product_id);
               if (productData) {
-                const { data, error } = await supabase
-                  .from('individual_products')
-                  .select('id, product_id')
-                  .eq('product_id', productData.id);
-                
-                console.log('🔍 Product ID query result:', { data, error });
-                
-                if (!error && data && data.length > 0) {
-                  individualProducts = data;
-                  console.log('🔍 Found individual products using product ID:', individualProducts.length);
-                }
-              }
-            }
-            
-            // If still no individual products found, try a broader search
-            if (individualProducts.length === 0) {
-              console.log('🔍 No individual products found, trying broader search...');
-              
-              // Get all individual products and check if any match
-              const { data: allProducts, error: allError } = await supabase
-                .from('individual_products')
-                .select('id, product_id, product_name')
-                .limit(100);
-              
-              if (!allError && allProducts) {
-                console.log('🔍 All individual products:', allProducts);
-                
-                // Check if any individual product has a product_id that matches our flow's production_product_id
-                const matchingProducts = allProducts.filter(p => 
-                  p.product_id === flow.production_product_id || 
-                  p.product_name === flow.flow_name?.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0]
-                );
-                
-                if (matchingProducts.length > 0) {
-                  individualProducts = matchingProducts;
-                  console.log('🔍 Found matching individual products:', matchingProducts.length);
-                }
+                productName = productData.name || 'Unknown Product';
+                category = productData.category || 'Unknown';
+                color = productData.color || 'Unknown';
+                pattern = productData.pattern || 'Unknown';
+                length = productData.length || 'N/A';
+                width = productData.width || 'N/A';
+                weight = productData.weight || 'N/A';
+
+                // Keep using batch_size, not current_stock
+                // batch_size = what user wants to produce (e.g., 1)
+                // current_stock = what's available in inventory (e.g., 4)
               }
             }
           } catch (error) {
-            console.warn('Individual products table may not exist:', error);
+            console.error('Error loading product details:', error);
           }
 
+          // Load material consumption for this batch
+          let materialsConsumed: any[] = [];
+          try {
+            console.log(`🔍 Loading material consumption for batch ${batch.id}...`);
+            const { data: consumptionResp, error: consumptionError } = await MaterialConsumptionService.getMaterialConsumption({
+              production_batch_id: batch.id
+            });
+            
+            console.log(`🔍 Material consumption response for batch ${batch.id}:`, {
+              hasError: !!consumptionError,
+              error: consumptionError,
+              hasData: !!consumptionResp,
+              responseType: typeof consumptionResp,
+              responseKeys: consumptionResp ? Object.keys(consumptionResp) : [],
+              responseData: consumptionResp
+            });
+            
+            if (!consumptionError && consumptionResp) {
+              // Service returns { data: [...], pagination: {...} }
+              // Handle different possible response structures
+              let consumptionData: any[] = [];
+              
+              if (Array.isArray(consumptionResp)) {
+                // If response is directly an array
+                consumptionData = consumptionResp;
+              } else if (consumptionResp.data && Array.isArray(consumptionResp.data)) {
+                // If response is { data: [...], pagination: {...} }
+                consumptionData = consumptionResp.data;
+              } else if ((consumptionResp as any).data?.data && Array.isArray((consumptionResp as any).data.data)) {
+                // If response is { data: { data: [...], pagination: {...} } }
+                consumptionData = (consumptionResp as any).data.data;
+              }
+              
+              console.log(`🔍 Consumption data extracted:`, {
+                isArray: Array.isArray(consumptionData),
+                length: consumptionData.length,
+                firstItem: consumptionData[0],
+                consumptionData
+              });
+              
+              materialsConsumed = Array.isArray(consumptionData) ? consumptionData.map((m: any) => ({
+                materialId: m.material_id,
+                materialName: m.material_name || 'Unknown Material',
+                quantity: m.quantity_used || 0,
+                unit: m.unit || 'units',
+                consumedAt: m.consumed_at || m.created_at
+              })) : [];
+              
+              console.log(`✅ Loaded ${materialsConsumed.length} material consumption records for batch ${batch.id}`);
+            } else {
+              console.log(`⚠️ No material consumption found for batch ${batch.id}`, { error: consumptionError });
+            }
+          } catch (error) {
+            console.error('Error loading material consumption for batch', batch.id, ':', error);
+          }
+          
+          console.log(`📊 Final materialsConsumed for batch ${batch.id}:`, materialsConsumed.length, materialsConsumed);
+
+          // Determine status based on batch status
           let status: 'planning' | 'active' | 'completed' = 'planning';
-
-          // Only mark as completed if ALL steps are completed AND individual products exist
-          const allStepsCompleted = hasSteps && completedSteps === steps.length;
-          
-          console.log('🔍 Status calculation for flow:', flow.id);
-          console.log('🔍 Flow status from database:', flow.status);
-          console.log('🔍 hasSteps:', hasSteps, 'completedSteps:', completedSteps, 'totalSteps:', steps.length);
-          console.log('🔍 allStepsCompleted:', allStepsCompleted);
-          console.log('🔍 individualProducts.length:', individualProducts.length);
-          console.log('🔍 inProgressSteps:', inProgressSteps);
-          
-          // Check if flow status is already completed in database
-          if (flow.status === 'completed') {
-            status = 'completed';
-            console.log('🔍 Status set to: completed (from database flow status)');
-          } else if (individualProducts && individualProducts.length > 0 && allStepsCompleted) {
-            status = 'completed';
-            console.log('🔍 Status set to: completed (from steps and individual products)');
-          } else if (inProgressSteps > 0 || completedSteps > 0 || hasSteps) {
-            status = 'active';
-            console.log('🔍 Status set to: active');
-          } else {
-            console.log('🔍 Status set to: planning');
-          }
-
-          // Try to get actual product data by extracting product name from flow name
-          let productData = null;
-          try {
-            // Extract product name from flow name
-            // Flow name format: "Product Name Production Flow - Batch PRO-xxx"
-            const flowName = flow.flow_name || '';
-            const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
-            
-            console.log('🔍 Extracting product name from flow:', productName);
-            
-            // Find the actual product by name
-            const { data: products, error: productError } = await supabase
-              .from('products')
-              .select('*')
-              .eq('name', productName)
-              .limit(1);
-
-            if (!productError && products && products.length > 0) {
-              productData = products[0];
-              console.log('✅ Found product data for Production page:', productData);
-            } else {
-              console.log('❌ No product found with name:', productName);
-            }
-          } catch (error) {
-            console.error('Error loading product data for Production page:', error);
-            productData = null;
-          }
-
-          // Get material consumption data
-          let materialsConsumed = [];
-          try {
-            const { data: materials, error: materialsError } = await supabase
-              .from('material_consumption')
-              .select('*')
-              .eq('production_product_id', flow.production_product_id);
-            
-            if (materialsError) {
-              // Only log non-expected errors (suppress column not found errors)
-              if (materialsError.code !== '42703') {
-                console.warn('Error fetching material consumption:', materialsError);
-              }
-              materialsConsumed = [];
-            } else {
-              materialsConsumed = materials || [];
-            }
-          } catch (error) {
-            console.warn('Error fetching material consumption:', error);
-            materialsConsumed = [];
+          switch (batch.status) {
+            case 'planned':
+              status = 'planning';
+              break;
+            case 'in_progress':
+            case 'in_production':
+              status = 'active';
+              break;
+            case 'completed':
+              status = 'completed';
+              break;
+            default:
+              status = 'planning';
           }
 
           return {
-            id: flow.production_product_id, // Use production_product_id as the main ID
-            productId: flow.production_product_id,
-            productName: productData?.name || flow.flow_name.replace(' Production Flow', '') || `Production Item ${flow.production_product_id}`,
-            category: productData?.category || 'Carpet',
-            color: productData?.color || 'Standard',
-            pattern: productData?.pattern || 'N/A',
-            targetQuantity: 1, // Default quantity
-            priority: 'normal' as const,
+            id: batch.id,
+            productId: batch.product_id || 'unknown',
+            productName,
+            category,
+            color,
+            pattern,
+            targetQuantity: productBaseQuantity, // Use the product's actual base quantity
+            priority: batch.priority || 'normal',
             status,
-            expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            createdAt: flow.created_at,
-            materialsConsumed: materialsConsumed,
-            wasteGenerated: [], // TODO: Load waste data
+            // Expected completion: 7 days from start date, or from now if not started
+            expectedCompletion: batch.start_date
+              ? new Date(new Date(batch.start_date).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+              : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            // Actual completion: only set when status is completed
+            completionDate: batch.status === 'completed' ? batch.completion_date : undefined,
+            createdAt: batch.created_at || new Date().toISOString(),
+            materialsConsumed, // This should have the consumed materials
+            wasteGenerated: [], // TODO: Load from MongoDB waste management
             expectedProduct: {
-              name: productData?.name || flow.flow_name.replace(' Production Flow', ''),
-              category: productData?.category || 'Carpet',
-              height: productData?.height || 'N/A',
-              width: productData?.width || 'N/A',
-              weight: productData?.weight || 'N/A',
-              thickness: productData?.thickness || 'N/A',
-              materialComposition: productData?.material_composition || 'N/A',
+              name: productName,
+              category,
+              length: length,
+              width: width,
+              weight: weight,
+              materialComposition: 'N/A',
               qualityGrade: 'A'
             },
-            notes: ''
+            notes: batch.notes || ''
           };
         }));
 
@@ -374,6 +356,7 @@ export default function Production() {
         console.error('Error loading production products:', error);
         setProductionProducts([]);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
@@ -382,34 +365,83 @@ export default function Production() {
     loadNotifications();
   }, []);
 
-  // Load production flows - now we get them with the products, so just extract them
+  // Load production flows from MongoDB
   useEffect(() => {
     const loadFlows = async () => {
       try {
-        // Since we're loading from production_flows directly, we already have the flows
-        // Just need to get the detailed flow data for each product
-        const { data: flows, error } = await supabase
-          .from('production_flows')
-          .select(`
-            *,
-            production_flow_steps (*)
-          `);
-
-        if (error) {
-          console.error('Error loading production flows:', error);
-          setProductionFlows([]);
-          return;
+        // Load all production flows from MongoDB
+        const flows: any[] = [];
+        
+        // For each production product, try to load its flow by batch ID
+        for (const product of productionProducts) {
+          try {
+            // Try to get flow by batch ID (production_product_id)
+            const { data: flow, error } = await ProductionService.getProductionFlowByBatchId(product.id);
+            if (!error && flow) {
+              // Load flow steps for this flow
+              const { data: steps } = await ProductionService.getProductionFlowSteps(flow.id);
+              flows.push({
+                ...flow,
+                production_flow_steps: steps || []
+              });
+            }
+          } catch (error) {
+            // Silently skip if flow doesn't exist yet (404 is expected for new batches)
+            console.log(`No flow found for batch ${product.id} (this is normal for new batches)`);
+          }
         }
-
-        setProductionFlows(flows || []);
-        console.log('Production flows loaded:', flows?.length || 0);
+        
+        setProductionFlows(flows);
+        console.log('✅ Loaded production flows:', flows.length);
       } catch (error) {
         console.error('Error loading production flows:', error);
         setProductionFlows([]);
       }
     };
 
-    loadFlows();
+    if (productionProducts.length > 0) {
+      loadFlows();
+    }
+  }, [productionProducts]);
+
+  // Refresh flows when page becomes visible (in case user navigated back from machine stage)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && productionProducts.length > 0) {
+        console.log('🔄 Page became visible, refreshing production flows...');
+        const loadFlows = async () => {
+          try {
+            const flows: any[] = [];
+            
+            for (const product of productionProducts) {
+              try {
+                const { data: flow, error } = await ProductionService.getProductionFlowByBatchId(product.id);
+                if (!error && flow) {
+                  const { data: steps } = await ProductionService.getProductionFlowSteps(flow.id);
+                  flows.push({
+                    ...flow,
+                    production_flow_steps: steps || []
+                  });
+                }
+              } catch (error) {
+                // Silently skip if flow doesn't exist yet
+                console.log(`No flow found for batch ${product.id}`);
+              }
+            }
+            
+            setProductionFlows(flows);
+            console.log('🔄 Refreshed production flows:', flows.length);
+          } catch (error) {
+            console.error('Error refreshing production flows:', error);
+          }
+        };
+        
+        loadFlows();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [productionProducts]);
 
   // Update production products state (no localStorage needed)
@@ -427,19 +459,31 @@ export default function Production() {
     setIsLoading(true);
     // Small delay for better UX
     setTimeout(() => {
-      navigate(`/production-detail/${product.id}`);
+      // Use productId (actual product ID) instead of id (batch ID)
+      navigate(`/production-detail/${product.productId}`, {
+        state: {
+          targetQuantity: product.targetQuantity || 1,
+          batchId: product.id // Pass batch ID in state if needed
+        }
+      });
     }, 300);
   };
 
   // Continue production for active products
   const handleContinueProduction = (product: ProductionProduct) => {
-    navigate(`/production-detail/${product.id}`);
+    // Use productId (actual product ID) instead of id (batch ID)
+    navigate(`/production-detail/${product.productId}`, {
+      state: {
+        targetQuantity: product.targetQuantity || 1,
+        batchId: product.id // Pass batch ID in state if needed
+      }
+    });
   };
 
   // Show machine selection popup instead of direct navigation
   const [showMachineSelectionDialog, setShowMachineSelectionDialog] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductionProduct | null>(null);
-  const [machines, setMachines] = useState<any[]>([]);
+  const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachineId, setSelectedMachineId] = useState("");
   const [inspectorName, setInspectorName] = useState("");
 
@@ -450,8 +494,23 @@ export default function Production() {
 
   const loadMachines = async () => {
     try {
-      const machinesData = await MachineService.getMachines();
-      setMachines(machinesData);
+      const { data: machinesData, error } = await MachineService.getMachines();
+      if (error) {
+        console.error('Error loading machines:', error);
+        setMachines([]);
+        return;
+      }
+      // Map backend fields to frontend format
+      const mappedMachines = (machinesData || []).map((machine: any) => ({
+        id: machine.id,
+        name: machine.machine_name || machine.name,
+        description: machine.notes || machine.description || "",
+        status: machine.status,
+        created_at: machine.created_at,
+        updated_at: machine.updated_at
+      }));
+      setMachines(mappedMachines);
+      console.log('✅ Loaded', mappedMachines.length, 'machines from MongoDB');
     } catch (error) {
       console.error('Error loading machines:', error);
       setMachines([]);
@@ -473,24 +532,23 @@ export default function Production() {
     const selectedMachine = machines.find(m => m.id === selectedMachineId);
     if (!selectedMachine) return;
 
-    const flow = await ProductionFlowService.getProductionFlow(selectedProduct.id);
-    if (flow) {
-      const newStep = {
-        id: generateUniqueId('STEP'),
-        stepNumber: 1, // TODO: Get actual step count from production_flow_steps table
-        name: selectedMachine.name,
-        description: getMachineDescription(selectedMachine.name),
-        machineId: selectedMachineId,
-        machineName: selectedMachine.name,
-        status: 'pending' as const,
-        inspector: inspectorName,
-        stepType: 'machine_operation' as const,
-        createdAt: new Date().toISOString()
-      };
-
-      // TODO: Add step to production flow in Supabase
-      console.log('Adding step to production flow:', newStep);
-    }
+    // TODO: Implement production flow creation with MongoDB
+    // const flow = await ProductionService.createProductionFlow(selectedProduct.id);
+    // if (flow) {
+    //   const newStep = {
+    //     id: generateUniqueId('STEP'),
+    //     stepNumber: 1,
+    //     name: selectedMachine.name,
+    //     description: getMachineDescription(selectedMachine.name),
+    //     machineId: selectedMachineId,
+    //     machineName: selectedMachine.name,
+    //     status: 'pending' as const,
+    //     inspector: inspectorName,
+    //     stepType: 'machine_operation' as const,
+    //     createdAt: new Date().toISOString()
+    //   };
+    //   console.log('Adding step to production flow:', newStep);
+    // }
 
     navigate(`/production/${selectedProduct.id}/dynamic-flow`);
     
@@ -509,12 +567,7 @@ export default function Production() {
     }
   };
 
-  const skipToWasteGeneration = () => {
-    if (!selectedProduct) return;
-    setShowMachineSelectionDialog(false);
-    setSelectedProduct(null);
-    handleWasteGeneration(selectedProduct);
-  };
+  // REMOVED: skipToWasteGeneration function - machine step is now mandatory
 
   // Navigate to waste generation
   const handleWasteGeneration = (product: ProductionProduct) => {
@@ -583,20 +636,15 @@ export default function Production() {
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6 relative">
       {isLoading && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 sm:p-8 max-w-sm w-full mx-4">
-            <div className="flex flex-col items-center space-y-4">
-              <div className="relative">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              </div>
-              <div className="text-center">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                  Loading...
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Preparing production details
-                </p>
-              </div>
+        <div className="flex items-center justify-center py-8">
+          <div className="flex flex-col items-center space-y-4">
+            <div className="relative">
+              <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Loading production data...
+              </p>
             </div>
           </div>
         </div>
@@ -680,29 +728,37 @@ export default function Production() {
             />
         </div>
 
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border rounded px-3 py-1 text-sm"
-            >
-              <option value="all">All Status</option>
-              <option value="planning">Planning</option>
-              <option value="active">Active</option>
-              <option value="completed">Completed</option>
-            </select>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Filters:</span>
+            </div>
             
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="border rounded px-3 py-1 text-sm"
-            >
-              <option value="all">All Priority</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="normal">Normal</option>
-            </select>
+            <div className="flex flex-wrap gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="planning">Planning</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
@@ -730,6 +786,7 @@ export default function Production() {
                 onCompleteProduction={handleCompleteProduction}
                 getStatusColor={getStatusColor}
                 getPriorityColor={getPriorityColor}
+                navigate={navigate}
               />
             ))}
           </div>
@@ -751,6 +808,7 @@ export default function Production() {
                   onCompleteProduction={handleCompleteProduction}
                   getStatusColor={getStatusColor}
                   getPriorityColor={getPriorityColor}
+                  navigate={navigate}
                 />
               ))}
           </div>
@@ -772,6 +830,7 @@ export default function Production() {
                   onCompleteProduction={handleCompleteProduction}
                   getStatusColor={getStatusColor}
                   getPriorityColor={getPriorityColor}
+                  navigate={navigate}
                 />
               ))}
           </div>
@@ -793,6 +852,7 @@ export default function Production() {
                   onCompleteProduction={handleCompleteProduction}
                   getStatusColor={getStatusColor}
                   getPriorityColor={getPriorityColor}
+                  navigate={navigate}
                 />
               ))}
           </div>
@@ -819,7 +879,7 @@ export default function Production() {
           <DialogHeader>
             <DialogTitle>Add Machine Operation</DialogTitle>
             <DialogDescription>
-              Select a machine for production or skip to waste generation
+              Select a machine for production - machine step is mandatory
             </DialogDescription>
           </DialogHeader>
           
@@ -842,7 +902,7 @@ export default function Production() {
                 <SelectContent>
                   {machines.map((machine) => (
                     <SelectItem key={machine.id} value={machine.id}>
-                      {machine.name} - {machine.location}
+                      {machine.name} - {machine.description || 'Machine'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -860,24 +920,14 @@ export default function Production() {
               <Factory className="w-4 h-4 mr-2" />
               Add Machine Step
             </Button>
-            <div className="grid grid-cols-2 gap-3 w-full">
-              <Button 
-                variant="outline" 
-                onClick={skipToWasteGeneration}
-                className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                size="sm"
-              >
-                <AlertTriangle className="w-3 h-3 mr-1" />
-                Skip
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setShowMachineSelectionDialog(false)}
-                size="sm"
-              >
-                Cancel
-              </Button>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowMachineSelectionDialog(false)}
+              size="sm"
+              className="w-full"
+            >
+              Cancel
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -896,6 +946,7 @@ interface ProductionCardProps {
   onCompleteProduction: (product: ProductionProduct) => void;
   getStatusColor: (status: string) => string;
   getPriorityColor: (priority: string) => string;
+  navigate: (path: string) => void;
 }
 
 function ProductionCard({
@@ -907,7 +958,8 @@ function ProductionCard({
   onWasteGeneration,
   onCompleteProduction,
   getStatusColor,
-  getPriorityColor
+  getPriorityColor,
+  navigate
 }: ProductionCardProps) {
   return (
     <Card className="hover:shadow-lg transition-shadow">
@@ -941,16 +993,14 @@ function ProductionCard({
             <p className="font-medium">{product.color}</p>
           </div>
           <div>
-            <span className="text-gray-500">Height:</span>
-            <p className="font-medium">{product.expectedProduct?.height || 'N/A'}</p>
+            <span className="text-gray-500">Length:</span>
+            <p className="font-medium">{product.expectedProduct?.length || 'N/A'}</p>
           </div>
           <div>
             <span className="text-gray-500">Width:</span>
             <p className="font-medium">{product.expectedProduct?.width || 'N/A'}</p>
           </div>
           <div>
-            <span className="text-gray-500">Thickness:</span>
-            <p className="font-medium">{product.expectedProduct?.thickness || 'N/A'}</p>
           </div>
           <div>
             <span className="text-gray-500">Weight:</span>
@@ -958,7 +1008,7 @@ function ProductionCard({
           </div>
           <div>
             <span className="text-gray-500">Quantity:</span>
-            <p className="font-medium">{product.targetQuantity}</p>
+            <p className="font-medium">{product.targetQuantity} Products</p>
             </div>
             </div>
 
@@ -967,6 +1017,12 @@ function ProductionCard({
             <Clock className="w-3 h-3" />
             Expected: {new Date(product.expectedCompletion).toLocaleDateString()}
           </div>
+          {product.completionDate && product.status === "completed" && (
+            <div className="flex items-center gap-1 mb-1 text-green-600">
+              <CheckCircle className="w-3 h-3" />
+              Completed: {new Date(product.completionDate).toLocaleDateString()}
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <Truck className="w-3 h-3" />
             Materials: {product.materialsConsumed?.length || 0} consumed
@@ -974,45 +1030,6 @@ function ProductionCard({
               <span className="text-red-600 text-xs ml-1">⚠️ Required</span>
             )}
           </div>
-          {(() => {
-            const flow = productionFlows.find(f => f.production_product_id === product.id);
-            let progressPercentage = 0;
-
-            // Calculate progress from production flow steps if available
-            if (flow && flow.production_flow_steps && flow.production_flow_steps.length > 0) {
-              const completedSteps = flow.production_flow_steps.filter((step: any) => step.status === 'completed').length;
-              const totalSteps = flow.production_flow_steps.length;
-
-              // Calculate progress based on overall production workflow:
-              // - Machine operations: 60% of total progress
-              // - Waste generation: 20% of total progress
-              // - Individual product creation: 20% of total progress
-
-              const machineProgress = totalSteps > 0 ? (completedSteps / totalSteps) * 60 : 0;
-
-              // Check if individual products exist for this flow
-              const hasIndividualProducts = product.status === 'completed'; // This is already checked in the status logic above
-
-              if (hasIndividualProducts) {
-                progressPercentage = 100; // Truly completed
-              } else {
-                progressPercentage = Math.round(machineProgress); // Only machine progress
-              }
-            }
-
-            return flow && (
-              <div className="flex items-center gap-1">
-                <Factory className="w-3 h-3" />
-                Production Progress: {progressPercentage}%
-                <div className="w-16 bg-gray-200 rounded-full h-1 ml-1">
-                  <div
-                    className="bg-blue-600 h-1 rounded-full transition-all duration-300"
-                    style={{ width: `${progressPercentage}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
           {product.wasteGenerated?.length > 0 && (
             <div className="flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" />
@@ -1033,7 +1050,8 @@ function ProductionCard({
           )}
 
           {product.status === "active" && (() => {
-            const flow = productionFlows.find(f => f.production_product_id === product.id);
+            // Find flow by batch ID (matches either id or production_product_id)
+            const flow = productionFlows.find(f => f.id === product.id || f.production_product_id === product.id);
             const hasMaterials = product.materialsConsumed && product.materialsConsumed.length > 0;
             const hasMachineSteps = flow?.production_flow_steps?.some((s: any) => s.step_type === 'machine_operation');
             const hasWasteStep = flow?.production_flow_steps?.some((s: any) => s.step_type === 'wastage_tracking');
@@ -1043,66 +1061,81 @@ function ProductionCard({
             // Check if machine operations are completed
             const machineSteps = flow?.production_flow_steps?.filter((s: any) => s.step_type === 'machine_operation') || [];
             const areMachineStepsCompleted = machineSteps.length > 0 && machineSteps.every((s: any) => s.status === 'completed');
+            const hasInProgressMachineSteps = machineSteps.some((s: any) => s.status === 'in_progress');
             
-            // Determine the next step based on actual data
-            if (hasMachineSteps && !areMachineStepsCompleted) {
-              // Machine Operations Stage - show machine operations button
-              const completedMachineSteps = machineSteps.filter((s: any) => s.status === 'completed').length;
+            console.log(`🔍 Product ${product.productName} flow analysis:`, {
+              hasFlow: !!flow,
+              hasMaterials,
+              hasMachineSteps,
+              machineStepsCount: machineSteps.length,
+              areMachineStepsCompleted,
+              hasInProgressMachineSteps,
+              hasWasteStep,
+              isWasteCompleted
+            });
+            
+            // Stage 1: Plan Materials - No flow exists OR no materials added yet
+            if (!flow || (!hasMaterials && !hasMachineSteps)) {
               return (
                 <Button
-                  onClick={() => onMachineOperations(product)}
-                  className="w-full bg-green-600 hover:bg-green-700"
-                >
-                  <Factory className="w-4 h-4 mr-2" />
-                  Machine Operations ({completedMachineSteps}/{machineSteps.length})
-                </Button>
-              );
-            } else if (areMachineStepsCompleted && !hasWasteStep) {
-              // All machines completed, go to waste generation
-              return (
-                <Button
-                  onClick={() => onWasteGeneration(product)}
-                  className="w-full bg-orange-600 hover:bg-orange-700"
-                >
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Go to Waste Generation
-                </Button>
-              );
-            } else if (hasWasteStep && !isWasteCompleted) {
-              // Waste Generation Stage - continue to waste generation
-              return (
-                <Button
-                  onClick={() => onWasteGeneration(product)}
-                  className="w-full bg-orange-600 hover:bg-orange-700"
-                >
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Complete Waste Generation
-                </Button>
-              );
-            } else if (areMachineStepsCompleted) {
-              // All machines completed, need to create individual products
-              return (
-                <Button
-                  onClick={() => onCompleteProduction(product)}
-                  className="w-full bg-purple-600 hover:bg-purple-700"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Create Individual Products
-                </Button>
-              );
-            } else if (!hasMaterials) {
-              // No materials yet - go to planning
-              return (
-                <Button
-                  onClick={() => onContinueProduction(product)}
+                  onClick={() => onStartProduction(product)}
                   className="w-full bg-blue-600 hover:bg-blue-700"
                 >
                   <Truck className="w-4 h-4 mr-2" />
                   Plan Materials
                 </Button>
               );
-            } else {
-              // Default fallback - start machine operations
+            }
+            
+            // Stage 2: Machine Operations - Flow exists with machine steps but not all completed
+            if (hasMachineSteps && !areMachineStepsCompleted) {
+              const completedMachineSteps = machineSteps.filter((s: any) => s.status === 'completed').length;
+              const inProgressSteps = machineSteps.filter((s: any) => s.status === 'in_progress').length;
+              
+              let buttonText = `Machine Operations (${completedMachineSteps}/${machineSteps.length})`;
+              if (inProgressSteps > 0) {
+                buttonText = `Continue Machine Operations (${completedMachineSteps}/${machineSteps.length})`;
+              }
+              
+              return (
+                <Button
+                  onClick={() => onMachineOperations(product)}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                >
+                  <Factory className="w-4 h-4 mr-2" />
+                  {buttonText}
+                </Button>
+              );
+            }
+            
+            // Stage 3: Waste Generation - All machines completed but waste not done
+            if (areMachineStepsCompleted && (!hasWasteStep || !isWasteCompleted)) {
+              return (
+                <Button
+                  onClick={() => onWasteGeneration(product)}
+                  className="w-full bg-orange-600 hover:bg-orange-700"
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  {hasWasteStep ? 'Complete Waste Generation' : 'Go to Waste Generation'}
+                </Button>
+              );
+            }
+            
+            // Stage 4: Complete - Waste completed (or skipped), ready to create individual products
+            if (areMachineStepsCompleted && (isWasteCompleted || !hasWasteStep)) {
+              return (
+                <Button
+                  onClick={() => onCompleteProduction(product)}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Complete Production
+                </Button>
+              );
+            }
+            
+            // Fallback: If we have materials but no machine steps yet, start machine operations
+            if (hasMaterials && !hasMachineSteps) {
               return (
                 <Button
                   onClick={() => onMachineOperations(product)}
@@ -1113,16 +1146,34 @@ function ProductionCard({
                 </Button>
               );
             }
+            
+            // Final fallback
+            return (
+              <Button
+                onClick={() => onStartProduction(product)}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                <Truck className="w-4 h-4 mr-2" />
+                Plan Materials
+              </Button>
+            );
           })()}
 
           {product.status === "completed" && (
             <Button 
-              onClick={() => onCompleteProduction(product)}
+              onClick={() => {
+                console.log('Navigating to production summary for product:', product.id);
+                if (navigate) {
+                  navigate(`/production/summary/${product.id}`);
+                } else {
+                  console.error('Navigate function is not available');
+                }
+              }}
               variant="outline"
               className="w-full"
             >
               <Package className="w-4 h-4 mr-2" />
-              View Details
+              View Production Summary
             </Button>
           )}
         </div>

@@ -11,7 +11,6 @@ export interface IndividualProductQRData {
   dimensions: {
     length: number;
     width: number;
-    thickness?: number;
   };
   weight: number;
   color: string;

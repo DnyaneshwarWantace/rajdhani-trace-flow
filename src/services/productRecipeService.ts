@@ -4,12 +4,13 @@ import { generateUniqueId } from '@/lib/idGenerator';
 export interface CreateRecipeData {
   product_id: string;
   product_name: string;
+  base_unit: string; // Always "sqm" - the unit the recipe is defined for
   materials: {
     material_id: string;
     material_name: string;
-    quantity: number;
+    material_type: 'raw_material' | 'product';
+    quantity: number; // Quantity for 1 sqm
     unit: string;
-    cost_per_unit: number;
   }[];
   created_by?: string;
 }
@@ -24,10 +25,8 @@ export class ProductRecipeService {
   // Create a new product recipe with materials
   static async createRecipe(recipeData: CreateRecipeData): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
-      const recipeId = generateUniqueId('RECIPE');
-      const totalCost = recipeData.materials.reduce((sum, material) => 
-        sum + (material.cost_per_unit * material.quantity), 0
-      );
+      const recipeId = await generateUniqueId('RECIPE');
+      // No total cost calculation since cost_per_unit was removed
 
       // Create the recipe
       const client = supabaseAdmin || supabase;
@@ -37,7 +36,8 @@ export class ProductRecipeService {
           id: recipeId,
           product_id: recipeData.product_id,
           product_name: recipeData.product_name, // Use product_name to match database schema
-          total_cost: 0, // No total cost since quantities are dynamic
+          base_unit: "sqm", // Always use sqm as base unit
+          base_quantity: 1, // Always 1 for 1 sqm
           created_by: recipeData.created_by || 'admin'
         })
         .select()
@@ -52,7 +52,7 @@ export class ProductRecipeService {
       console.log('🔍 Creating recipe materials for recipe_id:', recipeId);
       console.log('🔍 Recipe materials data:', recipeData.materials);
       
-      const recipeMaterials = recipeData.materials.map((material, index) => {
+      const recipeMaterials = await Promise.all(recipeData.materials.map(async (material, index) => {
         console.log(`🔍 Processing material ${index}:`, material);
         
         // Validate required fields
@@ -66,19 +66,18 @@ export class ProductRecipeService {
         }
         
         const recipeMaterial = {
-          id: generateUniqueId('RECMAT'),
+          id: await generateUniqueId('RECMAT'),
           recipe_id: recipeId,
           material_id: material.material_id,
           material_name: material.material_name,
-          quantity: 1, // Default quantity for recipe reference
-          unit: material.unit,
-          cost_per_unit: material.cost_per_unit,
-          total_cost: material.cost_per_unit * 1 // Default total cost
+          material_type: material.material_type,
+          quantity: material.quantity,
+          unit: material.unit
         };
         
         console.log(`🔍 Created recipe material ${index}:`, recipeMaterial);
         return recipeMaterial;
-      });
+      }));
       
       console.log('🔍 All recipe materials to insert:', recipeMaterials);
 
@@ -131,13 +130,7 @@ export class ProductRecipeService {
   // Update an existing recipe
   static async updateRecipe(recipeId: string, recipeData: Partial<CreateRecipeData>): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
-      // If materials are being updated, recalculate total cost
-      let totalCost = 0;
-      if (recipeData.materials) {
-        totalCost = recipeData.materials.reduce((sum, material) => 
-          sum + (material.cost_per_unit * material.quantity), 0
-        );
-      }
+      // No total cost calculation since cost_per_unit was removed
 
       // Update the recipe
       const client = supabaseAdmin || supabase;
@@ -171,16 +164,15 @@ export class ProductRecipeService {
         }
 
         // Insert new materials
-        const recipeMaterials = recipeData.materials.map(material => ({
-          id: generateUniqueId('RECMAT'),
+        const recipeMaterials = await Promise.all(recipeData.materials.map(async material => ({
+          id: await generateUniqueId('RECMAT'),
           recipe_id: recipeId,
           material_id: material.material_id,
           material_name: material.material_name,
-          // No quantity field since quantities are dynamic
-          unit: material.unit,
-          cost_per_unit: material.cost_per_unit,
-          // No total_cost since quantities are dynamic
-        }));
+          material_type: material.material_type,
+          quantity: material.quantity,
+          unit: material.unit
+        })));
 
         const { error: materialsError } = await client
           .from('recipe_materials')
@@ -267,75 +259,36 @@ export class ProductRecipeService {
         .from('product_recipes')
         .select('*')
         .eq('product_id', productId)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      // Handle 406 errors and other RLS errors immediately
-      if (recipeError && (recipeError.message?.includes('406') || recipeError.message?.includes('Not Acceptable') || recipeError.code === 'PGRST116' || recipeError.code === 'PGRST301')) {
-        console.log('🔍 RLS/406 error on product_recipes table, skipping recipe lookup for:', productId);
-        this.tableAccessible = false; // Cache the result
-        return { data: null, error: null }; // Return null data but no error
-      }
-
-      // Method 2: If not found and productId looks like a production ID, try different patterns
-      if (recipeError && recipeError.code === 'PGRST116' && productId.startsWith('PRO-')) {
-        // Try with the production ID as-is (with 406 error handling)
-        const { data: recipe2, error: recipeError2 } = await client
-          .from('product_recipes')
-          .select('*')
-          .eq('product_id', productId)
-          .single();
-        
-        if (recipeError2 && (recipeError2.message?.includes('406') || recipeError2.message?.includes('Not Acceptable'))) {
-          // Silently handle 406 errors - table not accessible
-          return { data: null, error: null };
-        }
-        
-        if (!recipeError2 && recipe2) {
-          recipe = recipe2;
-          recipeError = null;
+      // Handle different types of errors
+      if (recipeError) {
+        if (recipeError.code === 'PGRST116') {
+          // PGRST116 = No rows found (normal case when no recipe exists)
+          console.log('🔍 No recipe found for product:', productId);
+          return { data: null, error: null }; // Return null data but no error
+        } else if (recipeError.message?.includes('406') || recipeError.message?.includes('Not Acceptable') || recipeError.code === 'PGRST301') {
+          // 406/RLS errors - table access issue
+          console.log('🔍 RLS/406 error on product_recipes table, skipping recipe lookup for:', productId);
+          this.tableAccessible = false; // Cache the result
+          return { data: null, error: null }; // Return null data but no error
+        } else {
+          // Other errors
+          console.log('🔍 Error fetching recipe for product:', productId, recipeError.message);
+          return { data: null, error: recipeError.message };
         }
       }
 
-      // Method 3: If still not found, try to find by product name (with 406 error handling)
-      if (recipeError && recipeError.code === 'PGRST116') {
-        
-        // Get the product name from products table
-        const { data: product, error: productError } = await client
-          .from('products')
-          .select('name')
-          .eq('id', productId)
-          .single();
-        
-        if (!productError && product) {
-          // Try to find recipe by product name (with 406 error handling)
-          const { data: recipe3, error: recipeError3 } = await client
-            .from('product_recipes')
-            .select('*')
-            .eq('product_name', product.name)
-            .single();
-          
-        if (recipeError3 && (recipeError3.message?.includes('406') || recipeError3.message?.includes('Not Acceptable'))) {
-          // Silently handle 406 errors - table not accessible
-          return { data: null, error: null };
-        }
-          
-          if (!recipeError3 && recipe3) {
-            recipe = recipe3;
-            recipeError = null;
-            console.log('✅ Found recipe by product name:', product.name);
-          }
-        }
-      }
-
-      if (recipeError && recipeError.code !== 'PGRST116') {
-        console.error('Error fetching recipe:', recipeError);
-        return { data: null, error: recipeError.message };
-      }
-
-      if (!recipe) {
-        // No recipe found - this is normal for new products
+      // If we have a recipe, continue with loading materials
+      if (recipe && !recipeError) {
+        // Recipe found, continue with loading materials
+      } else {
+        // No recipe found, return null
         return { data: null, error: null };
       }
+
+      // Recipe found, continue with loading materials
 
       console.log('✅ Found recipe:', recipe.id);
 
@@ -507,9 +460,9 @@ export class ProductRecipeService {
           materials: materialsUsed.map(m => ({
             material_id: m.material_id,
             material_name: m.material_name,
+            material_type: 'raw_material' as const, // Default to raw_material for production usage
             quantity: m.quantity,
-            unit: m.unit,
-            cost_per_unit: m.cost_per_unit
+            unit: m.unit
           }))
         });
       } else {
@@ -518,12 +471,13 @@ export class ProductRecipeService {
         return await this.createRecipe({
           product_id: productId,
           product_name: productName,
+          base_unit: 'sqm', // Always use sqm as base unit
           materials: materialsUsed.map(m => ({
             material_id: m.material_id,
             material_name: m.material_name,
+            material_type: 'raw_material' as const, // Default to raw_material for production usage
             quantity: m.quantity,
-            unit: m.unit,
-            cost_per_unit: m.cost_per_unit
+            unit: m.unit
           })),
           created_by: createdBy
         });
@@ -541,9 +495,9 @@ export class ProductRecipeService {
     materialsUsed: {
       material_id: string;
       material_name: string;
+      material_type: 'raw_material' | 'product';
       quantity: number;
       unit: string;
-      cost_per_unit: number;
     }[],
     options: {
       forceCreate?: boolean; // Force create new recipe even if one exists
@@ -564,12 +518,13 @@ export class ProductRecipeService {
           const result = await this.createRecipe({
             product_id: productId,
             product_name: `${productName} (Variant)`,
+            base_unit: 'sqm', // Always use sqm as base unit
             materials: materialsUsed.map(m => ({
               material_id: m.material_id,
               material_name: m.material_name,
+              material_type: m.material_type,
               quantity: m.quantity,
-              unit: m.unit,
-              cost_per_unit: m.cost_per_unit
+              unit: m.unit
             })),
             created_by: createdBy
           });
@@ -580,9 +535,9 @@ export class ProductRecipeService {
             materials: materialsUsed.map(m => ({
               material_id: m.material_id,
               material_name: m.material_name,
+              material_type: m.material_type,
               quantity: m.quantity,
-              unit: m.unit,
-              cost_per_unit: m.cost_per_unit
+              unit: m.unit
             }))
           });
           return { ...result, action: 'updated' };
@@ -595,12 +550,13 @@ export class ProductRecipeService {
         const result = await this.createRecipe({
           product_id: productId,
           product_name: productName,
+          base_unit: 'sqm', // Always use sqm as base unit
           materials: materialsUsed.map(m => ({
             material_id: m.material_id,
             material_name: m.material_name,
+            material_type: m.material_type,
             quantity: m.quantity,
-            unit: m.unit,
-            cost_per_unit: m.cost_per_unit
+            unit: m.unit
           })),
           created_by: createdBy
         });

@@ -62,6 +62,8 @@ export function EnhancedPricingForm({
   } = usePricingCalculator();
   
   const [localItem, setLocalItem] = useState<ExtendedOrderItem>(item);
+  const [previousPricingUnit, setPreviousPricingUnit] = useState<PricingUnit | undefined>(item.pricing_unit);
+  const [pricePerProduct, setPricePerProduct] = useState<number | null>(null); // Store price per product for auto-conversion
 
   // Debug: Log when product_id changes
   useEffect(() => {
@@ -84,8 +86,7 @@ export function EnhancedPricingForm({
     color: 'all',
     pattern: 'all',
     width: 'all',
-    height: 'all',
-    thickness: 'all',
+    length: 'all',
     weight: 'all',
     // Raw material filters
     brand: 'all',
@@ -100,37 +101,41 @@ export function EnhancedPricingForm({
   const availableUnits = [...new Set(getAvailablePricingUnits(item.product_dimensions))];
   
   useEffect(() => {
-    // For simple units (roll, piece, unit), use simple calculation
-    if (localItem.pricing_unit === 'roll' || localItem.pricing_unit === 'piece' || localItem.pricing_unit === 'unit') {
+    // Only calculate if pricing unit is selected and valid
+    if (!localItem.pricing_unit || !['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit)) {
+      // No pricing unit selected or invalid unit - use simple calculation
       const simpleTotal = localItem.unit_price * localItem.quantity;
       const updatedItem = {
         ...localItem,
         total_price: simpleTotal,
         unit_value: localItem.unit_price,
-        isValid: true,
+        isValid: localItem.unit_price > 0 && localItem.quantity > 0,
         errorMessage: ''
       };
       onUpdate(updatedItem);
       setCalculation(null); // No complex calculation needed
     } else {
-      // For complex units (GSM, sqm, etc.), use the pricing calculator
+      // For valid pricing units (GSM, sqm, sqft, kg), use the pricing calculator
       const calc = calculateItemPrice(localItem);
       setCalculation(calc);
       
+      // Ensure total_price is never 0 if unit_price and quantity are set
+      const finalTotalPrice = calc.totalPrice > 0 ? calc.totalPrice : (localItem.unit_price * localItem.quantity);
+      
       const updatedItem = {
         ...localItem,
-        unit_value: calc.unitValue,
-        total_price: calc.totalPrice,
+        unit_value: calc.unitValue > 0 ? calc.unitValue : localItem.unit_price,
+        total_price: finalTotalPrice,
         product_width: localItem.product_dimensions.width,
-        product_height: localItem.product_dimensions.height,
+        product_length: localItem.product_dimensions.length,
         product_weight: localItem.product_dimensions.weight,
-        isValid: calc.isValid,
+        isValid: calc.isValid || (localItem.unit_price > 0 && localItem.quantity > 0),
         errorMessage: calc.errorMessage
       };
       
       onUpdate(updatedItem);
     }
-  }, [localItem.pricing_unit, localItem.unit_price, localItem.quantity, calculateItemPrice]);
+  }, [localItem.pricing_unit, localItem.unit_price, localItem.quantity, localItem.product_dimensions, calculateItemPrice]);
 
   // Auto-fill product details when product is selected (without pricing)
   useEffect(() => {
@@ -147,8 +152,7 @@ export function EnhancedPricingForm({
           updatedItem.product_name = product.name;
         }
 
-        // NO AUTO-FILL FOR PRICING - user must input their own price
-        // Keep existing unit_price if already set, otherwise start with 0
+        // No auto-fill for pricing - user must input their own price for both products and raw materials
         if (!updatedItem.unit_price) {
           updatedItem.unit_price = 0;
         }
@@ -163,32 +167,32 @@ export function EnhancedPricingForm({
           const widthValue = parseFloat(product.width.toString().replace(/[^\d.-]/g, ''));
           if (!isNaN(widthValue)) availableDimensions.width = widthValue;
         }
-        if (product.height) {
-          const heightValue = parseFloat(product.height.toString().replace(/[^\d.-]/g, ''));
-          if (!isNaN(heightValue)) availableDimensions.height = heightValue;
+        if (product.length) {
+          const lengthValue = parseFloat(product.length.toString().replace(/[^\d.-]/g, ''));
+          if (!isNaN(lengthValue)) availableDimensions.length = lengthValue;
         }
         if (product.weight) {
           const weightValue = parseFloat(product.weight.toString().replace(/[^\d.-]/g, ''));
           if (!isNaN(weightValue)) availableDimensions.weight = weightValue;
         }
 
+        // Calculate SQM from length and width
+        if (availableDimensions.length && availableDimensions.width) {
+          const sqm = availableDimensions.length * availableDimensions.width;
+          // SQM is stored as area, but we'll calculate it dynamically
+        }
+
+        // Use weight directly as GSM (weight field stores GSM value)
+        if (availableDimensions.weight) {
+          availableDimensions.gsm = availableDimensions.weight; // Weight field contains GSM value
+        }
+
         updatedItem.product_dimensions = availableDimensions;
 
-        // Set default pricing unit to the product's unit (roll, piece, etc.)
-        if (product.unit && !updatedItem.pricing_unit) {
-          // Map common units to pricing units
-          const unitMapping: { [key: string]: PricingUnit } = {
-            'roll': 'roll',
-            'piece': 'piece',
-            'kg': 'kg',
-            'meter': 'meter',
-            'sqm': 'sqm',
-            'sqft': 'sqft',
-            'yard': 'yard',
-            'liter': 'liter',
-            'unit': 'unit'
-          };
-          updatedItem.pricing_unit = unitMapping[product.unit] || 'piece';
+        // Don't auto-set pricing unit - let user select it
+        // This allows user to enter price per product first, then select unit for conversion
+        if (!updatedItem.pricing_unit) {
+          updatedItem.pricing_unit = undefined; // No default, user will select
         }
 
         // Calculate total based on user input
@@ -204,12 +208,19 @@ export function EnhancedPricingForm({
   
   const handleUnitPriceChange = (value: string) => {
     const unitPrice = parseFloat(value) || 0;
-    setLocalItem(prev => ({ 
-      ...prev, 
-      unit_price: unitPrice,
-      // Simple calculation: unit_price * quantity
-      total_price: unitPrice * prev.quantity
-    }));
+    setLocalItem(prev => {
+      // If no pricing unit is selected, store this as price per product
+      if (!prev.pricing_unit || !['sqft', 'sqm', 'gsm', 'kg'].includes(prev.pricing_unit)) {
+        setPricePerProduct(unitPrice);
+      }
+      
+      return {
+        ...prev, 
+        unit_price: unitPrice,
+        // Simple calculation: unit_price * quantity
+        total_price: unitPrice * prev.quantity
+      };
+    });
   };
   
   const handleQuantityChange = (value: string) => {
@@ -223,7 +234,99 @@ export function EnhancedPricingForm({
   };
   
   const handlePricingUnitChange = (unit: PricingUnit) => {
-    setLocalItem(prev => ({ ...prev, pricing_unit: unit }));
+    setLocalItem(prev => {
+      const newItem = { ...prev, pricing_unit: unit };
+      const dimensions = prev.product_dimensions;
+      
+      // If user had entered a price, auto-convert it to the new unit
+      // This works when: 1) User enters price first, then selects unit, OR 2) User changes from one unit to another
+      if (prev.unit_price > 0 && ['sqft', 'sqm', 'gsm', 'kg'].includes(unit) && dimensions) {
+        let pricePerUnit = 0;
+        
+        // Determine base price (price per product):
+        // - If we have stored pricePerProduct, use it (user entered price per product first)
+        // - If no previous unit was selected, treat current price as price per product
+        // - If previous unit was a conversion unit, convert back to price per product first
+        let basePrice = prev.unit_price;
+        
+        if (pricePerProduct !== null) {
+          // User entered price per product first, use that
+          basePrice = pricePerProduct;
+        } else if (!previousPricingUnit || !['sqft', 'sqm', 'gsm', 'kg'].includes(previousPricingUnit)) {
+          // No previous unit or previous unit was not a conversion unit
+          // Treat current price as price per product
+          basePrice = prev.unit_price;
+          setPricePerProduct(prev.unit_price);
+        } else {
+          // Converting from one unit to another - convert back to price per product first
+          // Calculate what the price per product would be from the current unit_price
+          const prevAreaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
+          
+          if (previousPricingUnit === 'sqm' && prevAreaPerProduct > 0) {
+            basePrice = prev.unit_price * prevAreaPerProduct;
+          } else if (previousPricingUnit === 'sqft' && prevAreaPerProduct > 0) {
+            const prevAreaPerProductSqft = prevAreaPerProduct * 10.764;
+            basePrice = prev.unit_price * prevAreaPerProductSqft;
+          } else if (previousPricingUnit === 'gsm' && (dimensions.weight || dimensions.gsm) && prevAreaPerProduct > 0) {
+            const gsm = dimensions.weight || dimensions.gsm || 0;
+            basePrice = prev.unit_price * gsm * prevAreaPerProduct;
+          } else if (previousPricingUnit === 'kg' && dimensions.weight && dimensions.length && dimensions.width) {
+            // Calculate weight from GSM and area
+            const gsm = dimensions.weight || dimensions.gsm || 0;
+            const weightInKg = (gsm * prevAreaPerProduct) / 1000;
+            basePrice = prev.unit_price * weightInKg;
+          } else {
+            // Can't convert, use current price as base
+            basePrice = prev.unit_price;
+          }
+          
+          setPricePerProduct(basePrice);
+        }
+        
+        // Calculate price per unit based on the selected unit
+        if (unit === 'sqm') {
+          // Convert price per product to price per sqm
+          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
+          if (areaPerProduct > 0) {
+            pricePerUnit = basePrice / areaPerProduct;
+          }
+        } else if (unit === 'sqft') {
+          // Convert price per product to price per sqft
+          const areaPerProductSqm = (dimensions.length || 0) * (dimensions.width || 0);
+          const areaPerProductSqft = areaPerProductSqm * 10.764; // Convert sqm to sqft
+          if (areaPerProductSqft > 0) {
+            pricePerUnit = basePrice / areaPerProductSqft;
+          }
+        } else if (unit === 'gsm') {
+          // Convert price per product to price per GSM
+          // GSM is stored in the weight field
+          const gsm = dimensions.weight || dimensions.gsm || 0; // Use weight field as GSM
+          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
+          if (gsm > 0 && areaPerProduct > 0) {
+            // Price per GSM = Price per product / (GSM × Area in sqm)
+            pricePerUnit = basePrice / (gsm * areaPerProduct);
+          }
+        } else if (unit === 'kg') {
+          // Calculate weight in kg from length × width × GSM
+          // Weight (kg) = (GSM × Area in sqm) / 1000
+          const gsm = dimensions.weight || dimensions.gsm || 0; // GSM is in weight field
+          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
+          if (gsm > 0 && areaPerProduct > 0) {
+            const weightInKg = (gsm * areaPerProduct) / 1000; // Convert grams to kg
+            if (weightInKg > 0) {
+              pricePerUnit = basePrice / weightInKg;
+            }
+          }
+        }
+        
+        if (pricePerUnit > 0) {
+          newItem.unit_price = pricePerUnit;
+        }
+      }
+      
+      setPreviousPricingUnit(unit);
+      return newItem;
+    });
   };
 
   const handleTotalPriceChange = (value: string) => {
@@ -273,14 +376,9 @@ export function EnhancedPricingForm({
         // Width filter
         if (filters.width && filters.width !== 'all' && item.width !== filters.width) return false;
 
-        // Height filter
-        if (filters.height && filters.height !== 'all' && item.height !== filters.height) return false;
+        // Length filter
+        if (filters.length && filters.length !== 'all' && item.length !== filters.length) return false;
 
-        // Thickness filter
-        if (filters.thickness && filters.thickness !== 'all') {
-          const itemThickness = item.thickness?.toString() || '';
-          if (itemThickness !== filters.thickness) return false;
-        }
 
         // Weight filter
         if (filters.weight && filters.weight !== 'all') {
@@ -326,8 +424,7 @@ export function EnhancedPricingForm({
         colors: [...new Set(items.map(item => item.color).filter(Boolean))],
         patterns: [...new Set(items.map(item => item.pattern).filter(Boolean))],
         widths: [...new Set(items.map(item => item.width).filter(Boolean))],
-        heights: [...new Set(items.map(item => item.height).filter(Boolean))],
-        thickness: [...new Set(items.map(item => item.thickness).filter(Boolean))],
+        lengths: [...new Set(items.map(item => item.length).filter(Boolean))],
         weights: [...new Set(items.map(item => item.weight).filter(Boolean))],
         units: [...new Set(items.map(item => item.unit).filter(Boolean))]
       };
@@ -530,7 +627,14 @@ export function EnhancedPricingForm({
               <div className="text-blue-800 font-medium mb-2">📦 Selected {localItem.product_type === 'raw_material' ? 'Raw Material' : 'Product'} Details</div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div><span className="font-medium">Name:</span> {localItem.product_name}</div>
-                <div><span className="font-medium">Unit:</span> {localItem.pricing_unit || 'N/A'}</div>
+                <div><span className="font-medium">Unit:</span> {
+                  (() => {
+                    const item = localItem.product_type === 'raw_material'
+                      ? rawMaterials.find(m => m.id === localItem.product_id)
+                      : products.find(p => p.id === localItem.product_id);
+                    return item?.unit || 'N/A';
+                  })()
+                }</div>
                 <div><span className="font-medium">Your Price:</span> {localItem.unit_price > 0 ? `₹${localItem.unit_price}` : 'Not set'}</div>
                 <div><span className="font-medium">Available:</span> {
                   (() => {
@@ -540,15 +644,33 @@ export function EnhancedPricingForm({
                     const stock = localItem.product_type === 'raw_material'
                       ? (item?.stock ?? 0)
                       : (item?.stock ?? 0);
-                    const unit = item?.unit || 'units';
-                    return `${stock} ${unit}`;
+                    
+                    if (localItem.product_type === 'product') {
+                      const productText = `${stock} ${stock === 1 ? 'product' : 'products'}`;
+                      
+                      // Calculate total SQM if length and width are available
+                      if (item?.length && item?.width) {
+                        const lengthValue = parseFloat(item.length.toString().replace(/[^\d.-]/g, '')) || 0;
+                        const widthValue = parseFloat(item.width.toString().replace(/[^\d.-]/g, '')) || 0;
+                        if (lengthValue > 0 && widthValue > 0) {
+                          const sqmPerProduct = lengthValue * widthValue;
+                          const totalSqm = sqmPerProduct * stock;
+                          return `${productText} (${totalSqm.toFixed(2)} sqm)`;
+                        }
+                      }
+                      
+                      return productText;
+                    } else {
+                      const unit = item?.unit || 'units';
+                      return `${stock} ${unit}`;
+                    }
                   })()
                 }</div>
                 {localItem.product_dimensions.width && (
                   <div><span className="font-medium">Width:</span> {localItem.product_dimensions.width} cm</div>
                 )}
-                {localItem.product_dimensions.height && (
-                  <div><span className="font-medium">Height:</span> {localItem.product_dimensions.height} cm</div>
+                {localItem.product_dimensions.length && (
+                  <div><span className="font-medium">Length:</span> {localItem.product_dimensions.length} cm</div>
                 )}
                 {localItem.product_dimensions.weight && (
                   <div><span className="font-medium">Weight:</span> {localItem.product_dimensions.weight} kg</div>
@@ -561,7 +683,7 @@ export function EnhancedPricingForm({
                       const material = rawMaterials.find(m => m.id === localItem.product_id);
                       return (
                         <>
-                          {material?.brand && <div><span className="font-medium">Brand:</span> {material.brand}</div>}
+                          {material?.type && <div><span className="font-medium">Type:</span> {material.type}</div>}
                           {material?.supplier && <div><span className="font-medium">Supplier:</span> {material.supplier}</div>}
                           {material?.qualityGrade && <div><span className="font-medium">Quality:</span> {material.qualityGrade}</div>}
                         </>
@@ -579,7 +701,6 @@ export function EnhancedPricingForm({
                         <>
                           {product?.color && <div><span className="font-medium">Color:</span> {product.color}</div>}
                           {product?.pattern && <div><span className="font-medium">Pattern:</span> {product.pattern}</div>}
-                          {product?.thickness && <div><span className="font-medium">Thickness:</span> {product.thickness}</div>}
                         </>
                       );
                     })()}
@@ -602,7 +723,7 @@ export function EnhancedPricingForm({
           )}
 
           {/* Individual Product Selection (only for products with individual tracking AND available individual products) */}
-          {localItem.product_id && hasIndividualStock() && (() => {
+          {localItem.product_id && localItem.product_type !== 'raw_material' && hasIndividualStock() && (() => {
             const availableIndividualProducts = individualProducts.filter(ip => 
               ip.productId === localItem.product_id && ip.status === 'available'
             );
@@ -624,7 +745,7 @@ export function EnhancedPricingForm({
           )}
           
           {/* Show message when no individual products are available */}
-          {localItem.product_id && hasIndividualStock() && (() => {
+          {localItem.product_id && localItem.product_type !== 'raw_material' && hasIndividualStock() && (() => {
             const availableIndividualProducts = individualProducts.filter(ip => 
               ip.productId === localItem.product_id && ip.status === 'available'
             );
@@ -645,12 +766,10 @@ export function EnhancedPricingForm({
               {/* Quantity */}
               <div className="space-y-2">
                 <Label htmlFor={`quantity-${item.id}`} className="text-sm font-medium text-gray-700">
-                  Quantity ({(() => {
-                    const item = localItem.product_type === 'raw_material'
-                      ? rawMaterials.find(m => m.id === localItem.product_id)
-                      : products.find(p => p.id === localItem.product_id);
-                    return item?.unit || 'units';
-                  })()})
+                  {localItem.product_type === 'product' 
+                    ? `Quantity${localItem.quantity > 0 ? ` (${localItem.quantity} ${localItem.quantity === 1 ? 'product' : 'products'})` : ''}`
+                    : 'Quantity'
+                  }
                 </Label>
                 <Input
                   id={`quantity-${item.id}`}
@@ -658,23 +777,23 @@ export function EnhancedPricingForm({
                   min="1"
                   value={localItem.quantity}
                   onChange={(e) => handleQuantityChange(e.target.value)}
-                  placeholder={`Enter quantity in ${(() => {
-                    const item = localItem.product_type === 'raw_material'
-                      ? rawMaterials.find(m => m.id === localItem.product_id)
-                      : products.find(p => p.id === localItem.product_id);
-                    return item?.unit || 'units';
-                  })()}`}
+                  placeholder={localItem.product_type === 'product' 
+                    ? `Enter number of products`
+                    : `Enter quantity`
+                  }
                   className="w-full"
                 />
-                <p className="text-xs text-gray-500">
-                  💡 For bulk items: if unit is 'kg' and you enter '1000', it means 1000 kg (not 1000 pieces)
-                </p>
+                {localItem.product_type === 'raw_material' && (
+                  <p className="text-xs text-gray-500">
+                    💡 For bulk items: if unit is 'kg' and you enter '1000', it means 1000 kg
+                  </p>
+                )}
               </div>
 
               {/* Unit Price - User Input Required */}
               <div className="space-y-2">
                 <Label htmlFor={`unitPrice-${item.id}`} className="text-sm font-medium text-gray-700">
-                  Price per {localItem.pricing_unit || 'unit'} (₹) *
+                  Price (₹) *
                 </Label>
                 <Input
                   id={`unitPrice-${item.id}`}
@@ -744,8 +863,9 @@ export function EnhancedPricingForm({
             </div>
 
 
-            {/* Calculation Display - Only show if using unit conversion */}
-            {calculation && localItem.pricing_unit !== 'roll' && localItem.pricing_unit !== 'piece' && localItem.pricing_unit !== 'unit' && (
+            {/* Calculation Display - Show only for valid pricing units (sqft, sqm, kg, gsm) */}
+            {calculation && localItem.pricing_unit && localItem.pricing_unit !== 'unit' && 
+             ['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit) && calculation.isValid && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-medium text-gray-700">Unit Conversion Calculation</Label>
@@ -763,18 +883,126 @@ export function EnhancedPricingForm({
                 {showCalculation && (
                   <div className="p-3 bg-blue-50 rounded-lg space-y-2 text-sm border border-blue-200">
                     <div className="text-blue-800 font-medium mb-2">🔄 Unit Conversion Active</div>
-                    <div className="flex justify-between">
-                      <span>Unit Value:</span>
-                      <span className="font-medium">{calculation.unitValue.toFixed(2)} {formatUnit(calculation.pricingUnit)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Total Value:</span>
-                      <span className="font-medium">{calculation.totalValue.toFixed(2)} {formatUnit(calculation.pricingUnit)}</span>
-                    </div>
-                    <div className="flex justify-between border-t pt-2">
-                      <span>Calculated Price:</span>
-                      <span className="font-bold text-green-600">₹{calculation.totalPrice.toFixed(2)}</span>
-                    </div>
+                    {localItem.pricing_unit === 'gsm' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span>GSM:</span>
+                          <span className="font-medium">{(localItem.product_dimensions.weight || localItem.product_dimensions.gsm || 0).toFixed(2)} g/m²</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>SQM per Unit:</span>
+                          <span className="font-medium">
+                            {((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)).toFixed(2)} m²
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total SQM ({localItem.quantity} units):</span>
+                          <span className="font-medium">
+                            {(((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)) * localItem.quantity).toFixed(2)} m²
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Price per GSM:</span>
+                          <span className="font-medium">₹{localItem.unit_price.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Calculated Price:</span>
+                          <span className="font-bold text-green-600">₹{calculation.totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-blue-600 mt-2">
+                          Formula: Price = ₹{localItem.unit_price.toFixed(2)}/GSM × {(localItem.product_dimensions.weight || localItem.product_dimensions.gsm || 0).toFixed(2)} GSM × {(((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)) * localItem.quantity).toFixed(2)} SQM
+                        </div>
+                      </>
+                    )}
+                    {localItem.pricing_unit === 'sqm' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span>SQM per Unit:</span>
+                          <span className="font-medium">
+                            {((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)).toFixed(2)} m²
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total SQM ({localItem.quantity} units):</span>
+                          <span className="font-medium">
+                            {(((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)) * localItem.quantity).toFixed(2)} m²
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Price per SQM:</span>
+                          <span className="font-medium">₹{localItem.unit_price.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Calculated Price:</span>
+                          <span className="font-bold text-green-600">₹{calculation.totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-blue-600 mt-2">
+                          Formula: Price = ₹{localItem.unit_price.toFixed(2)}/SQM × {(((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)) * localItem.quantity).toFixed(2)} SQM
+                        </div>
+                      </>
+                    )}
+                    {localItem.pricing_unit === 'sqft' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Area per Product:</span>
+                          <span className="font-medium">
+                            {((localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0)).toFixed(2)} m²
+                            {' = '}
+                            {calculation.unitValue.toFixed(2)} sqft
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Area ({localItem.quantity} products):</span>
+                          <span className="font-medium">
+                            {calculation.totalValue.toFixed(2)} sqft
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Price per sqft:</span>
+                          <span className="font-medium">₹{localItem.unit_price.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Calculated Price:</span>
+                          <span className="font-bold text-green-600">₹{calculation.totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-blue-600 mt-2">
+                          Formula: Price = ₹{localItem.unit_price.toFixed(2)}/sqft × {calculation.totalValue.toFixed(2)} sqft
+                          <br />
+                          {(() => {
+                            const pricePerProduct = calculation.totalPrice / localItem.quantity;
+                            return `Price per product: ₹${pricePerProduct.toFixed(2)}`;
+                          })()}
+                        </div>
+                      </>
+                    )}
+                    {localItem.pricing_unit === 'kg' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span>Weight per Product:</span>
+                          <span className="font-medium">{calculation.unitValue.toFixed(2)} kg</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Total Weight ({localItem.quantity} products):</span>
+                          <span className="font-medium">{calculation.totalValue.toFixed(2)} kg</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Price per kg:</span>
+                          <span className="font-medium">₹{localItem.unit_price.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between border-t pt-2">
+                          <span>Calculated Price:</span>
+                          <span className="font-bold text-green-600">₹{calculation.totalPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs text-blue-600 mt-2">
+                          Formula: Price = ₹{localItem.unit_price.toFixed(2)}/kg × {calculation.totalValue.toFixed(2)} kg
+                          <br />
+                          {(() => {
+                            const pricePerProduct = calculation.totalPrice / localItem.quantity;
+                            return `Price per product: ₹${pricePerProduct.toFixed(2)}`;
+                          })()}
+                        </div>
+                      </>
+                    )}
                     <div className="text-xs text-blue-600 mt-2">
                       💡 You can edit the Total Price above to override this calculation
                     </div>
@@ -802,17 +1030,38 @@ export function EnhancedPricingForm({
                   : 'text-yellow-700'
               }`}>
                 {localItem.unit_price > 0 && localItem.quantity > 0 ? (
-                  <>Total = ₹{localItem.unit_price} per {(() => {
-                    const item = localItem.product_type === 'raw_material'
-                      ? rawMaterials.find(m => m.id === localItem.product_id)
-                      : products.find(p => p.id === localItem.product_id);
-                    return item?.unit || 'unit';
-                  })()} × {localItem.quantity} {(() => {
-                    const item = localItem.product_type === 'raw_material'
-                      ? rawMaterials.find(m => m.id === localItem.product_id)
-                      : products.find(p => p.id === localItem.product_id);
-                    return item?.unit || 'units';
-                  })()} = ₹{localItem.total_price}</>
+                  <>
+                    {localItem.pricing_unit && ['sqft', 'sqm', 'gsm', 'kg'].includes(localItem.pricing_unit) ? (
+                      // Show calculation based on pricing unit
+                      (() => {
+                        const unitLabel = localItem.pricing_unit === 'sqft' ? 'sqft' : 
+                                         localItem.pricing_unit === 'sqm' ? 'sqm' :
+                                         localItem.pricing_unit === 'gsm' ? 'GSM' : 'kg';
+                        const areaPerProduct = (localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0);
+                        const totalArea = areaPerProduct * localItem.quantity;
+                        
+                        if (localItem.pricing_unit === 'sqm') {
+                          return <>Total = ₹{localItem.unit_price.toFixed(2)} per sqm × {totalArea.toFixed(2)} sqm = ₹{localItem.total_price.toFixed(2)}</>;
+                        } else if (localItem.pricing_unit === 'sqft') {
+                          const totalAreaSqft = totalArea * 10.764;
+                          return <>Total = ₹{localItem.unit_price.toFixed(2)} per sqft × {totalAreaSqft.toFixed(2)} sqft = ₹{localItem.total_price.toFixed(2)}</>;
+                        } else if (localItem.pricing_unit === 'gsm') {
+                          const gsm = localItem.product_dimensions.weight || localItem.product_dimensions.gsm || 0;
+                          return <>Total = ₹{localItem.unit_price.toFixed(2)} per GSM × {gsm.toFixed(2)} GSM × {totalArea.toFixed(2)} sqm = ₹{localItem.total_price.toFixed(2)}</>;
+                        } else if (localItem.pricing_unit === 'kg') {
+                          const gsm = localItem.product_dimensions.weight || localItem.product_dimensions.gsm || 0;
+                          const areaPerProduct = (localItem.product_dimensions.length || 0) * (localItem.product_dimensions.width || 0);
+                          const weightPerProduct = gsm > 0 && areaPerProduct > 0 ? (gsm * areaPerProduct) / 1000 : 0;
+                          const totalWeight = weightPerProduct * localItem.quantity;
+                          return <>Total = ₹{localItem.unit_price.toFixed(2)} per kg × {totalWeight.toFixed(2)} kg = ₹{localItem.total_price.toFixed(2)}</>;
+                        }
+                        return <>Total = ₹{localItem.unit_price.toFixed(2)} per {unitLabel} × {localItem.quantity} {localItem.quantity === 1 ? 'product' : 'products'} = ₹{localItem.total_price.toFixed(2)}</>;
+                      })()
+                    ) : (
+                      // Simple pricing (no unit conversion)
+                      <>Total = ₹{localItem.unit_price.toFixed(2)} per product × {localItem.quantity} {localItem.quantity === 1 ? 'product' : 'products'} = ₹{localItem.total_price.toFixed(2)}</>
+                    )}
+                  </>
                 ) : (
                   'Please enter quantity and your selling price to calculate total'
                 )}
@@ -922,8 +1171,8 @@ export function EnhancedPricingForm({
                 onClick={() => {
                   setSearchTerm('');
                   setFilters({
-                    category: 'all', color: 'all', pattern: 'all', width: 'all', height: 'all',
-                    thickness: 'all', weight: 'all',
+                    category: 'all', color: 'all', pattern: 'all', width: 'all', length: 'all',
+                    weight: 'all',
                     brand: 'all', supplier: 'all', qualityGrade: 'all', unit: 'all',
                     minStock: '', maxStock: ''
                   });
@@ -1003,34 +1252,20 @@ export function EnhancedPricingForm({
                       </div>
 
                       <div className="space-y-1">
-                        <Label className="text-xs font-medium">Height</Label>
-                        <Select value={filters.height} onValueChange={(value) => setFilters(prev => ({ ...prev, height: value }))}>
+                        <Label className="text-xs font-medium">Length</Label>
+                        <Select value={filters.length} onValueChange={(value) => setFilters(prev => ({ ...prev, length: value }))}>
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="All" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="all">All Heights</SelectItem>
-                            {getFilterOptions.heights?.map(height => (
-                              <SelectItem key={height} value={height}>{height}</SelectItem>
+                            <SelectItem value="all">All Lengths</SelectItem>
+                            {getFilterOptions.lengths?.map(length => (
+                              <SelectItem key={length} value={length}>{length}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
 
-                      <div className="space-y-1">
-                        <Label className="text-xs font-medium">Thickness</Label>
-                        <Select value={filters.thickness} onValueChange={(value) => setFilters(prev => ({ ...prev, thickness: value }))}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="All" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Thickness</SelectItem>
-                            {getFilterOptions.thickness?.map(thickness => (
-                              <SelectItem key={thickness} value={thickness}>{thickness}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
 
                       <div className="space-y-1">
                         <Label className="text-xs font-medium">Weight</Label>
@@ -1171,11 +1406,11 @@ export function EnhancedPricingForm({
                             ...prev,
                             product_id: product.id,
                             product_name: product.name,
-                            unit_price: 0, // No preset pricing
+                            unit_price: 0, // No preset pricing - user must input their own price
                             product_dimensions: {
                               productType: prev.product_type === 'raw_material' ? 'raw_material' : 'carpet',
                               width: product.width ? parseFloat(product.width.toString().replace(/[^\d.-]/g, '')) || undefined : undefined,
-                              height: product.height ? parseFloat(product.height.toString().replace(/[^\d.-]/g, '')) || undefined : undefined,
+                              length: product.length ? parseFloat(product.length.toString().replace(/[^\d.-]/g, '')) || undefined : undefined,
                               weight: product.weight ? parseFloat(product.weight.toString().replace(/[^\d.-]/g, '')) || undefined : undefined
                             }
                           }));
@@ -1220,8 +1455,7 @@ export function EnhancedPricingForm({
                             {localItem.product_type === 'product' ? (
                               <>
                                 {product.width && <div>Width: {product.width}</div>}
-                                {product.height && <div>Height: {product.height}</div>}
-                                {product.thickness && <div>Thickness: {product.thickness}</div>}
+                                {product.length && <div>Length: {product.length}</div>}
                                 {product.weight && <div>Weight: {product.weight}</div>}
                               </>
                             ) : (

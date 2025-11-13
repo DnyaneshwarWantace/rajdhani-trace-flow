@@ -8,6 +8,8 @@ import {
   RawMaterialService,
   ProductionService,
   NotificationService,
+  SupplierService,
+  MongoDBRawMaterialService,
   testSupabaseConnection
 } from '../services';
 
@@ -57,7 +59,7 @@ export class SupabaseDemo {
 
     // Get customer stats
     console.log('\n3. Getting customer statistics...');
-    const stats = await CustomerService.getCustomerStats();
+    const stats = await CustomerService.getAllCustomerStats();
     console.log('✅ Customer stats:', stats);
 
     return customerResult.data;
@@ -73,10 +75,10 @@ export class SupabaseDemo {
       name: 'Premium Carpet',
       category: 'Carpets',
       color: 'Red',
-      size: '6x4 feet',
       pattern: 'Persian',
-      selling_price: 15000,
-      cost_price: 10000,
+      unit: 'sqft',
+      width: '6',
+      length: '4',
       individual_stock_tracking: true,
       min_stock_level: 5,
       max_stock_level: 100
@@ -97,7 +99,6 @@ export class SupabaseDemo {
         batch_number: 'BATCH001',
         production_date: new Date().toISOString().split('T')[0],
         final_weight: '15 kg',
-        final_thickness: '12 mm',
         quality_grade: 'A+',
         inspector: 'Quality Team'
       });
@@ -123,7 +124,8 @@ export class SupabaseDemo {
 
     // Create a supplier first
     console.log('\n1. Creating a supplier...');
-    const supplierResult = await RawMaterialService.createSupplier({
+    const supplierResult = await SupplierService.createSupplier({
+      id: `SUP-${Date.now()}`,
       name: 'Wool Suppliers Ltd',
       contact_person: 'Supplier Manager',
       email: 'contact@woolsuppliers.com',
@@ -143,9 +145,8 @@ export class SupabaseDemo {
 
     // Create raw material
     console.log('\n2. Creating raw material...');
-    const materialResult = await RawMaterialService.createRawMaterial({
+    const materialResult = await MongoDBRawMaterialService.createRawMaterial({
       name: 'Premium Wool',
-      brand: 'WoolCorp',
       category: 'Yarn',
       current_stock: 500,
       unit: 'kg',
@@ -169,7 +170,7 @@ export class SupabaseDemo {
 
     // Get inventory stats
     console.log('\n3. Getting inventory statistics...');
-    const inventoryStats = await RawMaterialService.getInventoryStats();
+    const inventoryStats = await MongoDBRawMaterialService.getInventoryStats();
     console.log('✅ Inventory stats:', inventoryStats);
 
     return materialResult.data;
@@ -312,10 +313,11 @@ export class SupabaseDemo {
     // Create a notification
     console.log('\n1. Creating a notification...');
     const notificationResult = await NotificationService.createNotification({
-      type: 'system_alert',
+      type: 'info',
       title: 'Demo Notification',
       message: 'This is a demo notification from the Supabase backend!',
       priority: 'medium',
+      status: 'unread',
       module: 'orders',
       created_by: 'demo_user'
     });
@@ -326,15 +328,23 @@ export class SupabaseDemo {
 
     // Get notifications
     console.log('\n2. Fetching notifications...');
-    const notificationsResult = await NotificationService.getNotifications({ limit: 5 });
+    const notificationsResult = await NotificationService.getNotifications();
     if (notificationsResult.data) {
-      console.log(`✅ Found ${notificationsResult.data.length} notifications`);
+      const limitedNotifications = notificationsResult.data.slice(0, 5);
+      console.log(`✅ Found ${notificationsResult.data.length} notifications (showing first 5)`);
     }
 
-    // Get notification stats
-    console.log('\n3. Getting notification statistics...');
-    const notificationStats = await NotificationService.getNotificationStats();
-    console.log('✅ Notification stats:', notificationStats);
+    // Calculate notification stats from fetched notifications
+    console.log('\n3. Calculating notification statistics...');
+    if (notificationsResult.data) {
+      const stats = {
+        total: notificationsResult.data.length,
+        unread: notificationsResult.data.filter(n => n.status === 'unread').length,
+        read: notificationsResult.data.filter(n => n.status === 'read').length,
+        dismissed: notificationsResult.data.filter(n => n.status === 'dismissed').length
+      };
+      console.log('✅ Notification stats:', stats);
+    }
 
     return notificationResult.data;
   }

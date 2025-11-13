@@ -26,19 +26,35 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
   const calculateItemPrice = useCallback((item: ExtendedOrderItem): PricingCalculation => {
     const { unit_price, quantity, pricing_unit, product_dimensions } = item;
     
+    // If no pricing unit selected or unit_price is 0, return simple calculation
+    if (!pricing_unit || !['sqft', 'sqm', 'kg', 'gsm'].includes(pricing_unit) || unit_price <= 0) {
+      return {
+        unitPrice: unit_price,
+        quantity,
+        unitValue: unit_price,
+        totalValue: unit_price * quantity,
+        totalPrice: unit_price * quantity,
+        pricingUnit: pricing_unit || 'unit' as PricingUnit,
+        isValid: unit_price > 0 && quantity > 0,
+        errorMessage: unit_price <= 0 ? 'Please enter a price' : ''
+      };
+    }
+    
     // Validate dimensions for the selected pricing unit
     const isValidDimensions = validateDimensionsForUnit(product_dimensions, pricing_unit);
     
     if (!isValidDimensions) {
+      // If dimensions are invalid but user has entered a price, still calculate using simple method
+      // This prevents showing 0 when dimensions are missing
       return {
         unitPrice: unit_price,
         quantity,
-        unitValue: 0,
-        totalValue: 0,
-        totalPrice: 0,
+        unitValue: unit_price,
+        totalValue: unit_price * quantity,
+        totalPrice: unit_price * quantity,
         pricingUnit: pricing_unit,
         isValid: false,
-        errorMessage: `Product dimensions are required for ${formatUnitLabel(pricing_unit)} pricing`
+        errorMessage: `Product dimensions are required for ${formatUnitLabel(pricing_unit)} pricing. Using simple calculation.`
       };
     }
     
@@ -62,7 +78,8 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
   const calculateOrderTotal = useCallback((items: ExtendedOrderItem[]): number => {
     return items.reduce((total, item) => {
       const calculation = calculateItemPrice(item);
-      return total + (calculation.isValid ? calculation.totalPrice : 0);
+      // Always add totalPrice, even if not valid (it will use simple calculation)
+      return total + (calculation.totalPrice || 0);
     }, 0);
   }, [calculateItemPrice]);
   

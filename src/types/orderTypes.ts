@@ -13,6 +13,7 @@ export interface ExtendedOrderItem {
   total_price: number;
   quality_grade?: string;
   specifications?: string;
+  supplier?: string; // Supplier name for raw materials
   
   // New dynamic pricing fields
   pricing_unit: PricingUnit;

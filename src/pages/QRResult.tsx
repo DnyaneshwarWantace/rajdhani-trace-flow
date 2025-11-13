@@ -1,36 +1,67 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Package, 
-  Calendar, 
-  MapPin, 
-  User, 
-  Star, 
-  Ruler, 
-  Weight, 
-  Layers,
+import {
+  Package,
+  Calendar,
+  MapPin,
+  User,
+  Ruler,
+  Weight,
   QrCode,
-  ArrowLeft,
-  Download,
-  Share,
   CheckCircle,
   Clock,
   Factory,
-  Award,
-  Eye,
-  Smartphone
+  Award
 } from "lucide-react";
-import { ProductService } from "@/services/ProductService";
-import { individualProductService } from "@/services/individualProductService";
-
 interface QRResultData {
   type: 'main' | 'individual';
   productId: string;
   individualProductId?: string;
 }
+
+// Function to fetch product data - public access via backend API (no auth required)
+const fetchProductData = async (productId: string) => {
+  try {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const response = await fetch(`${API_URL}/public/products/${productId}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch product');
+    }
+
+    return result.data;
+  } catch (err: any) {
+    throw new Error(`Failed to fetch product: ${err.message}`);
+  }
+};
+
+// Function to fetch individual product data - public access via backend API (no auth required)
+const fetchIndividualProductData = async (individualProductId: string) => {
+  try {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const response = await fetch(`${API_URL}/public/individual-products/${individualProductId}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to fetch individual product');
+    }
+
+    return result.data;
+  } catch (err: any) {
+    throw new Error(`Failed to fetch individual product: ${err.message}`);
+  }
+};
 
 export default function QRResult() {
   const [searchParams] = useSearchParams();
@@ -44,10 +75,24 @@ export default function QRResult() {
       try {
         setLoading(true);
         
+        // Debug: Log all URL parameters
+        console.log('🔍 All URL search params:', Object.fromEntries(searchParams.entries()));
+        console.log('🔍 Current URL:', window.location.href);
+        console.log('🔍 URL search string:', window.location.search);
+        
         // Get QR data from URL parameters
-        const qrData = searchParams.get('data');
+        let qrData = searchParams.get('data');
+        console.log('🔍 Raw QR data from searchParams:', qrData);
+        
+        // Fallback: try to get data from URL directly if searchParams fails
         if (!qrData) {
-          setError('No QR code data found');
+          const urlParams = new URLSearchParams(window.location.search);
+          qrData = urlParams.get('data');
+          console.log('🔍 Raw QR data from URLSearchParams fallback:', qrData);
+        }
+        
+        if (!qrData) {
+          setError('No QR code data found in URL parameters');
           return;
         }
 
@@ -59,27 +104,42 @@ export default function QRResult() {
           return;
         }
 
+        console.log('🔍 Parsed QR data:', parsedData);
+        
         if (parsedData.type === 'main') {
-          // Load main product data
-          const { data: product, error: productError } = await ProductService.getProductById(parsedData.productId);
-          if (productError) {
+          // Load main product data using admin client
+          console.log('🔍 Loading main product:', parsedData.productId);
+          try {
+            const product = await fetchProductData(parsedData.productId);
+            console.log('🔍 Product data result:', product);
+            setProductData(product);
+          } catch (productError) {
+            console.error('❌ Failed to load product:', productError);
             setError(`Failed to load product: ${productError}`);
             return;
           }
-          setProductData(product);
         } else if (parsedData.type === 'individual') {
-          // Load individual product data
-          const { data: individualProduct, error: individualError } = await individualProductService.getIndividualProductById(parsedData.individualProductId!);
-          if (individualError) {
+          // Load individual product data using admin client
+          console.log('🔍 Loading individual product:', parsedData.individualProductId);
+          try {
+            const individualProduct = await fetchIndividualProductData(parsedData.individualProductId!);
+            console.log('🔍 Individual product data result:', individualProduct);
+            setIndividualProductData(individualProduct);
+          } catch (individualError) {
+            console.error('❌ Failed to load individual product:', individualError);
             setError(`Failed to load individual product: ${individualError}`);
             return;
           }
-          setIndividualProductData(individualProduct);
           
           // Also load the main product data for context
-          const { data: product, error: productError } = await ProductService.getProductById(parsedData.productId);
-          if (!productError) {
+          console.log('🔍 Loading main product for context:', parsedData.productId);
+          try {
+            const product = await fetchProductData(parsedData.productId);
+            console.log('🔍 Main product data result:', product);
             setProductData(product);
+          } catch (productError) {
+            console.warn('⚠️ Failed to load main product for context:', productError);
+            // Don't fail the whole operation if we can't load the main product
           }
         }
 
@@ -113,14 +173,7 @@ export default function QRResult() {
             <Package className="w-10 h-10 text-red-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Loading Product</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Button 
-            onClick={() => window.location.href = '/'}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back Home
-          </Button>
+          <p className="text-gray-600">{error}</p>
         </div>
       </div>
     );
@@ -142,42 +195,7 @@ export default function QRResult() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <QrCode className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Product Details</h1>
-                <p className="text-sm text-gray-600">Scanned via QR Code</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm">
-                <Share className="w-4 h-4 mr-2" />
-                Share
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-              <Button 
-                onClick={() => window.location.href = '/'}
-                variant="outline" 
-                size="sm"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
+      {/* Main Content - Full Screen */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Product Header */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-8">
@@ -212,16 +230,6 @@ export default function QRResult() {
                   {displayData.category} • {displayData.color || 'Standard Color'}
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30">
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Full Details
-                </Button>
-                <Button className="bg-white text-blue-600 hover:bg-gray-50">
-                  <Smartphone className="w-4 h-4 mr-2" />
-                  Mobile View
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -249,6 +257,12 @@ export default function QRResult() {
                       <span className="text-gray-600 font-medium">Category</span>
                       <span className="font-semibold">{displayData.category}</span>
                     </div>
+                    {displayData.subcategory && (
+                      <div className="flex justify-between items-center py-3 border-b border-gray-100">
+                        <span className="text-gray-600 font-medium">Subcategory</span>
+                        <span className="font-semibold">{displayData.subcategory}</span>
+                      </div>
+                    )}
                     {displayData.color && (
                       <div className="flex justify-between items-center py-3 border-b border-gray-100">
                         <span className="text-gray-600 font-medium">Color</span>
@@ -323,12 +337,6 @@ export default function QRResult() {
                         </span>
                       </div>
                     )}
-                    {displayData.final_thickness && (
-                      <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                        <span className="text-gray-600 font-medium">Thickness</span>
-                        <span className="font-semibold">{displayData.final_thickness}</span>
-                      </div>
-                    )}
                   </div>
                   <div className="space-y-4">
                     {displayData.width && (
@@ -337,10 +345,10 @@ export default function QRResult() {
                         <span className="font-semibold">{displayData.width}</span>
                       </div>
                     )}
-                    {displayData.height && (
+                    {displayData.length && (
                       <div className="flex justify-between items-center py-3 border-b border-gray-100">
-                        <span className="text-gray-600 font-medium">Height</span>
-                        <span className="font-semibold">{displayData.height}</span>
+                        <span className="text-gray-600 font-medium">Length</span>
+                        <span className="font-semibold">{displayData.length}</span>
                       </div>
                     )}
                     {displayData.pile_height && (
@@ -484,26 +492,9 @@ export default function QRResult() {
               <QrCode className="w-6 h-6 text-blue-600" />
               <h3 className="text-xl font-bold text-gray-900">Rajdhani Trace System</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600">
               Complete product traceability and quality management system
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Download Report
-              </Button>
-              <Button variant="outline">
-                <Share className="w-4 h-4 mr-2" />
-                Share Product
-              </Button>
-              <Button 
-                onClick={() => window.location.href = '/'}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-            </div>
           </div>
         </div>
       </div>

@@ -1,0 +1,27 @@
+# INDIVIDUAL PRODUCTS TEMPLATE - Fill this sheet last (after all other sheets)
+# Each row = One batch of individual products to create
+# IMPORTANT: Product Name must exactly match Product Name from PRODUCTS sheet
+# System will automatically create QR codes for each individual product
+
+Product Name,Quantity to Create,Production Date,Quality Grade,Storage Location,Notes
+"Premium Carpet 6x9",10,"2024-01-15","A","Warehouse A","High quality batch - Persian design"
+"Luxury Rug 8x10",5,"2024-01-16","A+","Warehouse B","Premium silk batch - Geometric pattern"
+"Traditional Mat 3x5",20,"2024-01-17","A","Warehouse A","Traditional design batch - Green color"
+"Office Carpet 12x15",8,"2024-01-18","A","Warehouse C","Durable office batch - Gray color"
+"Kids Play Mat 4x6",15,"2024-01-19","A","Warehouse B","Colorful play batch - Multi-color"
+
+# INSTRUCTIONS:
+# 1. Product Name: Must exactly match Product Name from PRODUCTS sheet (REQUIRED)
+# 2. Quantity to Create: How many individual pieces to create (REQUIRED)
+# 3. Production Date: When these products were made (format: YYYY-MM-DD)
+# 4. Quality Grade: Choose from: A+, A, B, C, D
+# 5. Storage Location: Where these products are stored (e.g., "Warehouse A", "Shelf 1")
+# 6. Notes: Any additional information about this batch
+#
+# EXAMPLE:
+# If you write "Premium Carpet 6x9" and "10" in quantity, the system will create:
+# - 10 individual carpet pieces
+# - Each with a unique QR code
+# - All linked to the "Premium Carpet 6x9" product
+# - All stored in "Warehouse A"
+# - All with "A" quality grade

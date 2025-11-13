@@ -1,0 +1,30 @@
+# PRODUCT RECIPES TEMPLATE - Fill this sheet fourth (after products and raw materials)
+# Each row = One material needed to make a product
+# IMPORTANT: Product Name must exactly match Product Name from PRODUCTS sheet
+# IMPORTANT: Material Name must exactly match Material Name from RAW MATERIALS sheet
+
+Product Name,Material Name,Material Type,Quantity Needed,Unit,Cost Per Unit,Total Cost,Production Time (Minutes),Difficulty Level
+"Premium Carpet 6x9","Premium Cotton Yarn","raw_material",2.5,kg,450,1125,120,"Medium"
+"Premium Carpet 6x9","Reactive Dye Blue","raw_material",0.5,liters,350,175,30,"Easy"
+"Premium Carpet 6x9","Backing Cloth","raw_material",1.2,sqm,85,102,60,"Easy"
+"Luxury Rug 8x10","Pure Silk Fabric","raw_material",3.0,meters,1200,3600,180,"Hard"
+"Luxury Rug 8x10","Reactive Dye Blue","raw_material",0.8,liters,350,280,45,"Easy"
+"Luxury Rug 8x10","Chemical Coating","raw_material",0.3,liters,450,135,30,"Medium"
+"Traditional Mat 3x5","Premium Cotton Yarn","raw_material",1.0,kg,450,450,60,"Easy"
+"Traditional Mat 3x5","Reactive Dye Blue","raw_material",0.2,liters,350,70,15,"Easy"
+"Office Carpet 12x15","Premium Cotton Yarn","raw_material",4.0,kg,450,1800,240,"Medium"
+"Office Carpet 12x15","Backing Cloth","raw_material",2.5,sqm,85,212.5,90,"Easy"
+"Office Carpet 12x15","Adhesive Glue","raw_material",0.5,kg,320,160,30,"Easy"
+"Kids Play Mat 4x6","Premium Cotton Yarn","raw_material",1.5,kg,450,675,90,"Easy"
+"Kids Play Mat 4x6","Reactive Dye Blue","raw_material",0.4,liters,350,140,20,"Easy"
+
+# INSTRUCTIONS:
+# 1. Product Name: Must exactly match Product Name from PRODUCTS sheet (REQUIRED)
+# 2. Material Name: Must exactly match Material Name from RAW MATERIALS sheet (REQUIRED)
+# 3. Material Type: Write "raw_material" for materials, "product" if using other products as ingredients
+# 4. Quantity Needed: How much of this material is needed to make one product (REQUIRED)
+# 5. Unit: Unit of measurement (kg, meters, liters, etc.) (REQUIRED)
+# 6. Cost Per Unit: Price per unit (usually same as in RAW MATERIALS sheet)
+# 7. Total Cost: Quantity × Cost Per Unit
+# 8. Production Time: How many minutes this step takes
+# 9. Difficulty Level: Choose from: Easy, Medium, Hard

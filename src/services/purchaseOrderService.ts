@@ -1,7 +1,7 @@
 import { supabase, handleSupabaseError, PurchaseOrder } from '@/lib/supabase';
 import { logAudit } from './auditService';
 import { NotificationService } from './notificationService';
-import { RawMaterialService } from './rawMaterialService';
+import { RawMaterialService as MongoDBRawMaterialService } from './api/rawMaterialService';
 
 export interface CreatePurchaseOrderData {
   supplier_name: string;
@@ -239,9 +239,7 @@ export class PurchaseOrderService {
       if (!materialDetails) return;
 
       // Find existing material by name, supplier, and unit
-      const { data: materials } = await RawMaterialService.getRawMaterials({
-        search: materialDetails.material_name
-      });
+      const { data: materials } = await MongoDBRawMaterialService.getRawMaterials();
 
       const existingMaterial = materials?.find(material =>
         material.name === materialDetails.material_name &&
@@ -252,7 +250,7 @@ export class PurchaseOrderService {
       if (existingMaterial) {
         // Update existing material stock
         const newStock = existingMaterial.current_stock + materialDetails.quantity;
-        await RawMaterialService.updateRawMaterial(existingMaterial.id, {
+        await MongoDBRawMaterialService.updateRawMaterial(existingMaterial.id, {
           current_stock: newStock,
           cost_per_unit: materialDetails.cost_per_unit,
           last_restocked: new Date().toISOString(),
@@ -261,9 +259,8 @@ export class PurchaseOrderService {
         console.log(`✅ Updated existing material stock for ${materialDetails.material_name}`);
       } else {
         // Create new material
-        await RawMaterialService.createRawMaterial({
+        await MongoDBRawMaterialService.createRawMaterial({
           name: materialDetails.material_name,
-          brand: materialDetails.material_brand,
           category: materialDetails.material_category || 'Other',
           current_stock: materialDetails.quantity,
           unit: materialDetails.unit,
@@ -290,9 +287,7 @@ export class PurchaseOrderService {
       if (!materialDetails || !materialDetails.is_restock) return;
 
       // Find the material and update its status
-      const { data: materials } = await RawMaterialService.getRawMaterials({
-        search: materialDetails.material_name
-      });
+      const { data: materials } = await MongoDBRawMaterialService.getRawMaterials();
 
       const material = materials?.find(m =>
         m.name === materialDetails.material_name &&
@@ -301,7 +296,7 @@ export class PurchaseOrderService {
       );
 
       if (material) {
-        await RawMaterialService.updateRawMaterial(material.id, {
+        await MongoDBRawMaterialService.updateRawMaterial(material.id, {
           status: 'in-transit'
         });
         console.log(`✅ Updated ${materialDetails.material_name} status to in-transit`);

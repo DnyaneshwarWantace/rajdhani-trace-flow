@@ -17,9 +17,8 @@ export interface CreateProductData {
   base_quantity?: number;
   qr_code?: string;
   weight?: string;
-  thickness?: string;
   width?: string;
-  height?: string;
+  length?: string;
   image_url?: string;
 }
 
@@ -33,7 +32,6 @@ export interface CreateIndividualProductData {
   batch_number?: string;
   production_date: string;
   final_weight?: string;
-  final_thickness?: string;
   quality_grade?: 'A+' | 'A' | 'B' | 'C';
   inspector?: string;
   production_notes?: string;
@@ -101,9 +99,8 @@ export class ProductService {
         min_stock_level: productData.min_stock_level || 10,
         max_stock_level: productData.max_stock_level || 1000,
         weight: productData.weight?.trim() || null,
-        thickness: productData.thickness?.trim() || null,
         width: productData.width?.trim() || null,
-        height: productData.height?.trim() || null,
+        length: productData.length?.trim() || null,
         image_url: productData.image_url || null
       };
 
@@ -160,9 +157,8 @@ export class ProductService {
             production_date,
             inspector,
             final_weight,
-            final_thickness,
             final_width,
-            final_height,
+            final_length,
             notes,
             location
           )
@@ -241,7 +237,7 @@ export class ProductService {
       }
 
       // Calculate actual quantities and status for each product
-      const processedData = data?.map(product => {
+      const processedData = await Promise.all(data?.map(async product => {
         console.log(`Processing product ${product.name}:`, {
           individual_products: product.individual_products,
           individual_products_count: product.individual_products?.length || 0
@@ -266,7 +262,7 @@ export class ProductService {
         const actualStatus = this.calculateProductStatus(actualQuantity, product.min_stock_level);
 
         // Generate QR code if not exists
-        const productQRCode = product.qr_code || this.generateQRCode(product.id);
+        const productQRCode = product.qr_code || await this.generateQRCode(product.id);
 
         // Map database fields to UI expected format
         return {
@@ -283,9 +279,8 @@ export class ProductService {
           notes: product.notes || '',
           imageUrl: product.image_url,
           weight: product.weight || '',
-          thickness: product.thickness || '',
           width: product.width || '',
-          height: product.height || '',
+          length: product.length || '',
           manufacturingDate: product.manufacturing_date,
           individualStockTracking: product.individual_stock_tracking || false,
           minStockLevel: product.min_stock_level || 10,
@@ -305,12 +300,10 @@ export class ProductService {
             completionDate: ind.completion_date,
             materialsUsed: [], // Materials used would need separate query
             finalWeight: ind.final_weight || ind.weight || product.weight || '',
-            finalThickness: ind.final_thickness || ind.thickness || product.thickness || '',
             finalWidth: ind.final_width || ind.width || product.width || '',
-            finalHeight: ind.final_height || ind.height || product.height || '',
+            finalLength: ind.final_length || ind.length || product.length || '',
             width: ind.width || product.width || '',
-            height: ind.height || product.height || '',
-            thickness: ind.thickness || product.thickness || '',
+            length: ind.length || product.length || '',
             weight: ind.weight || product.weight || '',
             color: ind.color || product.color || '',
             pattern: ind.pattern || product.pattern || '',
@@ -327,7 +320,7 @@ export class ProductService {
           total_produced: product.individual_products?.length || 0,
           actual_status: actualStatus
         };
-      });
+      }) || []);
 
       return { data: processedData || [], error: null, count: count || 0 };
 
@@ -374,7 +367,7 @@ export class ProductService {
       const actualStatus = this.calculateProductStatus(actualQuantity, data.min_stock_level);
 
       // Generate QR code if not exists
-      const productQRCode = data.qr_code || this.generateQRCode(data.id);
+      const productQRCode = data.qr_code || await this.generateQRCode(data.id);
 
       const processedData = {
         id: data.id,
@@ -390,9 +383,8 @@ export class ProductService {
         notes: data.notes || '',
         imageUrl: data.image_url,
         weight: data.weight || '',
-        thickness: data.thickness || '',
         width: data.width || '',
-        height: data.height || '',
+        length: data.length || '',
         manufacturingDate: data.manufacturing_date,
         individualStockTracking: data.individual_stock_tracking || false,
         materialsUsed: [], // Empty array for now since recipe system isn't set up
@@ -480,7 +472,7 @@ export class ProductService {
       }
 
       // Generate unique QR code
-      const qrCode = this.generateQRCode(productData.product_id, productData.batch_number);
+      const qrCode = await this.generateQRCode(productData.product_id, productData.batch_number);
 
       // Prepare individual product data
       const newIndividualProduct = {
@@ -489,7 +481,6 @@ export class ProductService {
         batch_number: productData.batch_number?.trim() || null,
         production_date: productData.production_date,
         final_weight: productData.final_weight?.trim() || null,
-        final_thickness: productData.final_thickness?.trim() || null,
         quality_grade: productData.quality_grade || 'A',
         inspector: productData.inspector?.trim() || null,
         status: 'available' as const,
@@ -530,7 +521,7 @@ export class ProductService {
   // Generate QR code for individual product
   static async generateIndividualProductQRCode(individualProductId: string): Promise<{ qrCodeURL: string | null; error: string | null }> {
     try {
-      // Get individual product with full details (without product_recipes to avoid 406 errors)
+      // Get individual product with basic details (simplified to avoid 400 errors)
       const { data: individualProduct } = await supabase
         .from('individual_products')
         .select(`
@@ -540,25 +531,8 @@ export class ProductService {
             category,
             color,
             width,
-            height,
-            pattern,
-            product_recipes (
-              *,
-              recipe_materials (
-                quantity,
-                unit,
-                raw_materials (name)
-              )
-            )
-          ),
-          production_batches (
-            batch_number,
-            production_steps (
-              step_name,
-              completed_at,
-              operator,
-              quality_check_passed
-            )
+            length,
+            pattern
           )
         `)
         .eq('id', individualProductId)
@@ -579,8 +553,7 @@ export class ProductService {
         quality_grade: individualProduct.quality_grade || 'A',
         dimensions: {
           length: parseFloat(individualProduct.final_width || '0'),
-          width: parseFloat(individualProduct.final_height || '0'),
-          thickness: parseFloat(individualProduct.final_thickness || '0')
+          width: parseFloat(individualProduct.final_length || '0')
         },
         weight: parseFloat(individualProduct.final_weight || '0'),
         color: individualProduct.products.color || '',
@@ -612,21 +585,12 @@ export class ProductService {
   // Generate QR code for main product
   static async generateMainProductQRCode(productId: string): Promise<{ qrCodeURL: string | null; error: string | null }> {
     try {
-      // Get product with full details
+      // Get product with full details (without product_recipes to avoid 406 errors)
       const { data: product } = await supabase
         .from('products')
         .select(`
           *,
-          individual_products (status),
-          product_recipes (
-            production_time,
-            difficulty_level,
-            recipe_materials (
-              quantity,
-              unit,
-              raw_materials (id, name)
-            )
-          )
+          individual_products (status)
         `)
         .eq('id', productId)
         .single();
@@ -678,8 +642,8 @@ export class ProductService {
   }
 
   // Generate QR code for individual products
-  private static generateQRCode(productId: string, batchNumber?: string): string {
-    return IDGenerator.generateQRCode();
+  private static async generateQRCode(productId: string, batchNumber?: string): Promise<string> {
+    return await IDGenerator.generateQRCode();
   }
 
   // Update product stock status based on individual products
@@ -829,7 +793,6 @@ export class ProductService {
         ...(updateData.batch_number !== undefined && { batch_number: updateData.batch_number?.trim() || null }),
         ...(updateData.production_date && { production_date: updateData.production_date }),
         ...(updateData.final_weight !== undefined && { final_weight: updateData.final_weight?.trim() || null }),
-        ...(updateData.final_thickness !== undefined && { final_thickness: updateData.final_thickness?.trim() || null }),
         ...(updateData.quality_grade && { quality_grade: updateData.quality_grade }),
         ...(updateData.inspector !== undefined && { inspector: updateData.inspector?.trim() || null }),
         ...(updateData.status && { status: updateData.status }),

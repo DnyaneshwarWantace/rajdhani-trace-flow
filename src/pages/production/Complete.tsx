@@ -19,14 +19,17 @@ import {
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
 import { IDGenerator } from "@/lib/idGenerator";
-import { ProductionFlowService } from "@/services/productionFlowService";
-import { supabase } from "@/lib/supabase";
+// TODO: Replace ProductionFlowService with MongoDB implementation when available
 import { getProductionFlow, updateProductionStep } from "@/lib/machines";
 import { Loading } from "@/components/ui/loading";
 import ProductionProgressBar from "@/components/production/ProductionProgressBar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QRCodeService, IndividualProductQRData } from "@/lib/qrCode";
-import { individualProductService } from "@/services/individualProductService";
+import { IndividualProductService } from "@/services/api/individualProductService";
+import ProductService from "@/services/api/productService";
+import MaterialConsumptionService from "@/services/api/materialConsumptionService";
+import { ProductionService } from "@/services/api/productionService";
+import { DropdownService } from "@/services/api/dropdownService";
 
 interface ProductionProduct {
   id: string;
@@ -46,10 +49,9 @@ interface ProductionProduct {
   expectedProduct: {
     name: string;
     category: string;
-    height: string;
+    length: string;
     width: string;
     weight: string;
-    thickness: string;
     materialComposition: string;
     qualityGrade: string;
   };
@@ -63,9 +65,8 @@ interface IndividualProduct {
   customId: string;
   manufacturingDate: string;
   finalWeight: string;
-  finalThickness: string;
   finalWidth: string;
-  finalHeight: string;
+  finalLength: string;
   qualityGrade: "A+" | "A" | "B" | "C" | "D";
   status: "available" | "damaged";
   inspector: string;
@@ -78,22 +79,28 @@ interface IndividualProduct {
     qualityNotes?: string;
   }>;
   notes: string;
+  // Unit information for display
+  weightUnit?: string;
+  widthUnit?: string;
+  lengthUnit?: string;
 }
 
 export default function Complete() {
-  const { productId } = useParams();
+  const { batchId } = useParams();
+  const productId = batchId as string;
   const navigate = useNavigate();
   const [productionProduct, setProductionProduct] = useState<any>(null);
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
   const [editValue, setEditValue] = useState("");
-  const [inspector, setInspector] = useState("Admin");
+  const [inspector, setInspector] = useState("");
   const [productionFlow, setProductionFlow] = useState<any>(null);
   const [productionSteps, setProductionSteps] = useState<any[]>([]);
   const [showValidationPopup, setShowValidationPopup] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Array<{index: number, productId: string, missingFields: string[]}>>([]);
   const [showCompletionPopup, setShowCompletionPopup] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [qualityRatings, setQualityRatings] = useState<string[]>([]);
   const [completionSummary, setCompletionSummary] = useState<{
     totalProducts: number;
     available: number;
@@ -101,179 +108,245 @@ export default function Complete() {
     averageQuality: string;
   } | null>(null);
 
-  // Function to generate globally unique custom ID
-  const generateGloballyUniqueCustomId = (productName: string): string => {
-    // Get all existing individual products from storage
-    // Individual products are loaded from Supabase database
-    const allIndividualProducts: any[] = [];
-    
-    // Create product prefix from first 3 characters
-    const prefix = productName.substring(0, 3).toUpperCase();
-    
-    // Find all existing IDs with this prefix
-    const existingIds = allIndividualProducts
-      .filter((product: any) => product.customId?.startsWith(prefix + '-'))
-      .map((product: any) => product.customId);
-    
-    // Also include current batch IDs to avoid conflicts
-    const currentBatchIds = individualProducts.map(p => p.customId);
-    const allExistingIds = [...existingIds, ...currentBatchIds];
-    
-    // Find the next available number
-    let counter = 1;
-    let newId = `${prefix}-${String(counter).padStart(3, '0')}`;
-    
-    while (allExistingIds.includes(newId)) {
-      counter++;
-      newId = `${prefix}-${String(counter).padStart(3, '0')}`;
+  // Load quality rating options from database
+  const loadQualityRatings = async () => {
+    try {
+      const data = await DropdownService.getProductionDropdownData();
+      const opts = data?.quality_ratings?.filter((o: any) => o.is_active !== false).map((o: any) => o.value) || [];
+      if (opts.length) {
+        setQualityRatings(opts as string[]);
+        return;
+      }
+    } catch (e) {}
+    setQualityRatings(["A+", "A", "B", "C", "D"]);
+  };
+
+  // Function to generate globally unique custom ID using database
+  const generateGloballyUniqueCustomId = async (productName: string): Promise<string> => {
+    try {
+      // Create product prefix from first 3 characters
+      const prefix = productName.substring(0, 3).toUpperCase();
+      
+      // Fallback to timestamp-based ID for MongoDB
+      const timestamp = Date.now().toString().slice(-6);
+      return `${prefix}-${timestamp}`;
+      
+    } catch (error) {
+      console.warn('Error generating custom ID:', error);
+      // Fallback to timestamp-based ID
+      const timestamp = Date.now().toString().slice(-6);
+      return `${productName.substring(0, 3).toUpperCase()}-${timestamp}`;
     }
-    
-    return newId;
   };
 
   useEffect(() => {
     if (productId) {
-      // Load production data from Supabase like other pages
+      loadQualityRatings();
+      // Load production product data (MongoDB)
       const loadProductionData = async () => {
         try {
           console.log('🔍 Loading production data for Complete page, productId:', productId);
           
-          // Load the production flow from Supabase
-          const flow = await ProductionFlowService.getProductionFlow(productId);
-          console.log('🔍 Production flow loaded for Complete page:', flow);
-          
-          if (flow) {
-        setProductionFlow(flow);
-            
-            // Load actual product data from database
-            // Extract product name from flow name format: "Product Name Production Flow - Batch PRO-xxx"
-            const flowName = flow.flow_name || '';
-            const productName = flowName.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
-            
-            const { data: products, error: productsError } = await supabase
-              .from('products')
-              .select('*')
-              .eq('name', productName)
-              .single();
-            
-            console.log('🔍 Loaded actual product data:', products);
-            
-            // Load material consumption data to get actual materials used
-            // First try with batch ID, then fallback to product ID
-            let { data: materialsConsumed, error: materialsError } = await supabase
-              .from('material_consumption')
-              .select('*')
-              .eq('production_product_id', flow.production_product_id);
+          // Load material consumption for this batch to populate materialsConsumed
+          const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+            production_batch_id: productId
+          });
+          const rawConsumed = (consumptionResp?.data || []).map((m: any) => ({
+            materialId: m.material_id,
+            materialName: m.material_name || 'Unknown Material',
+            quantity: m.quantity_used || 0,
+            unit: m.unit || 'units',
+            cost: m.total_cost || (m.cost_per_unit || 0) * (m.quantity_used || 0),
+            consumedAt: m.consumed_at
+          }));
 
-            // If no records found with batch ID, try with product ID
-            if (!materialsConsumed || materialsConsumed.length === 0) {
-              console.log('No material consumption found with batch ID, trying with product ID...');
+          // De-duplicate by materialId+unit and sum quantities
+          const aggMap = new Map<string, any>();
+          rawConsumed.forEach((item) => {
+            const key = `${item.materialId}__${item.unit}`;
+            const existing = aggMap.get(key);
+            if (existing) {
+              existing.quantity += item.quantity;
+            } else {
+              aggMap.set(key, { ...item });
+            }
+          });
+          const materialsConsumed = Array.from(aggMap.values());
+
+          // Load batch to get product_id and details
+          let batchData: any = null;
+          try {
+            const { data: batchResp } = await ProductionService.getProductionBatchById(productId);
+            batchData = batchResp || null;
+          } catch (e) {
+            batchData = null;
+          }
+
+          // Load product details
+          let productData: any = null;
+          if (batchData?.product_id) {
+            try {
+              const { data: prod } = await ProductService.getProductById(batchData.product_id);
+              productData = prod || null;
+            } catch (e) {
+              productData = null;
+            }
+          }
+
+          const productionProduct: ProductionProduct = {
+            id: productId || 'unknown',
+            productId: (batchData?.product_id) || productId || 'unknown',
+            productName: (productData?.name) || (batchData?.product_name) || 'Unknown Product',
+            category: productData?.category || 'Carpet',
+            color: productData?.color || 'N/A',
+            size: productData?.size || 'N/A',
+            pattern: productData?.pattern || 'N/A',
+            targetQuantity: batchData?.batch_size || 1,
+            priority: 'normal',
+            status: 'active',
+            expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            createdAt: new Date().toISOString(),
+            materialsConsumed,
+            wasteGenerated: [],
+            expectedProduct: {
+              name: (productData?.name) || 'Unknown Product',
+              category: productData?.category || 'Carpet',
+              length: productData?.length || productData?.dimensions?.length || 'N/A',
+              width: productData?.width || productData?.dimensions?.width || 'N/A',
+              weight: productData?.weight || 'N/A',
+              materialComposition: (productData?.material_composition || productData?.materialComposition ||
+                (materialsConsumed && materialsConsumed.length > 0
+                  ? Array.from(new Set(materialsConsumed.map((m: any) => m.materialName))).join(', ')
+                  : 'N/A')
+              ),
+              qualityGrade: 'A'
+            },
+            notes: ''
+          };
+          setProductionProduct(productionProduct);
+
+          // Auto-generate individual product rows if none exist
+          if (individualProducts.length === 0) {
+            const defaultUnits = {
+              weightUnit: productData?.weight_unit || 'kg',
+              widthUnit: productData?.width_unit || 'm',
+              lengthUnit: productData?.length_unit || 'm'
+            };
+            const rows: IndividualProduct[] = Array.from({ length: Math.max(1, productionProduct.targetQuantity || 1) }).map((_, idx) => ({
+              id: '', // Will be generated by backend
+              qrCode: '', // Will be generated on completion
+              productId: productionProduct.productId,
+              customId: '', // Will be generated by backend to avoid duplicates
+              manufacturingDate: new Date().toISOString().split('T')[0],
+              finalWeight: '',
+              finalWidth: '',
+              finalLength: '',
+              qualityGrade: 'A',
+              status: 'available',
+              inspector: inspector || '',
+              productionSteps: [],
+              notes: '',
+              ...defaultUnits
+            }));
+            setIndividualProducts(rows);
+          }
+          
+          // Load flow and steps for accurate stage statuses
+          try {
+            const { data: flow } = await ProductionService.getProductionFlowByBatchId(productId);
+            if (flow) {
+              setProductionFlow(flow);
+              const { data: steps } = await ProductionService.getProductionFlowSteps(flow.id);
               
-              if (products) {
-                const { data: fallbackMaterials, error: fallbackError } = await supabase
-                  .from('material_consumption')
-                  .select('*')
-                  .eq('production_product_id', products.id);
+              // Extract inspector name from first machine operation step
+              const inspectorName = steps?.find((step: any) => step.step_type === 'machine_operation' && step.inspector_name)?.inspector_name || '';
+              if (inspectorName) {
+                setInspector(inspectorName);
+                console.log('✅ Extracted inspector name from production steps:', inspectorName);
                 
-                if (fallbackMaterials && fallbackMaterials.length > 0) {
-                  materialsConsumed = fallbackMaterials;
-                  console.log('✅ Found material consumption records with product ID:', products.id);
+                // Update existing individual products with inspector name if they don't have one
+                setIndividualProducts(prev => prev.map(ip => ({
+                  ...ip,
+                  inspector: ip.inspector || inspectorName
+                })));
+              }
+              setProductionSteps(steps || []);
+
+              // Ensure wastage step is completed for Complete page
+              const wasteStep = (steps || []).find((s: any) => s.step_type === 'wastage_tracking');
+              if (wasteStep && wasteStep.status !== 'completed') {
+                try {
+                  await ProductionService.updateProductionFlowStep(wasteStep.id, {
+                    status: 'completed',
+                    end_time: new Date().toISOString(),
+                    notes: 'Auto-marked completed on Complete page'
+                  } as any);
+                  wasteStep.status = 'completed';
+                  setProductionSteps([...(steps || [])]);
+                } catch (e) {
+                  console.error('Error auto-completing waste step:', e);
+                }
+              } else if (!wasteStep) {
+                try {
+                  await ProductionService.createProductionFlowStep({
+                    flow_id: flow.id,
+                    step_name: 'Waste Generation',
+                    step_type: 'wastage_tracking',
+                    status: 'completed',
+                    order_index: ((steps || []).length || 0) + 1,
+                    inspector_name: 'System'
+                  });
+                  const { data: refreshed } = await ProductionService.getProductionFlowSteps(flow.id);
+                  setProductionSteps(refreshed || []);
+                } catch (e) {
+                  console.error('Error creating waste step on Complete page:', e);
                 }
               }
+            } else {
+              setProductionFlow(null);
+              setProductionSteps([]);
             }
-            
-            console.log('🔍 Loaded materials consumed:', materialsConsumed);
-            
-            // Create production product with real data
-            const productionProduct: ProductionProduct = {
-              id: flow.production_product_id, // This is the batch ID
-              productId: products?.id, // This should be the actual product ID from database
-              productName: productName, // Use the extracted product name
-              category: products?.category || 'Carpet',
-              color: products?.color || 'Standard',
-              size: products?.size || 'N/A',
-              pattern: products?.pattern || 'N/A',
-              targetQuantity: 1,
-              priority: 'normal',
-              status: 'active',
-              expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-              createdAt: flow.created_at || new Date().toISOString(),
-              materialsConsumed: (materialsConsumed || []).map((m: any) => ({
-                materialId: m.material_id,
-                materialName: m.material_name || 'Unknown Material',
-                quantity: m.quantity_used || m.consumed_quantity || 0,
-                unit: m.unit || 'units',
-                cost: m.cost_per_unit || 0,
-                consumedAt: m.consumed_at || m.created_at
-              })),
-              wasteGenerated: [],
-              expectedProduct: {
-                name: flow.flow_name.replace(' Production Flow', ''),
-                category: products?.category || 'Carpet',
-                height: products?.height || 'N/A',
-                width: products?.width || 'N/A',
-                weight: products?.weight || 'N/A',
-                thickness: products?.thickness || 'N/A',
-                materialComposition: materialsConsumed && materialsConsumed.length > 0 
-                  ? materialsConsumed.map(m => m.material_name).join(', ')
-                  : products?.material_composition || 'N/A',
-                qualityGrade: 'A'
-              },
-              notes: ''
-            };
-            setProductionProduct(productionProduct);
-            console.log('✅ Created production product for Complete page:', productionProduct);
-            
-            // Load production steps
-            const steps = await ProductionFlowService.getFlowSteps(flow.id);
-            if (steps) {
-              // Set all production steps for progress tracking
-              setProductionSteps(steps);
-              
-              // Filter only completed steps for individual product history
-              const completedSteps = steps.filter(s => s.status === 'completed').map(step => ({
-                stepName: step.step_name,
-                machineUsed: step.machine_id || 'Unknown',
-                inspector: step.inspector_name || 'Unknown',
-                completedAt: step.end_time || '',
-                qualityNotes: step.notes || ''
-              }));
-              
-              // Initialize individual products with production history
-        // Generate globally unique custom IDs for all products in this batch
-        const customIds = [];
-              for (let i = 0; i < productionProduct.targetQuantity; i++) {
-                customIds.push(generateGloballyUniqueCustomId(productionProduct.productName));
-        }
-        
-              const initialProducts: IndividualProduct[] = await Promise.all(Array.from({ length: productionProduct.targetQuantity }, async (_, index) => ({
-          id: await IDGenerator.generateUniqueIndividualProductId(),
-          qrCode: IDGenerator.generateQRCode(),
-                productId: productionProduct.productId,
-          customId: customIds[index],
-          manufacturingDate: new Date().toISOString().split('T')[0],
-          finalWeight: "",
-          finalThickness: "",
-          finalWidth: "",
-          finalHeight: "",
-          qualityGrade: "A" as const,
-          status: "available" as const,
-          inspector: inspector,
-          inspectorId: generateUniqueId('INSP'),
-          productionSteps: completedSteps,
-          notes: ""
-        })));
-        setIndividualProducts(initialProducts);
-            }
-          } else {
-            console.error('❌ No production flow found for Complete page, productId:', productId);
+          } catch (e) {
+            console.error('Error loading flow/steps for Complete page:', e);
+            setProductionFlow(null);
+            setProductionSteps([]);
           }
+
+          // Recipe/material UI loading removed for this stage status fix
         } catch (error) {
-          console.error('❌ Error loading production data for Complete page:', error);
+          console.error('❌ Error loading production data:', error);
+          // Set a fallback production product to prevent infinite loading
+          const fallbackProduct: ProductionProduct = {
+            id: productId || 'unknown',
+            productId: productId || 'unknown',
+            productName: 'Unknown Product',
+            category: 'Unknown',
+            color: 'Unknown',
+            size: 'Unknown',
+            pattern: 'Unknown',
+            targetQuantity: 1,
+            priority: 'normal',
+            status: 'active',
+            expectedCompletion: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            materialsConsumed: [],
+            wasteGenerated: [],
+            expectedProduct: {
+              name: 'Unknown Product',
+              category: 'Unknown',
+              length: '',
+              width: '',
+              weight: '',
+              materialComposition: '',
+              qualityGrade: 'A+'
+            },
+            notes: ''
+          };
+          setProductionProduct(fallbackProduct);
         }
       };
-      
       loadProductionData();
+      
     }
   }, [productId, inspector]);
 
@@ -286,10 +359,35 @@ export default function Complete() {
     if (editingCell) {
       const newData = [...individualProducts];
       const { row, col } = editingCell;
-      newData[row] = { ...newData[row], [col]: editValue };
+      
+      let valueToSave = editValue;
+      
+      // Auto-append units based on field type if user didn't include them
+      if (productionProduct?.expectedProduct) {
+        const baseProduct = productionProduct.expectedProduct;
+        
+        if (col === 'finalWeight' && valueToSave && !valueToSave.includes('GSM') && !valueToSave.includes('kg')) {
+          // Extract unit from base weight (e.g., "400 GSM" -> "GSM")
+          const baseWeight = baseProduct.weight || '';
+          const weightUnit = baseWeight.includes('GSM') ? 'GSM' : baseWeight.includes('kg') ? 'kg' : 'GSM';
+          valueToSave = `${valueToSave.trim()} ${weightUnit}`;
+        } else if (col === 'finalWidth' && valueToSave && !valueToSave.includes('m') && !valueToSave.includes('feet')) {
+          // Extract unit from base width
+          const baseWidth = baseProduct.width || '';
+          const widthUnit = baseWidth.includes('feet') ? 'feet' : 'm';
+          valueToSave = `${valueToSave.trim()} ${widthUnit}`;
+        } else if (col === 'finalLength' && valueToSave && !valueToSave.includes('m') && !valueToSave.includes('feet')) {
+          // Extract unit from base length
+          const baseLength = baseProduct.length || '';
+          const lengthUnit = baseLength.includes('feet') ? 'feet' : 'm';
+          valueToSave = `${valueToSave.trim()} ${lengthUnit}`;
+        }
+      }
+      
+      newData[row] = { ...newData[row], [col]: valueToSave };
       setIndividualProducts(newData);
       
-      // Data is automatically saved to Supabase when completing production
+      // Data is automatically saved to MongoDB when completing production
       
       setEditingCell(null);
       setEditValue("");
@@ -301,7 +399,7 @@ export default function Complete() {
     setEditValue("");
   };
 
-  const addRow = () => {
+  const addRow = async () => {
     // Use production steps from state
     const completedSteps = productionSteps.filter(s => s.status === 'completed').map(step => ({
       stepName: step.step_name,
@@ -311,28 +409,29 @@ export default function Complete() {
       qualityNotes: step.notes || ''
     }));
     
+    // Get inspector name from production steps if not already set
+    const currentInspector = inspector || completedSteps.find(s => s.inspector && s.inspector !== 'Unknown')?.inspector || '';
 
     const newProduct: IndividualProduct = {
-      id: generateUniqueId('IND'),
-      qrCode: generateUniqueId('QR'),
+      id: '', // backend-generated on save
+      qrCode: '', // generated on completion
       productId: productionProduct.productId,
-      customId: generateGloballyUniqueCustomId(productionProduct.productName),
+      customId: '', // backend-generated unique custom ID
       manufacturingDate: new Date().toISOString().split('T')[0],
       finalWeight: "",
-      finalThickness: "",
       finalWidth: "",
-      finalHeight: "",
+      finalLength: "",
       qualityGrade: "A" as const,
       status: "available" as const,
-      inspector: inspector,
-      inspectorId: generateUniqueId('INSP'),
+      inspector: currentInspector,
+      inspectorId: '',
       productionSteps: completedSteps,
       notes: ""
     };
       const updatedProducts = [...individualProducts, newProduct];
       setIndividualProducts(updatedProducts);
       
-      // Data is automatically saved to Supabase when completing production
+      // Data is automatically saved to MongoDB when completing production
   };
 
   const removeRow = (index: number) => {
@@ -340,39 +439,16 @@ export default function Complete() {
     const updatedProducts = individualProducts.filter((_, i) => i !== index);
     setIndividualProducts(updatedProducts);
     
-    // Data is automatically saved to Supabase when completing production
+    // Data is automatically saved to MongoDB when completing production
   };
 
   const skipIndividualProductDetails = async () => {
-    if (!productionFlow) {
-      console.error('No production flow found');
-      return;
-    }
-
     try {
       console.log('Skipping individual product details');
-
-      // Create a completed individual product step to represent skipped individual product creation
-      const skippedStep = await ProductionFlowService.addStepToFlow({
-        flow_id: productionFlow.id,
-        step_name: 'N/A',
-        step_type: 'testing_individual',
-        order_index: productionSteps.length + 1,
-        machine_id: null, // No specific machine since it was skipped
-        inspector_name: 'System',
-        notes: 'Individual product details were skipped - no individual products were created'
-      });
-
-      // Mark the step as completed since it was skipped
-      if (skippedStep) {
-        await ProductionFlowService.completeFlowStep(skippedStep.id, 'Individual product details skipped by user');
-        console.log('✅ Skipped individual product step marked as completed:', skippedStep);
-      }
-
       // Navigate back to production overview
       navigate('/production');
     } catch (error) {
-      console.error('Error creating skipped individual product step:', error);
+      console.error('Error skipping individual product details:', error);
       // Still navigate back even if there's an error
       navigate('/production');
     }
@@ -395,12 +471,11 @@ export default function Complete() {
     
     try {
       // Validate all required fields are filled (excluding optional fields like notes)
-      const requiredFields = ['finalWeight', 'finalThickness', 'finalWidth', 'finalHeight', 'qualityGrade'];
+      const requiredFields = ['finalWeight', 'finalWidth', 'finalLength', 'qualityGrade'];
       const fieldLabels = {
       'finalWeight': 'Final Weight', 
-      'finalThickness': 'Final Thickness',
       'finalWidth': 'Final Width',
-      'finalHeight': 'Final Height',
+      'finalLength': 'Final Length',
       'qualityGrade': 'Quality Grade'
     };
     
@@ -428,36 +503,65 @@ export default function Complete() {
     }
 
     // Save individual products with complete production history and QR codes
+    const createdIds: string[] = [];
     for (const individualProduct of individualProducts) {
       try {
-        // Generate simple QR code string (not complex JSON object)
+        // Generate a QR code only on completion
         const individualProductQRCode = IDGenerator.generateQRCode();
-        
-        // Create in Supabase with batch ID for new batch system
-        const individualProductData: any = {
-          qr_code: individualProductQRCode,
-          product_id: individualProduct.productId,
-          product_name: productionProduct.productName, // Add missing required field
-          final_weight: individualProduct.finalWeight,
-          final_thickness: individualProduct.finalThickness,
-          final_width: individualProduct.finalWidth,
-          final_height: individualProduct.finalHeight,
-          quality_grade: individualProduct.qualityGrade,
-          status: individualProduct.status as 'available' | 'sold' | 'damaged' | 'in-production' | 'completed',
-          notes: individualProduct.notes,
-          production_date: individualProduct.manufacturingDate,
-          inspector: individualProduct.inspector
-        };
 
-        // Note: batch_id column doesn't exist in individual_products table
-        // The production batch information is tracked through the production flow
-
-        console.log('🔍 Saving to Supabase:', individualProductData);
-        const result = await individualProductService.createIndividualProduct(individualProductData);
+        // Create placeholder individual product (bulk API with quantity 1)
+        const result = await IndividualProductService.createIndividualProducts(
+          individualProduct.productId,
+          1,
+          {
+            batch_number: productId,
+            quality_grade: individualProduct.qualityGrade,
+            inspector: individualProduct.inspector || inspector || '', // Pass inspector name
+            notes: individualProduct.notes
+          }
+        );
         
         if (result.error) {
           console.error(`❌ Error creating individual product ${individualProduct.id}:`, result.error);
-          throw new Error(`Failed to create individual product: ${result.error.message}`);
+          throw new Error(`Failed to create individual product: ${result.error}`);
+        }
+
+        // Get created item id from bulk API response
+        // Bulk API returns: { data: { individual_products: [{id, qr_code, ...}] } }
+        const bulkData = result.data;
+        const createdItems = bulkData?.individual_products || [];
+        const createdId = createdItems[0]?.id;
+        
+        console.log(`🔍 Bulk API response:`, { bulkData, createdItems, createdId });
+        
+        if (createdId) {
+          createdIds.push(createdId);
+          
+          console.log(`📝 Updating individual product ${createdId} with final details...`);
+          console.log(`   Final Weight: ${individualProduct.finalWeight}`);
+          console.log(`   Final Width: ${individualProduct.finalWidth}`);
+          console.log(`   Final Length: ${individualProduct.finalLength}`);
+          
+          // Update final fields and QR code, inspector, status, and batch number
+          const updateResult = await IndividualProductService.updateIndividualProduct(createdId, {
+            final_weight: individualProduct.finalWeight,
+            final_width: individualProduct.finalWidth,
+            final_length: individualProduct.finalLength,
+            quality_grade: individualProduct.qualityGrade,
+            status: individualProduct.status as any,
+            production_date: individualProduct.manufacturingDate,
+            inspector: individualProduct.inspector,
+            notes: individualProduct.notes,
+          } as any);
+          
+          console.log(`✅ Updated individual product ${createdId} with final details:`, {
+            final_weight: individualProduct.finalWeight,
+            final_width: individualProduct.finalWidth,
+            final_length: individualProduct.finalLength,
+            updateResult
+          });
+        } else {
+          console.error(`❌ No createdId found! result.data:`, result.data);
         }
         
         console.log(`✅ Created individual product "${productionProduct.productName}" with QR code: ${individualProductQRCode}`);
@@ -466,111 +570,71 @@ export default function Complete() {
         // Continue with other products even if one fails
       }
     }
-    
-    // Individual products are saved to Supabase database only
 
-    // Update main product inventory in Supabase
+    // Persist created IDs for this batch so summary can show only these
+    try {
+      if (createdIds.length > 0) {
+        sessionStorage.setItem(`batch-created-individuals-${productId}`, JSON.stringify(createdIds));
+      }
+    } catch {}
+
+    // Individual products are saved to MongoDB database only
+
+    // Update main product inventory in MongoDB
     try {
       const availableCount = individualProducts.filter(p => p.status === "available").length;
       const damagedCount = individualProducts.filter(p => p.status === "damaged").length;
       
       console.log(`📊 Production completed: ${availableCount} available, ${damagedCount} damaged products`);
       
-      // Update product base_quantity in Supabase
-      const { data: currentProduct, error: productError } = await supabase
-        .from('products')
-        .select('base_quantity, status')
-        .eq('id', productionProduct.productId)
-        .single();
+      // Update product base_quantity in MongoDB
+      const { data: currentProduct, error: productError } = await ProductService.getProductById(productionProduct.productId);
       
       if (currentProduct && !productError) {
         const newQuantity = (currentProduct.base_quantity || 0) + availableCount;
         const newStatus = newQuantity <= 0 ? 'out-of-stock' : 
                                               newQuantity <= 5 ? 'low-stock' : 'in-stock';
       
-        await supabase
-          .from('products')
-          .update({
-            base_quantity: newQuantity,
-            status: newStatus,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', productionProduct.productId);
+        await ProductService.updateProduct(productionProduct.productId, {
+          base_quantity: newQuantity,
+          status: newStatus
+        });
         
         console.log(`✅ Updated product base_quantity: ${currentProduct.base_quantity} → ${newQuantity} (${newStatus})`);
         console.log(`✅ Production completed successfully! ${availableCount} individual products added to inventory.`);
         console.log(`✅ Both individual products created AND base_quantity increased.`);
       } else {
-        console.warn('⚠️ Could not update product base_quantity in Supabase:', productError);
+        console.warn('⚠️ Could not update product base_quantity in MongoDB:', productError);
         console.warn('⚠️ Individual products were created but base_quantity could not be updated.');
       }
+
+      // Mark batch as completed in backend with actual completion timestamp
+      try {
+        await ProductionService.updateProductionBatch(productId, {
+          status: 'completed' as any,
+          completion_date: new Date().toISOString() // Set actual completion date to NOW
+        });
+        console.log('✅ Production batch marked as completed with timestamp:', new Date().toISOString());
+        // Navigate back to Production to refresh list/status
+        navigate('/production', { replace: true });
+      } catch (e) {
+        console.error('❌ Error updating production batch status:', e);
+      }
+
+      // Optionally update flow status if available
+      try {
+        if (productionFlow?.id) {
+          // There is no dedicated updateProductionFlow in service; skipping for now
+          // Steps are already persisted; batch status drives UI
+        }
+      } catch {}
     } catch (error) {
       console.error('❌ Error updating product inventory:', error);
       console.error('❌ Individual products were created but there was an error updating inventory.');
     }
 
-    // Mark production as completed
-    // Production products are managed in Supabase database
-    const productionProducts: any[] = [];
-    const updatedProduction = productionProducts.map((p: any) => 
-      p.id === productionProduct.id ? { 
-        ...p, 
-        status: "completed",
-        completedAt: new Date().toISOString(),
-        finalInspector: inspector,
-        actualQuantity: individualProducts.length,
-        qualityDistribution: getQualityDistribution(individualProducts)
-      } : p
-    );
-    // Production products are managed in Supabase database only
-
-    // Update production flow status
-    if (productionFlow && productionFlow.status !== 'completed') {
-      const lastStep = productionSteps[productionSteps.length - 1];
-      if (lastStep) {
-        try {
-          await updateProductionStep(productionFlow.id, lastStep.id, {
-            status: 'completed',
-            endTime: new Date().toISOString(),
-            inspectorName: inspector
-          });
-          console.log('✅ Production flow step marked as completed');
-        } catch (error) {
-          console.error('❌ Error updating production flow step:', error);
-        }
-      }
-
-      // Update the production flow status to completed
-      try {
-        console.log('🔍 Updating production flow status to completed for flow ID:', productionFlow.id);
-        console.log('🔍 Current production flow status:', productionFlow.status);
-        console.log('🔍 Production flow data:', productionFlow);
-        
-        const { data: updateData, error: updateError } = await supabase
-          .from('production_flows')
-          .update({
-            status: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', productionFlow.id)
-          .select();
-        
-        if (updateError) {
-          console.error('❌ Error updating production flow status:', updateError);
-        } else {
-          console.log('✅ Production flow status updated to completed:', updateData);
-          
-          // Also update the local state
-          setProductionFlow(prev => ({
-            ...prev,
-            status: 'completed',
-            updated_at: new Date().toISOString()
-          }));
-        }
-      } catch (error) {
-        console.error('❌ Error updating production flow status:', error);
-      }
-    }
+    // Mark production as completed (local state only)
+    console.log('✅ Production completed locally');
 
     // Show completion summary popup
     setCompletionSummary({
@@ -614,11 +678,15 @@ export default function Complete() {
     return <Loading message="Loading individual product details..." />;
   }
 
+  // Get inspector name from first machine operation step
+  const inspectorName = productionSteps
+    .find((step: any) => step.step_type === 'machine_operation' && step.inspector_name)?.inspector_name || '';
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <Header 
         title="Complete Production"
-        subtitle={`Final product creation for ${productionProduct.productName}`}
+        subtitle={`Final product creation for ${productionProduct.productName}${inspectorName ? ` • Inspector: ${inspectorName}` : ''}`}
       />
 
       {/* Production Progress Bar */}
@@ -695,7 +763,7 @@ export default function Complete() {
                 value={inspector}
                 onChange={(e) => {
                   setInspector(e.target.value);
-                  // Inspector name is saved to Supabase when completing production
+                  // Inspector name is saved to MongoDB when completing production
                 }}
                 className="w-full"
               />
@@ -725,8 +793,8 @@ export default function Complete() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <Label className="text-sm text-gray-500">Expected Height</Label>
-              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.height || 'N/A'}</p>
+              <Label className="text-sm text-gray-500">Expected Length</Label>
+              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.length || 'N/A'}</p>
             </div>
             <div>
               <Label className="text-sm text-gray-500">Expected Width</Label>
@@ -735,10 +803,6 @@ export default function Complete() {
             <div>
               <Label className="text-sm text-gray-500">Expected Weight</Label>
               <p className="font-medium text-gray-900">{productionProduct.expectedProduct.weight || 'N/A'}</p>
-            </div>
-            <div>
-              <Label className="text-sm text-gray-500">Expected Thickness</Label>
-              <p className="font-medium text-gray-900">{productionProduct.expectedProduct.thickness || 'N/A'}</p>
             </div>
           </div>
           
@@ -778,7 +842,7 @@ export default function Complete() {
                         <div>
                           <h4 className="font-medium text-gray-900">{material.materialName}</h4>
                           <p className="text-sm text-gray-500">
-                            {material.materialBrand && `${material.materialBrand} • `}
+                            {material.materialType && `${material.materialType} • `}
                             {material.materialCategory}
                           </p>
                         </div>
@@ -828,13 +892,10 @@ export default function Complete() {
             <table className="w-full border-collapse border border-gray-200">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="border border-gray-200 p-2 text-left text-sm font-medium">Custom ID</th>
-                  <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Manufacturing Date</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
-                  <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Thickness</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                  <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Height</th>
+                  <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Quality Grade</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                   <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
@@ -844,27 +905,6 @@ export default function Complete() {
               <tbody>
                 {individualProducts.map((product, index) => (
                   <tr key={product.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-200 p-2">
-                      {editingCell?.row === index && editingCell?.col === 'customId' ? (
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                        />
-                      ) : (
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
-                          onClick={() => handleCellClick(index, 'customId')}
-                        >
-                          {product.customId}
-                  </div>
-                      )}
-                    </td>
-                    <td className="border border-gray-200 p-2 text-sm text-gray-600">
-                      {product.qrCode}
-                    </td>
                     <td className="border border-gray-200 p-2">
                       {editingCell?.row === index && editingCell?.col === 'manufacturingDate' ? (
                         <Input
@@ -892,7 +932,7 @@ export default function Complete() {
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder="e.g., 600 GSM"
+                          placeholder={`e.g., 2 ${product.weightUnit || 'kg'}`}
                         />
                       ) : (
                         <div
@@ -904,25 +944,6 @@ export default function Complete() {
                       )}
                     </td>
                     <td className="border border-gray-200 p-2">
-                      {editingCell?.row === index && editingCell?.col === 'finalThickness' ? (
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                          placeholder="e.g., 11mm"
-                        />
-                      ) : (
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded"
-                          onClick={() => handleCellClick(index, 'finalThickness')}
-                        >
-                          {product.finalThickness || "Click to edit"}
-                        </div>
-                      )}
-                    </td>
-                    <td className="border border-gray-200 p-2">
                       {editingCell?.row === index && editingCell?.col === 'finalWidth' ? (
                         <Input
                           value={editValue}
@@ -930,7 +951,7 @@ export default function Complete() {
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder="e.g., 1.83m"
+                          placeholder={`e.g., 4 ${product.widthUnit || 'feet'}`}
                         />
                       ) : (
                         <div
@@ -942,21 +963,21 @@ export default function Complete() {
                       )}
                     </td>
                     <td className="border border-gray-200 p-2">
-                      {editingCell?.row === index && editingCell?.col === 'finalHeight' ? (
+                      {editingCell?.row === index && editingCell?.col === 'finalLength' ? (
                         <Input
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder="e.g., 2.74m"
+                          placeholder={`e.g., 3 ${product.lengthUnit || 'feet'}`}
                         />
                       ) : (
                         <div
                           className="cursor-pointer p-1 hover:bg-blue-50 rounded"
-                          onClick={() => handleCellClick(index, 'finalHeight')}
+                          onClick={() => handleCellClick(index, 'finalLength')}
                         >
-                          {product.finalHeight || "Click to edit"}
+                          {product.finalLength || "Click to edit"}
                         </div>
                       )}
                     </td>
@@ -968,18 +989,18 @@ export default function Complete() {
                           newData[index].qualityGrade = value;
                           setIndividualProducts(newData);
                           
-                          // Data is automatically saved to Supabase when completing production
+                          // Data is automatically saved to MongoDB when completing production
                         }}
                       >
                         <SelectTrigger className="w-20">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="A+">A+</SelectItem>
-                          <SelectItem value="A">A</SelectItem>
-                          <SelectItem value="B">B</SelectItem>
-                          <SelectItem value="C">C</SelectItem>
-                          <SelectItem value="D">D</SelectItem>
+                          {qualityRatings.map(rating => (
+                            <SelectItem key={rating} value={rating}>
+                              {rating}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </td>
@@ -991,7 +1012,7 @@ export default function Complete() {
                           newData[index].status = value;
                           setIndividualProducts(newData);
                           
-                          // Data is automatically saved to Supabase when completing production
+                          // Data is automatically saved to MongoDB when completing production
                         }}
                       >
                         <SelectTrigger className="w-24">
@@ -1049,14 +1070,21 @@ export default function Complete() {
                 {individualProducts.filter(p => p.status === "available").length} products will be added to inventory
               </p>
               {(() => {
-                const requiredFields = ['finalWeight', 'finalThickness', 'finalWidth', 'finalHeight', 'qualityGrade'];
+                const requiredFields = ['finalWeight', 'finalWidth', 'finalLength', 'qualityGrade'];
+                if (individualProducts.length === 0) {
+                  return (
+                    <div className="text-sm text-red-600 mt-1">
+                      <p>⚠️ No individual product rows added. Please add at least 1 row.</p>
+                    </div>
+                  );
+                }
                 const incompleteProducts = individualProducts.filter(product => 
                   requiredFields.some(field => !product[field as keyof IndividualProduct] || product[field as keyof IndividualProduct] === "")
                 );
                 return incompleteProducts.length > 0 ? (
                   <div className="text-sm text-red-600 mt-1">
                     <p>⚠️ {incompleteProducts.length} products have incomplete data.</p>
-                    <p className="text-xs mt-1">Missing: Final Weight, Final Thickness, Final Width, Final Height, or Quality Grade</p>
+                    <p className="text-xs mt-1">Missing: Final Weight, Final Width, Final Length, or Quality Grade</p>
                   </div>
                 ) : (
                   <p className="text-sm text-green-600 mt-1">

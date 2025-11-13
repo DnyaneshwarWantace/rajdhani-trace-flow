@@ -52,23 +52,23 @@ export function BusinessInsights({ data, loading }: BusinessInsightsProps) {
   }
 
   // Inventory insights
-  const carpetLowStock = products.carpetLowStock || 0;
-  const carpetProducts = products.carpetProducts || 0;
-  const lowStockPercentage = carpetProducts > 0 ? Math.round((carpetLowStock / carpetProducts) * 100) : 0;
+  const totalProducts = products.total_products || 0;
+  const lowStockProducts = products.low_stock_products || 0;
+  const lowStockPercentage = totalProducts > 0 ? Math.round((lowStockProducts / totalProducts) * 100) : 0;
 
   if (lowStockPercentage > 30) {
     insights.push({
       type: "warning",
       icon: Package,
       title: "High Low Stock Alert",
-      message: `${lowStockPercentage}% of carpet products are low in stock. Consider restocking.`,
+      message: `${lowStockPercentage}% of products are low in stock. Consider restocking.`,
       action: "Review inventory"
     });
   }
 
   // Order insights
-  const totalOrders = orders.total || 0;
-  const completedOrders = (orders.delivered || 0) + (orders.dispatched || 0);
+  const totalOrders = orders.totalOrders || 0;
+  const completedOrders = orders.completedOrders || 0;
   const completionRate = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
 
   if (completionRate >= 85) {
@@ -82,8 +82,8 @@ export function BusinessInsights({ data, loading }: BusinessInsightsProps) {
   }
 
   // Customer insights
-  const totalCustomers = customers.total || 0;
-  const activeCustomers = customers.active || 0;
+  const totalCustomers = customers.totalCustomers || 0;
+  const activeCustomers = customers.activeCustomers || 0;
   const customerRetention = totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0;
 
   if (customerRetention >= 80) {
@@ -102,7 +102,7 @@ export function BusinessInsights({ data, loading }: BusinessInsightsProps) {
       type: "info",
       icon: Lightbulb,
       title: "Business Overview",
-      message: `You have ${totalOrders} orders, ${carpetProducts} carpet products, and ${totalCustomers} customers.`,
+      message: `You have ${totalOrders} orders, ${totalProducts} products, and ${totalCustomers} customers.`,
       action: "Monitor performance"
     });
   }

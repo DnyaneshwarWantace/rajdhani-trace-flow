@@ -1,0 +1,9 @@
+name,brand,category,current_stock,unit,min_threshold,max_capacity,reorder_point,supplier_name,cost_per_unit,batch_number,quality_grade,image_url
+"Premium Cotton Yarn","Premium Cotton","Yarn",500,"kg",50,1000,100,"Textile Suppliers Ltd",450,"BATCH-001","A+",""
+"Pure Silk Fabric","Luxury Silk","Fabric",200,"meters",20,500,40,"Fabric World Industries",1200,"BATCH-002","A",""
+"Reactive Dye Blue","Chemical Dyes","Dye",150,"liters",15,300,30,"Textile Suppliers Ltd",350,"BATCH-003","A",""
+"Polyester Thread 40s","Strong Thread","Thread",300,"kg",30,600,60,"Fabric World Industries",280,"BATCH-004","A",""
+"Backing Cloth","Strong Back","Fabric",400,"sqm",40,800,80,"Textile Suppliers Ltd",85,"BATCH-005","A",""
+"Wool Fiber","Natural Wool","Fiber",250,"kg",25,500,50,"Fabric World Industries",650,"BATCH-006","A+",""
+"Chemical Coating","Protective Coat","Coating",100,"liters",10,200,20,"Textile Suppliers Ltd",450,"BATCH-007","A",""
+"Adhesive Glue","Strong Bond","Adhesive",80,"kg",8,160,16,"Fabric World Industries",320,"BATCH-008","A",""

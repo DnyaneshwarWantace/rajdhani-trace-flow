@@ -16,13 +16,13 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
 
   // Order status distribution
   const orderStatusData = [
-    { name: "Pending", value: orders.pending || 0, color: "bg-yellow-500" },
-    { name: "Accepted", value: orders.accepted || 0, color: "bg-blue-500" },
-    { name: "In Production", value: orders.inProduction || 0, color: "bg-purple-500" },
-    { name: "Ready", value: orders.ready || 0, color: "bg-indigo-500" },
-    { name: "Dispatched", value: orders.dispatched || 0, color: "bg-orange-500" },
-    { name: "Delivered", value: orders.delivered || 0, color: "bg-green-500" },
-    { name: "Cancelled", value: orders.cancelled || 0, color: "bg-red-500" }
+    { name: "Pending", value: orders.pendingOrders || 0, color: "bg-yellow-500" },
+    { name: "Accepted", value: orders.acceptedOrders || 0, color: "bg-blue-500" },
+    { name: "In Production", value: orders.inProductionOrders || 0, color: "bg-purple-500" },
+    { name: "Ready", value: orders.readyOrders || 0, color: "bg-indigo-500" },
+    { name: "Dispatched", value: orders.dispatchedOrders || 0, color: "bg-orange-500" },
+    { name: "Delivered", value: orders.deliveredOrders || 0, color: "bg-green-500" },
+    { name: "Cancelled", value: orders.cancelledOrders || 0, color: "bg-red-500" }
   ];
 
   // Revenue breakdown
@@ -34,10 +34,8 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
 
   // Product vs Materials
   const inventoryData = [
-    { name: "Total Products", value: products.totalProducts || 0, color: "bg-blue-500" },
-    { name: "Available Units", value: products.availableUnits || 0, color: "bg-green-500" },
-    { name: "Raw Materials", value: materials.totalMaterials || 0, color: "bg-orange-500" },
-    { name: "Materials in Stock", value: materials.inStock || 0, color: "bg-purple-500" }
+    { name: "Total Products", value: products.total_products || 0, color: "bg-blue-500" },
+    { name: "Raw Materials", value: materials.totalMaterials || 0, color: "bg-orange-500" }
   ];
 
   const containerVariants = {
@@ -242,19 +240,19 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">{orders.total || 0}</div>
+                  <div className="text-2xl font-bold text-blue-600">{orders.totalOrders || 0}</div>
                   <div className="text-sm text-gray-600">Total Orders</div>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">{products.carpetProducts || 0}</div>
-                  <div className="text-sm text-gray-600">Carpet Products</div>
+                  <div className="text-2xl font-bold text-green-600">{products.total_products || 0}</div>
+                  <div className="text-sm text-gray-600">Total Products</div>
                 </div>
                 <div className="text-center p-4 bg-orange-50 rounded-lg">
                   <div className="text-2xl font-bold text-orange-600">{materials.totalMaterials || 0}</div>
                   <div className="text-sm text-gray-600">Raw Materials</div>
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600">{customers.total || 0}</div>
+                  <div className="text-2xl font-bold text-purple-600">{customers.totalCustomers || 0}</div>
                   <div className="text-sm text-gray-600">Total Customers</div>
                 </div>
               </div>

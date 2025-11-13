@@ -7,15 +7,12 @@ import { RealtimeMetrics } from "@/components/dashboard/RealtimeMetrics";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { PerformanceMetrics } from "@/components/dashboard/PerformanceMetrics";
 import { BusinessInsights } from "@/components/dashboard/BusinessInsights";
-import { RefreshCw, Zap, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  OrderService,
-  ProductService,
-  RawMaterialService,
-  CustomerService,
-  ProductionService
-} from "@/services";
+import { TrendingUp } from "lucide-react";
+import ProductService from "@/services/api/productService";
+import RawMaterialService from "@/services/api/rawMaterialService";
+import { IndividualProductService } from "@/services/api/individualProductService";
+import MongoDBOrderService from "@/services/api/orderService";
+import { CustomerService } from "@/services/customerService";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
@@ -28,43 +25,117 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
-      // Fetch all data in parallel for maximum performance
-      const [
-        orderStats,
+      // Fetch all data in parallel for maximum performance using MongoDB services
+      let [
         productStats,
         materialStats,
-        customerStats,
-        productionStats,
-        recentOrders,
-        recentProducts
+        recentProducts,
+        individualProducts,
+        orderStats,
+        customerStats
       ] = await Promise.all([
-        OrderService.getOrderStats(),
-        ProductService.getProductStats(),
-        RawMaterialService.getInventoryStats(),
-        CustomerService.getCustomerStats(),
-        ProductionService.getProductionStats(),
-        OrderService.getOrders({ limit: 10 }),
-        ProductService.getProducts({ limit: 8 })
+        ProductService.getProductStats().catch(err => {
+          console.warn('Failed to load product stats:', err);
+          return { data: null, error: err.message };
+        }),
+        RawMaterialService.getRawMaterials(),
+        ProductService.getProducts({ limit: 8 }),
+        IndividualProductService.getIndividualProductStats().catch(err => {
+          console.warn('Failed to load individual product stats:', err);
+          return { data: null, error: err.message };
+        }),
+        MongoDBOrderService.getOrderStats(),
+        CustomerService.getAllCustomerStats().catch(err => {
+          console.warn('Failed to load customer stats:', err);
+          return { data: null, error: err.message };
+        })
       ]);
 
       // Debug: Log the stats data
-      console.log('📊 Dashboard Stats Debug:');
-      console.log('Orders:', orderStats);
+      console.log('📊 Dashboard Stats Debug (MongoDB):');
       console.log('Products:', productStats);
       console.log('Materials:', materialStats);
-      console.log('Customers:', customerStats);
-      console.log('Production:', productionStats);
+      console.log('Recent Products:', recentProducts);
+      console.log('Individual Products:', individualProducts);
+      console.log('Order Stats:', orderStats);
+      console.log('Customer Stats:', customerStats);
+      
+      // Check if orderStats is valid and has the expected structure
+      if (!orderStats || typeof orderStats !== 'object') {
+        console.error('❌ Order Stats is invalid:', orderStats);
+        // Set default values to prevent crashes
+        orderStats = {
+          total: 0,
+          pending: 0,
+          accepted: 0,
+          inProduction: 0,
+          ready: 0,
+          dispatched: 0,
+          delivered: 0,
+          cancelled: 0,
+          totalRevenue: 0,
+          paidAmount: 0,
+          outstandingAmount: 0,
+          averageOrderValue: 0
+        };
+      }
+      
+      console.log('✅ Order Stats Total:', orderStats.total);
+      console.log('✅ Order Stats Revenue:', orderStats.totalRevenue);
+      console.log('✅ Order Stats Dispatched:', orderStats.dispatched);
+      console.log('✅ Order Stats Delivered:', orderStats.delivered);
+
+      // Calculate material stats with error handling
+      const materialStatsData = {
+        totalMaterials: materialStats?.data?.length || 0,
+        lowStockMaterials: materialStats?.data?.filter((m: any) => m.current_stock < m.min_threshold).length || 0,
+        totalValue: materialStats?.data?.reduce((sum: number, m: any) => sum + (m.total_value || 0), 0) || 0,
+        averageCost: materialStats?.data?.length > 0 ? 
+          materialStats.data.reduce((sum: number, m: any) => sum + (m.cost_per_unit || 0), 0) / materialStats.data.length : 0
+      };
+
+      // Calculate individual product stats with error handling
+      const individualProductStats = {
+        totalIndividualProducts: individualProducts?.data?.length || 0,
+        availableProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'available').length || 0,
+        soldProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'sold').length || 0,
+        damagedProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'damaged').length || 0
+      };
+
+      const dashboardStats = {
+        products: productStats?.data || {},
+        materials: materialStatsData,
+        individualProducts: individualProductStats,
+        orders: {
+          totalOrders: orderStats.total,
+          pendingOrders: orderStats.pending,
+          completedOrders: orderStats.dispatched + orderStats.delivered,
+          totalRevenue: orderStats.totalRevenue,
+          paidAmount: orderStats.paidAmount,
+          outstandingAmount: orderStats.outstandingAmount,
+          averageOrderValue: orderStats.averageOrderValue
+        },
+        customers: { 
+          totalCustomers: customerStats?.data?.total_customers || 0, 
+          activeCustomers: customerStats?.data?.active_customers || 0 
+        },
+        production: { totalProduction: 0, activeProduction: 0 } // Placeholder
+      };
+
+      // Debug: Log the dashboard stats structure
+      console.log('🔍 Dashboard - Stats structure:', dashboardStats);
+      console.log('🔍 Dashboard - Orders data:', dashboardStats.orders);
+      console.log('🔍 Dashboard - Orders totalOrders:', dashboardStats.orders.totalOrders);
+      console.log('🔍 Dashboard - Orders completedOrders:', dashboardStats.orders.completedOrders);
+      console.log('🔍 Dashboard - Orders totalRevenue:', dashboardStats.orders.totalRevenue);
+      console.log('🔍 Dashboard - Products data:', dashboardStats.products);
+      console.log('🔍 Dashboard - Materials data:', dashboardStats.materials);
+      console.log('🔍 Dashboard - Customers data:', dashboardStats.customers);
 
       setDashboardData({
-        stats: {
-          orders: orderStats,
-          products: productStats,
-          materials: materialStats,
-          customers: customerStats,
-          production: productionStats
-        },
-        recentOrders: recentOrders.data || [],
-        recentProducts: recentProducts.data || []
+        stats: dashboardStats,
+        recentOrders: [], // Placeholder - no orders service yet
+        recentProducts: recentProducts?.data || []
       });
 
       setLastRefresh(new Date());
@@ -119,30 +190,10 @@ export default function Dashboard() {
       >
         {/* Header */}
         <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between">
-            <Header
-              title="Business Dashboard"
-              subtitle="Real-time insights for carpets and raw materials business"
-            />
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 text-xs text-gray-600">
-                <Zap className="h-3 w-3 text-green-500" />
-                Live Data
-              </div>
-              <Button
-                onClick={fetchDashboardData}
-                variant="outline"
-                size="sm"
-                className="gap-2 border-gray-300 text-gray-700 hover:bg-gray-50"
-                disabled={loading}
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">
-                  {loading ? 'Refreshing...' : 'Refresh'}
-                </span>
-              </Button>
-            </div>
-          </div>
+          <Header
+            title="Business Dashboard"
+            subtitle="Real-time insights for carpets and raw materials business"
+          />
         </motion.div>
 
         {loading && !dashboardData ? (

@@ -13,12 +13,12 @@ import {
   Home,
   ChevronLeft,
   ChevronRight,
-  QrCode,
-  LogOut
+  LogOut,
+  Calculator
 } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { useAuth, UserRole } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarContext } from "@/contexts/SidebarContext";
 
 interface SidebarProps {
   className?: string;
@@ -29,8 +29,7 @@ interface SidebarItem {
   icon: any;
   href: string;
   color: string;
-  roles: UserRole[];
-  permission?: string;
+  permission: string; // Page permission key (e.g., 'products', 'orders', 'dashboard')
 }
 
 const sidebarItems: SidebarItem[] = [
@@ -39,125 +38,113 @@ const sidebarItems: SidebarItem[] = [
     icon: LayoutDashboard,
     href: "/",
     color: "text-primary",
-    roles: ['admin', 'production', 'inventory', 'raw_material', 'orders']
+    permission: 'dashboard'
   },
   {
     title: "Order Management",
     icon: ShoppingCart,
     href: "/orders",
     color: "text-blue-600",
-    roles: ['admin', 'orders'],
-    permission: 'orders.read'
+    permission: 'orders'
   },
   {
-    title: "Customers",
+    title: "Customer & Suppliers",
     icon: Users,
     href: "/customers",
     color: "text-indigo-600",
-    roles: ['admin', 'orders']
+    permission: 'customers' // User needs either customers OR suppliers permission
   },
   {
     title: "Products",
     icon: Package,
     href: "/products",
     color: "text-green-600",
-    roles: ['admin', 'inventory', 'production', 'raw_material'],
-    permission: 'products.read'
+    permission: 'products'
   },
   {
     title: "Production",
     icon: Factory,
     href: "/production",
     color: "text-orange-600",
-    roles: ['admin', 'production'],
-    permission: 'production.read'
+    permission: 'production'
   },
   {
     title: "Raw Materials",
     icon: Factory,
     href: "/materials",
     color: "text-amber-600",
-    roles: ['admin', 'raw_material'],
-    permission: 'raw_material.read'
+    permission: 'materials'
   },
   {
     title: "Manage Stock",
     icon: AlertTriangle,
     href: "/manage-stock",
     color: "text-red-600",
-    roles: ['admin', 'inventory'],
-    permission: 'inventory.write'
+    permission: 'products' // Uses products permission for stock management
   },
   {
     title: "Analytics",
     icon: BarChart3,
     href: "/analytics",
     color: "text-purple-600",
-    roles: ['admin']
+    permission: 'reports'
   },
   {
-    title: "Inventory System",
-    icon: Package,
-    href: "/inventory",
-    color: "text-emerald-600",
-    roles: ['admin', 'inventory'],
-    permission: 'inventory.read'
+    title: "Recipe Calculator",
+    icon: Calculator,
+    href: "/recipe-calculator",
+    color: "text-teal-600",
+    permission: 'production' // Uses production permission
   },
   {
-    title: "QR Scanner",
-    icon: QrCode,
-    href: "/qr-scanner",
-    color: "text-cyan-600",
-    roles: ['admin', 'inventory', 'production']
+    title: "Dropdown Master",
+    icon: Cog,
+    href: "/dropdown-master",
+    color: "text-purple-600",
+    permission: 'settings'
   },
   {
     title: "Settings",
     icon: Settings,
     href: "/settings",
     color: "text-gray-600",
-    roles: ['admin']
+    permission: 'settings'
   }
 ];
 
 export function Sidebar({ className }: SidebarProps) {
   const location = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, hasPermission, logout } = useAuth();
+  const { isCollapsed, setIsCollapsed, toggleSidebar } = useSidebarContext();
+  const { user, hasPageAccess, logout } = useAuth();
 
-  // Filter sidebar items based on user role and permissions
+  // Filter sidebar items based on page permissions
   const filteredSidebarItems = sidebarItems.filter(item => {
     if (!user) return false;
     
-    // Check if user role is allowed for this item
-    const hasRoleAccess = item.roles.includes(user.role);
+    // Admin always has access to everything
+    if (user.role === 'admin') return true;
     
-    // Check specific permission if required
-    const hasSpecificPermission = item.permission ? hasPermission(item.permission) : true;
+    // Special case: Customer & Suppliers - check if user has either customers OR suppliers permission
+    if (item.permission === 'customers' && item.href === '/customers') {
+      return hasPageAccess('customers') || hasPageAccess('suppliers');
+    }
     
-    return hasRoleAccess && hasSpecificPermission;
+    // Check page permission if specified
+    if (item.permission) {
+      return hasPageAccess(item.permission);
+    }
+    
+    // Default to false if no permission specified
+    return false;
   });
 
-  // Auto-collapse on mobile
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsCollapsed(true);
-      } else {
-        setIsCollapsed(false);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   return (
     <div className={cn(
-      "flex h-full flex-col bg-card border-r transition-all duration-300",
+      "flex flex-col bg-card border-r transition-all duration-300",
+      "h-screen fixed left-0 top-0",
       isCollapsed ? "w-16" : "w-64",
-      "md:relative fixed z-50 md:z-auto",
+      "z-50",
       className
     )}>
       {/* Header */}
@@ -182,7 +169,7 @@ export function Sidebar({ className }: SidebarProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={toggleSidebar}
             className="h-6 w-6 md:h-8 md:w-8 p-0"
           >
             {isCollapsed ? (
@@ -195,7 +182,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className={cn("flex-1 space-y-1 md:space-y-2", isCollapsed ? "p-1 md:p-2" : "p-2 md:p-4")}>
+      <nav className={cn("flex-1 space-y-1 md:space-y-2 overflow-y-auto sidebar-scrollbar", isCollapsed ? "p-1 md:p-2" : "p-2 md:p-4")}>
         {filteredSidebarItems.map((item) => {
           const isActive = location.pathname === item.href;
           const Icon = item.icon;
@@ -235,7 +222,7 @@ export function Sidebar({ className }: SidebarProps) {
         {!isCollapsed && user && (
           <div className="mb-3 p-2 bg-muted/50 rounded-lg">
             <div className="text-xs text-muted-foreground mb-1">Logged in as:</div>
-            <div className="text-sm font-medium truncate">{user.name}</div>
+            <div className="text-sm font-medium truncate">{user.full_name}</div>
             <div className="text-xs text-muted-foreground">{user.role}</div>
           </div>
         )}

@@ -57,7 +57,7 @@ export function DynamicPricingForm({
       unit_value: calc.unitValue,
       total_price: calc.totalPrice,
       product_width: localItem.product_dimensions.width,
-      product_height: localItem.product_dimensions.height,
+      product_length: localItem.product_dimensions.length,
       product_weight: localItem.product_dimensions.weight,
       isValid: calc.isValid,
       errorMessage: calc.errorMessage
@@ -236,13 +236,13 @@ export function DynamicPricingForm({
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor={`height-${item.id}`}>Height (meters)</Label>
+              <Label htmlFor={`length-${item.id}`}>Length (meters)</Label>
               <Input
-                id={`height-${item.id}`}
+                id={`length-${item.id}`}
                 type="number"
                 step="0.01"
-                value={localItem.product_dimensions.height || ''}
-                onChange={(e) => handleDimensionsChange('height', e.target.value)}
+                value={localItem.product_dimensions.length || ''}
+                onChange={(e) => handleDimensionsChange('length', e.target.value)}
                 placeholder="0.00"
               />
             </div>
@@ -285,17 +285,6 @@ export function DynamicPricingForm({
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor={`thickness-${item.id}`}>Thickness (mm)</Label>
-              <Input
-                id={`thickness-${item.id}`}
-                type="number"
-                step="0.01"
-                value={localItem.product_dimensions.thickness || ''}
-                onChange={(e) => handleDimensionsChange('thickness', e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
           </div>
           
           {/* Textile Properties */}

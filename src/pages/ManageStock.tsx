@@ -29,8 +29,8 @@ import {
   Plus
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { PurchaseOrderService, RawMaterialService } from "@/services";
+import { PurchaseOrderService } from "@/services/api/purchaseOrderService";
+import { rawMaterialService } from "@/services/rawMaterialService";
 
 interface StockOrder {
   id: string;
@@ -99,31 +99,29 @@ export default function ManageStock() {
   useEffect(() => {
     const loadOrders = async () => {
       try {
-        const { data, error } = await supabase
-          .from('purchase_orders')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
+        // Get all purchase orders from MongoDB
+        const { data: ordersData, error: ordersError } = await PurchaseOrderService.getPurchaseOrders();
+        
+        if (ordersError) throw new Error(ordersError);
         
         // Map database fields to interface format
-        const loadedOrders = (data || []).map((order: any) => {
-          // Try to get material details from material_details column first, then fallback to notes
+        const loadedOrders = (ordersData || []).map((order: any) => {
+          // Get material details from various sources
           let materialDetails: any = {};
           
+          // Try to get material details from material_details column first
           if (order.material_details) {
-            // Use material_details column if available
             materialDetails = order.material_details;
           } else if (order.notes) {
-            // Fallback to parsing notes field
+            // Try to parse notes as JSON first
             try {
               materialDetails = JSON.parse(order.notes);
-          } catch (e) {
-            // If parsing fails, use the notes as-is (for old orders)
-            console.log('Could not parse material details from notes:', order.notes);
+            } catch (e) {
+              // If parsing fails, treat notes as material description
+              console.log('Notes is plain text, using as material description:', order.notes);
               materialDetails = {
-                materialName: 'Unknown Material',
-                quantity: 0,
+                materialName: order.notes || 'Material Order',
+                quantity: 1,
                 unit: 'units',
                 costPerUnit: 0,
                 userNotes: order.notes
@@ -137,19 +135,19 @@ export default function ManageStock() {
           return {
             id: order.id,
             order_number: order.order_number,
-            materialName: materialDetails.materialName || materialDetails.material_name || 'Material Order',
-            materialBrand: materialDetails.materialBrand || materialDetails.material_brand || 'Unknown',
-            materialCategory: materialDetails.materialCategory || materialDetails.material_category || 'Other',
-            materialBatchNumber: materialDetails.materialBatchNumber || materialDetails.material_batch_number || `BATCH-${order.id}`,
+            materialName: materialDetails.materialName || materialDetails.material_name || order.material_name || order.notes || 'Material Order',
+            materialBrand: materialDetails.materialBrand || materialDetails.material_brand || order.material_type || 'Unknown',
+            materialCategory: materialDetails.materialCategory || materialDetails.material_category || order.material_category || 'Other',
+            materialBatchNumber: materialDetails.materialBatchNumber || materialDetails.material_batch_number || order.batch_number || `BATCH-${order.id}`,
             supplier: order.supplier_name,
             quantity: quantity,
-            unit: materialDetails.unit || 'units',
-            costPerUnit: materialDetails.costPerUnit || materialDetails.cost_per_unit || 0,
+            unit: materialDetails.unit || order.unit || 'units',
+            costPerUnit: materialDetails.costPerUnit || materialDetails.cost_per_unit || order.cost_per_unit || 0,
             totalCost: order.total_amount,
             orderDate: order.order_date,
             expectedDelivery: order.expected_delivery,
             status: order.status === 'pending' ? 'ordered' : order.status,
-            notes: materialDetails.userNotes || materialDetails.user_notes || '',
+            notes: materialDetails.userNotes || materialDetails.user_notes || order.notes || '',
             actualDelivery: order.actual_delivery,
             minThreshold: materialDetails.minThreshold || materialDetails.min_threshold || 100,
             maxCapacity: materialDetails.maxCapacity || materialDetails.max_capacity || 1000,
@@ -201,16 +199,16 @@ export default function ManageStock() {
       }
       
       // Check for recent orders (within last 5 minutes) to prevent rapid duplicates
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const { data: recentOrders, error: recentError } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('supplier_name', prefillData.supplier)
-        .eq('status', 'pending')
-        .gte('created_at', fiveMinutesAgo);
-
-      if (recentError) {
-        console.error('Error checking for recent orders:', recentError);
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const { data: allOrders, error: ordersError } = await PurchaseOrderService.getPurchaseOrders();
+      
+      let recentOrders = [];
+      if (!ordersError && allOrders) {
+        recentOrders = allOrders.filter(order => 
+          order.supplier_name === prefillData.supplier &&
+          order.status === 'pending' &&
+          new Date(order.created_at) >= fiveMinutesAgo
+        );
       }
 
       if (recentOrders && recentOrders.length > 0) {
@@ -265,25 +263,74 @@ export default function ManageStock() {
           isRestock: newOrder.isRestock
         };
 
-        // Add to Supabase and update state
-        const { data, error } = await supabase
-          .from('purchase_orders')
-          .insert({
-            id: newOrder.id,
-            order_number: newOrder.order_number,
-            supplier_name: newOrder.supplier,
-            order_date: newOrder.orderDate,
-            expected_delivery: newOrder.expectedDelivery,
-            status: newOrder.status === 'ordered' ? 'pending' : newOrder.status,
-            total_amount: newOrder.totalCost,
-            notes: JSON.stringify(materialDetails)
-          })
-          .select()
-          .single();
+        // Add to MongoDB and update state
+        const { data, error } = await PurchaseOrderService.createPurchaseOrder({
+          id: newOrder.id,
+          order_number: newOrder.order_number,
+          supplier_name: newOrder.supplier,
+          order_date: newOrder.orderDate,
+          expected_delivery: newOrder.expectedDelivery,
+          status: newOrder.status === 'ordered' ? 'pending' : (newOrder.status === 'in-transit' ? 'shipped' : newOrder.status),
+          total_amount: newOrder.totalCost,
+          notes: JSON.stringify(materialDetails)
+        });
 
         if (error) throw error;
         
-        setOrders(prev => [newOrder, ...prev]);
+        // Reload orders from database instead of manually adding to state
+        // This ensures we get the correct order ID from backend
+        const { data: updatedOrders, error: reloadError } = await PurchaseOrderService.getPurchaseOrders();
+        
+        if (!reloadError && updatedOrders) {
+          // Map database fields to interface format
+          const loadedOrders = (updatedOrders || []).map((order: any) => {
+            let materialDetails: any = {};
+            
+            if (order.material_details) {
+              materialDetails = order.material_details;
+            } else if (order.notes) {
+              try {
+                materialDetails = JSON.parse(order.notes);
+              } catch (e) {
+                materialDetails = {
+                  materialName: order.notes || 'Material Order',
+                  quantity: 1,
+                  unit: 'units',
+                  costPerUnit: 0,
+                  userNotes: order.notes
+                };
+              }
+            }
+
+            const quantity = materialDetails.quantity || materialDetails.quantity === 0 ? materialDetails.quantity : 1;
+
+            return {
+              id: order.id,
+              order_number: order.order_number,
+              materialName: materialDetails.materialName || materialDetails.material_name || order.material_name || order.notes || 'Material Order',
+              materialBrand: materialDetails.materialBrand || materialDetails.material_brand || order.material_type || 'Unknown',
+              materialCategory: materialDetails.materialCategory || materialDetails.material_category || order.material_category || 'Other',
+              materialBatchNumber: materialDetails.materialBatchNumber || materialDetails.material_batch_number || order.batch_number || `BATCH-${order.id}`,
+              supplier: order.supplier_name,
+              quantity: quantity,
+              unit: materialDetails.unit || order.unit || 'units',
+              costPerUnit: materialDetails.costPerUnit || materialDetails.cost_per_unit || order.cost_per_unit || 0,
+              totalCost: order.total_amount,
+              orderDate: order.order_date,
+              expectedDelivery: order.expected_delivery,
+              status: order.status === 'pending' ? 'ordered' : order.status,
+              notes: materialDetails.userNotes || materialDetails.user_notes || order.notes || '',
+              actualDelivery: order.actual_delivery,
+              minThreshold: materialDetails.minThreshold || materialDetails.min_threshold || 100,
+              maxCapacity: materialDetails.maxCapacity || materialDetails.max_capacity || 1000,
+              qualityGrade: materialDetails.qualityGrade || materialDetails.quality_grade || 'A',
+              isRestock: materialDetails.isRestock || materialDetails.is_restock || false
+            };
+          });
+          
+          const uniqueOrders = removeDuplicateOrders(loadedOrders);
+          setOrders(uniqueOrders);
+        }
         
         // Don't update raw material status immediately - wait for order approval
         console.log(`📋 Order created with status: ${newOrder.status}. Material status will be updated when order is approved.`);
@@ -320,20 +367,37 @@ export default function ManageStock() {
   });
 
   const updateOrderStatus = async (orderId: string, newStatus: StockOrder["status"]) => {
-    const updatedOrders = orders.map(order => 
-      order.id === orderId 
-        ? { 
-            ...order, 
-            status: newStatus,
-            actualDelivery: newStatus === "delivered" ? new Date().toISOString().split('T')[0] : order.actualDelivery
-          }
-        : order
-    );
-    
-    // Update local state
-    setOrders(updatedOrders);
-    
-    const orderToUpdate = updatedOrders.find(order => order.id === orderId);
+    try {
+      // Map frontend status to backend status
+      const backendStatus = newStatus === 'ordered' ? 'pending' : 
+                           newStatus === 'in-transit' ? 'shipped' : newStatus;
+      
+      // Update order status in MongoDB
+      const { data: updatedOrder, error } = await PurchaseOrderService.updatePurchaseOrder(orderId, { status: backendStatus });
+      
+      if (error) {
+        toast({
+          title: "Error",
+          description: `Failed to update order status: ${error}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update local state
+      const updatedOrders = orders.map(order => 
+        order.id === orderId 
+          ? { 
+              ...order, 
+              status: newStatus,
+              actualDelivery: newStatus === "delivered" ? new Date().toISOString().split('T')[0] : order.actualDelivery
+            }
+          : order
+      );
+      
+      setOrders(updatedOrders);
+      
+      const orderToUpdate = updatedOrders.find(order => order.id === orderId);
     
     // Handle material status changes based on order status
     if (orderToUpdate) {
@@ -370,13 +434,10 @@ export default function ManageStock() {
         userNotes: orderToUpdate.notes || '' // Preserve user notes
       };
       
-      const { error } = await supabase
-        .from('purchase_orders')
-        .update({
-          status: dbStatus,
-          notes: JSON.stringify(materialDetails)
-        })
-        .eq('id', orderId);
+      const { error } = await PurchaseOrderService.updatePurchaseOrder(orderId, {
+        status: dbStatus === 'in-transit' ? 'shipped' : dbStatus,
+        notes: JSON.stringify(materialDetails)
+      });
 
       if (error) {
         console.error('Error updating order:', error);
@@ -387,40 +448,51 @@ export default function ManageStock() {
         });
       }
     }
+    
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update order status",
+        variant: "destructive",
+      });
+    }
   };
 
   // Function to revert raw material status when order is cancelled
   const revertRawMaterialStatus = async (order: StockOrder) => {
     try {
-      // Find matching material in Supabase
-      const { data: materials, error } = await supabase
-        .from('raw_materials')
-        .select('*')
-        .eq('name', order.materialName)
-        .eq('supplier_name', order.supplier)
-        .eq('unit', order.unit);
+      // Find matching material in MongoDB
+      const { data: materials, error } = await rawMaterialService.getRawMaterials();
+      
+      if (error) throw new Error(error);
 
-      if (error) throw error;
+      const materialsArray = Array.isArray(materials) ? materials : [materials];
+      const matchingMaterial = materialsArray?.find(material => 
+        material.name === order.materialName &&
+        material.supplier_name === order.supplier &&
+        material.unit === order.unit
+      );
 
-      if (materials && materials.length > 0) {
-        const material = materials[0];
+      if (matchingMaterial) {
         console.log(`🔄 Reverting ${order.materialName} status from "in-transit" back to original status`);
         
         // Determine the appropriate status based on current stock
         let newStatus = 'in-stock';
-        if (material.current_stock === 0) {
+        if (matchingMaterial.current_stock === 0) {
           newStatus = 'out-of-stock';
-        } else if (material.current_stock <= material.min_threshold) {
+        } else if (matchingMaterial.current_stock <= matchingMaterial.min_threshold) {
           newStatus = 'low-stock';
         }
         
-        // Update status back to appropriate status
-        const { error: updateError } = await supabase
-          .from('raw_materials')
-          .update({ status: newStatus })
-          .eq('id', material.id);
+        // Update status back to appropriate status - include required fields
+        const { error: updateError } = await rawMaterialService.updateRawMaterial(matchingMaterial.id, { 
+          status: newStatus as any,
+          reorder_point: matchingMaterial.reorder_point || matchingMaterial.min_threshold || 100,
+          max_capacity: matchingMaterial.max_capacity || 1000
+        });
 
-        if (updateError) throw updateError;
+        if (updateError) throw new Error(updateError);
         
         console.log(`✅ Reverted ${order.materialName} status to "${newStatus}"`);
       } else {
@@ -438,27 +510,29 @@ export default function ManageStock() {
   // Function to update raw material status to "in-transit" when order is approved
   const updateRawMaterialStatusToInTransit = async (order: StockOrder) => {
     try {
-      // Find matching material in Supabase
-      const { data: materials, error } = await supabase
-        .from('raw_materials')
-        .select('*')
-        .eq('name', order.materialName)
-        .eq('supplier_name', order.supplier)
-        .eq('unit', order.unit);
+      // Find matching material in MongoDB
+      const { data: materials, error } = await rawMaterialService.getRawMaterials();
+      
+      if (error) throw new Error(error);
 
-      if (error) throw error;
+      const materialsArray = Array.isArray(materials) ? materials : [materials];
+      const matchingMaterial = materialsArray?.find(material => 
+        material.name === order.materialName &&
+        material.supplier_name === order.supplier &&
+        material.unit === order.unit
+      );
 
-      if (materials && materials.length > 0) {
-        const material = materials[0];
-        console.log(`✅ Found matching material: ${material.name} (${material.supplier_name})`);
+      if (matchingMaterial) {
+        console.log(`✅ Found matching material: ${matchingMaterial.name} (${matchingMaterial.supplier_name})`);
         
-        // Update status to in-transit
-        const { error: updateError } = await supabase
-          .from('raw_materials')
-          .update({ status: 'in-transit' })
-          .eq('id', material.id);
+        // Update status to in-transit - include required fields
+        const { error: updateError } = await rawMaterialService.updateRawMaterial(matchingMaterial.id, { 
+          status: 'in-transit',
+          reorder_point: matchingMaterial.reorder_point || matchingMaterial.min_threshold || 100,
+          max_capacity: matchingMaterial.max_capacity || 1000
+        });
 
-        if (updateError) throw updateError;
+        if (updateError) throw new Error(updateError);
         
         console.log(`📦 Updated ${order.materialName} status to "in-transit" (order approved)`);
       } else {
@@ -485,201 +559,197 @@ export default function ManageStock() {
       // - Same material + same supplier + price change = RESTOCK (update existing, new price)
       // - Same material + same supplier + different quality = NEW MATERIAL (create new entry)
       const updateRawMaterialStock = async (deliveredOrder: StockOrder) => {
-    try {
-      console.log('📦 Processing delivered order:', deliveredOrder);
-      
-      // Validate required fields
-      if (!deliveredOrder.materialName) {
-        toast({
-          title: "❌ Missing Material Name",
-          description: "Material name is required for delivery.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (!deliveredOrder.supplier) {
-        toast({
-          title: "❌ Missing Supplier",
-          description: "Supplier information is required for delivery.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Validate quantity before processing
-      if (!deliveredOrder.quantity || deliveredOrder.quantity <= 0) {
-        toast({
-          title: "❌ Invalid Quantity",
-          description: `Cannot deliver order with quantity ${deliveredOrder.quantity}. Please check the order details.`,
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log('✅ All validations passed, proceeding with stock update...');
-      
-              // Check if this is EXACTLY the same material (ALL fields must match for restock)
-        // SMART RESTOCK LOGIC: Only supplier, brand, and quality matter for restock
-        // Price changes are allowed and don't create new materials
-        // 
-        // Example scenarios:
-        // 1. RESTOCK: Cotton Yarn + ABC Textiles + Premium + Rolls (price can vary) = RESTOCK existing
-        // 2. NEW MATERIAL: Cotton Yarn + XYZ Textiles + Premium + Rolls = NEW MATERIAL (different supplier)
-        // 3. RESTOCK: Cotton Yarn + ABC Textiles + Premium + Rolls (price changed) = RESTOCK existing
-        // 4. NEW MATERIAL: Cotton Yarn + ABC Textiles + Standard + Rolls = NEW MATERIAL (different quality)
-        // 5. NEW MATERIAL: Cotton Yarn + ABC Textiles + Premium + Kg = NEW MATERIAL (different unit)
-        
-        // SMART RESTOCK LOGIC: Prioritize restock orders marked with isRestock flag
-        // For restock orders: Match by name + supplier (most important fields)
-        // For new orders: Match by all fields (name, brand, category, supplier, quality, unit)
-        let existingMaterial;
-        
-        // AGGRESSIVE MATCHING: Find the material that was created when this order was placed
-        console.log('🔍 Looking for the material created with this order...');
-        
-        // Strategy 1: Look for in-transit materials with same name and supplier
-        let { data: inTransitMaterials, error: inTransitError } = await supabase
-            .from('raw_materials')
-            .select('*')
-            .eq('name', deliveredOrder.materialName)
-            .eq('supplier_name', deliveredOrder.supplier)
-          .eq('status', 'in-transit');
-        
-        if (inTransitError) {
-          console.error('❌ Error searching for in-transit materials:', inTransitError);
-        } else if (inTransitMaterials && inTransitMaterials.length > 0) {
-          existingMaterial = inTransitMaterials[0];
-          console.log('✅ Found in-transit material:', existingMaterial);
-        } else {
-          console.log('❌ No in-transit material found, trying broader search...');
+        try {
+          console.log('📦 Processing delivered order:', deliveredOrder);
           
-          // Strategy 2: Look for any material with same name and supplier (regardless of status)
-          const { data: sameNameSupplier, error: sameNameError } = await supabase
-            .from('raw_materials')
-            .select('*')
-            .eq('name', deliveredOrder.materialName)
-            .eq('supplier_name', deliveredOrder.supplier);
-          
-          if (sameNameError) {
-            console.error('❌ Error searching for same name/supplier materials:', sameNameError);
-          } else if (sameNameSupplier && sameNameSupplier.length > 0) {
-            // If multiple found, prefer the one with 0 stock (likely the order material)
-            const zeroStockMaterial = sameNameSupplier.find(m => m.current_stock === 0);
-            existingMaterial = zeroStockMaterial || sameNameSupplier[0];
-            console.log('✅ Found material with same name/supplier:', existingMaterial);
-          } else {
-            console.log('❌ No material found with same name/supplier, trying name only...');
-            
-            // Strategy 3: Look for any material with same name (last resort)
-            const { data: sameName, error: sameNameOnlyError } = await supabase
-              .from('raw_materials')
-              .select('*')
-              .eq('name', deliveredOrder.materialName);
-            
-            if (sameNameOnlyError) {
-              console.error('❌ Error searching for same name materials:', sameNameOnlyError);
-            } else if (sameName && sameName.length > 0) {
-              // Prefer in-transit or 0 stock materials
-              const preferredMaterial = sameName.find(m => 
-                m.status === 'in-transit' || m.current_stock === 0
-              );
-              existingMaterial = preferredMaterial || sameName[0];
-              console.log('✅ Found material with same name:', existingMaterial);
-            }
+          // Validate required fields
+          if (!deliveredOrder.materialName) {
+            toast({
+              title: "❌ Missing Material Name",
+              description: "Material name is required for delivery.",
+              variant: "destructive",
+            });
+            return;
           }
-        }
+          
+          if (!deliveredOrder.supplier) {
+            toast({
+              title: "❌ Missing Supplier",
+              description: "Supplier information is required for delivery.",
+              variant: "destructive",
+            });
+            return;
+          }
+      
+          // Validate quantity before processing
+          if (!deliveredOrder.quantity || deliveredOrder.quantity <= 0) {
+            toast({
+              title: "❌ Invalid Quantity",
+              description: `Cannot deliver order with quantity ${deliveredOrder.quantity}. Please check the order details.`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          console.log('✅ All validations passed, proceeding with stock update...');
+      
+          // Check if this is EXACTLY the same material (ALL fields must match for restock)
+          // SMART RESTOCK LOGIC: Only supplier, brand, and quality matter for restock
+          // Price changes are allowed and don't create new materials
+          // 
+          // Example scenarios:
+          // 1. RESTOCK: Cotton Yarn + ABC Textiles + Premium + Rolls (price can vary) = RESTOCK existing
+          // 2. NEW MATERIAL: Cotton Yarn + XYZ Textiles + Premium + Rolls = NEW MATERIAL (different supplier)
+          // 3. RESTOCK: Cotton Yarn + ABC Textiles + Premium + Rolls (price changed) = RESTOCK existing
+          // 4. NEW MATERIAL: Cotton Yarn + ABC Textiles + Standard + Rolls = NEW MATERIAL (different quality)
+          // 5. NEW MATERIAL: Cotton Yarn + ABC Textiles + Premium + Kg = NEW MATERIAL (different unit)
+          
+          // SMART RESTOCK LOGIC: Prioritize restock orders marked with isRestock flag
+          // For restock orders: Match by name + supplier (most important fields)
+          // For new orders: Match by all fields (name, brand, category, supplier, quality, unit)
+          let existingMaterial;
+          
+          // AGGRESSIVE MATCHING: Find the material that was created when this order was placed
+          console.log('🔍 Looking for the material created with this order...');
+          
+          // Strategy 1: Look for in-transit materials with same name and supplier
+          const { data: allMaterials, error: materialsError } = await rawMaterialService.getRawMaterials();
         
-        console.log('🔍 Searching for existing material with criteria:');
-        console.log('  - Name:', deliveredOrder.materialName);
-        console.log('  - Brand:', deliveredOrder.materialBrand);
-        console.log('  - Category:', deliveredOrder.materialCategory);
-        console.log('  - Supplier:', deliveredOrder.supplier);
-        console.log('  - Quality Grade:', deliveredOrder.qualityGrade);
-        console.log('  - Unit:', deliveredOrder.unit);
-        console.log('  - Is Restock Order:', deliveredOrder.isRestock);
-        console.log('🎯 Match found:', !!existingMaterial);
-        if (existingMaterial) {
-          console.log('✅ Existing material found:', existingMaterial);
-        } else {
-          console.log('❌ No existing material found - will create new one');
-          
-          // Let's also try a broader search to see what materials exist
-          const { data: allMaterials, error: allError } = await supabase
-            .from('raw_materials')
-            .select('id, name, brand, category, supplier_name, status, current_stock, unit, quality_grade')
-            .eq('name', deliveredOrder.materialName);
-          
-          if (!allError && allMaterials) {
-            console.log('🔍 All materials with same name:', allMaterials);
+          let materialsArray = [];
+          if (materialsError) {
+            console.error('❌ Error fetching materials:', materialsError);
+          } else {
+            materialsArray = Array.isArray(allMaterials) ? allMaterials : [allMaterials];
             
-            // Check if any of these materials match our criteria
-            const potentialMatches = allMaterials.filter(material => 
-              material.supplier_name === deliveredOrder.supplier
+            // Look for in-transit materials with same name and supplier
+            const inTransitMaterials = materialsArray.filter(material => 
+              material.name === deliveredOrder.materialName &&
+              material.supplier_name === deliveredOrder.supplier &&
+              material.status === 'in-transit'
             );
             
-            if (potentialMatches.length > 0) {
-              console.log('🎯 Potential matches found:', potentialMatches);
-              console.log('❌ Why they didn\'t match:');
-              potentialMatches.forEach(match => {
-                console.log(`  Material ${match.id}:`);
-                console.log(`    - Brand: "${match.brand}" vs "${deliveredOrder.materialBrand || 'Unknown'}"`);
-                console.log(`    - Category: "${match.category}" vs "${deliveredOrder.materialCategory || 'Other'}"`);
-                console.log(`    - Unit: "${match.unit}" vs "${deliveredOrder.unit}"`);
-                console.log(`    - Quality: "${match.quality_grade}" vs "${deliveredOrder.qualityGrade || 'A'}"`);
-                console.log(`    - Status: "${match.status}"`);
-              });
+            if (inTransitMaterials.length > 0) {
+              existingMaterial = inTransitMaterials[0];
+              console.log('✅ Found in-transit material:', existingMaterial);
+            } else {
+              console.log('❌ No in-transit material found, trying broader search...');
+              
+              // Strategy 2: Look for any material with same name and supplier (regardless of status)
+              const sameNameSupplier = materialsArray.filter(material => 
+                material.name === deliveredOrder.materialName &&
+                material.supplier_name === deliveredOrder.supplier
+              );
+              
+              if (sameNameSupplier.length > 0) {
+                // If multiple found, prefer the one with 0 stock (likely the order material)
+                const zeroStockMaterial = sameNameSupplier.find(m => m.current_stock === 0);
+                existingMaterial = zeroStockMaterial || sameNameSupplier[0];
+                console.log('✅ Found material with same name/supplier:', existingMaterial);
+              } else {
+                console.log('❌ No material found with same name/supplier, trying name only...');
+                
+                // Strategy 3: Look for any material with same name (last resort)
+                const sameName = materialsArray.filter(material => 
+                  material.name === deliveredOrder.materialName
+                );
+                
+                if (sameName.length > 0) {
+                  // Prefer in-transit or 0 stock materials
+                  const preferredMaterial = sameName.find(m => 
+                    m.status === 'in-transit' || m.current_stock === 0
+                  );
+                  existingMaterial = preferredMaterial || sameName[0];
+                  console.log('✅ Found material with same name:', existingMaterial);
+                }
+              }
             }
           }
-        }
-      
-      // CRITICAL: We should ALWAYS find an existing material for delivery
-      // If we don't find one, something is wrong with the order data
-      if (!existingMaterial) {
-        console.error('❌ CRITICAL ERROR: No existing material found for delivery!');
-        console.error('This should never happen - every order should have a corresponding material.');
-        console.error('Order details:', deliveredOrder);
         
-        toast({
-          title: "❌ Delivery Error",
-          description: `Cannot deliver order: No existing material found for "${deliveredOrder.materialName}" from "${deliveredOrder.supplier}". Please check the order data.`,
-          variant: "destructive",
-        });
-        return; // Stop processing - don't create new material
-        }
+          console.log('🔍 Searching for existing material with criteria:');
+          console.log('  - Name:', deliveredOrder.materialName);
+          console.log('  - Brand:', deliveredOrder.materialBrand);
+          console.log('  - Category:', deliveredOrder.materialCategory);
+          console.log('  - Supplier:', deliveredOrder.supplier);
+          console.log('  - Quality Grade:', deliveredOrder.qualityGrade);
+          console.log('  - Unit:', deliveredOrder.unit);
+          console.log('  - Is Restock Order:', deliveredOrder.isRestock);
+          console.log('🎯 Match found:', !!existingMaterial);
+          if (existingMaterial) {
+            console.log('✅ Existing material found:', existingMaterial);
+          } else {
+            console.log('❌ No existing material found - will create new one');
+            
+            // Debug: Show all materials with same name
+            const sameNameMaterials = materialsArray.filter(material => 
+              material.name === deliveredOrder.materialName
+            );
+            
+            if (sameNameMaterials.length > 0) {
+              console.log('🔍 All materials with same name:', sameNameMaterials);
+              
+              // Check if any of these materials match our criteria
+              const potentialMatches = sameNameMaterials.filter(material => 
+                material.supplier_name === deliveredOrder.supplier
+              );
+              
+              if (potentialMatches.length > 0) {
+                console.log('🎯 Potential matches found:', potentialMatches);
+                console.log('❌ Why they didn\'t match:');
+                potentialMatches.forEach(match => {
+                  console.log(`  Material ${match.id}:`);
+                  console.log(`    - Brand: "${match.type}" vs "${deliveredOrder.materialBrand || 'Unknown'}"`);
+                  console.log(`    - Category: "${match.category}" vs "${deliveredOrder.materialCategory || 'Other'}"`);
+                  console.log(`    - Unit: "${match.unit}" vs "${deliveredOrder.unit}"`);
+                  console.log(`    - Quality: "${match.quality_grade}" vs "${deliveredOrder.qualityGrade || 'A'}"`);
+                  console.log(`    - Status: "${match.status}"`);
+                });
+              }
+            }
+          }
       
-      if (existingMaterial) {
-        // This is an EXACT match - automatically treat as RESTOCK
-        const newStock = existingMaterial.current_stock + deliveredOrder.quantity;
-        const newStatus = newStock === 0 ? 'out-of-stock' : 
-                         newStock <= existingMaterial.min_threshold ? 'low-stock' : 'in-stock';
+          // CRITICAL: We should ALWAYS find an existing material for delivery
+          // If we don't find one, something is wrong with the order data
+          if (!existingMaterial) {
+            console.error('❌ CRITICAL ERROR: No existing material found for delivery!');
+            console.error('This should never happen - every order should have a corresponding material.');
+            console.error('Order details:', deliveredOrder);
+            
+            toast({
+              title: "❌ Delivery Error",
+              description: `Cannot deliver order: No existing material found for "${deliveredOrder.materialName}" from "${deliveredOrder.supplier}". Please check the order data.`,
+              variant: "destructive",
+            });
+            return; // Stop processing - don't create new material
+          }
         
-        // Update material in Supabase
-        console.log('🔄 Updating existing material in database...');
-        const { error: updateError } = await supabase
-          .from('raw_materials')
-          .update({
-            current_stock: newStock,
-            last_restocked: new Date().toISOString(),
-            status: newStatus,
-            cost_per_unit: deliveredOrder.costPerUnit,
-            total_value: newStock * deliveredOrder.costPerUnit
-          })
-          .eq('id', existingMaterial.id);
+          if (existingMaterial) {
+            // This is an EXACT match - automatically treat as RESTOCK
+            const newStock = existingMaterial.current_stock + deliveredOrder.quantity;
+            const newStatus = newStock === 0 ? 'out-of-stock' : 
+                             newStock <= existingMaterial.min_threshold ? 'low-stock' : 'in-stock';
+            
+            // Update material in MongoDB
+            console.log('🔄 Updating existing material in database...');
+            const { error: updateError } = await rawMaterialService.updateRawMaterial(existingMaterial.id, {
+              current_stock: newStock,
+              last_restocked: new Date().toISOString(),
+              status: newStatus,
+              cost_per_unit: deliveredOrder.costPerUnit
+            });
 
-        if (updateError) {
-          console.error('❌ Error updating material:', updateError);
-          throw updateError;
-        }
-        
-        console.log(`✅ Updated existing material ${deliveredOrder.materialName} from ${existingMaterial.current_stock} to ${newStock}`);
-        
-        toast({
-          title: "✅ Order Delivered Successfully!",
-          description: `${deliveredOrder.materialName} (${deliveredOrder.supplier}): ${existingMaterial.current_stock} + ${deliveredOrder.quantity} = ${newStock} ${deliveredOrder.unit}`,
-          variant: "default",
-        });
-      }
+            if (updateError) {
+              console.error('❌ Error updating material:', updateError);
+              throw updateError;
+            }
+            
+            console.log(`✅ Updated existing material ${deliveredOrder.materialName} from ${existingMaterial.current_stock} to ${newStock}`);
+            
+            toast({
+              title: "✅ Order Delivered Successfully!",
+              description: `${deliveredOrder.materialName} (${deliveredOrder.supplier}): ${existingMaterial.current_stock} + ${deliveredOrder.quantity} = ${newStock} ${deliveredOrder.unit}`,
+              variant: "default",
+            });
+          }
     } catch (error) {
       console.error('❌ Error updating raw material stock:', error);
       
@@ -859,7 +929,7 @@ export default function ManageStock() {
                     )}
                   </div>
                   
-                  {order.notes && (
+                  {order.notes && !order.notes.startsWith('{') && (
                     <div className="text-sm text-muted-foreground">
                       <strong>Notes:</strong> {order.notes}
                     </div>
@@ -1054,7 +1124,7 @@ export default function ManageStock() {
               </Card>
 
               {/* Notes */}
-              {selectedOrder.notes && (
+              {selectedOrder.notes && !selectedOrder.notes.startsWith('{') && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Order Notes</CardTitle>

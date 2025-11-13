@@ -7,19 +7,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Trash2, AlertTriangle, Factory, Package, X, CheckCircle, Eye, Save, Bell, Calculator, Info, QrCode } from "lucide-react";
+import { Plus, Search, Trash2, AlertTriangle, Factory, Package, X, CheckCircle, Eye, Save, Bell, Calculator, Info, QrCode, Edit, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { generateUniqueId, createNotification } from "@/lib/storageUtils";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { CustomerService } from "@/services/customerService";
 import { NotificationService } from "@/services/notificationService";
-import { OrderService } from "@/services/orderService";
+import { MongoDBOrderService } from "@/services/api/orderService";
+import ProductService from "@/services/api/productService";
+import RawMaterialService from "@/services/api/rawMaterialService";
+import IndividualProductService from "@/services/api/individualProductService";
+import MongoDBNotificationService from "@/services/api/notificationService";
 import { DynamicPricingForm } from "@/components/order/DynamicPricingForm";
 import { EnhancedPricingForm } from "@/components/order/EnhancedPricingForm";
 import { usePricingCalculator } from "@/hooks/usePricingCalculator";
 import { ExtendedOrderItem, OrderFormData } from "@/types/orderTypes";
 import { PricingUnit, ProductDimensions, getSuggestedPricingUnit, getAvailablePricingUnits } from "@/utils/unitConverter";
+import { GSTApiService } from "@/services/gstApiService";
 import { 
   Dialog,
   DialogContent,
@@ -52,14 +56,22 @@ interface Customer {
   city: string;
   state: string;
   pincode: string;
-  customerType: "individual" | "business";
-  status: "active" | "inactive";
-  totalOrders: number;
-  totalValue: number;
-  lastOrderDate: string;
-  registrationDate: string;
-  gstNumber?: string;
-  companyName?: string;
+  customer_type: "individual" | "business";
+  status: "active" | "inactive" | "suspended" | "new";
+  total_orders: number;
+  total_value: string;
+  last_order_date?: string;
+  registration_date: string;
+  gst_number?: string;
+  company_name?: string;
+  credit_limit: string;
+  outstanding_amount: string;
+  // Address fields (stored as JSON strings)
+  permanent_address?: string;
+  delivery_address?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 
@@ -101,7 +113,21 @@ export default function NewOrder() {
     pincode: "",
     customerType: "individual" as "individual" | "business",
     gstNumber: "",
-    companyName: ""
+    companyName: "",
+    // New address fields
+    permanentAddress: {
+      address: "",
+      city: "",
+      state: "",
+      pincode: ""
+    },
+    deliveryAddress: {
+      address: "",
+      city: "",
+      state: "",
+      pincode: ""
+    },
+    sameAsPermanent: true // Checkbox for same address
   });
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [orderDetails, setOrderDetails] = useState({
@@ -109,6 +135,15 @@ export default function NewOrder() {
     notes: "",
     paidAmount: 0
   });
+  
+  // Address management state
+  const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  } | null>(null);
+  const [showAddressEditor, setShowAddressEditor] = useState(false);
 
   // GST Management State
   const [gstSettings, setGstSettings] = useState({
@@ -123,14 +158,70 @@ export default function NewOrder() {
   const [currentOrderItem, setCurrentOrderItem] = useState<ExtendedOrderItem | null>(null);
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedQRProduct, setSelectedQRProduct] = useState<any>(null);
+  
+  // Product search filter states
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [productCategoryFilter, setProductCategoryFilter] = useState("all");
+  const [productSubcategoryFilter, setProductSubcategoryFilter] = useState("all");
+  const [productColorFilter, setProductColorFilter] = useState("all");
+  const [productSizeFilter, setProductSizeFilter] = useState("all");
 
+  // GST API Integration State
+  const [isFetchingGST, setIsFetchingGST] = useState(false);
+  const [gstFetchError, setGstFetchError] = useState<string | null>(null);
+  const [gstAutoFilled, setGstAutoFilled] = useState(false);
+
+
+  // GST API Integration Functions
+  const handleGSTNumberChange = async (gstNumber: string) => {
+    setNewCustomer({...newCustomer, gstNumber});
+    setGstFetchError(null);
+    setGstAutoFilled(false);
+
+    // Only fetch if GST number is complete (15 characters)
+    if (gstNumber.length === 15) {
+      setIsFetchingGST(true);
+      try {
+        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstNumber);
+        
+        if (error) {
+          setGstFetchError(error);
+        } else if (data) {
+          // Auto-fill customer details
+          // Use company name as customer name (GST doesn't have individual customer names)
+          setNewCustomer({
+            ...newCustomer,
+            gstNumber: data.gstNumber,
+            name: data.companyName, // Use company name as customer name
+            companyName: data.companyName,
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            pincode: data.pincode
+            // Note: Email and phone are not in GST data, user must enter manually
+          });
+          setGstAutoFilled(true);
+        }
+      } catch (error) {
+        console.error('Error fetching GST details:', error);
+        setGstFetchError('Failed to fetch GST details');
+      } finally {
+        setIsFetchingGST(false);
+      }
+    }
+  };
+
+  const clearGSTAutoFill = () => {
+    setGstAutoFilled(false);
+    setGstFetchError(null);
+  };
 
   // Load customers and products from storage on component mount
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        // Load customers from Supabase
-        const { data: supabaseCustomers, error } = await CustomerService.getCustomers();
+        // Load customers from MongoDB
+        const { data: customersData, error } = await CustomerService.getCustomers();
         
         if (error) {
           console.error('Error loading customers:', error);
@@ -142,29 +233,10 @@ export default function NewOrder() {
           return;
         }
 
-        if (supabaseCustomers) {
-          // Convert from Supabase format to local format
-          const localCustomers: Customer[] = supabaseCustomers.map(customer => ({
-            id: customer.id,
-            name: customer.name,
-            email: customer.email,
-            phone: customer.phone,
-            address: customer.address || '',
-            city: customer.city || '',
-            state: customer.state || '',
-            pincode: customer.pincode || '',
-            customerType: customer.customer_type,
-            status: customer.status === 'active' ? 'active' : 'inactive',
-            totalOrders: customer.total_orders,
-            totalValue: customer.total_value,
-            lastOrderDate: customer.last_order_date || '',
-            registrationDate: customer.registration_date,
-            gstNumber: customer.gst_number,
-            companyName: customer.company_name
-          }));
-          
-          setCustomers(localCustomers);
-          console.log('✅ Loaded', localCustomers.length, 'customers from Supabase for NewOrder');
+        if (customersData) {
+          // MongoDB customers are already in the correct format
+          setCustomers(customersData);
+          console.log('✅ Loaded', customersData.length, 'customers from MongoDB for NewOrder');
         }
       } catch (error) {
         console.error('Error loading customers:', error);
@@ -178,119 +250,75 @@ export default function NewOrder() {
 
     loadCustomers();
     
-    // Load products and raw materials from Supabase
+    // Load products and raw materials from MongoDB
     const loadProductsAndMaterials = async () => {
       try {
-        // Load products from Supabase
-        const { data: products, error: productsError } = await supabaseAdmin
-          .from('products')
-          .select('*');
+        // Load products from MongoDB
+        const { data: products, error: productsError } = await ProductService.getProducts();
         
         if (productsError) {
           console.error('Error loading products:', productsError);
         } else {
-          console.log('✅ Loaded', products?.length || 0, 'products from Supabase');
+          console.log('✅ Loaded', products?.length || 0, 'products from MongoDB');
         }
 
-        // Load raw materials from Supabase
-        const { data: rawMaterials, error: materialsError } = await supabaseAdmin
-          .from('raw_materials')
-          .select('*');
+        // Load raw materials from MongoDB
+        const { data: rawMaterials, error: materialsError } = await RawMaterialService.getRawMaterials();
         
         if (materialsError) {
           console.error('Error loading raw materials:', materialsError);
         } else {
-          console.log('✅ Loaded', rawMaterials?.length || 0, 'raw materials from Supabase');
+          console.log('✅ Loaded', rawMaterials?.length || 0, 'raw materials from MongoDB');
         }
 
-        // Load individual products from Supabase
-        const { data: individualProducts, error: individualError } = await supabaseAdmin
-          .from('individual_products')
-          .select('*');
-        
-        if (individualError) {
-          console.error('Error loading individual products:', individualError);
-        } else {
-          console.log('✅ Loaded', individualProducts?.length || 0, 'individual products from Supabase');
-        }
+        // Individual products will be loaded per product when needed
+        console.log('✅ Individual products will be loaded per product when needed');
 
-        return { products: products || [], rawMaterials: rawMaterials || [], individualProducts: individualProducts || [] };
+        return { products: products || [], rawMaterials: rawMaterials || [], individualProducts: [] };
       } catch (error) {
-        console.error('Error loading data from Supabase:', error);
+        console.error('Error loading data from MongoDB:', error);
         return { products: [], rawMaterials: [], individualProducts: [] };
       }
     };
 
-    // Load all data from Supabase
+    // Load all data from MongoDB
     const loadAllData = async () => {
       try {
-        // Load products from Supabase
-        const { data: productsData, error: productsError } = await supabaseAdmin
-          .from('products')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // Load products from MongoDB
+        const { data: productsData, error: productsError } = await ProductService.getProducts();
 
         if (productsError) {
           console.error('Error loading products:', productsError);
           throw productsError;
         }
 
-        // Load individual products from Supabase
-        const { data: individualProductsData, error: individualError } = await supabaseAdmin
-          .from('individual_products')
-          .select('*');
+        // Individual products will be loaded per product when needed
+        console.log('✅ Individual products will be loaded per product when needed');
 
-        if (individualError) {
-          console.error('Error loading individual products:', individualError);
-          throw individualError;
-        }
-
-        // Load raw materials from Supabase
-        const { data: rawMaterialsData, error: rawMaterialsError } = await supabaseAdmin
-          .from('raw_materials')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // Load raw materials from MongoDB
+        const { data: rawMaterialsData, error: rawMaterialsError } = await RawMaterialService.getRawMaterials();
 
         if (rawMaterialsError) {
           console.error('Error loading raw materials:', rawMaterialsError);
           throw rawMaterialsError;
         }
 
-        // Transform products to match the expected format and calculate stock
+        // Transform products to match the expected format
         const transformedProducts = (productsData || []).map((product: any) => {
-          // Only count individual products that are actually available (not sold or damaged)
-          const availableIndividualProducts = (individualProductsData || []).filter(
-            (item: any) => item.product_id === product.id && item.status === "available"
-      );
-      
-      // Count total individual products for debugging
-          const totalIndividualProducts = (individualProductsData || []).filter(
-            (item: any) => item.product_id === product.id
-      );
-      const soldProducts = totalIndividualProducts.filter(item => item.status === "sold");
-      const damagedProducts = totalIndividualProducts.filter(item => item.status === "damaged");
-      
-      console.log(`📦 Product ${product.name}:`, {
-        total: totalIndividualProducts.length,
-        available: availableIndividualProducts.length,
-        sold: soldProducts.length,
-        damaged: damagedProducts.length
-      });
-
           // Calculate stock based on individual tracking setting
           let calculatedStock = 0;
           if (product.individual_stock_tracking === false) {
             // For bulk products, use base_quantity
             calculatedStock = product.base_quantity || 0;
           } else {
-            // For individual tracking, count available individual products
-            calculatedStock = availableIndividualProducts.length;
+            // For individual tracking products, we'll load individual products separately
+            // For now, use base_quantity as fallback - will be updated when individual products are loaded
+            calculatedStock = product.base_quantity || 0;
           }
 
           console.log(`📊 Stock calculation for ${product.name}:`, {
             individual_tracking: product.individual_stock_tracking,
             base_quantity: product.base_quantity,
-            available_individual: availableIndividualProducts.length,
             calculated_stock: calculatedStock
           });
 
@@ -300,10 +328,11 @@ export default function NewOrder() {
             price: 0, // No fixed pricing - will be set per order
             stock: calculatedStock,
             category: product.category,
+            subcategory: product.subcategory || "",
             color: product.color,
             size: product.pattern, // Map pattern to size for compatibility
             pattern: product.pattern,
-            dimensions: `${product.width} x ${product.height}`,
+            dimensions: `${product.width} x ${product.length}`,
             weight: product.weight,
             imageUrl: product.image_url || "",
             status: "in-stock", // Default status
@@ -311,8 +340,7 @@ export default function NewOrder() {
             unit: product.unit || "units",
             individualStockTracking: product.individual_stock_tracking,
             width: product.width,
-            height: product.height,
-            thickness: product.thickness
+            length: product.length
           };
         });
 
@@ -340,83 +368,53 @@ export default function NewOrder() {
           };
         });
 
-        // Transform individual products
-        const transformedIndividualProducts = (individualProductsData || []).map((product: any) => ({
-          id: product.id,
-          qrCode: product.qr_code,
-          productId: product.product_id,
-          productName: product.product_name,
-          manufacturingDate: product.production_date || product.completion_date || product.added_date,
-          dimensions: product.final_dimensions || product.dimensions || "N/A",
-          weight: product.final_weight || product.weight || "N/A",
-          qualityGrade: product.quality_grade,
-          inspector: product.inspector,
-          status: product.status,
-          location: product.location,
-          finalDimensions: product.final_dimensions,
-          finalWeight: product.final_weight
-        }));
+        // Individual products will be loaded per product when needed
+        // Load individual products for stock calculation
+        console.log('📦 Loading individual products for stock calculation...');
+        const { data: individualProductsData, error: individualProductsError } = await IndividualProductService.getAllAvailableIndividualProducts();
+        
+        if (individualProductsError) {
+          console.error('Error loading individual products:', individualProductsError);
+          // Continue without individual products - stock will show base_quantity
+        } else {
+          console.log('✅ Loaded individual products:', individualProductsData?.length || 0);
+        }
 
         // Set all data
         setRealProducts(transformedProducts);
         setRawMaterials(transformedRawMaterials);
-        setIndividualProducts(transformedIndividualProducts);
+        setIndividualProducts(individualProductsData || []);
         
-        console.log('✅ Loaded products from Supabase:', transformedProducts.length);
-        console.log('🔍 Loaded individual products from Supabase:', transformedIndividualProducts.length);
-        console.log('🧱 Loaded raw materials from Supabase:', transformedRawMaterials.length);
+        // Update product stock after individual products are loaded
+        const updatedProducts = transformedProducts.map(product => {
+          const productIndividualProducts = (individualProductsData || []).filter(ip => ip.product_id === product.id);
+          
+          if (productIndividualProducts.length > 0) {
+            // If individual products exist, count only available ones
+            const availableCount = productIndividualProducts.filter(ip => ip.status === 'available').length;
+            return { ...product, stock: availableCount };
+          } else {
+            // If no individual products exist, use base_quantity
+            return { ...product, stock: product.stock };
+          }
+        });
+        
+        setRealProducts(updatedProducts);
+        
+        console.log('✅ Loaded products from MongoDB:', transformedProducts.length);
+        console.log('🔍 Individual products will be loaded per product when needed');
+        console.log('🧱 Loaded raw materials from MongoDB:', transformedRawMaterials.length);
         
         // Debug: Log stock values for first few products
         transformedProducts.slice(0, 3).forEach(product => {
           console.log(`📊 Product "${product.name}" stock: ${product.stock}, individual tracking: ${product.individualStockTracking}`);
         });
       } catch (error) {
-        console.error('Error loading data from Supabase:', error);
-        // Fallback to empty arrays if Supabase fails
-        const storedProducts = [];
-        const storedIndividualProducts = [];
-        const storedRawMaterials = [];
-        
-        const transformedProducts = storedProducts.map((product: any) => {
-          const availableIndividualProducts = storedIndividualProducts.filter(
-            (item: any) => item.productId === product.id && item.status === "available"
-          );
-
-      return {
-        id: product.id,
-        name: product.name,
-        price: product.sellingPrice || product.totalCost || 0,
-            stock: product.individualStockTracking === false ? product.quantity : availableIndividualProducts.length,
-        category: product.category,
-        color: product.color,
-        size: product.size,
-        pattern: product.pattern,
-        dimensions: product.dimensions,
-        weight: product.weight,
-        imageUrl: product.imageUrl,
-        status: product.status,
-        location: product.location,
-            unit: product.unit,
-            individualStockTracking: product.individualStockTracking
-      };
-    });
-    
-    const transformedRawMaterials = storedRawMaterials.map((material: any) => ({
-      id: material.id,
-      name: material.name,
-      price: material.costPerUnit || 0,
-          stock: material.currentStock || 0,
-      category: material.category,
-      brand: material.brand,
-      unit: material.unit,
-      supplier: material.supplier,
-      status: material.status,
-      location: material.location || 'Warehouse'
-    }));
-    
-    setRealProducts(transformedProducts);
-    setRawMaterials(transformedRawMaterials);
-        setIndividualProducts(storedIndividualProducts);
+        console.error('Error loading data from MongoDB:', error);
+        // Fallback to empty arrays if MongoDB fails
+        setRealProducts([]);
+        setRawMaterials([]);
+        setIndividualProducts([]);
         
         console.log('⚠️ Fallback: Using empty data arrays');
       }
@@ -424,6 +422,19 @@ export default function NewOrder() {
 
     loadAllData();
   }, [toast]);
+
+  // Auto-calculate recipe requirements when order items change
+  useEffect(() => {
+    const productItems = orderItems.filter(item => item.product_type === 'product');
+    
+    if (productItems.length > 0) {
+      // Recipe calculation removed - use dedicated Recipe Calculator page instead
+      console.log('Recipe calculation available on dedicated Recipe Calculator page');
+    } else {
+      // Clear any existing recipe calculation when no products
+      console.log('No products in order - recipe calculation not needed');
+    }
+  }, [orderItems]);
 
   const addOrderItem = () => {
     const newItem: ExtendedOrderItem = {
@@ -463,7 +474,7 @@ export default function NewOrder() {
             const productDimensions: ProductDimensions = {
               productType: updated.product_type === 'raw_material' ? 'raw_material' : 'carpet',
               width: product.dimensions?.width,
-              height: product.dimensions?.height,
+              length: product.dimensions?.length,
               weight: product.weight,
               gsm: product.gsm,
               denier: product.denier,
@@ -599,7 +610,7 @@ export default function NewOrder() {
 
   const getAvailableIndividualProducts = (productId: string) => {
     return individualProducts
-      .filter(p => p.productId === productId && p.status === "available")
+      .filter(p => p.product_id === productId && p.status === "available")
       .map(p => ({
         ...p,
         // Calculate age in days from manufacturing date
@@ -611,6 +622,21 @@ export default function NewOrder() {
         location: p.location || "Warehouse"
       }))
       .sort((a, b) => a.age - b.age); // Sort by age (oldest first)
+  };
+
+  // Function to get available stock for a product (following Supabase logic)
+  const getAvailableStock = (product: any) => {
+    // Check if there are individual products for this product
+    const productIndividualProducts = individualProducts.filter(p => p.product_id === product.id);
+    
+    if (productIndividualProducts.length > 0) {
+      // If individual products exist, count only available ones (regardless of tracking setting)
+      const availableCount = productIndividualProducts.filter(p => p.status === 'available').length;
+      return availableCount;
+    } else {
+      // If no individual products exist, use base_quantity
+      return product.stock || 0;
+    }
   };
 
   const handleProductionAlert = (item: OrderItem) => {
@@ -716,10 +742,12 @@ export default function NewOrder() {
         discount_amount: newOrder.discountAmount,
         paid_amount: orderDetails.paidAmount,
         priority: 'medium' as const,
-        special_instructions: newOrder.notes
+        special_instructions: newOrder.notes,
+        // Store the delivery address with the order
+        delivery_address: orderDeliveryAddress || undefined
       };
 
-      const { data: createdOrder, error: orderError } = await OrderService.createOrder(orderData);
+      const { data: createdOrder, error: orderError } = await MongoDBOrderService.createOrder(orderData);
       
       if (orderError) {
         console.error('Error creating order:', orderError);
@@ -742,8 +770,8 @@ export default function NewOrder() {
           if (customer.id === selectedCustomer.id) {
             return {
               ...customer,
-              totalOrders: customer.totalOrders + 1,
-              totalValue: customer.totalValue + totalAmount,
+              total_orders: customer.total_orders + 1,
+              total_value: (parseFloat(customer.total_value) + totalAmount).toFixed(2),
               lastOrderDate: newOrder.orderDate
             };
           }
@@ -761,7 +789,7 @@ export default function NewOrder() {
       if (!product) return false;
       
       // Check if order quantity exceeds available stock
-      const availableStock = product.stock || 0;
+      const availableStock = getAvailableStock(product);
       const shortfall = Math.max(0, item.quantity - availableStock);
       
       return shortfall > 0; // Needs production if there's a shortfall
@@ -792,22 +820,22 @@ export default function NewOrder() {
         const shortfall = Math.max(0, item.quantity - availableStock);
         
         // Check if notification already exists to prevent duplicates
-        const { exists: hasExistingNotification } = await NotificationService.notificationExists(
+        const { exists: hasExistingNotification } = await MongoDBNotificationService.notificationExists(
           'production_request',
           item.product_id,
           'unread'
         );
         
         if (!hasExistingNotification) {
-          await createNotification({
+          await MongoDBNotificationService.createNotification({
             type: 'production_request',
             title: `Product Stock Alert - ${item.product_name}`,
             message: `Order ${newOrder.orderNumber} requires ${item.quantity} units of ${item.product_name}. Current stock: ${availableStock} units. Need to produce ${shortfall} more units.`,
             priority: 'high',
             status: 'unread',
             module: 'products',
-            relatedId: item.product_id,
-            relatedData: {
+            related_id: item.product_id,
+            related_data: {
               productId: item.product_id,
               productName: item.product_name,
               requiredQuantity: item.quantity,
@@ -816,11 +844,14 @@ export default function NewOrder() {
               orderId: newOrder.id,
               orderNumber: newOrder.orderNumber
             },
-            createdBy: 'system'
+            created_by: 'system'
           });
         }
       }
     }
+
+    // Recipe calculation removed - use dedicated Recipe Calculator page instead
+    console.log('Recipe calculation available on dedicated Recipe Calculator page');
 
     // Send notifications to materials section for raw materials needing restocking
     if (rawMaterialsNeedingRestock.length > 0) {
@@ -831,22 +862,22 @@ export default function NewOrder() {
         const shortfall = Math.max(0, item.quantity - availableStock);
         
         // Check if notification already exists to prevent duplicates
-        const { exists: hasExistingNotification } = await NotificationService.notificationExists(
+        const { exists: hasExistingNotification } = await MongoDBNotificationService.notificationExists(
           'restock_request',
           item.product_id,
           'unread'
         );
         
         if (!hasExistingNotification) {
-          await createNotification({
+          await MongoDBNotificationService.createNotification({
             type: 'restock_request',
             title: `Raw Material Stock Alert - ${item.product_name}`,
             message: `Order ${newOrder.orderNumber} requires ${item.quantity} units of ${item.product_name}. Current stock: ${availableStock} units. Need to restock ${shortfall} more units.`,
             priority: 'high',
             status: 'unread',
             module: 'materials',
-            relatedId: item.product_id,
-            relatedData: {
+            related_id: item.product_id,
+            related_data: {
               materialId: item.product_id,
               materialName: item.product_name,
               requiredQuantity: item.quantity,
@@ -855,7 +886,7 @@ export default function NewOrder() {
               orderId: newOrder.id,
               orderNumber: newOrder.orderNumber
             },
-            createdBy: 'system'
+            created_by: 'system'
           });
         }
       }
@@ -946,13 +977,13 @@ export default function NewOrder() {
                     onClick={() => setSelectedCustomer(customer)}
                   >
                     <div className="font-medium">{customer.name}</div>
-                    {customer.companyName && (
-                      <div className="text-sm text-muted-foreground">{customer.companyName}</div>
+                    {customer.company_name && (
+                      <div className="text-sm text-muted-foreground">{customer.company_name}</div>
                     )}
                     <div className="text-sm text-muted-foreground">{customer.email} • {customer.phone}</div>
                     <div className="text-sm text-muted-foreground">{customer.address}, {customer.city}, {customer.state} - {customer.pincode}</div>
-                    {customer.gstNumber && (
-                      <div className="text-xs text-muted-foreground">GST: {customer.gstNumber}</div>
+                    {customer.gst_number && (
+                      <div className="text-xs text-muted-foreground">GST: {customer.gst_number}</div>
                     )}
                   </div>
                 ))}
@@ -982,15 +1013,15 @@ export default function NewOrder() {
               {/* Basic Information */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      value={newCustomer.name}
-                      onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
-                      placeholder="Enter customer full name"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Full Name *</Label>
+                      <Input
+                        id="name"
+                        value={newCustomer.name}
+                        onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                        placeholder="Enter customer full name"
+                      />
+                    </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address *</Label>
@@ -1015,15 +1046,16 @@ export default function NewOrder() {
                     />
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="gstNumber">GST Number</Label>
-                    <Input
-                      id="gstNumber"
-                      value={newCustomer.gstNumber}
-                      onChange={(e) => setNewCustomer({...newCustomer, gstNumber: e.target.value})}
-                      placeholder="Enter GST number (optional)"
-                    />
-                  </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="gstNumber">GST Number</Label>
+                      <Input
+                        id="gstNumber"
+                        value={newCustomer.gstNumber}
+                        onChange={(e) => handleGSTNumberChange(e.target.value)}
+                        placeholder="Enter GST number"
+                        maxLength={15}
+                      />
+                    </div>
                 </div>
 
                 {newCustomer.customerType === "business" && (
@@ -1100,7 +1132,20 @@ export default function NewOrder() {
                       pincode: "",
                       customerType: "individual",
                       gstNumber: "",
-                      companyName: ""
+                      companyName: "",
+                      permanentAddress: {
+                        address: "",
+                        city: "",
+                        state: "",
+                        pincode: ""
+                      },
+                      deliveryAddress: {
+                        address: "",
+                        city: "",
+                        state: "",
+                        pincode: ""
+                      },
+                      sameAsPermanent: true
                     });
                     setShowNewCustomerForm(false);
                   }}
@@ -1122,9 +1167,9 @@ export default function NewOrder() {
                     try {
                       // Create new customer using CustomerService
                       const customerData = {
-                      name: newCustomer.name.trim(),
-                      email: newCustomer.email.trim(),
-                      phone: newCustomer.phone.trim(),
+                        name: newCustomer.name.trim(),
+                        email: newCustomer.email.trim(),
+                        phone: newCustomer.phone.trim(),
                         address: newCustomer.address.trim() || undefined,
                         city: newCustomer.city.trim() || undefined,
                         state: newCustomer.state.trim() || undefined,
@@ -1146,25 +1191,8 @@ export default function NewOrder() {
                       }
 
                       if (newCustomerData) {
-                        // Convert from Supabase format to local format
-                        const localCustomer: Customer = {
-                          id: newCustomerData.id,
-                          name: newCustomerData.name,
-                          email: newCustomerData.email,
-                          phone: newCustomerData.phone,
-                          address: newCustomerData.address || '',
-                          city: newCustomerData.city || '',
-                          state: newCustomerData.state || '',
-                          pincode: newCustomerData.pincode || '',
-                          customerType: newCustomerData.customer_type,
-                          status: newCustomerData.status === 'active' ? 'active' : 'inactive',
-                          totalOrders: newCustomerData.total_orders,
-                          totalValue: newCustomerData.total_value,
-                          lastOrderDate: newCustomerData.last_order_date || '',
-                          registrationDate: newCustomerData.registration_date,
-                          gstNumber: newCustomerData.gst_number,
-                          companyName: newCustomerData.company_name
-                        };
+                        // MongoDB customers are already in the correct format
+                        const localCustomer: Customer = newCustomerData;
 
                         // Add to customers array
                         const updatedCustomers = [...customers, localCustomer];
@@ -1184,7 +1212,20 @@ export default function NewOrder() {
                       pincode: "",
                       customerType: "individual",
                       gstNumber: "",
-                      companyName: ""
+                      companyName: "",
+                      permanentAddress: {
+                        address: "",
+                        city: "",
+                        state: "",
+                        pincode: ""
+                      },
+                      deliveryAddress: {
+                        address: "",
+                        city: "",
+                        state: "",
+                        pincode: ""
+                      },
+                      sameAsPermanent: true
                     });
                     setShowNewCustomerForm(false);
                     
@@ -1270,6 +1311,8 @@ export default function NewOrder() {
         </CardContent>
       </Card>
 
+      {/* Recipe calculation removed - use dedicated Recipe Calculator page instead */}
+
       {/* Order Details */}
       <Card>
         <CardHeader>
@@ -1290,9 +1333,15 @@ export default function NewOrder() {
             <Label htmlFor="paidAmount">Advance Payment (Optional)</Label>
             <Input 
               id="paidAmount"
-              type="number"
+              type="text"
               value={orderDetails.paidAmount}
-              onChange={(e) => setOrderDetails(prev => ({ ...prev, paidAmount: parseFloat(e.target.value) || 0 }))}
+              onChange={(e) => {
+                // Allow only numbers, decimals, and leading zeros
+                const value = e.target.value;
+                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                  setOrderDetails(prev => ({ ...prev, paidAmount: parseFloat(value) || 0 }));
+                }
+              }}
               placeholder="Enter advance payment amount (₹0 if no advance)"
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -1328,17 +1377,21 @@ export default function NewOrder() {
               <Label htmlFor="gst-rate">GST Rate (%)</Label>
               <Input
                 id="gst-rate"
-                type="number"
+                type="text"
                 min="0"
                 max="100"
                 step="0.01"
                 value={gstSettings.rate}
                 onChange={(e) => {
-                  const rate = parseFloat(e.target.value) || 0;
-                  setGstSettings(prev => ({ 
-                    ...prev, 
-                    rate: rate
-                  }));
+                  // Allow only numbers, decimals, and leading zeros
+                  const value = e.target.value;
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    const rate = parseFloat(value) || 0;
+                    setGstSettings(prev => ({ 
+                      ...prev, 
+                      rate: rate
+                    }));
+                  }
                 }}
                 placeholder="Enter GST percentage (e.g., 18)"
               />
@@ -1379,6 +1432,80 @@ export default function NewOrder() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delivery Address Management */}
+      {selectedCustomer && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Delivery Address
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {orderDeliveryAddress ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-medium text-green-800">Delivery Address Set</h4>
+                      <p className="text-sm text-green-600">
+                        {orderDeliveryAddress.address}, {orderDeliveryAddress.city}, {orderDeliveryAddress.state} - {orderDeliveryAddress.pincode}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowAddressEditor(true)}
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-800 mb-2">Set Delivery Address</h4>
+                  <p className="text-sm text-blue-600 mb-3">
+                    Choose delivery address for this order. You can use the customer's default delivery address or set a custom one.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm"
+                      onClick={() => {
+                        if (selectedCustomer.delivery_address) {
+                          setOrderDeliveryAddress(JSON.parse(selectedCustomer.delivery_address));
+                        } else if (selectedCustomer.permanent_address) {
+                          setOrderDeliveryAddress(JSON.parse(selectedCustomer.permanent_address));
+                        } else {
+                          // Use legacy address
+                          setOrderDeliveryAddress({
+                            address: selectedCustomer.address,
+                            city: selectedCustomer.city,
+                            state: selectedCustomer.state,
+                            pincode: selectedCustomer.pincode
+                          });
+                        }
+                      }}
+                    >
+                      Use Customer's Address
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowAddressEditor(true)}
+                    >
+                      Set Custom Address
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Order Summary */}
       <Card>
@@ -1436,25 +1563,6 @@ export default function NewOrder() {
              </Button>
            </div>
 
-           {/* Order Created Success Message */}
-           {orderItems.length > 0 && (
-             <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-               <div className="flex items-center gap-2 text-green-800 mb-2">
-                 <CheckCircle className="w-5 h-5" />
-                 <span className="font-medium">Order Ready to View</span>
-               </div>
-               <div className="text-sm text-green-700 mb-3">
-                 Your order has been created successfully. Click below to view complete order details.
-               </div>
-               <Button 
-                 onClick={() => navigate(`/orders/ORD${Date.now()}`)}
-                 className="bg-green-600 hover:bg-green-700"
-               >
-                 <Package className="w-4 h-4 mr-2" />
-                 View Order Details
-               </Button>
-             </div>
-           )}
         </CardContent>
       </Card>
 
@@ -1673,7 +1781,17 @@ export default function NewOrder() {
       </Dialog>
 
       {/* Product Search Modal */}
-      <Dialog open={showProductSearch} onOpenChange={setShowProductSearch}>
+      <Dialog open={showProductSearch} onOpenChange={(open) => {
+        setShowProductSearch(open);
+        if (!open) {
+          // Reset filters when dialog closes
+          setProductSearchTerm("");
+          setProductCategoryFilter("all");
+          setProductSubcategoryFilter("all");
+          setProductColorFilter("all");
+          setProductSizeFilter("all");
+        }
+      }}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1687,57 +1805,99 @@ export default function NewOrder() {
 
           <div className="space-y-4">
             {/* Search and Filters */}
-            <div className="flex gap-4">
-              <div className="flex-1">
+            <div className="flex flex-wrap gap-4">
+              <div className="flex-1 min-w-[200px]">
                 <Input
-                  placeholder={`Search ${currentOrderItem?.product_type === 'raw_material' ? 'raw materials by name, category, brand, or unit' : 'products by name, category, color, or size'}...`}
+                  placeholder={`Search ${currentOrderItem?.product_type === 'raw_material' ? 'raw materials by name, category, brand, or unit' : 'products by name, category, subcategory, color, or size'}...`}
                   className="h-10"
-                  onChange={(e) => {
-                    // Filter products based on search
-                    const searchTerm = e.target.value.toLowerCase();
-                    // This would be implemented with proper filtering logic
-                  }}
+                  value={productSearchTerm}
+                  onChange={(e) => setProductSearchTerm(e.target.value)}
                 />
               </div>
-              <Select>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="carpets">Carpets</SelectItem>
-                  <SelectItem value="rugs">Rugs</SelectItem>
-                  <SelectItem value="mats">Mats</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Colors</SelectItem>
-                  <SelectItem value="red">Red</SelectItem>
-                  <SelectItem value="blue">Blue</SelectItem>
-                  <SelectItem value="green">Green</SelectItem>
-                  <SelectItem value="brown">Brown</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sizes</SelectItem>
-                  <SelectItem value="small">Small</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="large">Large</SelectItem>
-                </SelectContent>
-              </Select>
+              {currentOrderItem?.product_type !== 'raw_material' && (
+                <>
+                  <Select value={productCategoryFilter} onValueChange={setProductCategoryFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {[...new Set(realProducts.map(p => p.category).filter(Boolean))].sort().map(category => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productSubcategoryFilter} onValueChange={setProductSubcategoryFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Subcategory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Subcategories</SelectItem>
+                      {[...new Set(realProducts.map(p => p.subcategory).filter(Boolean))].sort().map(subcategory => (
+                        <SelectItem key={subcategory} value={subcategory}>{subcategory}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productColorFilter} onValueChange={setProductColorFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Color" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Colors</SelectItem>
+                      {[...new Set(realProducts.map(p => p.color).filter(Boolean))].sort().map(color => (
+                        <SelectItem key={color} value={color}>{color}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productSizeFilter} onValueChange={setProductSizeFilter}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Sizes</SelectItem>
+                      {[...new Set(realProducts.map(p => p.size).filter(Boolean))].sort().map(size => (
+                        <SelectItem key={size} value={size}>{size}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
             </div>
 
             {/* Product Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-              {(currentOrderItem?.product_type === 'raw_material' ? rawMaterials : realProducts).map((product) => (
+              {(currentOrderItem?.product_type === 'raw_material' ? rawMaterials : realProducts)
+                .filter((product) => {
+                  if (currentOrderItem?.product_type === 'raw_material') {
+                    // For raw materials, only filter by search term
+                    if (productSearchTerm) {
+                      const search = productSearchTerm.toLowerCase();
+                      return (
+                        product.name?.toLowerCase().includes(search) ||
+                        product.category?.toLowerCase().includes(search) ||
+                        product.brand?.toLowerCase().includes(search) ||
+                        product.unit?.toLowerCase().includes(search)
+                      );
+                    }
+                    return true;
+                  } else {
+                    // For products, filter by all criteria
+                    const matchesSearch = !productSearchTerm || 
+                      product.name?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                      product.category?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                      (product.subcategory && product.subcategory.toLowerCase().includes(productSearchTerm.toLowerCase())) ||
+                      product.color?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+                      product.size?.toLowerCase().includes(productSearchTerm.toLowerCase());
+                    
+                    const matchesCategory = productCategoryFilter === "all" || product.category === productCategoryFilter;
+                    const matchesSubcategory = productSubcategoryFilter === "all" || (product.subcategory && product.subcategory === productSubcategoryFilter);
+                    const matchesColor = productColorFilter === "all" || product.color === productColorFilter;
+                    const matchesSize = productSizeFilter === "all" || product.size === productSizeFilter;
+                    
+                    return matchesSearch && matchesCategory && matchesSubcategory && matchesColor && matchesSize;
+                  }
+                })
+                .map((product) => (
                 <div
                   key={product.id}
                   className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md ${
@@ -1755,7 +1915,7 @@ export default function NewOrder() {
                         const productDimensions: ProductDimensions = {
                           productType: updated.product_type === 'raw_material' ? 'raw_material' : 'carpet',
                           width: product.dimensions?.width,
-                          height: product.dimensions?.height,
+                          length: product.dimensions?.length,
                           weight: product.weight,
                           gsm: product.gsm,
                           denier: product.denier,
@@ -1777,6 +1937,12 @@ export default function NewOrder() {
                       return item;
                     }));
                     setShowProductSearch(false);
+                    // Reset filters when product is selected
+                    setProductSearchTerm("");
+                    setProductCategoryFilter("all");
+                    setProductSubcategoryFilter("all");
+                    setProductColorFilter("all");
+                    setProductSizeFilter("all");
                   }}
                 >
                   {/* Product Image */}
@@ -1798,7 +1964,7 @@ export default function NewOrder() {
                     <div className="text-xs text-muted-foreground">
                       {currentOrderItem?.product_type === 'raw_material' 
                         ? `${product.category} • ${product.brand} • ${product.unit}`
-                        : `${product.category} • ${product.color} • ${product.size}`}
+                        : `${product.category}${product.subcategory ? ` • ${product.subcategory}` : ''} • ${product.color} • ${product.size}`}
                     </div>
                     {currentOrderItem?.product_type === 'raw_material' ? (
                       product.supplier && (
@@ -1822,10 +1988,10 @@ export default function NewOrder() {
                     {/* Stock Status */}
                     <div className="flex items-center justify-between">
                       <Badge 
-                        variant={product.stock > 20 ? "default" : product.stock > 5 ? "secondary" : "destructive"}
+                        variant={getAvailableStock(product) > 20 ? "default" : getAvailableStock(product) > 5 ? "secondary" : "destructive"}
                         className="text-xs"
                       >
-                        Stock: {product.stock}
+                        Stock: {getAvailableStock(product)}
                       </Badge>
                                         <div className="text-sm font-semibold text-white">
                     ₹{product.price.toLocaleString()}
@@ -1943,6 +2109,138 @@ export default function NewOrder() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Address Editor Dialog */}
+      <Dialog open={showAddressEditor} onOpenChange={setShowAddressEditor}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Delivery Address</DialogTitle>
+            <DialogDescription>
+              Set the delivery address for this order. Changes will be saved to the customer's profile.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="delivery-address">Address</Label>
+              <Textarea
+                id="delivery-address"
+                value={orderDeliveryAddress?.address || ''}
+                onChange={(e) => setOrderDeliveryAddress(prev => prev ? {...prev, address: e.target.value} : {
+                  address: e.target.value,
+                  city: '',
+                  state: '',
+                  pincode: ''
+                })}
+                placeholder="Enter delivery address"
+                rows={2}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="delivery-city">City</Label>
+                <Input
+                  id="delivery-city"
+                  value={orderDeliveryAddress?.city || ''}
+                  onChange={(e) => setOrderDeliveryAddress(prev => prev ? {...prev, city: e.target.value} : {
+                    address: '',
+                    city: e.target.value,
+                    state: '',
+                    pincode: ''
+                  })}
+                  placeholder="Enter city"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="delivery-state">State</Label>
+                <Input
+                  id="delivery-state"
+                  value={orderDeliveryAddress?.state || ''}
+                  onChange={(e) => setOrderDeliveryAddress(prev => prev ? {...prev, state: e.target.value} : {
+                    address: '',
+                    city: '',
+                    state: e.target.value,
+                    pincode: ''
+                  })}
+                  placeholder="Enter state"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="delivery-pincode">Pincode</Label>
+                <Input
+                  id="delivery-pincode"
+                  value={orderDeliveryAddress?.pincode || ''}
+                  onChange={(e) => setOrderDeliveryAddress(prev => prev ? {...prev, pincode: e.target.value} : {
+                    address: '',
+                    city: '',
+                    state: '',
+                    pincode: e.target.value
+                  })}
+                  placeholder="Enter pincode"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddressEditor(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (orderDeliveryAddress && selectedCustomer) {
+                  // Update customer's delivery address in database
+                  try {
+                    const { error } = await CustomerService.updateCustomer(selectedCustomer.id, {
+                      delivery_address: orderDeliveryAddress
+                    } as any);
+                    
+                    if (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to update customer address",
+                        variant: "destructive"
+                      });
+                    } else {
+                      toast({
+                        title: "Success",
+                        description: "Delivery address updated successfully",
+                      });
+                      
+                      // Update local customer data
+                      const updatedCustomers = customers.map(customer => 
+                        customer.id === selectedCustomer.id 
+                          ? { ...customer, delivery_address: JSON.stringify(orderDeliveryAddress) }
+                          : customer
+                      );
+                      setCustomers(updatedCustomers);
+                      setSelectedCustomer({ ...selectedCustomer, delivery_address: JSON.stringify(orderDeliveryAddress) });
+                    }
+                  } catch (error) {
+                    console.error('Error updating customer address:', error);
+                    toast({
+                      title: "Error",
+                      description: "Failed to update customer address",
+                      variant: "destructive"
+                    });
+                  }
+                }
+                setShowAddressEditor(false);
+              }}
+              disabled={!orderDeliveryAddress?.address || !orderDeliveryAddress?.city || !orderDeliveryAddress?.state || !orderDeliveryAddress?.pincode}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Address
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

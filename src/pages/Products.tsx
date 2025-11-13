@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { ProductService } from "@/services";
-import { individualProductService } from "@/services/individualProductService";
-import { ProductRecipeService } from "@/services/productRecipeService";
-import { NotificationService } from "@/services/notificationService";
+import { useToast } from "@/hooks/use-toast";
+import { MongoDBProductService, IndividualProductService } from "@/services";
+import { MongoDBRecipeService } from "@/services/api/recipeService";
+import MongoDBNotificationService from "@/services/api/notificationService";
+import { rawMaterialService } from "@/services/rawMaterialService";
+import { mapMongoDBProductToFrontend, mapFrontendProductToMongoDB, mapFrontendIndividualProductToMongoDB, type Product as FrontendProduct, type IndividualProduct as FrontendIndividualProduct } from "@/utils/typeMapping";
 import { 
   getFromStorage, 
   saveToStorage, 
@@ -18,8 +20,10 @@ import {
 } from "@/lib/storageUtils";
 import { IDGenerator } from "@/lib/idGenerator";
 import { QRCodeService, IndividualProductQRData, MainProductQRData } from "@/lib/qrCode";
-import { DropdownService, DropdownOption } from "@/services/dropdownService";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
+import { DropdownService } from "@/services";
+import type { DropdownOption } from "@/services/api/dropdownService";
+import { uploadImageToR2, deleteImageFromR2 } from "@/services/api/r2Service";
+// Supabase removed - now using MongoDB via backend API
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -49,7 +53,7 @@ import {
   Plus, Search, Package, AlertTriangle, Upload, Image, X, Download, 
   FileSpreadsheet, CheckCircle, AlertCircle, QrCode, Calendar, 
   Edit, Eye, Filter, SortAsc, SortDesc, Hash, Play, RefreshCw,
-  Bell, Factory, Clock, ArrowRight, Copy, Trash2
+  Bell, Factory, Clock, ArrowRight, Copy, Trash2, ChevronDown
 } from "lucide-react";
 
 interface ProductMaterial {
@@ -58,60 +62,10 @@ interface ProductMaterial {
   quantity: number;
   unit: string;
   cost: number;
+  selectedQuantity?: number;
 }
 
-interface Product {
-  id: string;
-  qrCode: string;
-  name: string;
-  category: string;
-  color: string;
-  pattern: string;
-  quantity: number;
-  unit: string;
-  expiryDate?: string;
-  materialsUsed: ProductMaterial[];
-  status: "in-stock" | "low-stock" | "out-of-stock" | "expired" | "in-production";
-  notes: string;
-  imageUrl?: string;
-  weight: string;
-  thickness: string;
-  width: string;
-  height: string;
-  manufacturingDate?: string;
-  individualStockTracking?: boolean;
-  actual_quantity?: number;
-  actual_status?: "in-stock" | "low-stock" | "out-of-stock" | "expired" | "in-production"; // Calculated status based on actual stock
-  individual_products?: any[];
-}
-
-interface IndividualProduct {
-  id: string;
-  qrCode: string;
-  productId: string;
-  productName?: string;
-  color?: string;
-  pattern?: string;
-  weight?: string;
-  thickness?: string;
-  width?: string;
-  height?: string;
-  materialsUsed: ProductMaterial[];
-  finalWeight: string;
-  finalThickness: string;
-  finalWidth: string;
-  finalHeight: string;
-  finalPileHeight?: string;
-  finalQualityGrade?: string;
-  qualityGrade: string;
-  inspector?: string;
-  notes: string;
-  status: "available" | "sold" | "damaged";
-  location?: string;
-  addedDate?: string;
-  productionDate?: string;
-  completionDate?: string;
-}
+// Using imported types from typeMapping
 
 const statusStyles = {
   "in-stock": "bg-success text-success-foreground",
@@ -123,24 +77,44 @@ const statusStyles = {
 
 export default function Products() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, hasPageAccess } = useAuth();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Check page permission
+  const hasProductsAccess = hasPageAccess('products');
+  
+  // Redirect if no access
+  useEffect(() => {
+    if (!hasProductsAccess) {
+      navigate('/access-denied', { state: { pageName: 'Products' } });
+    }
+  }, [hasProductsAccess, navigate]);
+  
+  // Don't render if no permission
+  if (!hasProductsAccess) {
+    return null;
+  }
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [isImportProductsOpen, setIsImportProductsOpen] = useState(false);
   const [isEditProductOpen, setIsEditProductOpen] = useState(false);
   const [isDuplicateProductOpen, setIsDuplicateProductOpen] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [duplicateProduct, setDuplicateProduct] = useState<Product | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<FrontendProduct | null>(null);
+  const [duplicateProduct, setDuplicateProduct] = useState<FrontendProduct | null>(null);
+  const [products, setProducts] = useState<FrontendProduct[]>([]);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string>(""); // Store R2 URL
+  const [duplicateSelectedImage, setDuplicateSelectedImage] = useState<File | null>(null); // Store file for duplicate product
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [selectedQRProduct, setSelectedQRProduct] = useState<Product | null>(null);
-  const [selectedQRIndividualProduct, setSelectedQRIndividualProduct] = useState<IndividualProduct | null>(null);
+  const [selectedQRProduct, setSelectedQRProduct] = useState<FrontendProduct | null>(null);
+  const [selectedQRIndividualProduct, setSelectedQRIndividualProduct] = useState<FrontendIndividualProduct | null>(null);
   const [productsWithRecipes, setProductsWithRecipes] = useState<Set<string>>(new Set());
   const [isAddingToProduction, setIsAddingToProduction] = useState<string | null>(null);
   const [isDuplicatingProduct, setIsDuplicatingProduct] = useState<string | null>(null);
@@ -150,27 +124,33 @@ export default function Products() {
     units: DropdownOption[];
     colors: DropdownOption[];
     patterns: DropdownOption[];
-    thicknesses: DropdownOption[];
     weights: DropdownOption[];
     categories: DropdownOption[];
-    heights: DropdownOption[];
+    subcategories: DropdownOption[];
+    lengths: DropdownOption[];
     widths: DropdownOption[];
   }>({
     units: [],
     colors: [],
     patterns: [],
-    thicknesses: [],
     weights: [],
     categories: [],
-    heights: [],
+    subcategories: [],
+    lengths: [],
     widths: [],
   });
   const [colorSearchTerm, setColorSearchTerm] = useState("");
   const [unitSearchTerm, setUnitSearchTerm] = useState("");
   const [weightSearchTerm, setWeightSearchTerm] = useState("");
-  const [thicknessSearchTerm, setThicknessSearchTerm] = useState("");
-  const [heightSearchTerm, setHeightSearchTerm] = useState("");
+  const [lengthSearchTerm, setLengthSearchTerm] = useState("");
   const [widthSearchTerm, setWidthSearchTerm] = useState("");
+  
+  // Add New Unit Dialog state
+  const [isAddUnitDialogOpen, setIsAddUnitDialogOpen] = useState(false);
+  const [newUnitNameInput, setNewUnitNameInput] = useState("");
+  const [currentUnitType, setCurrentUnitType] = useState<'weight' | 'length' | 'width'>('weight');
+  const [currentUnitPlaceholder, setCurrentUnitPlaceholder] = useState("");
+  
   // Load dropdown options from database
   const loadDropdownOptions = async () => {
     try {
@@ -178,6 +158,42 @@ export default function Products() {
       setDropdownOptions(options);
     } catch (error) {
       console.error('Error loading dropdown options:', error);
+    }
+  };
+
+  // Load unit options from database using MongoDB
+  const loadUnitOptions = async () => {
+    try {
+      // Load weight units from MongoDB
+      const weightUnitsData = await DropdownService.getOptionsByCategory('weight_units');
+      if (weightUnitsData) {
+        setWeightUnits(weightUnitsData.map(item => item.value));
+      }
+
+      // Load length units from MongoDB - try both singular and plural categories
+      const lengthUnitsDataPlural = await DropdownService.getOptionsByCategory('length_units');
+      const lengthUnitsDataSingular = await DropdownService.getOptionsByCategory('length_unit');
+      const allLengthUnits = [
+        ...(lengthUnitsDataPlural || []).map(item => item.value),
+        ...(lengthUnitsDataSingular || []).map(item => item.value)
+      ];
+      // Remove duplicates - use all units from backend, no filtering
+      const uniqueLengthUnits = Array.from(new Set(allLengthUnits));
+      setLengthUnits(uniqueLengthUnits);
+
+      // Load width units from MongoDB - try both singular and plural categories
+      const widthUnitsDataPlural = await DropdownService.getOptionsByCategory('width_units');
+      const widthUnitsDataSingular = await DropdownService.getOptionsByCategory('width_unit');
+      const allWidthUnits = [
+        ...(widthUnitsDataPlural || []).map(item => item.value),
+        ...(widthUnitsDataSingular || []).map(item => item.value)
+      ];
+      // Remove duplicates - use all units from backend, no filtering
+      const uniqueWidthUnits = Array.from(new Set(allWidthUnits));
+      setWidthUnits(uniqueWidthUnits);
+
+    } catch (error) {
+      console.error('Error loading unit options:', error);
     }
   };
   
@@ -198,31 +214,38 @@ export default function Products() {
   };
 
   const getFilteredWeights = () => {
-    if (!weightSearchTerm.trim()) return dropdownOptions.weights.map(opt => opt.value);
-    return dropdownOptions.weights
-      .filter(opt => opt.value.toLowerCase().includes(weightSearchTerm.toLowerCase()))
-      .map(opt => opt.value);
+    // Return combined values as-is (e.g., "600 GSM", "4 mm", "5 m")
+    // Don't parse - show full combined values in dropdown
+    const weights = dropdownOptions.weights.map(opt => opt.value);
+    
+    if (!weightSearchTerm.trim()) return weights;
+    
+    return weights.filter(w => 
+      w.toLowerCase().includes(weightSearchTerm.toLowerCase())
+    );
   };
 
-  const getFilteredThicknesses = () => {
-    if (!thicknessSearchTerm.trim()) return dropdownOptions.thicknesses.map(opt => opt.value);
-    return dropdownOptions.thicknesses
-      .filter(opt => opt.value.toLowerCase().includes(thicknessSearchTerm.toLowerCase()))
-      .map(opt => opt.value);
-  };
 
-  const getFilteredHeights = () => {
-    if (!heightSearchTerm.trim()) return dropdownOptions.heights.map(opt => opt.value);
-    return dropdownOptions.heights
-      .filter(opt => opt.value.toLowerCase().includes(heightSearchTerm.toLowerCase()))
-      .map(opt => opt.value);
+  const getFilteredLengths = () => {
+    // Return combined values as-is (e.g., "5 m", "10 ft")
+    const lengths = dropdownOptions.lengths.map(opt => opt.value);
+    
+    if (!lengthSearchTerm.trim()) return lengths;
+    
+    return lengths.filter(l => 
+      l.toLowerCase().includes(lengthSearchTerm.toLowerCase())
+    );
   };
 
   const getFilteredWidths = () => {
-    if (!widthSearchTerm.trim()) return dropdownOptions.widths.map(opt => opt.value);
-    return dropdownOptions.widths
-      .filter(opt => opt.value.toLowerCase().includes(widthSearchTerm.toLowerCase()))
-      .map(opt => opt.value);
+    // Return combined values as-is (e.g., "10 m", "5 ft")
+    const widths = dropdownOptions.widths.map(opt => opt.value);
+    
+    if (!widthSearchTerm.trim()) return widths;
+    
+    return widths.filter(w => 
+      w.toLowerCase().includes(widthSearchTerm.toLowerCase())
+    );
   };
 
   
@@ -233,13 +256,20 @@ export default function Products() {
         // Load dropdown options first
         await loadDropdownOptions();
         
-        const result = await ProductService.getProducts();
-        console.log("Loaded products from Supabase:", result);
+        // Load unit options
+        await loadUnitOptions();
+        
+        const result = await MongoDBProductService.getProducts();
+        console.log("Loaded products from MongoDB:", result);
         if (result.error) {
           console.error("Error loading products:", result.error);
           setProducts([]);
         } else {
-          setProducts(result.data || []);
+          const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
+          setProducts(mappedProducts);
+          
+          // Load individual products for each product
+          await loadIndividualProductsForAllProducts(mappedProducts);
           
           // Check which products have recipes
           await checkProductsWithRecipes(result.data || []);
@@ -253,8 +283,87 @@ export default function Products() {
     loadProducts();
   }, []);
 
-  // Check which products have recipes
-  const checkProductsWithRecipes = async (products: Product[]) => {
+  // Calculate product status based on available stock
+  const calculateProductStatus = (product: any) => {
+    if (product.individualStockTracking) {
+      // For individual tracking products, check available individual products
+      const availableCount = product.individual_products?.filter((ip: any) => ip.status === 'available').length || 0;
+      if (availableCount === 0) {
+        return 'out-of-stock';
+      } else if (availableCount <= product.minStockLevel) {
+        return 'low-stock';
+      } else {
+        return 'in-stock';
+      }
+    } else {
+      // For bulk products, check base quantity
+      if (product.baseQuantity === 0) {
+        return 'out-of-stock';
+      } else if (product.baseQuantity <= product.minStockLevel) {
+        return 'low-stock';
+      } else {
+        return 'in-stock';
+      }
+    }
+  };
+
+  // Load individual products for all products
+  const loadIndividualProductsForAllProducts = async (products: any[]) => {
+    const updatedProducts = [...products];
+    
+    for (let i = 0; i < updatedProducts.length; i++) {
+      const product = updatedProducts[i];
+      if (product.individualStockTracking) {
+        try {
+          const { data: individualProducts, error } = await IndividualProductService.getIndividualProductsByProductId(product.id);
+          if (individualProducts && !error) {
+            const mappedIndividualProducts = individualProducts.map((ip: any) => ({
+              id: ip.id,
+              qrCode: ip.qr_code,
+              productId: ip.product_id,
+              productName: ip.product_name,
+              color: ip.color,
+              pattern: ip.pattern,
+              length: ip.length,
+              width: ip.width,
+              weight: ip.weight,
+              finalLength: ip.final_length,
+              finalWidth: ip.final_width,
+              finalWeight: ip.final_weight,
+              qualityGrade: ip.quality_grade,
+              status: ip.status,
+              location: ip.location,
+              productionDate: ip.production_date,
+              completionDate: ip.completion_date,
+              inspector: ip.inspector,
+              notes: ip.notes,
+              soldDate: ip.sold_date,
+              customerId: ip.customer_id,
+              orderId: ip.order_id,
+              createdAt: ip.created_at,
+              updatedAt: ip.updated_at
+            }));
+            updatedProducts[i] = { ...product, individual_products: mappedIndividualProducts };
+          }
+        } catch (error) {
+          // Skip if no individual products found
+        }
+      }
+      
+      // Calculate and update the product status based on available stock
+      const calculatedStatus = calculateProductStatus(updatedProducts[i]);
+      updatedProducts[i] = { 
+        ...updatedProducts[i], 
+        actual_status: calculatedStatus,
+        status: calculatedStatus
+      };
+    }
+    
+    setProducts(updatedProducts);
+  };
+
+  // Check which products have recipes using MongoDB
+  const checkProductsWithRecipes = async (products: any[]) => {
     const productsWithRecipesSet = new Set<string>();
     
     // Only check recipes if we have products
@@ -263,22 +372,29 @@ export default function Products() {
       return;
     }
     
-    console.log('🔍 Checking recipes for', products.length, 'products...');
+    console.log('🔍 Checking recipes for', products.length, 'products using MongoDB...');
     
     for (const product of products) {
       try {
-        const recipe = await getProductRecipe(product.id);
-        if (recipe && recipe.recipe_materials && recipe.recipe_materials.length > 0) {
+        const { data: recipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
+        // Only log if there's an actual error (not a 404, which is expected for products without recipes)
+        if (error) {
+          // Only log non-404 errors
+          if (!error.includes('404') && !error.includes('Not Found')) {
+            console.warn(`⚠️ Error checking recipe for product ${product.name}:`, error);
+          }
+        } else if (recipe && recipe.materials && recipe.materials.length > 0) {
           productsWithRecipesSet.add(product.id);
-          console.log('✅ Found recipe for product:', product.name);
+          console.log('✅ Found MongoDB recipe for product:', product.name);
         }
+        // Silently ignore 404s (no recipe found) - this is expected and normal
       } catch (error) {
         // Silently handle recipe errors - don't spam console
-        console.log(`ℹ️ No recipe found for product ${product.name} (${product.id})`);
+        // 404 errors are expected for products without recipes
       }
     }
     
-    console.log('🔍 Recipe check complete. Products with recipes:', productsWithRecipesSet.size);
+    console.log('🔍 MongoDB Recipe check complete. Products with recipes:', productsWithRecipesSet.size);
     setProductsWithRecipes(productsWithRecipesSet);
   };
   
@@ -286,53 +402,184 @@ export default function Products() {
   const [newProduct, setNewProduct] = useState({
     name: "",
     category: "",
+    subcategory: "",
     color: "",
     pattern: "",
     quantity: "",
     unit: "",
     notes: "",
     weight: "",
-    thickness: "",
+    weightUnit: "",
     width: "",
-    height: "",
+    widthUnit: "",
+    length: "",
+    lengthUnit: "",
+    qualityGrade: "A", // Default quality grade
     manufacturingDate: new Date().toISOString().split('T')[0] // Default to current date
   });
 
   // Materials section state
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [productMaterials, setProductMaterials] = useState<ProductMaterial[]>([]);
+  const [duplicateProductMaterials, setDuplicateProductMaterials] = useState<ProductMaterial[]>([]);
   const [newMaterial, setNewMaterial] = useState({
     materialId: "",
     materialName: "",
     quantity: "",
     unit: "",
-    cost: ""
+    cost: "",
+    selectedQuantity: 0
   });
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   
+  // Enhanced material selection state
+  const [showMaterialSelector, setShowMaterialSelector] = useState(false);
+  const [materialSearchTerm, setMaterialSearchTerm] = useState("");
+  const [selectedMaterialType, setSelectedMaterialType] = useState<"all" | "raw_material" | "product">("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("all");
+  
+  // Two-step selection state
+  const [selectionStep, setSelectionStep] = useState<"type" | "filter">("type");
+  const [chosenType, setChosenType] = useState<"product" | "material" | null>(null);
+  
+  // Product-specific filters
+  const [selectedColor, setSelectedColor] = useState<string>("all");
+  const [selectedLength, setSelectedLength] = useState<string>("all");
+  const [selectedWidth, setSelectedWidth] = useState<string>("all");
+  const [selectedWeight, setSelectedWeight] = useState<string>("all");
+  
+  // Helper functions for enhanced material selection
+  const getFilteredMaterials = () => {
+    let filtered: any[] = [];
+    
+    // First filter by chosen type
+    if (chosenType === "product") {
+      filtered = availableProducts.map(p => ({ ...p, type: 'product' }));
+    } else if (chosenType === "material") {
+      // Map raw materials to include current_stock field for consistency
+      filtered = rawMaterials.map(m => ({ 
+        ...m, 
+        type: 'material',
+        current_stock: m.currentStock || 0 // Map currentStock to current_stock
+      }));
+    } else {
+      // Map both types with consistent field names
+      const mappedRawMaterials = rawMaterials.map(m => ({ 
+        ...m, 
+        type: 'material',
+        current_stock: m.currentStock || 0 // Map currentStock to current_stock
+      }));
+      const mappedProducts = availableProducts.map(p => ({ ...p, type: 'product' }));
+      filtered = [...mappedRawMaterials, ...mappedProducts];
+    }
+    
+    // Filter by search term
+    if (materialSearchTerm) {
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(materialSearchTerm.toLowerCase()) ||
+        item.category?.toLowerCase().includes(materialSearchTerm.toLowerCase()) ||
+        item.brand?.toLowerCase().includes(materialSearchTerm.toLowerCase())
+      );
+    }
+    
+    // Apply type-specific filters
+    if (chosenType === "material") {
+      // Material-specific filters
+      if (selectedCategory !== "all") {
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+      if (selectedSupplier !== "all") {
+        filtered = filtered.filter(item => item.supplier_name === selectedSupplier);
+      }
+    } else if (chosenType === "product") {
+      // Product-specific filters
+      if (selectedColor !== "all") {
+        filtered = filtered.filter(item => item.color === selectedColor);
+      }
+      if (selectedLength !== "all") {
+        filtered = filtered.filter(item => item.length === selectedLength);
+      }
+      if (selectedWidth !== "all") {
+        filtered = filtered.filter(item => item.width === selectedWidth);
+      }
+      if (selectedWeight !== "all") {
+        filtered = filtered.filter(item => item.weight === selectedWeight);
+      }
+    }
+    
+    return filtered;
+  };
+  
+  const getUniqueCategories = () => {
+    const categories = new Set<string>();
+    rawMaterials.forEach(m => m.category && categories.add(m.category));
+    availableProducts.forEach(p => p.category && categories.add(p.category));
+    return Array.from(categories).sort();
+  };
+  
+  const getUniqueSuppliers = () => {
+    const suppliers = new Set<string>();
+    rawMaterials.forEach(m => m.supplier_name && suppliers.add(m.supplier_name));
+    return Array.from(suppliers).sort();
+  };
+  
+  // Product-specific helper functions
+  const getUniqueProductColors = () => {
+    const colors = new Set<string>();
+    availableProducts.forEach(p => p.color && colors.add(p.color));
+    return Array.from(colors).sort();
+  };
+  
+  
+  const getUniqueProductLengths = () => {
+    const lengths = new Set<string>();
+    availableProducts.forEach(p => p.length && lengths.add(p.length));
+    return Array.from(lengths).sort();
+  };
+  
+  const getUniqueProductWidths = () => {
+    const widths = new Set<string>();
+    availableProducts.forEach(p => p.width && widths.add(p.width));
+    return Array.from(widths).sort();
+  };
+  
+  const getUniqueProductWeights = () => {
+    const weights = new Set<string>();
+    availableProducts.forEach(p => p.weight && weights.add(p.weight));
+    return Array.from(weights).sort();
+  };
+  
   // Add new item states
   const [newCategoryInput, setNewCategoryInput] = useState("");
+  const [newSubcategoryInput, setNewSubcategoryInput] = useState("");
   const [newColorInput, setNewColorInput] = useState("");
   const [newPatternInput, setNewPatternInput] = useState("");
   const [newUnitInput, setNewUnitInput] = useState("");
   const [newLocationInput, setNewLocationInput] = useState("");
   const [newPileHeightInput, setNewPileHeightInput] = useState("");
-  const [newThicknessInput, setNewThicknessInput] = useState("");
   const [newWeightInput, setNewWeightInput] = useState("");
-  const [newHeightInput, setNewHeightInput] = useState("");
+  const [newLengthInput, setNewLengthInput] = useState("");
   const [newWidthInput, setNewWidthInput] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showAddSubcategory, setShowAddSubcategory] = useState(false);
   const [showAddColor, setShowAddColor] = useState(false);
   const [showAddPattern, setShowAddPattern] = useState(false);
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [showAddLocation, setShowAddLocation] = useState(false);
   const [showAddPileHeight, setShowAddPileHeight] = useState(false);
-  const [showAddThickness, setShowAddThickness] = useState(false);
   const [showAddWeight, setShowAddWeight] = useState(false);
-  const [showAddHeight, setShowAddHeight] = useState(false);
+  const [showAddLength, setShowAddLength] = useState(false);
   const [showAddWidth, setShowAddWidth] = useState(false);
   const [materialsApplicable, setMaterialsApplicable] = useState(true);
   const [individualStockTracking, setIndividualStockTracking] = useState(true);
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+
+  // Unit options for weight, length, width (loaded from database)
+  const [weightUnits, setWeightUnits] = useState<string[]>([]);
+  const [lengthUnits, setLengthUnits] = useState<string[]>([]);
+  const [widthUnits, setWidthUnits] = useState<string[]>([]);
 
   // Load dynamic options and raw materials from localStorage
   useEffect(() => {
@@ -343,23 +590,21 @@ export default function Products() {
 
     const loadRawMaterials = async () => {
       try {
-        // Load raw materials from Supabase using admin client to bypass RLS
-        const { data, error } = await supabaseAdmin
-          .from('raw_materials')
-          .select('*')
-          .order('created_at', { ascending: false });
+        // Load raw materials from MongoDB
+        const { data, error } = await rawMaterialService.getRawMaterials();
         
         if (error) {
           console.error('Error loading raw materials:', error);
           setRawMaterials([]);
         } else {
-          console.log('Raw materials from database:', data);
+          console.log('Raw materials from MongoDB:', data);
           
           // Map database fields to UI interface
-          const mappedMaterials = (data || []).map((item: any) => ({
+          const materialsArray = Array.isArray(data) ? data : [data];
+          const mappedMaterials = materialsArray.map((item: any) => ({
             id: item.id,
             name: item.name,
-            brand: item.brand || '',
+            brand: item.type || '',
             category: item.category,
             currentStock: parseFloat(item.current_stock) || 0,
             unit: item.unit,
@@ -389,8 +634,35 @@ export default function Products() {
       }
     };
 
+    const loadAvailableProducts = async () => {
+      try {
+        // Load products that can be used as recipe ingredients from MongoDB
+        const { data, error } = await MongoDBProductService.getProducts();
+        
+        if (error) {
+          console.error('Error loading products for recipe ingredients:', error);
+          setAvailableProducts([]);
+          return;
+        }
+        
+        // Map products to include individual product count
+        const productsWithIndividualCount = (data || []).map(product => ({
+          ...product,
+          individual_count: product.individual_products_count || 0
+        }));
+        
+        console.log('✅ Loaded products for recipe ingredients:', productsWithIndividualCount?.length || 0);
+        console.log('🔍 Sample product data:', productsWithIndividualCount?.[0]); // Debug: see what fields are available
+        setAvailableProducts(productsWithIndividualCount);
+      } catch (error) {
+        console.error('Error loading products for recipe ingredients:', error);
+        setAvailableProducts([]);
+      }
+    };
+
     loadDynamicOptions();
     loadRawMaterials();
+    loadAvailableProducts();
   }, []);
 
   // Load notifications and check for low stock on component mount
@@ -398,13 +670,13 @@ export default function Products() {
     const loadNotifications = async () => {
       try {
         // Load production notifications
-        const { data: productionNotifications, error: productionError } = await NotificationService.getNotificationsByModule('production');
+        const { data: productionNotifications, error: productionError } = await MongoDBNotificationService.getNotificationsByModule('production');
         if (productionError) {
           console.error('Error loading production notifications:', productionError);
         }
         
         // Load product notifications
-        const { data: productNotifications, error: productError } = await NotificationService.getNotificationsByModule('products');
+        const { data: productNotifications, error: productError } = await MongoDBNotificationService.getNotificationsByModule('products');
         if (productError) {
           console.error('Error loading product notifications:', productError);
         }
@@ -431,7 +703,10 @@ export default function Products() {
   // Handle notification actions
   const handleMarkAsRead = async (notificationId: string) => {
     try {
-      await NotificationService.markAsRead(notificationId);
+      // Update notification status in MongoDB - change status to 'read'
+      await MongoDBNotificationService.updateNotification(notificationId, { 
+        status: 'read'
+      });
     // Update local state
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
       console.log('🗑️ Notification marked as read:', notificationId);
@@ -442,7 +717,10 @@ export default function Products() {
 
   const handleResolveNotification = async (notificationId: string) => {
     try {
-      await NotificationService.markAsDismissed(notificationId);
+      // Update notification status in MongoDB to 'dismissed' (resolved)
+      await MongoDBNotificationService.updateNotification(notificationId, { 
+        status: 'dismissed'
+      });
     // Update local state
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
       console.log('🗑️ Notification dismissed:', notificationId);
@@ -453,9 +731,11 @@ export default function Products() {
 
   const handleClearAllNotifications = async () => {
     try {
-      // Mark all notifications as dismissed
+      // Mark all notifications as dismissed - change status to 'dismissed'
       const notificationPromises = notifications.map(notification => 
-        NotificationService.markAsDismissed(notification.id)
+        MongoDBNotificationService.updateNotification(notification.id, {
+          status: 'dismissed'
+        })
       );
       await Promise.all(notificationPromises);
       
@@ -492,7 +772,7 @@ export default function Products() {
 
 
   // Handle adding new product
-  const handleDuplicateProduct = async (product: Product) => {
+  const handleDuplicateProduct = async (product: FrontendProduct) => {
     console.log("Original product being duplicated:", product);
     
     // Set loading state for this specific product
@@ -500,13 +780,36 @@ export default function Products() {
     
     try {
       // Create a copy of the product with new ID and QR code
-      const duplicatedProduct: Product = {
+      const duplicatedProduct: FrontendProduct = {
         ...product,
-        id: IDGenerator.generateProductId(),
-        qrCode: generateQRCode(),
+        id: await IDGenerator.generateProductId(),
+        qrCode: await generateQRCode(),
       };
       
       console.log("Duplicated product:", duplicatedProduct);
+
+      // Load the recipe from the original product
+      try {
+        const { data: existingRecipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
+        if (existingRecipe && existingRecipe.materials) {
+          // Convert recipe materials to product materials format
+          const recipeMaterials = existingRecipe.materials.map((material: any) => ({
+            materialId: material.material_id,
+            materialName: material.material_name,
+            quantity: material.quantity_per_sqm,
+            unit: material.unit,
+            cost: material.cost_per_unit || 0
+          }));
+          setDuplicateProductMaterials(recipeMaterials);
+          console.log("✅ Loaded recipe with", recipeMaterials.length, "materials for duplication");
+        } else {
+          setDuplicateProductMaterials([]);
+          console.log("ℹ️ No recipe found for original product");
+        }
+      } catch (recipeError) {
+        console.error("Error loading recipe for duplication:", recipeError);
+        setDuplicateProductMaterials([]);
+      }
       
       setDuplicateProduct(duplicatedProduct);
       setIsDuplicateProductOpen(true);
@@ -524,8 +827,41 @@ export default function Products() {
     // Validation - required fields
     if (!duplicateProduct.name || !duplicateProduct.category || !duplicateProduct.unit) {
       console.error("Please fill in all required fields: Name, Category, and Unit");
+      alert("Please fill in all required fields: Name, Category, and Unit");
       return;
     }
+
+    // Upload image if one was selected (before creating product)
+    let finalImageUrl = duplicateProduct.imageUrl || "";
+    // Check if imageUrl is a data URL (preview) - means we need to upload
+    if (duplicateSelectedImage && duplicateProduct.imageUrl && duplicateProduct.imageUrl.startsWith('data:')) {
+      setUploadingImage(true);
+      try {
+        const uploadResult = await uploadImageToR2(duplicateSelectedImage, 'products');
+        if (uploadResult.error) {
+          toast({
+            title: "Upload Failed",
+            description: uploadResult.error,
+            variant: "destructive"
+          });
+          setUploadingImage(false);
+          return;
+        }
+        finalImageUrl = uploadResult.url;
+      } catch (error: any) {
+        toast({
+          title: "Upload Failed",
+          description: error.message || "Failed to upload image",
+          variant: "destructive"
+        });
+        setUploadingImage(false);
+        return;
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+
+    // Recipe is optional - user can add it later when editing the product
 
     // Set loading state for the original product being duplicated
     const originalProduct = products.find(p => p.name === duplicateProduct.name && p.id !== duplicateProduct.id);
@@ -536,11 +872,11 @@ export default function Products() {
     try {
       console.log("Creating duplicate product in database:", duplicateProduct);
       
-      // Create the duplicate product in the database using ProductService
-      const result = await ProductService.createProduct({
-        id: duplicateProduct.id,
+      // Create the duplicate product in the database using MongoDBProductService
+      const result = await MongoDBProductService.createProduct({
         name: duplicateProduct.name,
         category: duplicateProduct.category,
+        subcategory: duplicateProduct.subcategory || undefined,
         color: duplicateProduct.color,
         pattern: duplicateProduct.pattern,
         unit: duplicateProduct.unit,
@@ -550,10 +886,11 @@ export default function Products() {
         base_quantity: duplicateProduct.quantity,
         qr_code: duplicateProduct.qrCode,
         weight: duplicateProduct.weight,
-        thickness: duplicateProduct.thickness,
         width: duplicateProduct.width,
-        height: duplicateProduct.height,
-        image_url: duplicateProduct.imageUrl
+        length: duplicateProduct.length,
+        length_unit: duplicateProduct.lengthUnit,
+        width_unit: duplicateProduct.widthUnit,
+        image_url: finalImageUrl
       });
 
       if (result.error) {
@@ -563,10 +900,23 @@ export default function Products() {
 
       console.log("✅ Duplicate product created successfully:", result.data);
       
+      // Generate proper QR code with product data after successful creation
+      try {
+        const qrCodeURL = await QRCodeService.generateMainProductQR(generateMainProductQRData(duplicateProduct));
+        if (qrCodeURL) {
+          console.log('✅ QR code generated for duplicate product:', duplicateProduct.id);
+        } else {
+          console.warn('⚠️ Failed to generate QR code for duplicate product:', duplicateProduct.id);
+        }
+      } catch (qrError) {
+        console.warn('⚠️ Error generating QR code for duplicate product:', duplicateProduct.id, qrError);
+      }
+      
       // Refresh the products list to show the new duplicate
-      const updatedResult = await ProductService.getProducts();
+      const updatedResult = await MongoDBProductService.getProducts();
       if (updatedResult.data) {
-        setProducts(updatedResult.data);
+        const mappedProducts = updatedResult.data.map(mapMongoDBProductToFrontend);
+        setProducts(mappedProducts);
       }
 
       // Generate individual products if quantity > 0 and individual stock tracking is enabled
@@ -579,14 +929,12 @@ export default function Products() {
         // Generate individual products for each quantity
         for (let i = 0; i < duplicateProduct.quantity; i++) {
           try {
-            const { error } = await ProductService.createIndividualProduct({
-              product_id: duplicateProduct.id,
-              production_date: currentDate,
-              final_weight: duplicateProduct.weight,
-              final_thickness: duplicateProduct.thickness,
-              quality_grade: 'A' as 'A+' | 'A' | 'B' | 'C',
-              location: '',
-              production_notes: `Auto-generated from ${duplicateProduct.name}`
+            const inspectorName = user?.full_name || '';
+            const { error } = await IndividualProductService.createIndividualProducts(duplicateProduct.id, 1, {
+              batch_number: `BATCH-${Date.now()}`,
+              quality_grade: duplicateProduct.qualityGrade || 'A', // Use product's quality grade or default to A
+              inspector: inspectorName, // Use logged-in user name as inspector
+              notes: `Item ${i + 1} of ${duplicateProduct.quantity} - Auto-created from product duplication`
             });
             
             if (error) {
@@ -602,8 +950,45 @@ export default function Products() {
         console.log(`Generated ${duplicateProduct.quantity} individual products for ${duplicateProduct.name}`);
       }
 
+      // Save recipe if materials were added
+      if (duplicateProductMaterials.length > 0) {
+        console.log('Saving recipe with materials:', duplicateProductMaterials);
+
+        const mappedMaterials = duplicateProductMaterials.map((material) => {
+          // Determine if it's a raw material or product
+          const isRawMaterial = rawMaterials.some(rm => rm.id === material.materialId);
+          const materialType: 'raw_material' | 'product' = isRawMaterial ? 'raw_material' : 'product';
+
+          return {
+            material_id: material.materialId,
+            material_name: material.materialName,
+            material_type: materialType,
+            quantity_per_sqm: parseFloat(material.quantity.toString()),
+            unit: material.unit
+          };
+        });
+
+        try {
+          // Create recipe for the duplicate product
+          const { error: recipeError } = await MongoDBRecipeService.createRecipe({
+            product_id: duplicateProduct.id,
+            materials: mappedMaterials
+          });
+
+          if (recipeError) {
+            console.error('Error creating recipe for duplicate product:', recipeError);
+            alert('Product created but failed to save recipe. Please edit the product to add the recipe.');
+          } else {
+            console.log('✅ Recipe saved successfully for duplicate product:', duplicateProduct.name);
+          }
+        } catch (err) {
+          console.error('Error creating recipe for duplicate product:', err);
+        }
+      }
+
       // Reset form and close dialog
       setDuplicateProduct(null);
+      setDuplicateProductMaterials([]);
       setIsDuplicateProductOpen(false);
       
       console.log("Product duplicated successfully:", duplicateProduct.name);
@@ -615,24 +1000,29 @@ export default function Products() {
     }
   };
 
-  const handleEditProduct = async (product: Product) => {
+  const handleEditProduct = async (product: FrontendProduct) => {
     setSelectedProduct(product);
     setIsEditProductOpen(true);
     
-    // Load existing recipe for this product
+    // Reset image state when opening edit dialog
+    setSelectedImage(null);
+    setImagePreview("");
+    setImageUrl(product.imageUrl || "");
+    
+    // Load existing recipe for this product using MongoDB
     try {
-      const existingRecipe = await getProductRecipe(product.id);
-      if (existingRecipe && existingRecipe.recipe_materials) {
+      const { data: existingRecipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
+      if (existingRecipe && existingRecipe.materials) {
         // Convert recipe materials to product materials format
-        const recipeMaterials = existingRecipe.recipe_materials.map((material: any) => ({
+        const recipeMaterials = existingRecipe.materials.map((material: any) => ({
           materialId: material.material_id,
           materialName: material.material_name,
-          quantity: material.quantity,
+          quantity: material.quantity_per_sqm,
           unit: material.unit,
           cost: material.cost_per_unit || 0
         }));
         setProductMaterials(recipeMaterials);
-        console.log('✅ Loaded existing recipe for product:', product.name, recipeMaterials);
+        console.log('✅ Loaded existing MongoDB recipe for product:', product.name, recipeMaterials);
       } else {
         // No existing recipe, use product's materialsUsed if available
         if (product.materialsUsed && product.materialsUsed.length > 0) {
@@ -661,21 +1051,60 @@ export default function Products() {
     // Validation - required fields
     if (!selectedProduct.name || !selectedProduct.category || !selectedProduct.unit) {
       console.error("Please fill in all required fields: Name, Category, and Unit");
+      alert("Please fill in all required fields: Name, Category, and Unit");
       return;
+    }
+
+    // Upload new image if one was selected
+    let finalImageUrl = selectedProduct.imageUrl || "";
+    if (selectedImage) {
+      if (imageUrl) {
+        // Image already uploaded
+        finalImageUrl = imageUrl;
+      } else {
+        // Upload image now
+        setUploadingImage(true);
+        try {
+          const uploadResult = await uploadImageToR2(selectedImage, 'products');
+          if (uploadResult.error) {
+            toast({
+              title: "Upload Failed",
+              description: uploadResult.error,
+              variant: "destructive"
+            });
+            setUploadingImage(false);
+            return;
+          }
+          finalImageUrl = uploadResult.url;
+          setImageUrl(uploadResult.url);
+        } catch (error: any) {
+          toast({
+            title: "Upload Failed",
+            description: error.message || "Failed to upload image",
+            variant: "destructive"
+          });
+          setUploadingImage(false);
+          return;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
     }
 
     try {
       // Update the product in the database
-      const { error } = await ProductService.updateProduct(selectedProduct.id, {
+      const { error } = await MongoDBProductService.updateProduct(selectedProduct.id, {
         name: selectedProduct.name,
         category: selectedProduct.category,
+        subcategory: selectedProduct.subcategory || undefined,
         color: selectedProduct.color,
         pattern: selectedProduct.pattern,
         unit: selectedProduct.unit,
         weight: selectedProduct.weight,
-        thickness: selectedProduct.thickness,
         width: selectedProduct.width,
-        height: selectedProduct.height
+        length: selectedProduct.length,
+        notes: selectedProduct.notes,
+        image_url: finalImageUrl
       });
 
       if (error) {
@@ -684,84 +1113,346 @@ export default function Products() {
         return;
       }
 
+      // Update or create recipe if materials were modified
+      if (productMaterials.length > 0) {
+        console.log('Updating recipe with materials:', productMaterials);
+
+         const mappedMaterials = productMaterials.map((material) => {
+           // Determine if it's a raw material or product
+           const isRawMaterial = rawMaterials.some(rm => rm.id === material.materialId);
+           const materialType: 'raw_material' | 'product' = isRawMaterial ? 'raw_material' : 'product';
+
+           return {
+             material_id: material.materialId,
+             material_name: material.materialName,
+             material_type: materialType,
+             quantity_per_sqm: parseFloat(material.quantity.toString()),
+             unit: material.unit
+           };
+         });
+
+        // Check if recipe exists
+        const { data: existingRecipe } = await MongoDBRecipeService.getRecipeByProductId(selectedProduct.id);
+
+        if (existingRecipe) {
+          // Update existing recipe
+          const { error: recipeError } = await MongoDBRecipeService.updateRecipe(existingRecipe.id, {
+            materials: mappedMaterials
+          });
+
+          if (recipeError) {
+            console.error('Error updating recipe:', recipeError);
+            alert('Product updated but failed to update recipe. Please try again.');
+          } else {
+            console.log('✅ Recipe updated successfully for product:', selectedProduct.name);
+          }
+        } else {
+          // Create new recipe
+          const { error: recipeError } = await MongoDBRecipeService.createRecipe({
+            product_id: selectedProduct.id,
+            materials: mappedMaterials
+          });
+
+          if (recipeError) {
+            console.error('Error creating recipe:', recipeError);
+            alert('Product updated but failed to create recipe. Please try again.');
+          } else {
+            console.log('✅ Recipe created successfully for product:', selectedProduct.name);
+          }
+        }
+      } else {
+        // If no materials, delete the recipe if it exists
+        const { data: existingRecipe } = await MongoDBRecipeService.getRecipeByProductId(selectedProduct.id);
+        if (existingRecipe) {
+          await MongoDBRecipeService.deleteRecipe(existingRecipe.id);
+          console.log('Recipe deleted for product:', selectedProduct.name);
+        }
+      }
+
       // Update the product in the local products array
       const updatedProducts = products.map(p => 
         p.id === selectedProduct.id ? selectedProduct : p
       );
       setProducts(updatedProducts);
-      // Products are saved to Supabase database only
-
-      // Reset form and close dialog
-      setSelectedProduct(null);
-      setIsEditProductOpen(false);
       
       // Refresh recipe status for this product
       if (productMaterials.length > 0) {
         const updatedSet = new Set(productsWithRecipes);
         updatedSet.add(selectedProduct.id);
         setProductsWithRecipes(updatedSet);
+      } else {
+        const updatedSet = new Set(productsWithRecipes);
+        updatedSet.delete(selectedProduct.id);
+        setProductsWithRecipes(updatedSet);
       }
-      
-      console.log("Product updated successfully:", selectedProduct.name);
+
+      // Reset form and close dialog
+      setSelectedProduct(null);
+      setProductMaterials([]);
+      setIsEditProductOpen(false);
+
+      console.log("✅ Product updated successfully:", selectedProduct.name);
+      alert("Product updated successfully!");
     } catch (error) {
       console.error("Error updating product:", error);
+      alert("An error occurred while updating the product. Please try again.");
     }
   };
 
+  // SQM Calculation function
+  const calculateSQM = (length: string, width: string, lengthUnit: string, widthUnit: string): number => {
+    const lengthValue = parseFloat(length) || 0;
+    const widthValue = parseFloat(width) || 0;
+    
+    // Convert to meters for consistent calculation
+    let lengthInMeters = lengthValue;
+    let widthInMeters = widthValue;
+    
+    // Convert length to meters
+    switch (lengthUnit.toLowerCase()) {
+      case 'mm': lengthInMeters = lengthValue / 1000; break;
+      case 'cm': lengthInMeters = lengthValue / 100; break;
+      case 'feet': lengthInMeters = lengthValue * 0.3048; break;
+      case 'inches': lengthInMeters = lengthValue * 0.0254; break;
+      case 'yards': lengthInMeters = lengthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': lengthInMeters = lengthValue; break;
+    }
+    
+    // Convert width to meters
+    switch (widthUnit.toLowerCase()) {
+      case 'mm': widthInMeters = widthValue / 1000; break;
+      case 'cm': widthInMeters = widthValue / 100; break;
+      case 'feet': widthInMeters = widthValue * 0.3048; break;
+      case 'inches': widthInMeters = widthValue * 0.0254; break;
+      case 'yards': widthInMeters = widthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': widthInMeters = widthValue; break;
+    }
+    
+    return lengthInMeters * widthInMeters;
+  };
+
+  // Helper function to show conversion
+  const getConversionDisplay = (value: string, unit: string): string => {
+    const numValue = parseFloat(value) || 0;
+    const unitLower = unit.toLowerCase();
+    
+    if (unitLower === 'feet') {
+      const meters = numValue * 0.3048;
+      return `(${meters.toFixed(2)}m)`;
+    } else if (unitLower === 'm' || unitLower === 'meter' || unitLower === 'meters') {
+      const feet = numValue / 0.3048;
+      return `(${feet.toFixed(2)}ft)`;
+    }
+    return '';
+  };
+
+  // Auto-calculate recipe ratio for products using actual units
+  const calculateProductRatio = (sourceProduct: any, targetProduct: any): number => {
+    // Use the actual units from the product data (no hardcoded defaults)
+    const sourceLengthUnit = (sourceProduct as any).length_unit || sourceProduct.lengthUnit || '';
+    const sourceWidthUnit = (sourceProduct as any).width_unit || sourceProduct.widthUnit || '';
+    const targetLengthUnit = targetProduct.lengthUnit || '';
+    const targetWidthUnit = targetProduct.widthUnit || '';
+    
+    // If units are missing, return 0 (can't calculate ratio)
+    if (!sourceLengthUnit || !sourceWidthUnit || !targetLengthUnit || !targetWidthUnit) {
+      return 0;
+    }
+    
+    const sourceSQM = calculateSQM(sourceProduct.length, sourceProduct.width, sourceLengthUnit, sourceWidthUnit);
+    const targetSQM = calculateSQM(targetProduct.length, targetProduct.width, targetLengthUnit, targetWidthUnit);
+    
+    // Calculate how many units of source product are needed for 1 SQM of target product
+    // Formula: 1 / sourceSQM (units of source per 1 SQM of target)
+    const unitsPerSQM = sourceSQM > 0 ? 1 / sourceSQM : 0;
+    
+    console.log(`🔄 Ratio calculation for 1 SQM: Source product (${sourceProduct.length} ${sourceLengthUnit} × ${sourceProduct.width} ${sourceWidthUnit} = ${sourceSQM.toFixed(4)} SQM per unit) → ${unitsPerSQM.toFixed(4)} units needed per 1 SQM of target product`);
+    
+    if (sourceSQM === 0) return 0;
+    return unitsPerSQM;
+  };
+
   const handleAddProduct = async () => {
+    // Set loading state
+    setIsCreatingProduct(true);
+
+    // Upload image if one was selected (before creating product)
+    let finalImageUrl = imageUrl || "";
+    if (selectedImage && !imageUrl) {
+      setUploadingImage(true);
+      try {
+        const uploadResult = await uploadImageToR2(selectedImage, 'products');
+        if (uploadResult.error) {
+          toast({
+            title: "Upload Failed",
+            description: uploadResult.error,
+            variant: "destructive"
+          });
+          setUploadingImage(false);
+          setIsCreatingProduct(false);
+          return;
+        }
+        finalImageUrl = uploadResult.url;
+        setImageUrl(uploadResult.url);
+      } catch (error: any) {
+        toast({
+          title: "Upload Failed",
+          description: error.message || "Failed to upload image",
+          variant: "destructive"
+        });
+        setUploadingImage(false);
+        setIsCreatingProduct(false);
+        return;
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+
     // Validation - required fields
     if (!newProduct.name || !newProduct.category || !newProduct.quantity || !newProduct.unit) {
-      console.error("Please fill in all required fields: Name, Category, Quantity, and Unit");
+      console.error("Please fill in all required fields: Name, Category, Quantity (SQM), and Unit");
+      setIsCreatingProduct(false);
       return;
     }
+    
+    // Validation - length and width are compulsory for SQM calculation
+    if (!newProduct.length || !newProduct.width) {
+      console.error("Length and Width are required for SQM calculation");
+      alert("Length and Width are required! These dimensions are needed to calculate the recipe based on 1 SQM of the product.");
+      setIsCreatingProduct(false);
+      return;
+    }
+
+    // Use the units exactly as selected from dropdown (trim whitespace)
+    const lengthUnit = newProduct.lengthUnit ? newProduct.lengthUnit.trim() : '';
+    const widthUnit = newProduct.widthUnit ? newProduct.widthUnit.trim() : '';
+    
+    if (!lengthUnit || !widthUnit) {
+      console.error("Length unit and Width unit are required");
+      alert("Length unit and Width unit are required! Please select units from the dropdown.");
+      setIsCreatingProduct(false);
+      return;
+    }
+
+    // Ensure the selected units exist in length_unit and width_unit categories (singular, for backend validation)
+    // Backend checks against 'length_unit' (singular) category, not 'length_units' (plural)
+    try {
+      const lengthUnitsCheck = await DropdownService.getOptionsByCategory('length_unit');
+      const lengthUnitExists = lengthUnitsCheck && lengthUnitsCheck.some((u: any) => u.value === lengthUnit);
+      
+      if (!lengthUnitExists) {
+        console.log(`⚠️ Unit "${lengthUnit}" not found in length_unit category, adding it...`);
+        const addResult = await DropdownService.addOption('length_unit', lengthUnit);
+        if (!addResult.success) {
+          console.error(`❌ Failed to add unit "${lengthUnit}" to length_unit category:`, addResult.error);
+          alert(`Failed to add unit "${lengthUnit}" to the database. Please add it manually from the Dropdown Master page first.`);
+          setIsCreatingProduct(false);
+          return;
+        }
+        console.log(`✅ Successfully added unit "${lengthUnit}" to length_unit category`);
+      }
+      
+      const widthUnitsCheck = await DropdownService.getOptionsByCategory('width_unit');
+      const widthUnitExists = widthUnitsCheck && widthUnitsCheck.some((u: any) => u.value === widthUnit);
+      
+      if (!widthUnitExists) {
+        console.log(`⚠️ Unit "${widthUnit}" not found in width_unit category, adding it...`);
+        const addResult = await DropdownService.addOption('width_unit', widthUnit);
+        if (!addResult.success) {
+          console.error(`❌ Failed to add unit "${widthUnit}" to width_unit category:`, addResult.error);
+          alert(`Failed to add unit "${widthUnit}" to the database. Please add it manually from the Dropdown Master page first.`);
+          setIsCreatingProduct(false);
+          return;
+        }
+        console.log(`✅ Successfully added unit "${widthUnit}" to width_unit category`);
+      }
+    } catch (error) {
+      console.error('Error ensuring units exist in backend categories:', error);
+      alert("Error validating units. Please try again.");
+      setIsCreatingProduct(false);
+      return;
+    }
+
+    // Calculate SQM for this product using the selected units
+    // Note: calculateSQM handles unit conversion, so we pass the units as-is
+    const productSQM = calculateSQM(newProduct.length, newProduct.width, lengthUnit, widthUnit);
+    console.log(`📐 Product SQM calculated: ${productSQM.toFixed(4)} SQM`);
+    
+    // Show SQM calculation to user with selected units
+    if (productSQM > 0) {
+      console.log(`📊 Product dimensions: ${newProduct.length} ${lengthUnit} × ${newProduct.width} ${widthUnit} = ${productSQM.toFixed(4)} SQM`);
+    }
+    
+    // Recipe is optional - user can add it later when editing the product
 
     let productId: string; // Declare productId at function scope
 
     try {
-      const generatedProductId = IDGenerator.generateProductId();
+      const generatedProductId = await IDGenerator.generateProductId();
       
       // Material costs are tracked individually, no total product cost needed
 
       // Create the product object with essential fields only
-      const product: Product = {
+      // Use normalized units (lowercase) to ensure backend compatibility
+      const product: FrontendProduct = {
         id: generatedProductId,
-        qrCode: generateQRCode(),
+        qrCode: await generateQRCode(),
         name: newProduct.name,
         category: newProduct.category,
-        color: newProduct.color || "NA",
-        pattern: newProduct.pattern || "Standard",
+        color: newProduct.color || "",
+        pattern: newProduct.pattern || "",
         quantity: parseInt(newProduct.quantity),
         unit: newProduct.unit,
         materialsUsed: productMaterials,
         status: "in-stock",
         notes: newProduct.notes || "",
-        imageUrl: imagePreview || "",
+        imageUrl: finalImageUrl || "",
         weight: newProduct.weight || "NA",
-        thickness: newProduct.thickness || "NA",
+        weightUnit: newProduct.weightUnit,
         width: newProduct.width || "NA",
-        height: newProduct.height || "NA",
+        widthUnit: widthUnit, // Use unit exactly as selected from dropdown
+        length: newProduct.length || "NA",
+        lengthUnit: lengthUnit, // Use unit exactly as selected from dropdown
         manufacturingDate: newProduct.manufacturingDate || new Date().toISOString().split('T')[0],
-        individualStockTracking: individualStockTracking
+        individualStockTracking: individualStockTracking,
+        baseQuantity: parseInt(newProduct.quantity),
+        minStockLevel: 10,
+        maxStockLevel: 1000,
+        hasRecipe: false,
+        individualProductsCount: 0,
+        actual_quantity: parseInt(newProduct.quantity),
+        actual_status: "in-stock",
+        individual_products: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
-      // Save to Supabase
+      // Save to MongoDB
       try {
-        const { data: createdProduct, error } = await ProductService.createProduct({
-          name: product.name,
-          category: product.category,
-          color: product.color,
-          pattern: product.pattern,
-          unit: product.unit,
-          individual_stock_tracking: product.individualStockTracking,
-          base_quantity: product.individualStockTracking ? 0 : product.quantity, // Use 0 for individual tracking, actual quantity for bulk
-          min_stock_level: 10,
-          max_stock_level: 1000,
-          weight: product.weight,
-          thickness: product.thickness,
+        console.log('🔍 Creating product with units:', {
+          length: product.length,
+          lengthUnit: product.lengthUnit,
           width: product.width,
-          height: product.height,
-          image_url: product.imageUrl
+          widthUnit: product.widthUnit
         });
+        
+        const mongoProductData = mapFrontendProductToMongoDB({
+          ...product,
+          baseQuantity: product.individualStockTracking ? 0 : product.quantity,
+          minStockLevel: 10,
+          maxStockLevel: 1000,
+          lengthUnit: lengthUnit, // Use unit exactly as selected (will match database)
+          widthUnit: widthUnit    // Use unit exactly as selected (will match database)
+        });
+        
+        console.log('🔍 MongoDB product data being sent:', {
+          length: mongoProductData.length,
+          length_unit: mongoProductData.length_unit,
+          width: mongoProductData.width,
+          width_unit: mongoProductData.width_unit
+        });
+        
+        const { data: createdProduct, error } = await MongoDBProductService.createProduct(mongoProductData);
         
         if (error) {
           console.error("Error creating product:", error);
@@ -775,9 +1466,21 @@ export default function Products() {
           alert("Failed to get product ID. Please try again.");
           return;
         }
+        
+        // Generate proper QR code with product data after successful creation
+        try {
+          const qrCodeURL = await QRCodeService.generateMainProductQR(generateMainProductQRData(products.find(p => p.id === productId)!));
+          if (qrCodeURL) {
+            console.log('✅ QR code generated for main product:', productId);
+          } else {
+            console.warn('⚠️ Failed to generate QR code for main product:', productId);
+          }
+        } catch (qrError) {
+          console.warn('⚠️ Error generating QR code for main product:', productId, qrError);
+        }
 
-        // Verify the product exists in the database before creating individual products
-        console.log(`🔍 Verifying product ${productId} exists in database...`);
+        // Verify the product exists in MongoDB before creating individual products
+        console.log(`🔍 Verifying product ${productId} exists in MongoDB...`);
 
         // Retry verification with exponential backoff
         let verifyProduct = null;
@@ -788,11 +1491,7 @@ export default function Products() {
           verificationAttempts++;
           console.log(`Verification attempt ${verificationAttempts}/${maxVerificationAttempts}...`);
 
-          const { data, error } = await supabaseAdmin
-            .from('products')
-            .select('id, name')
-            .eq('id', productId)
-            .single();
+          const { data, error } = await MongoDBProductService.getProductById(productId);
 
           if (!error && data) {
             verifyProduct = data;
@@ -818,12 +1517,15 @@ export default function Products() {
         // Add additional delay to ensure database consistency
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Reload products from Supabase
-        const result = await ProductService.getProducts();
+        // Reload products from MongoDB (initial reload - will be updated again after individual products are created)
+        const result = await MongoDBProductService.getProducts();
         if (result.error) {
           console.error("Error reloading products:", result.error);
         } else {
-          setProducts(result.data || []);
+          const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
+          setProducts(mappedProducts);
+          // Load individual products for immediate feedback (will be reloaded again after individual products are created)
+          await loadIndividualProductsForAllProducts(mappedProducts);
         }
       } catch (error) {
         console.error("Error saving product:", error);
@@ -833,53 +1535,9 @@ export default function Products() {
 
       // Create individual stock items only if individual tracking is enabled
       if (individualStockTracking) {
-      const individualProducts: IndividualProduct[] = [];
-        const currentDate = new Date().toISOString().split('T')[0];
-        
-      for (let i = 0; i < product.quantity; i++) {
-        // Add a small delay to ensure unique IDs
-        await new Promise(resolve => setTimeout(resolve, 10));
-        const individualProductId = await IDGenerator.generateUniqueIndividualProductId();
-        const serialNumber = `${product.name.replace(/\s+/g, '').substring(0, 6).toUpperCase()}-${String(i + 1).padStart(3, '0')}`;
-        
-        const individualProduct: IndividualProduct = {
-          id: individualProductId,
-          qrCode: IDGenerator.generateQRCode(),
-          productId: productId,
-            productName: product.name,
-            color: product.color,
-            pattern: product.pattern,
-            weight: product.weight,
-            thickness: product.thickness,
-            width: product.width,
-            height: product.height,
-            materialsUsed: product.materialsUsed || [],
-            qualityGrade: 'A',
-            status: 'available',
-            location: 'Warehouse A - General Storage', // Default location for new individual products
-            addedDate: currentDate,
-            notes: `Item ${i + 1} of ${product.quantity} - Auto-created from product entry`,
-          finalWeight: product.weight,
-          finalThickness: product.thickness,
-          finalWidth: product.width,
-          finalHeight: product.height,
-            finalQualityGrade: 'A',
-            productionDate: currentDate,
-            completionDate: currentDate
-        };
-        individualProducts.push(individualProduct);
-      }
-
-      // Save individual products to database
-      console.log(`🔄 Creating ${individualProducts.length} individual products for product ${productId}...`);
-
       // Final verification that the product still exists just before creating individual products
       console.log(`🔍 Final verification that product ${productId} exists before creating individual products...`);
-      const { data: finalVerifyProduct, error: finalVerifyError } = await supabaseAdmin
-        .from('products')
-        .select('id, name')
-        .eq('id', productId)
-        .single();
+        const { data: finalVerifyProduct, error: finalVerifyError } = await MongoDBProductService.getProductById(productId);
 
       if (finalVerifyError || !finalVerifyProduct) {
         console.error("Final product verification failed:", finalVerifyError);
@@ -889,141 +1547,115 @@ export default function Products() {
 
       console.log(`✅ Final verification successful: ${finalVerifyProduct.name} (${finalVerifyProduct.id})`);
 
-      // TEMPORARY WORKAROUND: If foreign key constraint fails, try without individual products
-      let individualProductsCreated = 0;
-      let hasForeignKeyError = false;
-      
-      for (const individualProduct of individualProducts) {
+        // Create individual products using the bulk API
         try {
-          console.log(`Creating individual product: ${individualProduct.id} for product: ${productId}`);
-
-          // Retry creating individual product with exponential backoff
-          let success = false;
-          let attempts = 0;
-          const maxAttempts = 3;
-
-          while (!success && attempts < maxAttempts) {
-            attempts++;
-            console.log(`Individual product creation attempt ${attempts}/${maxAttempts}...`);
-
-            const { error } = await individualProductService.createIndividualProduct({
-              id: individualProduct.id,
-              product_id: productId,
-              product_name: individualProduct.productName,
-              color: individualProduct.color,
-              pattern: individualProduct.pattern,
-              weight: individualProduct.weight,
-              thickness: individualProduct.thickness,
-              width: individualProduct.width,
-              height: individualProduct.height,
-              final_weight: individualProduct.finalWeight,
-              final_thickness: individualProduct.finalThickness,
-              final_width: individualProduct.finalWidth,
-              final_height: individualProduct.finalHeight,
-              quality_grade: individualProduct.qualityGrade as 'A+' | 'A' | 'B' | 'C',
-              status: individualProduct.status as 'available' | 'sold' | 'damaged' | 'in-production' | 'completed',
-              location: individualProduct.location,
-              notes: individualProduct.notes,
-              added_date: individualProduct.addedDate,
-              production_date: individualProduct.productionDate,
-              completion_date: individualProduct.completionDate,
-              inspector: individualProduct.inspector
-            });
+          console.log(`🔄 Creating ${product.quantity} individual products for product ${productId}...`);
+          
+          // Get logged-in user name for inspector
+          const inspectorName = user?.full_name || '';
+          
+          const { data: createdIndividualProducts, error } = await IndividualProductService.createIndividualProducts(
+            productId, 
+            product.quantity, 
+            {
+              batch_number: `BATCH-${Date.now()}`,
+              quality_grade: newProduct.qualityGrade, // Use selected quality grade
+              inspector: inspectorName, // Use logged-in user name as inspector
+              notes: `Auto-created ${product.quantity} individual products for ${product.name}`
+            }
+          );
 
             if (error) {
-              console.error(`❌ Error creating individual product (attempt ${attempts}):`, error);
-              console.error('Product ID:', productId);
-              console.error('Individual Product ID:', individualProduct.id);
-
-              // Check if it's a foreign key constraint error
-              if (error.message && error.message.includes('foreign key constraint')) {
-                if (attempts < maxAttempts) {
-                  // Wait before retry for foreign key constraint errors
-                  const delay = 200 * attempts; // 200ms, 400ms
-                  console.log(`Foreign key constraint error, waiting ${delay}ms before retry...`);
-                  await new Promise(resolve => setTimeout(resolve, delay));
-                  continue;
+            console.error('❌ Error creating individual products:', error);
+            alert(`Product "${product.name}" created successfully, but individual products failed: ${error}`);
                 } else {
-                  hasForeignKeyError = true;
-                  console.error('🚨 Foreign key constraint error detected after retries - stopping individual product creation');
-                  break; // Stop trying to create more individual products
-                }
-              } else {
-                // For other errors, don't retry
-                break;
-              }
-            } else {
-              console.log('✅ Individual product created successfully:', individualProduct.productName);
-              individualProductsCreated++;
-              success = true;
-            }
+            console.log('✅ Successfully created individual products:', createdIndividualProducts);
+            console.log(`✅ Created ${createdIndividualProducts.created_count} individual products for product "${product.name}"`);
           }
-
-          if (hasForeignKeyError) {
-            break; // Stop creating more individual products
-          }
-
         } catch (err) {
-          console.error('Error creating individual product:', err);
+          console.error('❌ Error creating individual products:', err);
+          alert(`Product "${product.name}" created successfully, but individual products failed: ${err.message}`);
         }
       }
-      
-      // Summary of individual product creation
-      if (hasForeignKeyError) {
-        console.warn(`⚠️ Foreign key constraint error prevented individual product creation. Product created successfully but individual products failed.`);
-        console.warn(`🔧 Please run the SQL script: force-fix-foreign-key.sql in your Supabase SQL editor`);
-        alert(`Product "${product.name}" created successfully, but individual products failed due to database constraint issue. Please run the SQL fix script.`);
-      } else {
-        console.log(`✅ Successfully created ${individualProductsCreated} individual products for product "${product.name}"`);
-      }
-      }
 
-      // Save recipe if materials were added
+      // Save recipe if materials were added - USING MONGODB
       if (productMaterials.length > 0) {
         console.log('Product materials before creating recipe:', productMaterials);
         
-        const mappedMaterials = productMaterials.map(material => ({
-          id: material.materialId,
-          name: material.materialName,
-          quantity: material.quantity,
-          unit: material.unit,
-          cost_per_unit: material.cost,
-          selectedQuantity: material.quantity
-        }));
+        const mappedMaterials = productMaterials.map((material) => {
+          // Determine if it's a raw material or product
+          const isRawMaterial = rawMaterials.some(rm => rm.id === material.materialId);
+          const materialType = isRawMaterial ? 'raw_material' : 'product';
+          
+          return {
+            material_id: material.materialId,
+            material_name: material.materialName,
+            material_type: materialType as 'raw_material' | 'product',
+            quantity_per_sqm: parseFloat(material.quantity.toString()),
+            unit: material.unit
+          };
+        });
         
-        console.log('Mapped materials for recipe:', mappedMaterials);
+        console.log('Mapped materials for MongoDB recipe:', mappedMaterials);
         
         try {
-          const recipe = createRecipeFromMaterials(
-            productId,
-            product.name,
-            mappedMaterials,
-            'admin'
-          );
-          await saveProductRecipe(recipe);
-          console.log('✅ Recipe saved for product:', product.name, recipe);
+          // Use MongoDB RecipeService instead of Supabase
+          const { data: recipe, error: recipeError } = await MongoDBRecipeService.createRecipe({
+            product_id: productId,
+            materials: mappedMaterials,
+            created_by: 'admin'
+          });
+          
+          if (recipeError) {
+            console.error('❌ Error saving recipe to MongoDB:', recipeError);
+          } else {
+            console.log('✅ Recipe saved to MongoDB for product:', product.name, recipe);
+          }
         } catch (error) {
           console.error('❌ Error saving recipe for product:', product.name, error);
           // Don't fail the entire product creation if recipe saving fails
         }
       }
 
-      // Update local state
-      setProducts([...products, product]);
+      // Reload all products from database to get updated quantities (including individual products count)
+      console.log('🔄 Reloading products from database to get updated quantities...');
+      try {
+        const result = await MongoDBProductService.getProducts();
+        if (result.error) {
+          console.error("Error reloading products:", result.error);
+        } else {
+          const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
+          setProducts(mappedProducts);
+          
+          // Load individual products for all products (including the newly created one)
+          await loadIndividualProductsForAllProducts(mappedProducts);
+          
+          // Check which products have recipes
+          await checkProductsWithRecipes(result.data || []);
+          
+          console.log('✅ Products reloaded with updated quantities');
+        }
+      } catch (error) {
+        console.error("Error reloading products:", error);
+      }
 
       // Reset form
       setNewProduct({
         name: "",
         category: "",
+        subcategory: "",
         color: "",
         pattern: "",
         quantity: "",
         unit: "",
         notes: "",
         weight: "",
-        thickness: "",
+        weightUnit: "GSM",
         width: "",
-        height: "",
+        widthUnit: "",
+        length: "",
+        lengthUnit: "",
+        qualityGrade: "A", // Reset to default
         manufacturingDate: new Date().toISOString().split('T')[0]
       });
       setProductMaterials([]);
@@ -1032,10 +1664,12 @@ export default function Products() {
         materialName: "",
         quantity: "",
         unit: "",
-        cost: ""
+        cost: "",
+        selectedQuantity: 0
       });
       setImagePreview("");
       setSelectedImage(null);
+      setImageUrl("");
       setMaterialsApplicable(true); // Reset to default
       setIndividualStockTracking(true); // Reset to default
       setIsAddProductOpen(false);
@@ -1047,15 +1681,18 @@ export default function Products() {
         setProductsWithRecipes(updatedSet);
       }
 
-      const successMessage = individualStockTracking 
+      const successMessage = individualStockTracking
         ? `Product "${product.name}" added successfully!\n${product.quantity} individual stock items created with unique QR codes.`
-        : `Product "${product.name}" added successfully!\nBulk quantity: ${product.quantity} ${product.unit} (no individual QR codes).`;
+        : `Product "${product.name}" added successfully!\nBulk quantity: ${product.quantity} products (no individual QR codes).`;
       
       console.log(successMessage);
       
     } catch (error) {
       console.error('Error adding product:', error);
       console.error('Error adding product. Please try again.');
+    } finally {
+      // Reset loading state
+      setIsCreatingProduct(false);
     }
   };
 
@@ -1069,6 +1706,19 @@ export default function Products() {
       setNewProduct({...newProduct, category: newCategoryInput.trim()});
       setNewCategoryInput("");
       setShowAddCategory(false);
+      }
+    }
+  };
+
+  const addNewSubcategory = async () => {
+    if (newSubcategoryInput.trim()) {
+      const result = await DropdownService.addOption('subcategory', newSubcategoryInput.trim());
+      if (result.success) {
+        // Reload dropdown options to include the new subcategory
+        await loadDropdownOptions();
+        setNewProduct({...newProduct, subcategory: newSubcategoryInput.trim()});
+        setNewSubcategoryInput("");
+        setShowAddSubcategory(false);
       }
     }
   };
@@ -1114,175 +1764,382 @@ export default function Products() {
   // Location function removed - locations are only for individual products
 
 
-  const addNewThickness = async () => {
-    if (newThicknessInput.trim()) {
-      const result = await DropdownService.addOption('thickness', newThicknessInput.trim());
-      if (result.success) {
-        await loadDropdownOptions();
-      setNewProduct({...newProduct, thickness: newThicknessInput.trim()});
-      setNewThicknessInput("");
-      setShowAddThickness(false);
-      }
-    }
-  };
 
   const addNewWeight = async () => {
-    if (newWeightInput.trim()) {
-      const result = await DropdownService.addOption('weight', newWeightInput.trim());
+    if (newWeightInput.trim() && newProduct.weightUnit) {
+      // Unit is required - store as combined value
+      const combinedValue = `${newWeightInput.trim()} ${newProduct.weightUnit.trim()}`;
+      
+      // If unit is new, save it to database
+      if (!weightUnits.includes(newProduct.weightUnit)) {
+        await addNewUnitToDatabase('weight', newProduct.weightUnit);
+        await loadDropdownOptions();
+      }
+      
+      // Store combined value in dropdown (e.g., "600 GSM")
+      const result = await DropdownService.addOption('weight', combinedValue);
       if (result.success) {
         await loadDropdownOptions();
-      setNewProduct({...newProduct, weight: newWeightInput.trim()});
-      setNewWeightInput("");
-      setShowAddWeight(false);
+        // Set value and unit separately in the form
+        setNewProduct({
+          ...newProduct,
+          weight: newWeightInput.trim(),
+          weightUnit: newProduct.weightUnit
+        });
+        setNewWeightInput("");
+        setShowAddWeight(false);
       }
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a weight value and select a unit",
+        variant: "destructive",
+      });
     }
   };
 
-  const addNewHeight = async () => {
-    if (newHeightInput.trim()) {
-      const result = await DropdownService.addOption('height', newHeightInput.trim());
+  // Handle adding new unit from dialog
+  const handleAddNewUnit = async () => {
+    if (!newUnitNameInput.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a unit name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const unitValue = newUnitNameInput.trim();
+    
+    // Set the unit in the product state based on type
+    if (currentUnitType === 'weight') {
+      setNewProduct({...newProduct, weightUnit: unitValue});
+    } else if (currentUnitType === 'length') {
+      setNewProduct({...newProduct, lengthUnit: unitValue});
+    } else if (currentUnitType === 'width') {
+      setNewProduct({...newProduct, widthUnit: unitValue});
+    }
+
+    // Save to database (for length and width, this saves to both plural and singular categories)
+    await addNewUnitToDatabase(currentUnitType, unitValue);
+    
+    // Reload unit options to show the new unit
+    await loadUnitOptions();
+    
+    // Close dialog and reset
+    setIsAddUnitDialogOpen(false);
+    setNewUnitNameInput("");
+    
+    toast({
+      title: "Success",
+      description: `Unit "${unitValue}" added successfully`,
+    });
+  };
+
+  // Add new unit to database using MongoDB
+  const addNewUnitToDatabase = async (unitType: string, unitValue: string) => {
+    try {
+      // For length and width, save to both plural (for frontend dropdowns) and singular (for backend validation)
+      if (unitType === 'length' || unitType === 'width') {
+        // Save to plural category (for frontend dropdown)
+        const resultPlural = await DropdownService.addOption(`${unitType}_units`, unitValue);
+        // Save to singular category (for backend validation - backend checks 'length_unit' not 'length_units')
+        const resultSingular = await DropdownService.addOption(`${unitType}_unit`, unitValue);
+        
+        if (resultPlural.success || resultSingular.success) {
+          console.log(`✅ Added new ${unitType} unit: ${unitValue} (to both ${unitType}_units and ${unitType}_unit categories)`);
+          await loadUnitOptions();
+          return true;
+        } else {
+          console.error(`Error adding new ${unitType} unit:`, resultPlural.error || resultSingular.error);
+          return false;
+        }
+      } else {
+        // For other units (weight), just save to plural category
+        const result = await DropdownService.addOption(`${unitType}_units`, unitValue);
+        if (result.success) {
+          console.log(`✅ Added new ${unitType} unit: ${unitValue}`);
+          await loadUnitOptions();
+          return true;
+        } else {
+          console.error(`Error adding new ${unitType} unit:`, result.error);
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error(`Error adding new ${unitType} unit:`, error);
+      return false;
+    }
+  };
+
+  const addNewLength = async () => {
+    if (newLengthInput.trim() && newProduct.lengthUnit) {
+      // Unit is required - store as combined value
+      const combinedValue = `${newLengthInput.trim()} ${newProduct.lengthUnit.trim()}`;
+      
+      // If unit is new, save it to database
+      if (!lengthUnits.includes(newProduct.lengthUnit)) {
+        await addNewUnitToDatabase('length', newProduct.lengthUnit);
+        await loadDropdownOptions();
+      }
+      
+      // Store combined value in dropdown (e.g., "5 m")
+      console.log('🔍 Adding length:', { combinedValue, length: newLengthInput.trim(), unit: newProduct.lengthUnit });
+      const result = await DropdownService.addOption('length', combinedValue);
       if (result.success) {
         await loadDropdownOptions();
-        setNewProduct({...newProduct, height: newHeightInput.trim()});
-        setNewHeightInput("");
-        setShowAddHeight(false);
+        // Set value and unit separately in the form - use the exact combined value format
+        setNewProduct({
+          ...newProduct,
+          length: newLengthInput.trim(),
+          lengthUnit: newProduct.lengthUnit.trim() // Ensure unit is trimmed
+        });
+        setNewLengthInput("");
+        setShowAddLength(false);
+        console.log('✅ Length added successfully:', { length: newLengthInput.trim(), unit: newProduct.lengthUnit.trim() });
+      } else {
+        console.error('❌ Failed to add length:', result.error);
       }
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a length value and select a unit",
+        variant: "destructive",
+      });
     }
   };
 
   const addNewWidth = async () => {
-    if (newWidthInput.trim()) {
-      const result = await DropdownService.addOption('width', newWidthInput.trim());
+    if (newWidthInput.trim() && newProduct.widthUnit) {
+      // Unit is required - store as combined value
+      const combinedValue = `${newWidthInput.trim()} ${newProduct.widthUnit.trim()}`;
+      
+      // If unit is new, save it to database
+      if (!widthUnits.includes(newProduct.widthUnit)) {
+        await addNewUnitToDatabase('width', newProduct.widthUnit);
+        await loadDropdownOptions();
+      }
+      
+      // Store combined value in dropdown (e.g., "10 m")
+      console.log('🔍 Adding width:', { combinedValue, width: newWidthInput.trim(), unit: newProduct.widthUnit });
+      const result = await DropdownService.addOption('width', combinedValue);
       if (result.success) {
         await loadDropdownOptions();
-        setNewProduct({...newProduct, width: newWidthInput.trim()});
+        // Set value and unit separately in the form - use the exact combined value format
+        setNewProduct({
+          ...newProduct,
+          width: newWidthInput.trim(),
+          widthUnit: newProduct.widthUnit.trim() // Ensure unit is trimmed
+        });
         setNewWidthInput("");
         setShowAddWidth(false);
+        console.log('✅ Width added successfully:', { width: newWidthInput.trim(), unit: newProduct.widthUnit.trim() });
+      } else {
+        console.error('❌ Failed to add width:', result.error);
       }
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a width value and select a unit",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Helper function to parse value with unit (e.g., "3 M" -> { value: "3", unit: "M" })
+  const parseValueWithUnit = (combinedValue: string): { value: string; unit: string } => {
+    if (!combinedValue || combinedValue === "N/A" || combinedValue === "add_new") {
+      return { value: "", unit: "" };
+    }
+    
+    // Match patterns like "3 M", "4 mm", "400 GSM", "3.5 m", etc.
+    const match = combinedValue.match(/^([\d.]+)\s*(.+)$/);
+    if (match) {
+      return {
+        value: match[1].trim(),
+        unit: match[2].trim()
+      };
+    }
+    
+    // If no match, return as is (for backward compatibility)
+    return { value: combinedValue, unit: "" };
+  };
+
+  // Helper function to find and delete dropdown option by category and value
+  const deleteDropdownOption = async (category: string, value: string, resetField?: string) => {
+    try {
+      // Find the option in the appropriate category
+      let option: DropdownOption | undefined;
+      
+      switch (category) {
+        case 'category':
+          option = dropdownOptions.categories.find(opt => opt.value === value);
+          break;
+        case 'color':
+          option = dropdownOptions.colors.find(opt => opt.value === value);
+          break;
+        case 'pattern':
+          option = dropdownOptions.patterns.find(opt => opt.value === value);
+          break;
+        case 'unit':
+          option = dropdownOptions.units.find(opt => opt.value === value);
+          break;
+        case 'weight':
+          option = dropdownOptions.weights.find(opt => opt.value === value);
+          break;
+        case 'length':
+          option = dropdownOptions.lengths.find(opt => opt.value === value);
+          break;
+        case 'width':
+          option = dropdownOptions.widths.find(opt => opt.value === value);
+          break;
+        case 'subcategory':
+          option = dropdownOptions.subcategories.find(opt => opt.value === value);
+          break;
+        default:
+          // Try to find in all categories
+          const allOptions = [
+            ...dropdownOptions.categories,
+            ...dropdownOptions.subcategories,
+            ...dropdownOptions.colors,
+            ...dropdownOptions.patterns,
+            ...dropdownOptions.units,
+            ...dropdownOptions.weights,
+            ...dropdownOptions.lengths,
+            ...dropdownOptions.widths
+          ];
+          option = allOptions.find(opt => opt.category === category && opt.value === value);
+      }
+
+      if (!option) {
+        toast({
+          title: "Error",
+          description: `Option "${value}" not found in ${category}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Delete using the option ID
+      const result = await DropdownService.deleteOption(option.id);
+      if (result.success) {
+        await loadDropdownOptions();
+        // Reset field if provided
+        if (resetField && newProduct[resetField as keyof typeof newProduct] === value) {
+          setNewProduct({...newProduct, [resetField]: ""});
+        }
+        toast({
+          title: "Success",
+          description: `"${value}" deleted successfully`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to delete option",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting dropdown option:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete option",
+        variant: "destructive",
+      });
     }
   };
 
   // Delete functions for dropdown options
+  const deleteSubcategory = async (subcategory: string) => {
+    await deleteDropdownOption('subcategory', subcategory, 'subcategory');
+  };
+
   const deleteCategory = async (category: string) => {
-    const result = await DropdownService.deleteOption('category', category);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset category if it was selected
-      if (newProduct.category === category) {
-        setNewProduct({...newProduct, category: ""});
-      }
-    }
+    await deleteDropdownOption('category', category, 'category');
   };
 
   const deleteColor = async (color: string) => {
-    const result = await DropdownService.deleteOption('color', color);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset color if it was selected
-      if (newProduct.color === color) {
-        setNewProduct({...newProduct, color: ""});
-      }
-    }
+    await deleteDropdownOption('color', color, 'color');
   };
 
   const deletePattern = async (pattern: string) => {
-    const result = await DropdownService.deleteOption('pattern', pattern);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset pattern if it was selected
-      if (newProduct.pattern === pattern) {
-        setNewProduct({...newProduct, pattern: ""});
-      }
-    }
+    await deleteDropdownOption('pattern', pattern, 'pattern');
   };
 
   const deleteUnit = async (unit: string) => {
-    const result = await DropdownService.deleteOption('unit', unit);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset unit if it was selected
-      if (newProduct.unit === unit) {
-        setNewProduct({...newProduct, unit: ""});
-      }
-    }
+    await deleteDropdownOption('unit', unit, 'unit');
   };
 
   const deleteWeight = async (weight: string) => {
-    const result = await DropdownService.deleteOption('weight', weight);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset weight if it was selected
-      if (newProduct.weight === weight) {
-        setNewProduct({...newProduct, weight: ""});
-      }
-    }
+    await deleteDropdownOption('weight', weight, 'weight');
   };
 
-  const deleteThickness = async (thickness: string) => {
-    const result = await DropdownService.deleteOption('thickness', thickness);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset thickness if it was selected
-      if (newProduct.thickness === thickness) {
-        setNewProduct({...newProduct, thickness: ""});
-      }
-    }
-  };
 
-  const deleteHeight = async (height: string) => {
-    const result = await DropdownService.deleteOption('height', height);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset height if it was selected
-      if (newProduct.height === height) {
-        setNewProduct({...newProduct, height: ""});
-      }
-    }
+  const deleteLength = async (length: string) => {
+    await deleteDropdownOption('length', length, 'length');
   };
 
   const deleteWidth = async (width: string) => {
-    const result = await DropdownService.deleteOption('width', width);
-    if (result.success) {
-      await loadDropdownOptions();
-      // Reset width if it was selected
-      if (newProduct.width === width) {
-        setNewProduct({...newProduct, width: ""});
-      }
-    }
+    await deleteDropdownOption('width', width, 'width');
   };
 
-  // Handle image upload
+  // Handle image selection (only stores file and creates preview, does NOT upload)
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    console.log('Image upload triggered, file:', file);
+    console.log('Image selected, file:', file);
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file');
+        toast({
+          title: "Invalid File",
+          description: "Please select a valid image file",
+          variant: "destructive"
+        });
         return;
       }
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+        toast({
+          title: "File Too Large",
+          description: "Image size should be less than 5MB",
+          variant: "destructive"
+        });
         return;
       }
       
+      // Store file for later upload
       setSelectedImage(file);
+      
+      // Create preview (data URL for display)
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        console.log('Image preview generated, length:', result.length);
+        console.log('Image preview generated');
         setImagePreview(result);
       };
       reader.readAsDataURL(file);
+      
+      // Clear any previous uploaded URL (will be set when user clicks save)
+      setImageUrl("");
     }
   };
 
   // Remove image
-  const removeImage = () => {
+  const removeImage = async () => {
+    // Delete from R2 if URL exists
+    if (imageUrl) {
+      try {
+        await deleteImageFromR2(imageUrl);
+        console.log('✅ Image deleted from R2');
+      } catch (error) {
+        console.error('Error deleting image from R2:', error);
+        // Continue with removal even if delete fails
+      }
+    }
     setSelectedImage(null);
     setImagePreview("");
+    setImageUrl("");
   };
 
   // Material handling functions
@@ -1293,9 +2150,18 @@ export default function Products() {
       return;
     }
     
-    console.log('Material selection changed:', { materialId, availableMaterials: rawMaterials.length });
+    console.log('Material selection changed:', { materialId, availableMaterials: rawMaterials.length, availableProducts: availableProducts.length });
     
-    const selectedMaterial = rawMaterials.find(m => m.id === materialId);
+    // Check if it's a raw material
+    let selectedMaterial = rawMaterials.find(m => m.id === materialId);
+    let isProduct = false;
+    
+    // If not found in raw materials, check if it's a product
+    if (!selectedMaterial) {
+      selectedMaterial = availableProducts.find(p => p.id === materialId);
+      isProduct = true;
+    }
+    
     if (selectedMaterial) {
       console.log('Selected material found:', selectedMaterial);
       setNewMaterial({
@@ -1303,12 +2169,69 @@ export default function Products() {
         materialName: selectedMaterial.name, // Auto-fill from raw material inventory
         quantity: "",
         unit: selectedMaterial.unit || "",
-        cost: selectedMaterial.costPerUnit?.toString() || ""
+        cost: selectedMaterial.costPerUnit?.toString() || "",
+        selectedQuantity: 0
       });
     } else {
       console.error('Selected material not found for ID:', materialId);
       console.error('Available materials:', rawMaterials.map(m => ({ id: m.id, name: m.name })));
     }
+  };
+
+  // Enhanced material selection handler with auto-ratio calculation
+  const handleEnhancedMaterialSelection = (material: any) => {
+    let autoCalculatedQuantity = "";
+    
+    // Only auto-calculate for PRODUCTS (not raw materials)
+    // Use the type field from getFilteredMaterials() which sets type: 'product' or type: 'material'
+    const isProduct = material.type === 'product';
+    
+    if (isProduct) {
+      // This is a product - auto-calculate the ratio for 1 SQM
+      // Check if both source product (material) and target product (newProduct) have required fields
+      const sourceLengthUnit = (material as any).length_unit || material.lengthUnit || '';
+      const sourceWidthUnit = (material as any).width_unit || material.widthUnit || '';
+      
+      if (!material.length || !material.width || !sourceLengthUnit || !sourceWidthUnit) {
+        console.warn(`⚠️ Cannot auto-calculate: Source product (${material.name}) is missing required fields. Length: ${material.length}, Width: ${material.width}, LengthUnit: ${sourceLengthUnit}, WidthUnit: ${sourceWidthUnit}`);
+        alert(`The selected product "${material.name}" is missing length, width, or their units. Please update the product details first.`);
+      } else if (!newProduct.length || !newProduct.width || !newProduct.lengthUnit || !newProduct.widthUnit) {
+        console.warn(`⚠️ Cannot auto-calculate: Target product (${newProduct.name || 'new product'}) is missing required fields. Length: ${newProduct.length}, Width: ${newProduct.width}, LengthUnit: ${newProduct.lengthUnit}, WidthUnit: ${newProduct.widthUnit}`);
+        alert(`Please fill in Length, Width, and their units for the target product first, then select the product as recipe ingredient.`);
+      } else {
+        // Both products have required fields - calculate the ratio
+        const ratio = calculateProductRatio(material, newProduct);
+        console.log(`🔄 Calculation result: ratio = ${ratio} for product ${material.name}`);
+        if (ratio > 0 && !isNaN(ratio) && isFinite(ratio)) {
+          autoCalculatedQuantity = ratio.toFixed(4);
+          console.log(`✅ Auto-calculated ratio for PRODUCT: ${material.name} needs ${autoCalculatedQuantity} units for 1 SQM of target product`);
+        } else {
+          console.warn(`⚠️ Invalid ratio calculated (${ratio}) for product ${material.name}. Check if both products have valid dimensions.`);
+          alert(`Could not calculate the ratio. Please check that both products have valid length and width values.`);
+        }
+      }
+    } else {
+      // This is a raw material - let user type manually
+      console.log(`📝 RAW MATERIAL selected: ${material.name} - User will type quantity manually`);
+    }
+    
+    setNewMaterial({
+      materialId: material.id,
+      materialName: material.name,
+      quantity: autoCalculatedQuantity, // Empty for raw materials, auto-filled for products
+      unit: material.unit || "",
+      cost: material.costPerUnit?.toString() || "",
+      selectedQuantity: 0
+    });
+    // Don't close popup automatically - let user see the selection and close manually
+    // Reset filters but keep popup open so user can see selection
+    setMaterialSearchTerm("");
+    setSelectedCategory("all");
+    setSelectedSupplier("all");
+    setSelectedColor("all");
+    setSelectedLength("all");
+    setSelectedWidth("all");
+    setSelectedWeight("all");
   };
 
   const addProductMaterial = () => {
@@ -1317,25 +2240,42 @@ export default function Products() {
       return;
     }
 
-    const selectedMaterial = rawMaterials.find(m => m.id === newMaterial.materialId);
+    if (!newMaterial.quantity || parseFloat(newMaterial.quantity) <= 0) {
+      console.error("Please enter a valid quantity");
+      alert("Please enter a valid quantity (supports decimals like 0.5, 2.5, 0.2)");
+      return;
+    }
+
+    // Check if it's a raw material first
+    let selectedMaterial = rawMaterials.find(m => m.id === newMaterial.materialId);
+    let isProduct = false;
+    
+    // If not found in raw materials, check if it's a product
+    if (!selectedMaterial) {
+      selectedMaterial = availableProducts.find(p => p.id === newMaterial.materialId);
+      isProduct = true;
+    }
+
     if (!selectedMaterial) {
       console.error("Selected material not found for ID:", newMaterial.materialId);
-      console.error("Available materials:", rawMaterials.map(m => ({ id: m.id, name: m.name })));
+      console.error("Available raw materials:", rawMaterials.map(m => ({ id: m.id, name: m.name })));
+      console.error("Available products:", availableProducts.map(p => ({ id: p.id, name: p.name })));
       return;
     }
 
     console.log("Adding material to product:", {
       selectedMaterial,
       materialId: selectedMaterial.id,
-      materialName: selectedMaterial.name
+      materialName: selectedMaterial.name,
+      isProduct
     });
 
     const material: ProductMaterial = {
       materialId: selectedMaterial.id,
-      materialName: selectedMaterial.name, // Use exact name from raw material inventory
-      quantity: 1, // Default quantity for recipe reference
-      unit: selectedMaterial.unit || "piece", // Use material's unit or default
-      cost: selectedMaterial.costPerUnit || 0 // Use material's cost
+      materialName: selectedMaterial.name,
+      quantity: parseFloat(newMaterial.quantity || "1"), // Use the quantity from form (supports decimals)
+      unit: newMaterial.unit || selectedMaterial.unit || "piece",
+      cost: isProduct ? 0 : (selectedMaterial.costPerUnit || 0) // Products don't have cost in recipe
     };
 
     console.log("Created product material:", material);
@@ -1345,12 +2285,17 @@ export default function Products() {
       materialName: "",
       quantity: "",
       unit: "",
-      cost: ""
+      cost: "",
+      selectedQuantity: 0
     });
   };
 
   const removeProductMaterial = (index: number) => {
     setProductMaterials(productMaterials.filter((_, i) => i !== index));
+  };
+
+  const removeDuplicateProductMaterial = (index: number) => {
+    setDuplicateProductMaterials(duplicateProductMaterials.filter((_, i) => i !== index));
   };
 
   // Filter and sort products
@@ -1362,6 +2307,7 @@ export default function Products() {
                            (product.qrCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (product.color || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
+      const matchesSubcategory = subcategoryFilter === "all" || (product.subcategory && product.subcategory === subcategoryFilter);
       
       let matchesStatus = true;
       if (statusFilter === "low-stock") {
@@ -1374,23 +2320,31 @@ export default function Products() {
         matchesStatus = product.actual_status === "in-production";
       }
       
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesCategory && matchesSubcategory && matchesStatus;
     })
     .sort((a, b) => (a?.name || '').localeCompare(b?.name || ''));
 
   const dynamicCategories = [...new Set((products || []).map(p => p?.category).filter(Boolean))];
+  const dynamicSubcategories = [...new Set((products || []).map(p => p?.subcategory).filter(Boolean))];
   const totalProducts = (products || []).length;
   const lowStockCount = (products || []).filter(p => p?.actual_status === "low-stock" || p?.actual_status === "out-of-stock").length;
-  const totalValue = 0; // Pricing removed - will be set manually per order
 
   // Calculate available pieces for each product (excluding sold and damaged)
   const getAvailablePieces = (productId: string) => {
     const product = products.find(p => p.id === productId);
     
-    // Use the quantity that comes from ProductService (which handles both individual and bulk products)
+    if (!product) return 0;
     
-    // Return the quantity from ProductService (handles both individual and bulk products)
-    return product?.quantity || 0;
+    // For products with individual stock tracking, count only available individual products
+    if (product.individualStockTracking && product.individual_products) {
+      const availableCount = product.individual_products.filter((ip: any) => ip.status === 'available').length;
+      return availableCount;
+    }
+    
+    // For bulk products, use baseQuantity, quantity, or actual_quantity as fallback
+    // Ensure we return a number, not undefined or null
+    const qty = product.baseQuantity ?? product.quantity ?? product.actual_quantity ?? 0;
+    return typeof qty === 'number' ? qty : 0;
   };
 
   // Get individual products for a specific product
@@ -1399,8 +2353,22 @@ export default function Products() {
     return product?.individual_products || [];
   };
 
+  // Get individual product breakdown for display
+  const getIndividualProductBreakdown = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product || !product.individual_products) return null;
+    
+    const individualProducts = product.individual_products;
+    const available = individualProducts.filter((ip: any) => ip.status === 'available').length;
+    const sold = individualProducts.filter((ip: any) => ip.status === 'sold').length;
+    const damaged = individualProducts.filter((ip: any) => ip.status === 'damaged').length;
+    const total = individualProducts.length;
+    
+    return { available, sold, damaged, total };
+  };
+
   // Handle adding product to production
-  const handleAddToProduction = async (product: Product) => {
+  const handleAddToProduction = async (product: FrontendProduct) => {
     console.log('Adding product to production:', product);
     
     // Set loading state for this specific product
@@ -1435,10 +2403,10 @@ export default function Products() {
     } else {
       // For inventory users, send notification to production team
       try {
-        const notification = await NotificationService.createNotification({
+        const notification = await MongoDBNotificationService.createNotification({
           type: 'production_request',
           title: 'Production Request',
-          message: `Product "${product.name}" has been requested for production by ${user?.name || 'Inventory Manager'}. Please add this product to the production queue.`,
+          message: `Product "${product.name}" has been requested for production by ${user?.full_name || 'Inventory Manager'}. Please add this product to the production queue.`,
           module: 'production',
           priority: 'medium',
           status: 'unread',
@@ -1447,7 +2415,7 @@ export default function Products() {
             productId: product.id,
             productName: product.name,
             category: product.category,
-            requestedBy: user?.name || 'Inventory Manager',
+            requestedBy: user?.full_name || 'Inventory Manager',
             requestedByRole: user?.role || 'inventory',
             requestedAt: new Date().toISOString()
           },
@@ -1476,21 +2444,21 @@ export default function Products() {
   };
 
   // Handle showing QR code for main product
-  const handleShowProductQR = (product: Product) => {
+  const handleShowProductQR = (product: FrontendProduct) => {
     setSelectedQRProduct(product);
     setSelectedQRIndividualProduct(null);
     setShowQRCode(true);
   };
 
   // Handle showing QR code for individual product
-  const handleShowIndividualProductQR = (individualProduct: IndividualProduct) => {
+  const handleShowIndividualProductQR = (individualProduct: FrontendIndividualProduct) => {
     setSelectedQRIndividualProduct(individualProduct);
     setSelectedQRProduct(null);
     setShowQRCode(true);
   };
 
   // Generate QR data for main product
-  const generateMainProductQRData = (product: Product): MainProductQRData => {
+  const generateMainProductQRData = (product: FrontendProduct): MainProductQRData => {
     const productIndividualStocks = product.individual_products || [];
 
     const availableCount = productIndividualStocks.filter(p => p.status === 'available').length;
@@ -1529,19 +2497,18 @@ export default function Products() {
   };
 
   // Generate QR data for individual product
-  const generateIndividualProductQRData = (individualProduct: IndividualProduct, mainProduct: Product): IndividualProductQRData => {
+  const generateIndividualProductQRData = (individualProduct: FrontendIndividualProduct, mainProduct: FrontendProduct): IndividualProductQRData => {
     return {
       id: individualProduct.id,
       product_id: individualProduct.productId,
       product_name: individualProduct.productName || mainProduct.name,
       batch_id: individualProduct.id, // Using individual product ID as batch ID
       serial_number: individualProduct.qrCode,
-      production_date: individualProduct.productionDate || individualProduct.addedDate || new Date().toISOString().split('T')[0],
+      production_date: individualProduct.productionDate || new Date().toISOString().split('T')[0],
       quality_grade: individualProduct.qualityGrade || 'A',
       dimensions: {
-        length: parseFloat(individualProduct.width?.replace(/[^\d.]/g, '') || '0'),
-        width: parseFloat(individualProduct.height?.replace(/[^\d.]/g, '') || '0'),
-        thickness: parseFloat(individualProduct.thickness?.replace(/[^\d.]/g, '') || '0')
+        length: parseFloat(individualProduct.length?.replace(/[^\d.]/g, '') || '0'),
+        width: parseFloat(individualProduct.width?.replace(/[^\d.]/g, '') || '0')
       },
       weight: parseFloat(individualProduct.weight?.replace(/[^\d.]/g, '') || '0'),
       color: individualProduct.color || 'N/A',
@@ -1558,7 +2525,7 @@ export default function Products() {
       machine_used: ['Production Line'], // Default value
       inspector: individualProduct.inspector || 'System',
       status: individualProduct.status as 'active' | 'sold' | 'damaged' | 'returned',
-      created_at: individualProduct.addedDate || new Date().toISOString()
+      created_at: individualProduct.createdAt || new Date().toISOString()
     };
   };
 
@@ -1610,6 +2577,17 @@ export default function Products() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={subcategoryFilter} onValueChange={setSubcategoryFilter}>
+                  <SelectTrigger className="w-full sm:w-36 lg:w-48">
+                  <SelectValue placeholder="All Subcategories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcategories</SelectItem>
+                  {dynamicSubcategories.map(subcategory => (
+                    <SelectItem key={subcategory} value={subcategory}>{subcategory}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Status" />
@@ -1626,7 +2604,16 @@ export default function Products() {
             
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               {/* Add Product Button */}
-              <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+                <Dialog open={isAddProductOpen} onOpenChange={(open) => {
+                  setIsAddProductOpen(open);
+                  if (!open) {
+                    setIsCreatingProduct(false);
+                    // Reset image states when dialog closes
+                    setSelectedImage(null);
+                    setImagePreview("");
+                    setImageUrl("");
+                  }
+                }}>
                 <DialogTrigger asChild>
                   <Button className="flex items-center gap-2 w-full sm:w-auto">
                     <Plus className="w-4 h-4" />
@@ -1642,7 +2629,6 @@ export default function Products() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    {/* Basic Information */}
                     <div>
                       <Label htmlFor="productName">Product Name *</Label>
                       <Input
@@ -1713,6 +2699,63 @@ export default function Products() {
                           </Select>
                         )}
                       </div>
+
+                      {/* Subcategory Dropdown */}
+                      <div>
+                        <Label htmlFor="subcategory">Subcategory</Label>
+                        {showAddSubcategory ? (
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter new subcategory"
+                              value={newSubcategoryInput}
+                              onChange={(e) => setNewSubcategoryInput(e.target.value)}
+                            />
+                            <Button size="sm" onClick={addNewSubcategory}>Add</Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowAddSubcategory(false)}>Cancel</Button>
+                          </div>
+                        ) : (
+                          <Select value={newProduct.subcategory || 'N/A'} onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddSubcategory(true);
+                            } else {
+                              setNewProduct({...newProduct, subcategory: value === 'N/A' ? '' : value});
+                            }
+                          }}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select subcategory (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="N/A" className="text-gray-500 italic">
+                                N/A (No Subcategory)
+                              </SelectItem>
+                              {dropdownOptions.subcategories.map(opt => opt.value).map(subcategory => (
+                                <div key={subcategory} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                  <SelectItem value={subcategory} className="flex-1 p-0 h-auto">
+                                    {subcategory}
+                                  </SelectItem>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteSubcategory(subcategory);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                              <SelectItem value="add_new" className="text-blue-600 font-medium">
+                                + Add New Subcategory
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
 
                       {/* Color Dropdown */}
                       <div>
@@ -1791,9 +2834,6 @@ export default function Products() {
                           </Select>
                         )}
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
 
                       {/* Pattern Dropdown */}
                       <div>
@@ -1829,7 +2869,11 @@ export default function Products() {
                               {dropdownOptions.patterns.map(opt => opt.value).map(pattern => (
                                 <div key={pattern} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
                                   <SelectItem value={pattern} className="flex-1 p-0 h-auto">
-                                    {pattern}
+                                  {pattern === "NA" ? (
+                                    <span className="text-gray-500 italic">NA (No Pattern)</span>
+                                  ) : (
+                                    pattern
+                                  )}
                                   </SelectItem>
                                   <Button
                                     variant="ghost"
@@ -1844,11 +2888,6 @@ export default function Products() {
                                   </Button>
                                 </div>
                               ))}
-                              
-                              {/* N/A Option - Always at bottom */}
-                              <SelectItem value="N/A" className="text-gray-500 italic">
-                                N/A (No Pattern)
-                              </SelectItem>
                             </SelectContent>
                           </Select>
                         )}
@@ -1856,16 +2895,21 @@ export default function Products() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
+                      {/* Base Quantity Field */}
                       <div>
-                        <Label htmlFor="quantity">Quantity *</Label>
+                        <Label htmlFor="quantity">Base Quantity *</Label>
                         <Input
                           id="quantity"
                           type="number"
                           value={newProduct.quantity}
                           onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})}
-                          placeholder="5"
+                          placeholder="Enter quantity (e.g., 10)"
+                          min="0"
                           required
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Initial stock quantity
+                        </p>
                       </div>
                       
                       {/* Unit Dropdown */}
@@ -1976,35 +3020,441 @@ export default function Products() {
                       </div>
                     </div>
 
+                    {/* Quality Grade Selection - Hidden (Auto-set to A) */}
+                    <div className="mb-4 hidden">
+                      <Label className="text-sm font-medium mb-2 block">Quality Grade for Individual Products</Label>
+                      <Select value={newProduct.qualityGrade} onValueChange={(value) => setNewProduct({...newProduct, qualityGrade: value})}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select quality grade" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="A+">A+ (Premium)</SelectItem>
+                          <SelectItem value="A">A (High)</SelectItem>
+                          <SelectItem value="B">B (Good)</SelectItem>
+                          <SelectItem value="C">C (Standard)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Quality grade automatically set to A for all products
+                      </div>
+                    </div>
+
+                    {/* Length and Width Dropdowns */}
                     <div className="grid grid-cols-2 gap-4">
-                      {/* Weight field */}
                       <div>
-                        <Label htmlFor="weight">Weight *</Label>
-                        {showAddWeight ? (
+                        <Label htmlFor="length">Length *</Label>
+                        <p className="text-xs text-gray-500 mb-2">Required for SQM calculation</p>
+                        {newProduct.length && newProduct.width && (
+                          <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded mb-2">
+                            📐 SQM: {calculateSQM(newProduct.length, newProduct.width, newProduct.lengthUnit, newProduct.widthUnit).toFixed(4)} m²
+                            <br />
+                            <span className="text-gray-600">
+                              {newProduct.length}{newProduct.lengthUnit} {getConversionDisplay(newProduct.length, newProduct.lengthUnit)} × {newProduct.width}{newProduct.widthUnit} {getConversionDisplay(newProduct.width, newProduct.widthUnit)}
+                            </span>
+                          </div>
+                        )}
+                        {showAddLength ? (
+                          <div className="space-y-2">
                           <div className="flex gap-2">
                         <Input
-                              placeholder="Enter new weight (e.g., 1200gsm)"
-                              value={newWeightInput}
-                              onChange={(e) => setNewWeightInput(e.target.value)}
-                            />
-                            <Button size="sm" onClick={addNewWeight}>Add</Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowAddWeight(false)}>Cancel</Button>
+                                placeholder="Enter length value (e.g., 5)"
+                                value={newLengthInput}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (/^\d*\.?\d*$/.test(value)) {
+                                    setNewLengthInput(value);
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              {/* Unit dropdown - select from existing units or add new */}
+                              <Select
+                                value={newProduct.lengthUnit || ""}
+                                onValueChange={(value) => {
+                                  if (value === "add_new_unit") {
+                                    // Open dialog to add new unit
+                                    setCurrentUnitType('length');
+                                    setCurrentUnitPlaceholder("e.g., feet, m, cm, inch");
+                                    setNewUnitNameInput("");
+                                    setIsAddUnitDialogOpen(true);
+                                  } else {
+                                    setNewProduct({...newProduct, lengthUnit: value || ""});
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="Select unit *" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                                    + Add New Unit
+                                  </SelectItem>
+                                  {lengthUnits.length > 0 ? (
+                                    lengthUnits.map(unit => (
+                                      <SelectItem key={unit} value={unit}>
+                                        {unit}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="p-2 text-sm text-gray-500 text-center">
+                                      No units available
+                                    </div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={addNewLength} disabled={!newLengthInput.trim() || !newProduct.lengthUnit}>
+                                Add {newLengthInput || "value"} {newProduct.lengthUnit || "unit"}
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => setShowAddLength(false)}>Cancel</Button>
+                            </div>
+                      </div>
+                        ) : (
+                          <div className="flex gap-2">
+                          <Select value={
+                            // Try to find exact match in dropdown options first
+                            (() => {
+                              const combinedValue = newProduct.length && newProduct.lengthUnit 
+                                ? `${newProduct.length} ${newProduct.lengthUnit}`.trim()
+                                : newProduct.length || "";
+                              
+                              // Check if this exact value exists in dropdown options
+                              const exactMatch = getFilteredLengths().find(l => l === combinedValue);
+                              if (exactMatch) return exactMatch;
+                              
+                              // If no exact match, try to find by parsing
+                              if (newProduct.length && newProduct.lengthUnit) {
+                                const searchValue = `${newProduct.length} ${newProduct.lengthUnit}`.trim();
+                                const found = getFilteredLengths().find(l => {
+                                  const parsed = parseValueWithUnit(l);
+                                  return parsed.value === newProduct.length && parsed.unit === newProduct.lengthUnit;
+                                });
+                                return found || searchValue;
+                              }
+                              
+                              return combinedValue;
+                            })()
+                          } onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddLength(true);
+                            } else if (value === "N/A") {
+                              setNewProduct({...newProduct, length: "", lengthUnit: ""});
+                              setLengthSearchTerm("");
+                            } else {
+                              // Parse combined value (e.g., "5 m" -> length: "5", lengthUnit: "m")
+                              const parsed = parseValueWithUnit(value);
+                              console.log('🔍 Selected length:', { value, parsed });
+                              setNewProduct({
+                                ...newProduct,
+                                length: parsed.value || value, // Set the numeric value
+                                lengthUnit: parsed.unit || "" // Set the unit if available
+                              });
+                              setLengthSearchTerm(""); // Clear search when length is selected
+                            }
+                          }}>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select length" />
+                              </SelectTrigger>
+                            <SelectContent>
+                              {/* Search Input */}
+                              <div className="p-2 border-b">
+                        <Input
+                                  placeholder="Search lengths..."
+                                  value={lengthSearchTerm}
+                                  onChange={(e) => setLengthSearchTerm(e.target.value)}
+                                  className="h-8"
+                        />
+                      </div>
+                              
+                              {/* Add New Length Option - Always at top */}
+                              <SelectItem value="add_new" className="text-blue-600 font-medium">
+                                + Add New Length
+                              </SelectItem>
+                              
+                              <SelectItem value="N/A" className="text-gray-500 italic">
+                                N/A (No Length)
+                              </SelectItem>
+                              
+                              {/* Length Options - Show combined values with delete button */}
+                              {getFilteredLengths().map(length => {
+                                return (
+                                  <div key={length} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                    <SelectItem value={length} className="flex-1 p-0 h-auto">
+                                      {length}
+                                    </SelectItem>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteLength(length);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Show message if no lengths found */}
+                              {getFilteredLengths().length === 0 && (
+                                <div className="p-2 text-sm text-gray-500 text-center">
+                                  No lengths found matching "{lengthSearchTerm}"
+                    </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        )}
+                      </div>
+                    <div>
+                        <Label htmlFor="width">Width *</Label>
+                        <p className="text-xs text-gray-500 mb-2">Required for SQM calculation</p>
+                        {showAddWidth ? (
+                          <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                                placeholder="Enter width value (e.g., 10)"
+                              value={newWidthInput}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (/^\d*\.?\d*$/.test(value)) {
+                                    setNewWidthInput(value);
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              {/* Unit dropdown - select from existing units or add new */}
+                              <Select
+                                value={newProduct.widthUnit || ""}
+                                onValueChange={(value) => {
+                                  if (value === "add_new_unit") {
+                                    // Open dialog to add new unit
+                                    setCurrentUnitType('width');
+                                    setCurrentUnitPlaceholder("e.g., feet, m, cm, inch");
+                                    setNewUnitNameInput("");
+                                    setIsAddUnitDialogOpen(true);
+                                  } else {
+                                    setNewProduct({...newProduct, widthUnit: value || ""});
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="Select unit *" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                                    + Add New Unit
+                                  </SelectItem>
+                                  {widthUnits.length > 0 ? (
+                                    widthUnits.map(unit => (
+                                      <SelectItem key={unit} value={unit}>
+                                        {unit}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="p-2 text-sm text-gray-500 text-center">
+                                      No units available
+                                    </div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={addNewWidth} disabled={!newWidthInput.trim() || !newProduct.widthUnit}>
+                                Add {newWidthInput || "value"} {newProduct.widthUnit || "unit"}
+                              </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowAddWidth(false)}>Cancel</Button>
+                            </div>
                           </div>
                         ) : (
+                          <div className="flex gap-2">
+                          <Select value={
+                            // Try to find exact match in dropdown options first
+                            (() => {
+                              const combinedValue = newProduct.width && newProduct.widthUnit 
+                                ? `${newProduct.width} ${newProduct.widthUnit}`.trim()
+                                : newProduct.width || "";
+                              
+                              // Check if this exact value exists in dropdown options
+                              const exactMatch = getFilteredWidths().find(w => w === combinedValue);
+                              if (exactMatch) return exactMatch;
+                              
+                              // If no exact match, try to find by parsing
+                              if (newProduct.width && newProduct.widthUnit) {
+                                const searchValue = `${newProduct.width} ${newProduct.widthUnit}`.trim();
+                                const found = getFilteredWidths().find(w => {
+                                  const parsed = parseValueWithUnit(w);
+                                  return parsed.value === newProduct.width && parsed.unit === newProduct.widthUnit;
+                                });
+                                return found || searchValue;
+                              }
+                              
+                              return combinedValue;
+                            })()
+                          } onValueChange={(value) => {
+                            if (value === "add_new") {
+                              setShowAddWidth(true);
+                            } else if (value === "N/A") {
+                              setNewProduct({...newProduct, width: "", widthUnit: ""});
+                              setWidthSearchTerm("");
+                            } else {
+                              // Parse combined value (e.g., "10 m" -> width: "10", widthUnit: "m")
+                              const parsed = parseValueWithUnit(value);
+                              console.log('🔍 Selected width:', { value, parsed });
+                              setNewProduct({
+                                ...newProduct,
+                                width: parsed.value || value, // Set the numeric value
+                                widthUnit: parsed.unit || "" // Set the unit if available
+                              });
+                              setWidthSearchTerm(""); // Clear search when width is selected
+                            }
+                          }}>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select width" />
+                              </SelectTrigger>
+                            <SelectContent>
+                            {/* Search Input */}
+                            <div className="p-2 border-b">
+                              <Input
+                                  placeholder="Search widths..."
+                                  value={widthSearchTerm}
+                                  onChange={(e) => setWidthSearchTerm(e.target.value)}
+                                className="h-8"
+                      />
+                    </div>
+
+                              {/* Add New Width Option - Always at top */}
+                              <SelectItem value="add_new" className="text-blue-600 font-medium">
+                                + Add New Width
+                              </SelectItem>
+                            
+                            <SelectItem value="N/A" className="text-gray-500 italic">
+                                N/A (No Width)
+                            </SelectItem>
+                            
+                              {/* Width Options - Show combined values with delete button */}
+                              {getFilteredWidths().map(width => {
+                                return (
+                                  <div key={width} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                    <SelectItem value={width} className="flex-1 p-0 h-auto">
+                                      {width}
+                                    </SelectItem>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteWidth(width);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+                            
+                              {/* Show message if no widths found */}
+                              {getFilteredWidths().length === 0 && (
+                              <div className="p-2 text-sm text-gray-500 text-center">
+                                  No widths found matching "{widthSearchTerm}"
+                              </div>
+                            )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Weight field - Full width */}
+                    <div>
+                      <Label htmlFor="weight">Weight *</Label>
+                        {showAddWeight ? (
+                          <div className="space-y-2">
+                          <div className="flex gap-2">
+                        <Input
+                                placeholder="Enter weight value (e.g., 3)"
+                              value={newWeightInput}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (/^\d*\.?\d*$/.test(value)) {
+                                    setNewWeightInput(value);
+                                  }
+                                }}
+                                className="flex-1"
+                              />
+                              {/* Unit dropdown - select from existing units or add new */}
+                              <Select
+                                value={newProduct.weightUnit || ""}
+                                onValueChange={(value) => {
+                                  if (value === "add_new_unit") {
+                                    // Open dialog to add new unit
+                                    setCurrentUnitType('weight');
+                                    setCurrentUnitPlaceholder("e.g., GSM, kg, g, lb");
+                                    setNewUnitNameInput("");
+                                    setIsAddUnitDialogOpen(true);
+                                  } else {
+                                    setNewProduct({...newProduct, weightUnit: value || ""});
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="Select unit *" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                                    + Add New Unit
+                                  </SelectItem>
+                                  {weightUnits.length > 0 ? (
+                                    weightUnits.map(unit => (
+                                      <SelectItem key={unit} value={unit}>
+                                        {unit}
+                                      </SelectItem>
+                                    ))
+                                  ) : (
+                                    <div className="p-2 text-sm text-gray-500 text-center">
+                                      No units available
+                                    </div>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={addNewWeight} disabled={!newWeightInput.trim() || !newProduct.weightUnit}>
+                                Add {newWeightInput || "value"} {newProduct.weightUnit || "unit"}
+                              </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowAddWeight(false)}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
                           <Select
-                          value={newProduct.weight}
+                          value={newProduct.weight && newProduct.weightUnit ? `${newProduct.weight} ${newProduct.weightUnit}` : newProduct.weight || ""}
                             onValueChange={(value) => {
                               if (value === "add_new") {
                                 setShowAddWeight(true);
+                              } else if (value === "N/A") {
+                                setNewProduct({...newProduct, weight: "", weightUnit: ""});
+                                setWeightSearchTerm("");
                               } else {
-                                setNewProduct({...newProduct, weight: value});
+                                // Parse combined value (e.g., "600 GSM" -> weight: "600", weightUnit: "GSM")
+                                const parsed = parseValueWithUnit(value);
+                                setNewProduct({
+                                  ...newProduct,
+                                  weight: parsed.value || value, // Set the numeric value
+                                  weightUnit: parsed.unit || "" // Set the unit if available
+                                });
                                 setWeightSearchTerm(""); // Clear search when weight is selected
                               }
                             }}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select weight" />
-                            </SelectTrigger>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Select weight" />
+                              </SelectTrigger>
                             <SelectContent>
                               {/* Search Input */}
                               <div className="p-2 border-b">
@@ -2015,36 +3465,38 @@ export default function Products() {
                                   className="h-8"
                         />
                       </div>
-                              
+
                               {/* Add New Weight Option - Always at top */}
                               <SelectItem value="add_new" className="text-blue-600 font-medium">
                                 + Add New Weight
                               </SelectItem>
-                              
+
                               <SelectItem value="N/A" className="text-gray-500 italic">
                                 N/A (No Weight)
                               </SelectItem>
-                              
-                              {/* Weight Options */}
-                              {getFilteredWeights().map(weight => (
-                                <div key={weight} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
-                                  <SelectItem value={weight} className="flex-1 p-0 h-auto">
-                                  {weight}
-                                </SelectItem>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteWeight(weight);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                              
+
+                              {/* Weight Options - Show combined values (e.g., "600 GSM", "4 mm") */}
+                              {getFilteredWeights().map(weight => {
+                                return (
+                                  <div key={weight} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                    <SelectItem value={weight} className="flex-1 p-0 h-auto">
+                                      {weight}
+                                    </SelectItem>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteWeight(weight);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                );
+                              })}
+
                               {/* Show message if no weights found */}
                               {getFilteredWeights().length === 0 && (
                                 <div className="p-2 text-sm text-gray-500 text-center">
@@ -2053,245 +3505,12 @@ export default function Products() {
                               )}
                             </SelectContent>
                           </Select>
+                        </div>
                         )}
-                      </div>
                     </div>
 
-                    {/* Height and Width Dropdowns */}
-                    <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <Label htmlFor="height">Height *</Label>
-                        {showAddHeight ? (
-                          <div className="flex gap-2">
-                      <Input
-                              placeholder="Enter new height (e.g., 2.74m)"
-                              value={newHeightInput}
-                              onChange={(e) => setNewHeightInput(e.target.value)}
-                            />
-                            <Button size="sm" onClick={addNewHeight}>Add</Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowAddHeight(false)}>Cancel</Button>
-                          </div>
-                        ) : (
-                          <Select value={newProduct.height} onValueChange={(value) => {
-                            if (value === "add_new") {
-                              setShowAddHeight(true);
-                            } else {
-                              setNewProduct({...newProduct, height: value});
-                              setHeightSearchTerm(""); // Clear search when height is selected
-                            }
-                          }}>
-                          <SelectTrigger>
-                              <SelectValue placeholder="Select height" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {/* Search Input */}
-                            <div className="p-2 border-b">
-                              <Input
-                                  placeholder="Search heights..."
-                                  value={heightSearchTerm}
-                                  onChange={(e) => setHeightSearchTerm(e.target.value)}
-                                className="h-8"
-                      />
-                    </div>
-
-                              {/* Add New Height Option - Always at top */}
-                            <SelectItem value="add_new" className="text-blue-600 font-medium">
-                                + Add New Height
-                            </SelectItem>
-                            
-                              <SelectItem value="N/A" className="text-gray-500 italic">
-                                N/A (No Height)
-                              </SelectItem>
-                              
-                              {/* Height Options */}
-                              {getFilteredHeights().map(height => (
-                                <div key={height} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
-                                  <SelectItem value={height} className="flex-1 p-0 h-auto">
-                                    {height}
-                                  </SelectItem>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteHeight(height);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                              
-                              {/* Show message if no heights found */}
-                              {getFilteredHeights().length === 0 && (
-                              <div className="p-2 text-sm text-gray-500 text-center">
-                                  No heights found matching "{heightSearchTerm}"
-                              </div>
-                            )}
-                          </SelectContent>
-                        </Select>
-                        )}
-                      </div>
-                      <div>
-                        <Label htmlFor="width">Width *</Label>
-                        {showAddWidth ? (
-                          <div className="flex gap-2">
-                        <Input
-                              placeholder="Enter new width (e.g., 1.83m)"
-                              value={newWidthInput}
-                              onChange={(e) => setNewWidthInput(e.target.value)}
-                            />
-                            <Button size="sm" onClick={addNewWidth}>Add</Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowAddWidth(false)}>Cancel</Button>
-                      </div>
-                        ) : (
-                          <Select value={newProduct.width} onValueChange={(value) => {
-                            if (value === "add_new") {
-                              setShowAddWidth(true);
-                            } else {
-                              setNewProduct({...newProduct, width: value});
-                              setWidthSearchTerm(""); // Clear search when width is selected
-                            }
-                          }}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select width" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {/* Search Input */}
-                              <div className="p-2 border-b">
-                        <Input
-                                  placeholder="Search widths..."
-                                  value={widthSearchTerm}
-                                  onChange={(e) => setWidthSearchTerm(e.target.value)}
-                                  className="h-8"
-                        />
-                      </div>
-                              
-                              {/* Add New Width Option - Always at top */}
-                              <SelectItem value="add_new" className="text-blue-600 font-medium">
-                                + Add New Width
-                              </SelectItem>
-                              
-                              <SelectItem value="N/A" className="text-gray-500 italic">
-                                N/A (No Width)
-                              </SelectItem>
-                              
-                              {/* Width Options */}
-                              {getFilteredWidths().map(width => (
-                                <div key={width} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
-                                  <SelectItem value={width} className="flex-1 p-0 h-auto">
-                                    {width}
-                                  </SelectItem>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteWidth(width);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                              
-                              {/* Show message if no widths found */}
-                              {getFilteredWidths().length === 0 && (
-                                <div className="p-2 text-sm text-gray-500 text-center">
-                                  No widths found matching "{widthSearchTerm}"
-                    </div>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Thickness field */}
-                    <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="thickness">Thickness *</Label>
-                        {showAddThickness ? (
-                        <div className="flex gap-2">
-                          <Input
-                              placeholder="Enter new thickness (e.g., 15mm)"
-                              value={newThicknessInput}
-                              onChange={(e) => setNewThicknessInput(e.target.value)}
-                            />
-                            <Button size="sm" onClick={addNewThickness}>Add</Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowAddThickness(false)}>Cancel</Button>
-                          </div>
-                        ) : (
-                        <Select
-                        value={newProduct.thickness}
-                          onValueChange={(value) => {
-                            if (value === "add_new") {
-                              setShowAddThickness(true);
-                            } else {
-                              setNewProduct({...newProduct, thickness: value});
-                              setThicknessSearchTerm(""); // Clear search when thickness is selected
-                            }
-                          }}
-                        >
-                            <SelectTrigger>
-                            <SelectValue placeholder="Select thickness" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {/* Search Input */}
-                            <div className="p-2 border-b">
-                              <Input
-                                placeholder="Search thicknesses..."
-                                value={thicknessSearchTerm}
-                                onChange={(e) => setThicknessSearchTerm(e.target.value)}
-                                className="h-8"
-                      />
-                    </div>
-
-                            {/* Add New Thickness Option - Always at top */}
-                              <SelectItem value="add_new" className="text-blue-600 font-medium">
-                              + Add New Thickness
-                              </SelectItem>
-                            
-                            <SelectItem value="N/A" className="text-gray-500 italic">
-                              N/A (No Thickness)
-                            </SelectItem>
-                            
-                            {/* Thickness Options */}
-                            {getFilteredThicknesses().map(thickness => (
-                              <div key={thickness} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
-                                <SelectItem value={thickness} className="flex-1 p-0 h-auto">
-                                  {thickness}
-                                </SelectItem>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteThickness(thickness);
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                            
-                            {/* Show message if no thicknesses found */}
-                            {getFilteredThicknesses().length === 0 && (
-                              <div className="p-2 text-sm text-gray-500 text-center">
-                                No thicknesses found matching "{thicknessSearchTerm}"
-                              </div>
-                            )}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-
-                      </div>
-                      <div>
-                        <Label htmlFor="notes">Notes</Label>
+                      <Label htmlFor="notes">Notes</Label>
                         <Textarea
                           id="notes"
                           value={newProduct.notes}
@@ -2353,91 +3572,132 @@ export default function Products() {
                         </div>
                       </div>
 
-                    </div>
-
                     {/* Materials Section - Moved to Bottom */}
                     <div className="border-t pt-4">
                       <div className="flex items-center justify-between mb-4">
                         <Label className="text-lg font-medium">Materials Used</Label>
                         <div className="text-sm text-muted-foreground bg-blue-50 px-3 py-1 rounded-lg">
-                          💡 Materials added here will be saved as recipe for future production
+                          💡 Materials added here will be saved as recipe for 1 SQM of this product
                         </div>
                       </div>
                       
-                      {/* Materials Applicable Selection */}
+                      {/* Recipe Creation - Optional */}
                       <div className="mb-4">
-                        <Label className="text-sm font-medium mb-2 block">Does this product use materials?</Label>
-                        <div className="flex gap-4">
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name="materialsApplicable"
-                              value="yes"
-                              checked={materialsApplicable === true}
-                              onChange={() => setMaterialsApplicable(true)}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm">Yes, add materials</span>
-                          </label>
-                          <label className="flex items-center space-x-2">
-                            <input
-                              type="radio"
-                              name="materialsApplicable"
-                              value="no"
-                              checked={materialsApplicable === false}
-                              onChange={() => {
-                                setMaterialsApplicable(false);
-                                // Clear any existing materials when NA is selected
-                                setProductMaterials([]);
-                              }}
-                              className="text-blue-600"
-                            />
-                            <span className="text-sm">No, not applicable (NA)</span>
-                          </label>
-                        </div>
+                        <Label className="text-sm font-medium">Recipe Creation (Optional)</Label>
+                        <p className="text-xs text-gray-500">You can add materials to create the recipe now, or add it later when editing the product</p>
                       </div>
                       
-                      {/* Add Material Form - Only show if materials are applicable */}
-                      {materialsApplicable && (
+                      {/* Add Material Form - Optional */}
                         <div className="bg-gray-50 p-4 rounded-lg mb-4">
                           <div className="space-y-4">
                             <div>
-                              <Label htmlFor="materialSelect">Select Raw Material</Label>
-                              <Select value={newMaterial.materialId} onValueChange={handleMaterialSelection}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Choose from existing raw materials" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {rawMaterials.map((material) => (
-                                    <SelectItem key={material.id} value={material.id}>
-                                      {material.name}
-                                    </SelectItem>
-                                  ))}
-                                  <SelectItem value="add_new" className="text-blue-600 font-medium">
-                                    + Add New Material
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
+                            <Label htmlFor="materialSelect">Select Material or Product *</Label>
+                            <div className="space-y-2">
+                              {/* Current Selection Display */}
+                              {newMaterial.materialId ? (
+                                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-blue-900">{newMaterial.materialName}</div>
+                                    <div className="text-sm text-blue-700">
+                                      {rawMaterials.find(m => m.id === newMaterial.materialId) ? 'Raw Material' : 'Product'}
+                            </div>
+                          </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setNewMaterial({
+                                      materialId: "",
+                                      materialName: "",
+                                      quantity: "",
+                                      unit: "",
+                                      cost: "",
+                                      selectedQuantity: 0
+                                    })}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setShowMaterialSelector(true)}
+                                  className="w-full h-12 border-dashed border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                                >
+                                  <Search className="w-4 h-4 mr-2" />
+                                  Click to search and select material or product
+                                </Button>
+                              )}
+                              
+                              {/* Add New Material Button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate('/materials')}
+                                className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add New Material
+                              </Button>
                             </div>
                           </div>
                           
-                          <Button onClick={addProductMaterial} className="w-full mt-4">
+                          {/* Quantity for Base Unit */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="materialQuantity">Quantity *</Label>
+                              <Input
+                                id="materialQuantity"
+                                type="text"
+                                value={newMaterial.quantity}
+                                onChange={(e) => {
+                                  // Allow only numbers, decimals, and leading zeros
+                                  const value = e.target.value;
+                                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                    setNewMaterial({...newMaterial, quantity: value});
+                                  }
+                                }}
+                                placeholder={newMaterial.materialId && availableProducts.some(p => p.id === newMaterial.materialId) ? "Auto-calculated for products" : "e.g., 0.5, 2.5, 0.2"}
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                {newMaterial.materialId && availableProducts.some(p => p.id === newMaterial.materialId) 
+                                  ? "Auto-calculated for products, or edit manually" 
+                                  : "Quantity needed for 1 SQM of this product (supports decimals like 0.5kg, 0.2 pieces)"
+                                }
+                              </p>
+                            </div>
+                            <div>
+                              <Label htmlFor="materialUnit">Unit *</Label>
+                              <Input
+                                id="materialUnit"
+                                value={newMaterial.unit}
+                                onChange={(e) => setNewMaterial({...newMaterial, unit: e.target.value})}
+                                placeholder="e.g., kg, meters, pieces"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          onClick={addProductMaterial} 
+                          className="w-full mt-4"
+                          disabled={!newMaterial.materialId || !newMaterial.quantity || !newMaterial.unit}
+                        >
                             <Plus className="w-4 h-4 mr-2" />
                             Add Material to Recipe
                           </Button>
                         </div>
-                      )}
 
-                      {/* Added Materials List - Only show if materials are applicable */}
-                      {materialsApplicable && productMaterials.length > 0 && (
+                      {/* Added Materials List - Show if recipe has materials */}
+                      {productMaterials.length > 0 && (
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">Added Materials:</Label>
+                          <Label className="text-sm font-medium">Recipe Materials:</Label>
                           {productMaterials.map((material, index) => (
                             <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
                               <div className="flex-1">
                                 <div className="font-medium">{material.materialName}</div>
                                 <div className="text-sm text-gray-600">
-                                  Raw material for recipe
+                                  {material.quantity} {material.unit}
                                 </div>
                               </div>
                               <Button
@@ -2452,14 +3712,426 @@ export default function Products() {
                           ))}
                         </div>
                       )}
+                      
+                      {/* Recipe Info Message */}
+                      {productMaterials.length === 0 && (
+                        <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm text-blue-800 font-medium">No Recipe Added</span>
+                          </div>
+                          <p className="text-sm text-blue-700 mt-1">
+                            You can create the product without a recipe and add it later when editing the product.
+                          </p>
+                        </div>
+                      )}
                     </div>
+                  </div>
 
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setIsAddProductOpen(false)}>
+                  <DialogFooter>
+                      <Button variant="outline" onClick={() => {
+                        setIsAddProductOpen(false);
+                        setIsCreatingProduct(false);
+                      }}>
                         Cancel
                       </Button>
-                      <Button onClick={handleAddProduct}>
-                        Add Product
+                      <Button 
+                        onClick={handleAddProduct}
+                        disabled={isCreatingProduct}
+                      >
+                        {isCreatingProduct ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Creating Product...
+                          </>
+                        ) : (
+                          "Add Product"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Enhanced Material Selector Dialog */}
+                <Dialog open={showMaterialSelector} onOpenChange={(open) => {
+                  setShowMaterialSelector(open);
+                  if (!open) {
+                    // Reset state when dialog closes
+                    setSelectionStep("type");
+                    setChosenType(null);
+                    setMaterialSearchTerm("");
+                    setSelectedCategory("all");
+                    setSelectedSupplier("all");
+                    setSelectedColor("all");
+                    setSelectedLength("all");
+                    setSelectedWidth("all");
+                    setSelectedWeight("all");
+                  }
+                }}>
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Search className="w-5 h-5" />
+                        Select Material or Product
+                      </DialogTitle>
+                      <DialogDescription>
+                        {selectionStep === "type" 
+                          ? "First, choose whether you want to add a Product or Raw Material to your recipe"
+                          : `Now filter and select from available ${chosenType === "product" ? "Products" : "Raw Materials"}`
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4">
+                      {/* Step 1: Choose Type */}
+                      {selectionStep === "type" && (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Product Option */}
+                            <div 
+                              className="p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                              onClick={() => {
+                                setChosenType("product");
+                                setSelectionStep("filter");
+                              }}
+                            >
+                              <div className="text-center">
+                                <Package className="w-12 h-12 mx-auto mb-3 text-blue-600" />
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Product</h3>
+                                <p className="text-sm text-gray-600 mb-3">
+                                  Select from existing products in your inventory
+                                </p>
+                                <div className="text-xs text-gray-500">
+                                  Available: {availableProducts.length} products
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Material Option */}
+                            <div 
+                              className="p-6 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors"
+                              onClick={() => {
+                                setChosenType("material");
+                                setSelectionStep("filter");
+                              }}
+                            >
+                              <div className="text-center">
+                                <Factory className="w-12 h-12 mx-auto mb-3 text-green-600" />
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Raw Material</h3>
+                                <p className="text-sm text-gray-600 mb-3">
+                                  Select from raw materials in your inventory
+                                </p>
+                                <div className="text-xs text-gray-500">
+                                  Available: {rawMaterials.length} materials
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Step 2: Filter and Select */}
+                      {selectionStep === "filter" && (
+                        <div className="space-y-4">
+                          {/* Back Button */}
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectionStep("type");
+                                setChosenType(null);
+                                setMaterialSearchTerm("");
+                                setSelectedCategory("all");
+                                setSelectedSupplier("all");
+                                setSelectedColor("all");
+                                setSelectedLength("all");
+                                setSelectedWidth("all");
+                                setSelectedWeight("all");
+                              }}
+                            >
+                              <ArrowRight className="w-4 h-4 mr-1 rotate-180" />
+                              Back to Type Selection
+                            </Button>
+                            <Badge variant="outline" className="ml-2">
+                              {chosenType === "product" ? "Products" : "Raw Materials"}
+                            </Badge>
+                          </div>
+                          
+                          {/* Search Bar */}
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <Input
+                              placeholder={`Search ${chosenType === "product" ? "products" : "materials"} by name, category, or brand...`}
+                              value={materialSearchTerm}
+                              onChange={(e) => setMaterialSearchTerm(e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                          
+                          {/* Type-specific Filters */}
+                          {chosenType === "material" && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Category Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Category</Label>
+                                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Categories</SelectItem>
+                                    {getUniqueCategories().map(category => (
+                                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {/* Supplier Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Supplier</Label>
+                                <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Suppliers</SelectItem>
+                                    {getUniqueSuppliers().map(supplier => (
+                                      <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {chosenType === "product" && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Color Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Color</Label>
+                                <Select value={selectedColor} onValueChange={setSelectedColor}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Colors</SelectItem>
+                                    {getUniqueProductColors().map(color => (
+                                      <SelectItem key={color} value={color}>{color}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {/* Length Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Length</Label>
+                                <Select value={selectedLength} onValueChange={setSelectedLength}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Lengths</SelectItem>
+                                    {getUniqueProductLengths().map(length => (
+                                      <SelectItem key={length} value={length}>{length}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {/* Width Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Width</Label>
+                                <Select value={selectedWidth} onValueChange={setSelectedWidth}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Widths</SelectItem>
+                                    {getUniqueProductWidths().map(width => (
+                                      <SelectItem key={width} value={width}>{width}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              
+                              {/* Weight Filter */}
+                              <div>
+                                <Label className="text-sm font-medium">Weight</Label>
+                                <Select value={selectedWeight} onValueChange={setSelectedWeight}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="all">All Weights</SelectItem>
+                                    {getUniqueProductWeights().map(weight => (
+                                      <SelectItem key={weight} value={weight}>{weight}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Selected Material Display */}
+                          {newMaterial.materialId && (
+                            <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <CheckCircle className="w-5 h-5 text-green-600" />
+                                    <span className="font-semibold text-green-900">Selected: {newMaterial.materialName}</span>
+                                  </div>
+                                  <div className="text-sm text-green-700">
+                                    {rawMaterials.find(m => m.id === newMaterial.materialId) ? 'Raw Material' : 'Product'}
+                                    {newMaterial.quantity && (
+                                      <span className="ml-2">• Quantity: {newMaterial.quantity} {newMaterial.unit}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setNewMaterial({
+                                    materialId: "",
+                                    materialName: "",
+                                    quantity: "",
+                                    unit: "",
+                                    cost: "",
+                                    selectedQuantity: 0
+                                  })}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Results */}
+                          <div className="max-h-96 overflow-y-auto">
+                            {getFilteredMaterials().length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {getFilteredMaterials().map((material) => {
+                                  // Debug: log material data to see what fields are available
+                                  console.log('🔍 Material data for display:', material);
+                                  
+                                  // Get stock value - use individual count for products, current_stock for materials
+                                  const stockValue = material.type === 'product' 
+                                    ? (material.individual_count || 0) // Use individual product count
+                                    : (material.current_stock || 0); // Use current stock for raw materials
+                                  
+                                  // Check if this material is currently selected
+                                  const isSelected = newMaterial.materialId === material.id;
+                                  
+                                  return (
+                                    <div
+                                      key={material.id}
+                                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
+                                        isSelected
+                                          ? 'border-green-500 bg-green-100 ring-2 ring-green-300'
+                                          : material.type === 'product' 
+                                            ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100' 
+                                            : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100'
+                                      }`}
+                                      onClick={() => handleEnhancedMaterialSelection(material)}
+                                    >
+                                      <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                          <div className={`p-2 rounded-lg ${
+                                            material.type === 'product' ? 'bg-blue-100' : 'bg-green-100'
+                                          }`}>
+                                            {material.type === 'product' ? (
+                                              <Package className="w-5 h-5 text-blue-600" />
+                                            ) : (
+                                              <Factory className="w-5 h-5 text-green-600" />
+                                            )}
+                                          </div>
+                                          <div className="flex-1">
+                                            <h3 className="font-semibold text-gray-900 text-sm">{material.name}</h3>
+                                            <Badge 
+                                              variant={material.type === 'product' ? 'default' : 'secondary'}
+                                              className="text-xs mt-1"
+                                            >
+                                              {material.type === 'product' ? 'Product' : 'Raw Material'}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-xs text-gray-600 space-y-1">
+                                          <div><span className="font-medium">Category:</span> {material.category || 'N/A'}</div>
+                                          <div><span className="font-medium">Unit:</span> {material.unit || 'N/A'}</div>
+                                          {material.brand && <div><span className="font-medium">Brand:</span> {material.brand}</div>}
+                                          {material.supplier_name && <div><span className="font-medium">Supplier:</span> {material.supplier_name}</div>}
+                                          {chosenType === "product" && (
+                                            <>
+                                              {material.color && <div><span className="font-medium">Color:</span> {material.color}</div>}
+                                              {material.length && <div><span className="font-medium">Length:</span> {material.length}</div>}
+                                              {material.width && <div><span className="font-medium">Width:</span> {material.width}</div>}
+                                              {material.weight && <div><span className="font-medium">Weight:</span> {material.weight}</div>}
+                                            </>
+                                          )}
+                                        </div>
+                                        
+                                        <div className="pt-2 border-t border-gray-200">
+                                          <div className="flex items-center justify-between">
+                                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                              stockValue >= 1
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-red-100 text-red-800'
+                                            }`}>
+                                              Stock: {stockValue} {material.unit}
+                                            </div>
+                                            <div className="text-xs font-medium">
+                                              {stockValue >= 1 ? (
+                                                <span className="text-green-600">✓ Available</span>
+                                              ) : (
+                                                <span className="text-red-600">⚠ Out of Stock</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {material.costPerUnit && (
+                                            <div className="text-xs text-gray-600 mt-1">
+                                              Cost: ₹{material.costPerUnit}/{material.unit}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="p-8 text-center text-gray-500">
+                                <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                                <p className="text-lg font-medium mb-2">No {chosenType === "product" ? "products" : "materials"} found</p>
+                                <p className="text-sm">Try adjusting your search terms or filters</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <DialogFooter>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setShowMaterialSelector(false);
+                          // Reset filters when closing
+                          setSelectionStep("type");
+                          setChosenType(null);
+                          setMaterialSearchTerm("");
+                          setSelectedCategory("all");
+                          setSelectedSupplier("all");
+                          setSelectedColor("all");
+                          setSelectedLength("all");
+                          setSelectedWidth("all");
+                          setSelectedWeight("all");
+                        }}
+                      >
+                        {newMaterial.materialId ? 'Done' : 'Cancel'}
                       </Button>
                     </DialogFooter>
                   </DialogContent>
@@ -2492,18 +4164,6 @@ export default function Products() {
                   <div className="text-2xl font-bold text-warning">{lowStockCount}</div>
                   <p className="text-xs text-muted-foreground">
                     Need attention
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-                  <Package className="h-4 w-4 text-success" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">₹{(totalValue || 0).toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Inventory value
                   </p>
                 </CardContent>
               </Card>
@@ -2593,16 +4253,42 @@ export default function Products() {
                           <td className="p-4">
                             <div className="space-y-1">
                               <div className="font-medium text-foreground">
-                                {getAvailablePieces(product.id || '')} {product.unit || 'pieces'}
+                                {getAvailablePieces(product.id || '')} Products
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                Price: On Request
-                              </div>
-                              {getAvailablePieces(product.id || '') !== (product.quantity || 0) && (
+                              {(() => {
+                                // Calculate total SQM for all products
+                                const quantity = getAvailablePieces(product.id || '');
+                                const perProductSQM = calculateSQM(
+                                  product.length || '0',
+                                  product.width || '0',
+                                  product.lengthUnit || 'feet',
+                                  product.widthUnit || 'feet'
+                                );
+                                const totalSQM = quantity * perProductSQM;
+
+                                return (
+                                  <div className="text-xs text-muted-foreground">
+                                    Total: {totalSQM.toFixed(4)} SQM
+                                  </div>
+                                );
+                              })()}
+                              {(() => {
+                                const breakdown = getIndividualProductBreakdown(product.id || '');
+                                if (breakdown) {
+                                  return (
+                                    <div className="text-xs text-muted-foreground">
+                                      Total: {breakdown.total} • Available: {breakdown.available} • Sold: {breakdown.sold} • Damaged: {breakdown.damaged}
+                                    </div>
+                                  );
+                                } else if (getAvailablePieces(product.id || '') !== (product.quantity || 0)) {
+                                  return (
                                 <div className="text-xs text-muted-foreground">
-                                  Total: {product.quantity || 0} {product.unit || 'pieces'}
+                                  Total Products: {product.quantity || 0}
                                 </div>
-                              )}
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                           </td>
                           <td className="p-4">
@@ -2831,7 +4517,15 @@ export default function Products() {
                                 </div>
                               </td>
                               <td className="p-4">
-                                <div className="font-medium">{availableStock} {product?.unit || 'units'}</div>
+                                <div className="font-medium">{availableStock} Products</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {(availableStock * calculateSQM(
+                                    product?.length || '0',
+                                    product?.width || '0',
+                                    product?.lengthUnit || 'feet',
+                                    product?.widthUnit || 'feet'
+                                  )).toFixed(4)} SQM
+                                </div>
                               </td>
                               <td className="p-4">
                                 <Badge className={`${
@@ -2925,13 +4619,13 @@ export default function Products() {
                                 <div>Product: {notification.relatedData.productName}</div>
                               )}
                               {notification.relatedData.requiredQuantity && (
-                                <div>Required: {notification.relatedData.requiredQuantity} units</div>
+                                <div>Required: {notification.relatedData.requiredQuantity} products</div>
                               )}
                               {notification.relatedData.availableStock !== undefined && (
-                                <div>Available: {notification.relatedData.availableStock} units</div>
+                                <div>Available: {notification.relatedData.availableStock} products</div>
                               )}
                               {notification.relatedData.shortfall && (
-                                <div>Shortfall: {notification.relatedData.shortfall} units</div>
+                                <div>Shortfall: {notification.relatedData.shortfall} products</div>
                               )}
                               {notification.relatedData.threshold && (
                                 <div>Threshold: {notification.relatedData.threshold} units</div>
@@ -2999,7 +4693,13 @@ export default function Products() {
         </Tabs>
 
         {/* Duplicate Product Dialog */}
-        <Dialog open={isDuplicateProductOpen} onOpenChange={setIsDuplicateProductOpen}>
+        <Dialog open={isDuplicateProductOpen} onOpenChange={(open) => {
+          setIsDuplicateProductOpen(open);
+          if (!open) {
+            // Reset image states when dialog closes
+            setDuplicateSelectedImage(null);
+          }
+        }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Duplicate Product</DialogTitle>
@@ -3016,9 +4716,8 @@ export default function Products() {
                     <Input
                       id="duplicate-name"
                       value={duplicateProduct.name}
-                      readOnly
-                      className="bg-gray-50 cursor-not-allowed"
-                      placeholder="Product name (read-only)"
+                      onChange={(e) => setDuplicateProduct({...duplicateProduct, name: e.target.value})}
+                      placeholder="Enter product name"
                     />
                   </div>
                   <div>
@@ -3046,50 +4745,26 @@ export default function Products() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="duplicate-color">Color</Label>
+                    <Label htmlFor="duplicate-subcategory">Subcategory</Label>
                     <Select
-                      value={duplicateProduct.color}
-                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, color: value})}
+                      value={duplicateProduct.subcategory || 'N/A'}
+                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, subcategory: value === 'N/A' ? '' : value})}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select color" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getFilteredColors().map((color) => (
-                          <SelectItem key={color} value={color}>
-                            {color}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="duplicate-pattern">Pattern</Label>
-                    <Select
-                      value={duplicateProduct.pattern}
-                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, pattern: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select pattern" />
+                        <SelectValue placeholder="Select subcategory (optional)" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Pattern)
+                          None (No Subcategory)
                         </SelectItem>
-                        {dropdownOptions.patterns.map(opt => opt.value).map((pattern) => (
-                          <SelectItem key={pattern} value={pattern}>
-                            {pattern}
+                        {dropdownOptions.subcategories.map(opt => opt.value).map((subcategory) => (
+                          <SelectItem key={subcategory} value={subcategory}>
+                            {subcategory}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="duplicate-unit">Unit *</Label>
                     <Select
@@ -3112,63 +4787,81 @@ export default function Products() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="duplicate-quantity">Quantity *</Label>
+                    <Label htmlFor="duplicate-color">Color</Label>
+                    <Select
+                      value={duplicateProduct.color}
+                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, color: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select color" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getFilteredColors().map((color) => (
+                          <SelectItem key={color} value={color}>
+                            {color}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="duplicate-pattern">Pattern</Label>
+                    <Select
+                      value={duplicateProduct.pattern}
+                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, pattern: value})}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select pattern" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dropdownOptions.patterns.map(opt => opt.value).map((pattern) => (
+                          <SelectItem key={pattern} value={pattern}>
+                            {pattern === "NA" ? (
+                              <span className="text-gray-500 italic">NA (No Pattern)</span>
+                            ) : (
+                              pattern
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Weight - Full Width */}
+                <div>
+                  <Label htmlFor="duplicate-weight">Weight</Label>
+                  <Select
+                    value={duplicateProduct.weight}
+                    onValueChange={(value) => setDuplicateProduct({...duplicateProduct, weight: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select weight" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="N/A" className="text-gray-500 italic">
+                        N/A (No Weight)
+                      </SelectItem>
+                      {getFilteredWeights().map(weight => (
+                        <SelectItem key={weight} value={weight}>
+                          {weight}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Length and Width */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="duplicate-length">Length</Label>
                     <Input
-                      id="duplicate-quantity"
-                      type="number"
-                      value={duplicateProduct.quantity}
-                      onChange={(e) => setDuplicateProduct({...duplicateProduct, quantity: parseInt(e.target.value) || 0})}
-                      placeholder="Enter quantity"
+                      id="duplicate-length"
+                      value={duplicateProduct.length}
+                      onChange={(e) => setDuplicateProduct({...duplicateProduct, length: e.target.value})}
+                      placeholder="Enter length (e.g., 2.74m)"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="duplicate-weight">Weight</Label>
-                    <Select
-                      value={duplicateProduct.weight}
-                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, weight: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select weight" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Weight)
-                        </SelectItem>
-                        {getFilteredWeights().map(weight => (
-                          <SelectItem key={weight} value={weight}>
-                            {weight}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="duplicate-thickness">Thickness</Label>
-                    <Select
-                      value={duplicateProduct.thickness}
-                      onValueChange={(value) => setDuplicateProduct({...duplicateProduct, thickness: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select thickness" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Thickness)
-                        </SelectItem>
-                        {getFilteredThicknesses().map(thickness => (
-                          <SelectItem key={thickness} value={thickness}>
-                            {thickness}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="duplicate-width">Width</Label>
                     <Input
@@ -3176,28 +4869,6 @@ export default function Products() {
                       value={duplicateProduct.width}
                       onChange={(e) => setDuplicateProduct({...duplicateProduct, width: e.target.value})}
                       placeholder="Enter width (e.g., 1.83m)"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="duplicate-height">Height</Label>
-                    <Input
-                      id="duplicate-height"
-                      value={duplicateProduct.height}
-                      onChange={(e) => setDuplicateProduct({...duplicateProduct, height: e.target.value})}
-                      placeholder="Enter height (e.g., 2.74m)"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="duplicate-location">Location</Label>
-                    <Input
-                      id="duplicate-location"
-                      value=""
-                      onChange={() => {}} // Location is not used for main products
-                      placeholder="Location set during production"
-                      disabled
                     />
                   </div>
                 </div>
@@ -3211,6 +4882,139 @@ export default function Products() {
                     placeholder="Enter product notes"
                     rows={3}
                   />
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <Label>Product Image (Optional)</Label>
+                  <div className="mt-2">
+                    {duplicateProduct.imageUrl ? (
+                      <div className="relative inline-block">
+                        <img
+                          src={duplicateProduct.imageUrl}
+                          alt="Product preview"
+                          className="w-32 h-32 object-cover rounded-lg border"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={() => {
+                            setDuplicateProduct({...duplicateProduct, imageUrl: ''});
+                            setDuplicateSelectedImage(null);
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
+                        onClick={() => document.getElementById('duplicate-product-image')?.click()}
+                      >
+                        <Image className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">Click to upload product image</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            document.getElementById('duplicate-product-image')?.click();
+                          }}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Choose Image
+                        </Button>
+                        <input
+                          id="duplicate-product-image"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              // Validate file type
+                              if (!file.type.startsWith('image/')) {
+                                toast({
+                                  title: "Invalid File",
+                                  description: "Please select a valid image file",
+                                  variant: "destructive"
+                                });
+                                return;
+                              }
+                              
+                              // Validate file size (max 5MB)
+                              if (file.size > 5 * 1024 * 1024) {
+                                toast({
+                                  title: "File Too Large",
+                                  description: "Image size should be less than 5MB",
+                                  variant: "destructive"
+                                });
+                                return;
+                              }
+                              
+                              // Store file for later upload (when user clicks save)
+                              setDuplicateSelectedImage(file);
+                              
+                              // Create preview (data URL for display)
+                              const reader = new FileReader();
+                              reader.onloadend = () => {
+                                setDuplicateProduct({...duplicateProduct, imageUrl: reader.result as string});
+                              };
+                              reader.readAsDataURL(file);
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Recipe Section */}
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">Recipe / Materials</Label>
+                  </div>
+
+                  {/* Recipe Materials List */}
+                  {duplicateProductMaterials && duplicateProductMaterials.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Recipe Materials:</Label>
+                      {duplicateProductMaterials.map((material: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">{material.materialName}</div>
+                            <div className="text-sm text-gray-600">
+                              {material.quantity} {material.unit}
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeDuplicateProductMaterial(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No Recipe Message */}
+                  {(!duplicateProductMaterials || duplicateProductMaterials.length === 0) && (
+                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-blue-800 font-medium">No Recipe Added</span>
+                      </div>
+                      <p className="text-sm text-blue-700 mt-1">
+                        You can create the product without a recipe and add it later when editing the product.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -3229,7 +5033,10 @@ export default function Products() {
             )}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDuplicateProductOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsDuplicateProductOpen(false);
+                setDuplicateProductMaterials([]);
+              }}>
                 Cancel
               </Button>
               <Button 
@@ -3250,185 +5057,927 @@ export default function Products() {
         </Dialog>
 
         {/* Edit Product Dialog */}
-        <Dialog open={isEditProductOpen} onOpenChange={setIsEditProductOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={isEditProductOpen} onOpenChange={(open) => {
+          setIsEditProductOpen(open);
+          if (!open) {
+            // Reset image states when dialog closes
+            setSelectedImage(null);
+            setImagePreview("");
+            setImageUrl("");
+          }
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Product</DialogTitle>
               <DialogDescription>
-                Update the product details.
+                Update the product details and recipe.
               </DialogDescription>
             </DialogHeader>
             
             {selectedProduct && (
               <div className="space-y-4">
+                <div>
+                  <Label htmlFor="edit-name">Product Name *</Label>
+                  <Input
+                    id="edit-name"
+                    value={selectedProduct.name}
+                    onChange={(e) => setSelectedProduct({...selectedProduct, name: e.target.value})}
+                    placeholder="e.g., Traditional Persian Carpet"
+                    required
+                  />
+                </div>
+                
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-name">Product Name *</Label>
-                    <Input
-                      id="edit-name"
-                      value={selectedProduct.name}
-                      onChange={(e) => setSelectedProduct({...selectedProduct, name: e.target.value})}
-                      placeholder="Enter product name"
-                    />
-                  </div>
+                  {/* Category Dropdown */}
                   <div>
                     <Label htmlFor="edit-category">Category *</Label>
-                    <Select
-                      value={selectedProduct.category}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, category: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Category)
-                        </SelectItem>
-                        {dropdownOptions.categories.map(opt => opt.value).map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                    {showAddCategory ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new category"
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                        />
+                        <Button size="sm" onClick={addNewCategory}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddCategory(false)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedProduct.category} onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddCategory(true);
+                        } else {
+                          // Auto-set color to NA for Plain Carpet
+                          if (value === "Plain Carpet") {
+                            setSelectedProduct({...selectedProduct, category: value, color: "NA"});
+                          } else {
+                            setSelectedProduct({...selectedProduct, category: value});
+                          }
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="N/A" className="text-gray-500 italic">
+                            N/A (No Category)
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          {dropdownOptions.categories.map(opt => opt.value).map(category => (
+                            <div key={category} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                              <SelectItem value={category} className="flex-1 p-0 h-auto">
+                                {category}
+                              </SelectItem>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteCategory(category);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Category
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+
+                  {/* Subcategory Dropdown */}
+                  <div>
+                    <Label htmlFor="edit-subcategory">Subcategory</Label>
+                    {showAddSubcategory ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new subcategory"
+                          value={newSubcategoryInput}
+                          onChange={(e) => setNewSubcategoryInput(e.target.value)}
+                        />
+                        <Button size="sm" onClick={addNewSubcategory}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddSubcategory(false)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedProduct.subcategory || 'N/A'} onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddSubcategory(true);
+                        } else {
+                          setSelectedProduct({...selectedProduct, subcategory: value === 'N/A' ? '' : value});
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select subcategory (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="N/A" className="text-gray-500 italic">
+                            N/A (No Subcategory)
+                          </SelectItem>
+                          {dropdownOptions.subcategories.map(opt => opt.value).map(subcategory => (
+                            <div key={subcategory} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                              <SelectItem value={subcategory} className="flex-1 p-0 h-auto">
+                                {subcategory}
+                              </SelectItem>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteSubcategory(subcategory);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Subcategory
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Color Dropdown */}
                   <div>
                     <Label htmlFor="edit-color">Color</Label>
-                    <Select
-                      value={selectedProduct.color}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, color: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select color" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getFilteredColors().map((color) => (
-                          <SelectItem key={color} value={color}>
-                            {color}
+                    {showAddColor ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new color"
+                          value={newColorInput}
+                          onChange={(e) => setNewColorInput(e.target.value)}
+                        />
+                        <Button size="sm" onClick={addNewColor}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddColor(false)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedProduct.color} onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddColor(true);
+                        } else {
+                          setSelectedProduct({...selectedProduct, color: value});
+                          setColorSearchTerm(""); // Clear search when color is selected
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select color" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Search Input */}
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Search colors..."
+                              value={colorSearchTerm}
+                              onChange={(e) => setColorSearchTerm(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          
+                          {/* Add New Color Option - Always at top */}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Color
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          
+                          {/* Color Options */}
+                          {getFilteredColors().map(color => (
+                            <div key={color} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                              <SelectItem value={color} className="flex-1 p-0 h-auto">
+                                {color === "NA" ? (
+                                  <span className="text-gray-500 italic">NA (No Color)</span>
+                                ) : (
+                                  color
+                                )}
+                              </SelectItem>
+                              {color !== "NA" && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteColor(color);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                          
+                          {/* Show message if no colors found */}
+                          {getFilteredColors().length === 0 && (
+                            <div className="p-2 text-sm text-gray-500 text-center">
+                              No colors found matching "{colorSearchTerm}"
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                  {/* Pattern Dropdown */}
                   <div>
                     <Label htmlFor="edit-pattern">Pattern</Label>
-                    <Select
-                      value={selectedProduct.pattern}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, pattern: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select pattern" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Pattern)
-                        </SelectItem>
-                        {dropdownOptions.patterns.map(opt => opt.value).map((pattern) => (
-                          <SelectItem key={pattern} value={pattern}>
-                            {pattern}
+                    {showAddPattern ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new pattern"
+                          value={newPatternInput}
+                          onChange={(e) => setNewPatternInput(e.target.value)}
+                        />
+                        <Button size="sm" onClick={addNewPattern}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddPattern(false)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedProduct.pattern} onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddPattern(true);
+                        } else {
+                          setSelectedProduct({...selectedProduct, pattern: value});
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select pattern" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Add New Pattern Option - Always at top */}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Pattern
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          
+                          {/* Pattern Options */}
+                          {dropdownOptions.patterns.map(opt => opt.value).map(pattern => (
+                            <div key={pattern} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                              <SelectItem value={pattern} className="flex-1 p-0 h-auto">
+                                {pattern === "NA" ? (
+                                  <span className="text-gray-500 italic">NA (No Pattern)</span>
+                                ) : (
+                                  pattern
+                                )}
+                              </SelectItem>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deletePattern(pattern);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                  {/* Base Quantity Field - Read Only */}
+                  <div>
+                    <Label htmlFor="edit-quantity">Base Quantity</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="edit-quantity"
+                        type="number"
+                        value={selectedProduct.baseQuantity || selectedProduct.quantity || 0}
+                        readOnly
+                        disabled
+                        className="bg-gray-100 cursor-not-allowed"
+                      />
+                      <span className="text-sm text-muted-foreground">(Read Only)</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Quantity cannot be edited. Use inventory management to update stock.
+                    </p>
+                  </div>
+                  
+                  {/* Unit Dropdown */}
                   <div>
                     <Label htmlFor="edit-unit">Unit *</Label>
-                    <Select
-                      value={selectedProduct.unit}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, unit: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {getFilteredUnits().map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
+                    {showAddUnit ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter new unit (e.g., bundles)"
+                          value={newUnitInput}
+                          onChange={(e) => setNewUnitInput(e.target.value)}
+                        />
+                        <Button size="sm" onClick={addNewUnit}>Add</Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddUnit(false)}>Cancel</Button>
+                      </div>
+                    ) : (
+                      <Select value={selectedProduct.unit} onValueChange={(value) => {
+                        if (value === "add_new") {
+                          setShowAddUnit(true);
+                        } else {
+                          setSelectedProduct({...selectedProduct, unit: value});
+                          setUnitSearchTerm(""); // Clear search when unit is selected
+                        }
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Search Input */}
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Search units..."
+                              value={unitSearchTerm}
+                              onChange={(e) => setUnitSearchTerm(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+                          
+                          {/* Add New Unit Option - Always at top */}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Unit
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          
+                          {/* Unit Options */}
+                          {getFilteredUnits().map(unit => (
+                            <div key={unit} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                              <SelectItem value={unit} className="flex-1 p-0 h-auto">
+                                {unit}
+                              </SelectItem>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteUnit(unit);
+                                }}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                          
+                          {/* Show message if no units found */}
+                          {getFilteredUnits().length === 0 && (
+                            <div className="p-2 text-sm text-gray-500 text-center">
+                              No units found matching "{unitSearchTerm}"
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-quantity">Quantity *</Label>
-                    <Input
-                      id="edit-quantity"
-                      type="number"
-                      value={selectedProduct.quantity}
-                      onChange={(e) => setSelectedProduct({...selectedProduct, quantity: parseInt(e.target.value) || 0})}
-                      placeholder="Enter quantity"
-                    />
+                {/* Individual Stock Tracking Option - Read Only */}
+                <div className="mb-4">
+                  <Label className="text-sm font-medium mb-2 block">Individual Stock Tracking</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center space-x-2 cursor-not-allowed opacity-70">
+                      <input
+                        type="radio"
+                        name="edit-individualStockTracking"
+                        value="yes"
+                        checked={selectedProduct.individualStockTracking === true}
+                        disabled
+                        readOnly
+                        className="text-blue-600 cursor-not-allowed"
+                      />
+                      <span className="text-sm">Yes, track individual pieces (with QR codes)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-not-allowed opacity-70">
+                      <input
+                        type="radio"
+                        name="edit-individualStockTracking"
+                        value="no"
+                        checked={selectedProduct.individualStockTracking === false}
+                        disabled
+                        readOnly
+                        className="text-blue-600 cursor-not-allowed"
+                      />
+                      <span className="text-sm">No, bulk tracking only (no QR codes)</span>
+                    </label>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Individual stock tracking cannot be changed after product creation. Current setting: <strong>{selectedProduct.individualStockTracking ? "Individual tracking enabled" : "Bulk tracking enabled"}</strong>
                   </div>
                 </div>
 
+                {/* Length and Width Dropdowns */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-weight">Weight</Label>
-                    <Select
-                      value={selectedProduct.weight}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, weight: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select weight" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Weight)
-                        </SelectItem>
-                        {getFilteredWeights().map(weight => (
-                          <SelectItem key={weight} value={weight}>
-                            {weight}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="edit-length">Length *</Label>
+                    <p className="text-xs text-gray-500 mb-2">Required for SQM calculation</p>
+                    {selectedProduct.length && selectedProduct.width && selectedProduct.lengthUnit && selectedProduct.widthUnit && (
+                      <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded mb-2">
+                        📐 SQM: {calculateSQM(selectedProduct.length, selectedProduct.width, selectedProduct.lengthUnit, selectedProduct.widthUnit).toFixed(4)} m²
+                        <br />
+                        <span className="text-gray-600">
+                          {selectedProduct.length}{selectedProduct.lengthUnit} {getConversionDisplay(selectedProduct.length, selectedProduct.lengthUnit)} × {selectedProduct.width}{selectedProduct.widthUnit} {getConversionDisplay(selectedProduct.width, selectedProduct.widthUnit)}
+                        </span>
+                      </div>
+                    )}
+                    {showAddLength ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter length value (e.g., 5)"
+                            value={newLengthInput}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (/^\d*\.?\d*$/.test(value)) {
+                                setNewLengthInput(value);
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {/* Unit dropdown - select from existing units or add new */}
+                          <Select
+                            value={selectedProduct.lengthUnit || ""}
+                            onValueChange={(value) => {
+                              if (value === "add_new_unit") {
+                                setCurrentUnitType('length');
+                                setCurrentUnitPlaceholder("e.g., feet, m, cm, inch");
+                                setNewUnitNameInput("");
+                                setIsAddUnitDialogOpen(true);
+                              } else {
+                                setSelectedProduct({...selectedProduct, lengthUnit: value || ""});
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue placeholder="Select unit *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                                + Add New Unit
+                              </SelectItem>
+                              {lengthUnits.length > 0 ? (
+                                lengthUnits.map(unit => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="p-2 text-sm text-gray-500 text-center">
+                                  No units available
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={async () => {
+                            if (newLengthInput.trim() && selectedProduct.lengthUnit) {
+                              const combinedValue = `${newLengthInput.trim()} ${selectedProduct.lengthUnit.trim()}`;
+                              if (!lengthUnits.includes(selectedProduct.lengthUnit)) {
+                                await addNewUnitToDatabase('length', selectedProduct.lengthUnit);
+                                await loadDropdownOptions();
+                              }
+                              const result = await DropdownService.addOption('length', combinedValue);
+                              if (result.success) {
+                                await loadDropdownOptions();
+                                setSelectedProduct({
+                                  ...selectedProduct,
+                                  length: newLengthInput.trim(),
+                                  lengthUnit: selectedProduct.lengthUnit.trim()
+                                });
+                                setNewLengthInput("");
+                                setShowAddLength(false);
+                              }
+                            }
+                          }} disabled={!newLengthInput.trim() || !selectedProduct.lengthUnit}>
+                            Add {newLengthInput || "value"} {selectedProduct.lengthUnit || "unit"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setShowAddLength(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Select value={
+                          (() => {
+                            const combinedValue = selectedProduct.length && selectedProduct.lengthUnit 
+                              ? `${selectedProduct.length} ${selectedProduct.lengthUnit}`.trim()
+                              : selectedProduct.length || "";
+                            
+                            const exactMatch = getFilteredLengths().find(l => l === combinedValue);
+                            if (exactMatch) return exactMatch;
+                            
+                            if (selectedProduct.length && selectedProduct.lengthUnit) {
+                              const searchValue = `${selectedProduct.length} ${selectedProduct.lengthUnit}`.trim();
+                              const found = getFilteredLengths().find(l => {
+                                const parsed = parseValueWithUnit(l);
+                                return parsed.value === selectedProduct.length && parsed.unit === selectedProduct.lengthUnit;
+                              });
+                              return found || searchValue;
+                            }
+                            
+                            return combinedValue;
+                          })()
+                        } onValueChange={(value) => {
+                          if (value === "add_new") {
+                            setShowAddLength(true);
+                          } else if (value === "N/A") {
+                            setSelectedProduct({...selectedProduct, length: "", lengthUnit: ""});
+                            setLengthSearchTerm("");
+                          } else {
+                            const parsed = parseValueWithUnit(value);
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              length: parsed.value || value,
+                              lengthUnit: parsed.unit || ""
+                            });
+                            setLengthSearchTerm("");
+                          }
+                        }}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select length" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Search Input */}
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Search lengths..."
+                                value={lengthSearchTerm}
+                                onChange={(e) => setLengthSearchTerm(e.target.value)}
+                                className="h-8"
+                              />
+                            </div>
+                            
+                            {/* Add New Length Option - Always at top */}
+                            <SelectItem value="add_new" className="text-blue-600 font-medium">
+                              + Add New Length
+                            </SelectItem>
+                            
+                            <SelectItem value="N/A" className="text-gray-500 italic">
+                              N/A (No Length)
+                            </SelectItem>
+                            
+                            {/* Length Options - Show combined values with delete button */}
+                            {getFilteredLengths().map(length => {
+                              return (
+                                <div key={length} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                  <SelectItem value={length} className="flex-1 p-0 h-auto">
+                                    {length}
+                                  </SelectItem>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteLength(length);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                            
+                            {/* Show message if no lengths found */}
+                            {getFilteredLengths().length === 0 && (
+                              <div className="p-2 text-sm text-gray-500 text-center">
+                                No lengths found matching "{lengthSearchTerm}"
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="edit-thickness">Thickness</Label>
-                    <Select
-                      value={selectedProduct.thickness}
-                      onValueChange={(value) => setSelectedProduct({...selectedProduct, thickness: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select thickness" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="N/A" className="text-gray-500 italic">
-                          N/A (No Thickness)
-                        </SelectItem>
-                        {getFilteredThicknesses().map(thickness => (
-                          <SelectItem key={thickness} value={thickness}>
-                            {thickness}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="edit-width">Width *</Label>
+                    <p className="text-xs text-gray-500 mb-2">Required for SQM calculation</p>
+                    {showAddWidth ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter width value (e.g., 10)"
+                            value={newWidthInput}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (/^\d*\.?\d*$/.test(value)) {
+                                setNewWidthInput(value);
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {/* Unit dropdown - select from existing units or add new */}
+                          <Select
+                            value={selectedProduct.widthUnit || ""}
+                            onValueChange={(value) => {
+                              if (value === "add_new_unit") {
+                                setCurrentUnitType('width');
+                                setCurrentUnitPlaceholder("e.g., feet, m, cm, inch");
+                                setNewUnitNameInput("");
+                                setIsAddUnitDialogOpen(true);
+                              } else {
+                                setSelectedProduct({...selectedProduct, widthUnit: value || ""});
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue placeholder="Select unit *" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                                + Add New Unit
+                              </SelectItem>
+                              {widthUnits.length > 0 ? (
+                                widthUnits.map(unit => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <div className="p-2 text-sm text-gray-500 text-center">
+                                  No units available
+                                </div>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={async () => {
+                            if (newWidthInput.trim() && selectedProduct.widthUnit) {
+                              const combinedValue = `${newWidthInput.trim()} ${selectedProduct.widthUnit.trim()}`;
+                              if (!widthUnits.includes(selectedProduct.widthUnit)) {
+                                await addNewUnitToDatabase('width', selectedProduct.widthUnit);
+                                await loadDropdownOptions();
+                              }
+                              const result = await DropdownService.addOption('width', combinedValue);
+                              if (result.success) {
+                                await loadDropdownOptions();
+                                setSelectedProduct({
+                                  ...selectedProduct,
+                                  width: newWidthInput.trim(),
+                                  widthUnit: selectedProduct.widthUnit.trim()
+                                });
+                                setNewWidthInput("");
+                                setShowAddWidth(false);
+                              }
+                            }
+                          }} disabled={!newWidthInput.trim() || !selectedProduct.widthUnit}>
+                            Add {newWidthInput || "value"} {selectedProduct.widthUnit || "unit"}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setShowAddWidth(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Select value={
+                          (() => {
+                            const combinedValue = selectedProduct.width && selectedProduct.widthUnit 
+                              ? `${selectedProduct.width} ${selectedProduct.widthUnit}`.trim()
+                              : selectedProduct.width || "";
+                            
+                            const exactMatch = getFilteredWidths().find(w => w === combinedValue);
+                            if (exactMatch) return exactMatch;
+                            
+                            if (selectedProduct.width && selectedProduct.widthUnit) {
+                              const searchValue = `${selectedProduct.width} ${selectedProduct.widthUnit}`.trim();
+                              const found = getFilteredWidths().find(w => {
+                                const parsed = parseValueWithUnit(w);
+                                return parsed.value === selectedProduct.width && parsed.unit === selectedProduct.widthUnit;
+                              });
+                              return found || searchValue;
+                            }
+                            
+                            return combinedValue;
+                          })()
+                        } onValueChange={(value) => {
+                          if (value === "add_new") {
+                            setShowAddWidth(true);
+                          } else if (value === "N/A") {
+                            setSelectedProduct({...selectedProduct, width: "", widthUnit: ""});
+                            setWidthSearchTerm("");
+                          } else {
+                            const parsed = parseValueWithUnit(value);
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              width: parsed.value || value,
+                              widthUnit: parsed.unit || ""
+                            });
+                            setWidthSearchTerm("");
+                          }
+                        }}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select width" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {/* Search Input */}
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Search widths..."
+                                value={widthSearchTerm}
+                                onChange={(e) => setWidthSearchTerm(e.target.value)}
+                                className="h-8"
+                              />
+                            </div>
+
+                            {/* Add New Width Option - Always at top */}
+                            <SelectItem value="add_new" className="text-blue-600 font-medium">
+                              + Add New Width
+                            </SelectItem>
+                            
+                            <SelectItem value="N/A" className="text-gray-500 italic">
+                              N/A (No Width)
+                            </SelectItem>
+                            
+                            {/* Width Options - Show combined values with delete button */}
+                            {getFilteredWidths().map(width => {
+                              return (
+                                <div key={width} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                  <SelectItem value={width} className="flex-1 p-0 h-auto">
+                                    {width}
+                                  </SelectItem>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteWidth(width);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                            
+                            {/* Show message if no widths found */}
+                            {getFilteredWidths().length === 0 && (
+                              <div className="p-2 text-sm text-gray-500 text-center">
+                                No widths found matching "{widthSearchTerm}"
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-location">Location</Label>
-                    <Input
-                      id="edit-location"
-                      value=""
-                      onChange={() => {}} // Location is not used for main products
-                      placeholder="Location set during production"
-                      disabled
-                    />
-                  </div>
+                {/* Weight field - Full width */}
+                <div>
+                  <Label htmlFor="edit-weight">Weight *</Label>
+                  {showAddWeight ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter weight value (e.g., 3)"
+                          value={newWeightInput}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (/^\d*\.?\d*$/.test(value)) {
+                              setNewWeightInput(value);
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        {/* Unit dropdown - select from existing units or add new */}
+                        <Select
+                          value={selectedProduct.weightUnit || ""}
+                          onValueChange={(value) => {
+                            if (value === "add_new_unit") {
+                              setCurrentUnitType('weight');
+                              setCurrentUnitPlaceholder("e.g., GSM, kg, g, lb");
+                              setNewUnitNameInput("");
+                              setIsAddUnitDialogOpen(true);
+                            } else {
+                              setSelectedProduct({...selectedProduct, weightUnit: value || ""});
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue placeholder="Select unit *" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="add_new_unit" className="text-blue-600 font-medium">
+                              + Add New Unit
+                            </SelectItem>
+                            {weightUnits.length > 0 ? (
+                              weightUnits.map(unit => (
+                                <SelectItem key={unit} value={unit}>
+                                  {unit}
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <div className="p-2 text-sm text-gray-500 text-center">
+                                No units available
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={async () => {
+                          if (newWeightInput.trim() && selectedProduct.weightUnit) {
+                            const combinedValue = `${newWeightInput.trim()} ${selectedProduct.weightUnit.trim()}`;
+                            if (!weightUnits.includes(selectedProduct.weightUnit)) {
+                              await addNewUnitToDatabase('weight', selectedProduct.weightUnit);
+                              await loadDropdownOptions();
+                            }
+                            const result = await DropdownService.addOption('weight', combinedValue);
+                            if (result.success) {
+                              await loadDropdownOptions();
+                              setSelectedProduct({
+                                ...selectedProduct,
+                                weight: newWeightInput.trim(),
+                                weightUnit: selectedProduct.weightUnit
+                              });
+                              setNewWeightInput("");
+                              setShowAddWeight(false);
+                            }
+                          }
+                        }} disabled={!newWeightInput.trim() || !selectedProduct.weightUnit}>
+                          Add {newWeightInput || "value"} {selectedProduct.weightUnit || "unit"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setShowAddWeight(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedProduct.weight && selectedProduct.weightUnit ? `${selectedProduct.weight} ${selectedProduct.weightUnit}` : selectedProduct.weight || ""}
+                        onValueChange={(value) => {
+                          if (value === "add_new") {
+                            setShowAddWeight(true);
+                          } else if (value === "N/A") {
+                            setSelectedProduct({...selectedProduct, weight: "", weightUnit: ""});
+                            setWeightSearchTerm("");
+                          } else {
+                            const parsed = parseValueWithUnit(value);
+                            setSelectedProduct({
+                              ...selectedProduct,
+                              weight: parsed.value || value,
+                              weightUnit: parsed.unit || ""
+                            });
+                            setWeightSearchTerm("");
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select weight" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Search Input */}
+                          <div className="p-2 border-b">
+                            <Input
+                              placeholder="Search weights..."
+                              value={weightSearchTerm}
+                              onChange={(e) => setWeightSearchTerm(e.target.value)}
+                              className="h-8"
+                            />
+                          </div>
+
+                          {/* Add New Weight Option - Always at top */}
+                          <SelectItem value="add_new" className="text-blue-600 font-medium">
+                            + Add New Weight
+                          </SelectItem>
+
+                          <SelectItem value="N/A" className="text-gray-500 italic">
+                            N/A (No Weight)
+                          </SelectItem>
+
+                          {/* Weight Options - Show combined values (e.g., "600 GSM", "4 mm") */}
+                          {getFilteredWeights().map(weight => {
+                            return (
+                              <div key={weight} className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm">
+                                <SelectItem value={weight} className="flex-1 p-0 h-auto">
+                                  {weight}
+                                </SelectItem>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteWeight(weight);
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+
+                          {/* Show message if no weights found */}
+                          {getFilteredWeights().length === 0 && (
+                            <div className="p-2 text-sm text-gray-500 text-center">
+                              No weights found matching "{weightSearchTerm}"
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -3437,19 +5986,250 @@ export default function Products() {
                     id="edit-notes"
                     value={selectedProduct.notes}
                     onChange={(e) => setSelectedProduct({...selectedProduct, notes: e.target.value})}
-                    placeholder="Enter product notes"
-                    rows={3}
+                    placeholder="Additional notes about the product..."
+                    className="min-h-[60px]"
                   />
+                </div>
+
+                {/* Image Upload */}
+                <div>
+                  <Label>Product Image (Optional)</Label>
+                  <div className="mt-2">
+                    {(imageUrl || selectedProduct.imageUrl || imagePreview) ? (
+                      <div className="relative">
+                        <img 
+                          src={imageUrl || selectedProduct.imageUrl || imagePreview} 
+                          alt="Preview" 
+                          className="w-32 h-32 object-cover rounded-lg border"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={async () => {
+                            // Delete old image from R2 if it exists
+                            const oldImageUrl = imageUrl || selectedProduct.imageUrl;
+                            if (oldImageUrl && oldImageUrl.startsWith('http')) {
+                              await deleteImageFromR2(oldImageUrl);
+                            }
+                            setSelectedImage(null);
+                            setImagePreview("");
+                            setImageUrl("");
+                            setSelectedProduct({...selectedProduct, imageUrl: ''});
+                          }}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div 
+                        className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors cursor-pointer"
+                        onClick={() => document.getElementById('edit-product-image')?.click()}
+                      >
+                        <Image className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground mb-2">Click to upload product image</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            document.getElementById('edit-product-image')?.click();
+                          }}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Choose Image
+                        </Button>
+                        <input
+                          id="edit-product-image"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploadingImage}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Materials Section - Moved to Bottom */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <Label className="text-lg font-medium">Materials Used</Label>
+                    <div className="text-sm text-muted-foreground bg-blue-50 px-3 py-1 rounded-lg">
+                      💡 Materials added here will be saved as recipe for 1 SQM of this product
+                    </div>
+                  </div>
+                  
+                  {/* Recipe Creation - Optional */}
+                  <div className="mb-4">
+                    <Label className="text-sm font-medium">Recipe Creation (Optional)</Label>
+                    <p className="text-xs text-gray-500">You can add materials to create the recipe now, or add it later when editing the product</p>
+                  </div>
+                  
+                  {/* Add Material Form - Optional */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-materialSelect">Select Material or Product *</Label>
+                        <div className="space-y-2">
+                          {/* Current Selection Display */}
+                          {newMaterial.materialId ? (
+                            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div className="flex-1">
+                                <div className="font-medium text-blue-900">{newMaterial.materialName}</div>
+                                <div className="text-sm text-blue-700">
+                                  {rawMaterials.find(m => m.id === newMaterial.materialId) ? 'Raw Material' : 'Product'}
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setNewMaterial({
+                                  materialId: "",
+                                  materialName: "",
+                                  quantity: "",
+                                  unit: "",
+                                  cost: "",
+                                  selectedQuantity: 0
+                                })}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowMaterialSelector(true)}
+                              className="w-full h-12 border-dashed border-2 border-gray-300 hover:border-blue-400 hover:bg-blue-50"
+                            >
+                              <Search className="w-4 h-4 mr-2" />
+                              Click to search and select material or product
+                            </Button>
+                          )}
+                          
+                          {/* Add New Material Button */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate('/materials')}
+                            className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add New Material
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      {/* Quantity for Base Unit */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-materialQuantity">Quantity *</Label>
+                          <Input
+                            id="edit-materialQuantity"
+                            type="text"
+                            value={newMaterial.quantity}
+                            onChange={(e) => {
+                              // Allow only numbers, decimals, and leading zeros
+                              const value = e.target.value;
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                setNewMaterial({...newMaterial, quantity: value});
+                              }
+                            }}
+                            placeholder={newMaterial.materialId && availableProducts.some(p => p.id === newMaterial.materialId) ? "Auto-calculated for products" : "e.g., 0.5, 2.5, 0.2"}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            {newMaterial.materialId && availableProducts.some(p => p.id === newMaterial.materialId) 
+                              ? "Auto-calculated for products, or edit manually" 
+                              : "Quantity needed for 1 SQM of this product (supports decimals like 0.5kg, 0.2 pieces)"
+                            }
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-materialUnit">Unit *</Label>
+                          <Input
+                            id="edit-materialUnit"
+                            value={newMaterial.unit}
+                            onChange={(e) => setNewMaterial({...newMaterial, unit: e.target.value})}
+                            placeholder="e.g., kg, meters, pieces"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={addProductMaterial}
+                      className="w-full mt-4"
+                      disabled={!newMaterial.materialId || !newMaterial.quantity || !newMaterial.unit}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Material to Recipe
+                    </Button>
+                  </div>
+
+                  {/* Added Materials List */}
+                  {productMaterials.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Recipe Materials:</Label>
+                      {productMaterials.map((material, index) => (
+                        <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">{material.materialName}</div>
+                            <div className="text-sm text-gray-600">
+                              {material.quantity} {material.unit}
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeProductMaterial(index)}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No Recipe Message */}
+                  {productMaterials.length === 0 && (
+                    <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-gray-600" />
+                        <span className="text-sm text-gray-800 font-medium">No Recipe Set</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Add materials to create a recipe for this product.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditProductOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsEditProductOpen(false);
+                setProductMaterials([]);
+                setSelectedImage(null);
+                setImagePreview("");
+                setImageUrl("");
+              }}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveEditProduct}>
-                Update Product
+              <Button onClick={handleSaveEditProduct} disabled={uploadingImage}>
+                {uploadingImage ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Update Product'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -3484,7 +6264,16 @@ export default function Products() {
                 <div className="text-sm text-muted-foreground">
                   <p><strong>Product:</strong> {selectedQRProduct.name}</p>
                   <p><strong>Category:</strong> {selectedQRProduct.category}</p>
-                  <p><strong>Available Stock:</strong> {getAvailablePieces(selectedQRProduct.id)} {selectedQRProduct.unit}</p>
+                  <p><strong>Available Stock:</strong> {getAvailablePieces(selectedQRProduct.id)} Products</p>
+                  <p><strong>Total SQM:</strong> {(
+                    getAvailablePieces(selectedQRProduct.id) *
+                    calculateSQM(
+                      selectedQRProduct.length || '0',
+                      selectedQRProduct.width || '0',
+                      selectedQRProduct.lengthUnit || 'feet',
+                      selectedQRProduct.widthUnit || 'feet'
+                    )
+                  ).toFixed(4)} SQM</p>
                 </div>
                 
                 <QRCodeDisplay
@@ -3515,6 +6304,47 @@ export default function Products() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowQRCode(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add New Unit Dialog */}
+        <Dialog open={isAddUnitDialogOpen} onOpenChange={setIsAddUnitDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Add New Unit</DialogTitle>
+              <DialogDescription>
+                Enter a new {currentUnitType} unit. {currentUnitPlaceholder && `Examples: ${currentUnitPlaceholder}`}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="new-unit">Unit Name</Label>
+                <Input
+                  id="new-unit"
+                  placeholder={currentUnitPlaceholder}
+                  value={newUnitNameInput}
+                  onChange={(e) => setNewUnitNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddNewUnit();
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsAddUnitDialogOpen(false);
+                setNewUnitNameInput("");
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddNewUnit} disabled={!newUnitNameInput.trim()}>
+                Add Unit
               </Button>
             </DialogFooter>
           </DialogContent>

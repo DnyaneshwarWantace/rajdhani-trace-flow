@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { OrderService } from "@/services/orderService";
+import { MongoDBOrderService } from "@/services/api/orderService";
 import { CustomerService } from "@/services/customerService";
-import { ProductService } from "@/services/ProductService";
+import ProductService from "@/services/api/productService";
+import IndividualProductService from "@/services/api/individualProductService";
+import RawMaterialService from "@/services/api/rawMaterialService";
+import AuthService from "@/services/api/authService";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -47,6 +50,19 @@ interface Customer {
   email: string;
   phone: string;
   address: string;
+  // New address fields
+  permanentAddress?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+  deliveryAddress?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }
 
 interface Order {
@@ -77,6 +93,13 @@ interface Order {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  // Delivery address stored with each order
+  delivery_address?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }
 
 export default function OrderDetails() {
@@ -98,10 +121,9 @@ export default function OrderDetails() {
 
   // Get available individual products for a specific product
   const getAvailableIndividualProductsForProduct = (productId: string) => {
-    console.log('🔍 getAvailableIndividualProductsForProduct called with productId:', productId);
-    console.log('🔍 availableIndividualProducts:', availableIndividualProducts);
-    const filtered = availableIndividualProducts.filter(ip => ip.product_id === productId);
-    console.log('🔍 filtered individual products:', filtered);
+    const filtered = availableIndividualProducts.filter(ip => {
+      return ip.product_id === productId;
+    });
     return filtered;
   };
 
@@ -122,11 +144,11 @@ export default function OrderDetails() {
                 qrCode: individualProduct.qr_code,
                 productId: individualProduct.product_id,
                 productName: individualProduct.product_name,
-                manufacturingDate: individualProduct.production_date || individualProduct.completion_date || individualProduct.added_date,
-                dimensions: individualProduct.final_dimensions || individualProduct.dimensions,
+                manufacturingDate: individualProduct.completion_date || individualProduct.production_date || individualProduct.added_date,
+                dimensions: `${individualProduct.final_length || individualProduct.length} x ${individualProduct.final_width || individualProduct.width}`,
                 weight: individualProduct.final_weight || individualProduct.weight,
                 qualityGrade: individualProduct.quality_grade,
-                inspector: individualProduct.inspector,
+                inspector: individualProduct.inspector || 'N/A',
                 status: individualProduct.status,
                 location: individualProduct.location
               });
@@ -174,11 +196,11 @@ export default function OrderDetails() {
               qrCode: ip.qr_code,
               productId: ip.product_id,
               productName: ip.product_name,
-              manufacturingDate: ip.production_date || ip.completion_date || ip.added_date,
-              dimensions: ip.final_dimensions || ip.dimensions,
+              manufacturingDate: ip.completion_date || ip.production_date || ip.added_date,
+              dimensions: `${ip.final_length || ip.length} x ${ip.final_width || ip.width}`,
               weight: ip.final_weight || ip.weight,
               qualityGrade: ip.quality_grade,
-              inspector: ip.inspector,
+              inspector: ip.inspector || 'N/A',
               status: ip.status,
               location: ip.location
             }))
@@ -205,44 +227,41 @@ export default function OrderDetails() {
     if (!order || !currentSelectingItem) return;
 
     try {
-      const selectedProductIds = currentSelectingItem.selectedIndividualProducts?.map(p => p.id) || [];
+      const selectedProducts = currentSelectingItem.selectedIndividualProducts || [];
+      
+      // Transform the selected products to match the backend expected format
+      const selectedIndividualProducts = selectedProducts.map(product => ({
+        individual_product_id: product.id,
+        qr_code: product.qrCode,
+        serial_number: product.serialNumber || product.id
+      }));
 
-      console.log('🔍 Saving individual product selections:', {
-        orderId: order.id,
-        itemId: currentSelectingItem.id,
-        selectedProductIds,
-        selectedCount: selectedProductIds.length,
-        requiredQuantity: currentSelectingItem.quantity
+      // Use the correct API endpoint for updating individual product selections
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const token = AuthService.getToken(); // Use AuthService instead of direct localStorage
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "Authentication required. Please log in again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      const response = await fetch(`${API_BASE_URL}/orders/items/${currentSelectingItem.id}/individual-products`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          selected_individual_products: selectedIndividualProducts
+        })
       });
 
-      // Update the order item with selected individual products using OrderService
-      console.log('🔍 About to call OrderService.updateOrder with:', {
-        orderId: order.id,
-        updateData: {
-          items: [{
-            id: currentSelectingItem.id,
-            quantity: currentSelectingItem.quantity,
-            unit_price: currentSelectingItem.unitPrice,
-            total_price: currentSelectingItem.totalPrice,
-            selected_individual_products: selectedProductIds
-          }]
-        }
-      });
+      const result = await response.json();
 
-      const { data: updateResult, error } = await OrderService.updateOrder(order.id, {
-        items: [{
-          id: currentSelectingItem.id,
-          quantity: currentSelectingItem.quantity,
-          unit_price: currentSelectingItem.unitPrice,
-          total_price: currentSelectingItem.totalPrice,
-          selected_individual_products: selectedProductIds
-        }]
-      });
-
-      console.log('🔍 OrderService.updateOrder result:', { updateResult, error });
-
-      if (error) {
-        console.error('Error updating order with individual product selections:', error);
+      if (!response.ok || !result.success) {
+        console.error('Error updating individual product selections:', result.error);
         toast({
           title: "Error",
           description: "Failed to save individual product selections.",
@@ -251,46 +270,102 @@ export default function OrderDetails() {
         return;
       }
 
-      console.log('✅ Order updated successfully with individual product selections');
-
-      // Check if all order items have their required individual products selected
-      const allItemsReady = order.items.every(item => {
-        if (item.id === currentSelectingItem.id) {
-          // For the current item, check the new selection count
-          return selectedProductIds.length >= item.quantity;
-        } else {
-          // For other items, check existing selections
-          return (item.selectedIndividualProducts?.length || 0) >= item.quantity;
-        }
-      });
-
-      console.log('🔍 All items ready for dispatch:', allItemsReady);
-
-      // If all items have their individual products selected, update order workflow
-      if (allItemsReady) {
-        console.log('🔍 All items ready, updating order status to dispatch workflow step');
-        const { error: statusError } = await OrderService.updateOrder(order.id, {
-          workflow_step: 'dispatch',
-          status: 'accepted' // Keep as accepted but ready for dispatch
-        });
-
-        if (statusError) {
-          console.error('Error updating order workflow step:', statusError);
-        } else {
-          console.log('✅ Order workflow step updated to dispatch');
-        }
-      }
-
       toast({
         title: "Success",
-        description: `Selected ${selectedProductIds.length} individual products for ${currentSelectingItem.productName}.`,
+        description: `Selected ${selectedProducts.length} individual products for ${currentSelectingItem.productName}.`,
       });
 
       setShowIndividualProductSelection(false);
       setCurrentSelectingItem(null);
 
-      // Reload order data to get updated individual product selections and workflow step
-      window.location.reload();
+      // Reload order data to get updated individual product selections
+      const { data: updatedOrderData, error: reloadError } = await MongoDBOrderService.getOrderById(order.id);
+      if (!reloadError && updatedOrderData) {
+        const orderInfo = (updatedOrderData as any).order || updatedOrderData;
+        const orderItems = (updatedOrderData as any).items || [];
+        
+        const transformedOrder: Order = {
+          id: orderInfo.id,
+          orderNumber: orderInfo.order_number,
+          customerId: orderInfo.customer_id,
+          customerName: orderInfo.customer_name,
+          customerEmail: orderInfo.customer_email,
+          customerPhone: orderInfo.customer_phone,
+          orderDate: orderInfo.order_date,
+          expectedDelivery: orderInfo.expected_delivery,
+          items: orderItems.map((item: any) => ({
+            id: item.id,
+            productId: item.product_id,
+            productName: item.product_name,
+            productType: item.product_type || 'product',
+            quantity: item.quantity,
+            unitPrice: parseFloat(item.unit_price),
+            totalPrice: parseFloat(item.total_price),
+            availableStock: 0,
+            unit: item.product_type === 'raw_material' ? 'kg' : 'pieces', // Use correct unit based on product type
+            selectedIndividualProducts: (item.selected_individual_products || []).map((ip: any) => ({
+              id: ip.individual_product_id,
+              qrCode: ip.qr_code,
+              productId: ip.product_id || item.product_id,
+              productName: ip.product_name || item.product_name,
+              manufacturingDate: ip.completion_date || ip.production_date || ip.added_date,
+              dimensions: `${ip.final_length || ip.length || 'N/A'} x ${ip.final_width || ip.width || 'N/A'}`,
+              weight: ip.final_weight || ip.weight || 'N/A',
+              qualityGrade: ip.quality_grade || 'N/A',
+              inspector: ip.inspector || 'N/A',
+              status: ip.status || 'available',
+              location: ip.location || 'N/A'
+            }))
+          })),
+          subtotal: parseFloat(orderInfo.subtotal),
+          gstRate: parseFloat(orderInfo.gst_rate),
+          gstAmount: parseFloat(orderInfo.gst_amount),
+          discountAmount: parseFloat(orderInfo.discount_amount),
+          totalAmount: parseFloat(orderInfo.total_amount),
+          paidAmount: parseFloat(orderInfo.paid_amount),
+          outstandingAmount: parseFloat(orderInfo.outstanding_amount),
+          paymentMethod: (orderInfo.payment_method || "credit") as "cash" | "card" | "bank-transfer" | "credit",
+          paymentTerms: orderInfo.payment_terms || "30 days",
+          dueDate: orderInfo.expected_delivery,
+          status: orderInfo.status as "pending" | "accepted" | "dispatched" | "delivered" | "cancelled",
+          workflowStep: (orderInfo.workflow_step || "accept") as "accept" | "dispatch" | "delivered",
+          acceptedAt: orderInfo.accepted_at,
+          dispatchedAt: orderInfo.dispatched_at,
+          deliveredAt: orderInfo.delivered_at,
+          notes: orderInfo.special_instructions || "",
+          createdAt: orderInfo.created_at,
+          updatedAt: orderInfo.updated_at,
+          delivery_address: orderInfo.delivery_address ? JSON.parse(orderInfo.delivery_address) : undefined
+        };
+        
+        // Enhance selected individual products with full details
+        const enhancedOrder = {
+          ...transformedOrder,
+          items: transformedOrder.items.map(item => ({
+            ...item,
+            selectedIndividualProducts: item.selectedIndividualProducts.map(selectedIP => {
+              // Find the full individual product details from the available products
+              const fullIPDetails = availableIndividualProducts?.find(ip => ip.id === selectedIP.id);
+              if (fullIPDetails) {
+                return {
+                  ...selectedIP,
+                  qrCode: fullIPDetails.qr_code,
+                  weight: fullIPDetails.final_weight || fullIPDetails.weight,
+                  manufacturingDate: fullIPDetails.completion_date || fullIPDetails.production_date || fullIPDetails.created_at,
+                  qualityGrade: fullIPDetails.quality_grade,
+                  inspector: fullIPDetails.inspector,
+                  dimensions: `${fullIPDetails.final_length || fullIPDetails.length} x ${fullIPDetails.final_width || fullIPDetails.width}`,
+                  location: fullIPDetails.location
+                };
+              }
+              return selectedIP;
+            })
+          }))
+        };
+        
+        setOrder(enhancedOrder);
+        setEditingOrder(enhancedOrder);
+      }
     } catch (error) {
       console.error('Error saving individual product selections:', error);
       toast({
@@ -305,7 +380,7 @@ export default function OrderDetails() {
     const loadOrderData = async () => {
       try {
         // Load order from Supabase
-        const { data: orderData, error: orderError } = await OrderService.getOrderById(orderId);
+        const { data: orderData, error: orderError } = await MongoDBOrderService.getOrderById(orderId);
         
         if (orderError || !orderData) {
       toast({
@@ -317,45 +392,62 @@ export default function OrderDetails() {
           return;
         }
 
-        // Transform Supabase order to match local interface
+        // Transform MongoDB order to match local interface
+        const orderInfo = (orderData as any).order || orderData; // Handle both response formats
+        const orderItems = (orderData as any).items || []; // Get items from response
+        
         const transformedOrder: Order = {
-          id: orderData.id,
-          orderNumber: orderData.order_number,
-          customerId: orderData.customer_id,
-          customerName: orderData.customer_name,
-          customerEmail: orderData.customer_email,
-          customerPhone: orderData.customer_phone,
-          orderDate: orderData.order_date,
-          expectedDelivery: orderData.expected_delivery,
-          items: (orderData.order_items || []).map((item: any) => ({
+          id: orderInfo.id,
+          orderNumber: orderInfo.order_number,
+          customerId: orderInfo.customer_id,
+          customerName: orderInfo.customer_name,
+          customerEmail: orderInfo.customer_email,
+          customerPhone: orderInfo.customer_phone,
+          orderDate: orderInfo.order_date,
+          expectedDelivery: orderInfo.expected_delivery,
+          items: (orderItems || []).map((item: any) => ({
             id: item.id,
             productId: item.product_id,
             productName: item.product_name,
             productType: item.product_type || 'product',
             quantity: item.quantity,
-            unitPrice: item.unit_price,
-            totalPrice: item.total_price,
+            unitPrice: parseFloat(item.unit_price),
+            totalPrice: parseFloat(item.total_price),
             availableStock: 0, // Will be populated from products
-            selectedIndividualProducts: []
+            unit: item.product_type === 'raw_material' ? 'kg' : 'pieces', // Use correct unit based on product type // Add missing unit property
+            selectedIndividualProducts: (item.selected_individual_products || []).map((ip: any) => ({
+              id: ip.individual_product_id,
+              qrCode: ip.qr_code,
+              productId: ip.product_id || item.product_id,
+              productName: ip.product_name || item.product_name,
+              manufacturingDate: ip.completion_date || ip.production_date || ip.added_date,
+              dimensions: `${ip.final_length || ip.length || 'N/A'} x ${ip.final_width || ip.width || 'N/A'}`,
+              weight: ip.final_weight || ip.weight || 'N/A',
+              qualityGrade: ip.quality_grade || 'N/A',
+              inspector: ip.inspector || 'N/A',
+              status: ip.status || 'available',
+              location: ip.location || 'N/A'
+            }))
           })),
-          subtotal: orderData.subtotal,
-          gstRate: orderData.gst_rate,
-          gstAmount: orderData.gst_amount,
-          discountAmount: orderData.discount_amount,
-          totalAmount: orderData.total_amount,
-          paidAmount: orderData.paid_amount,
-          outstandingAmount: orderData.outstanding_amount,
-          paymentMethod: "credit" as const,
-          paymentTerms: "30 days",
-          dueDate: orderData.expected_delivery,
-          status: orderData.status,
-          workflowStep: orderData.workflow_step || "accept",
-          acceptedAt: orderData.accepted_at,
-          dispatchedAt: orderData.dispatched_at,
-          deliveredAt: orderData.delivered_at,
-          notes: orderData.special_instructions || "",
-          createdAt: orderData.created_at,
-          updatedAt: orderData.updated_at
+          subtotal: parseFloat(orderInfo.subtotal),
+          gstRate: parseFloat(orderInfo.gst_rate),
+          gstAmount: parseFloat(orderInfo.gst_amount),
+          discountAmount: parseFloat(orderInfo.discount_amount),
+          totalAmount: parseFloat(orderInfo.total_amount),
+          paidAmount: parseFloat(orderInfo.paid_amount),
+          outstandingAmount: parseFloat(orderInfo.outstanding_amount),
+          paymentMethod: (orderInfo.payment_method || "credit") as "cash" | "card" | "bank-transfer" | "credit",
+          paymentTerms: orderInfo.payment_terms || "30 days",
+          dueDate: orderInfo.expected_delivery,
+          status: orderInfo.status as "pending" | "accepted" | "dispatched" | "delivered" | "cancelled",
+          workflowStep: (orderInfo.workflow_step || "accept") as "accept" | "dispatch" | "delivered",
+          acceptedAt: orderInfo.accepted_at,
+          dispatchedAt: orderInfo.dispatched_at,
+          deliveredAt: orderInfo.delivered_at,
+          notes: orderInfo.special_instructions || "",
+          createdAt: orderInfo.created_at,
+          updatedAt: orderInfo.updated_at,
+          delivery_address: orderInfo.delivery_address ? JSON.parse(orderInfo.delivery_address) : undefined
         };
 
         setOrder(transformedOrder);
@@ -365,45 +457,22 @@ export default function OrderDetails() {
         const { data: productsData } = await ProductService.getProducts();
         setProducts(productsData || []);
 
-        // Load individual products for this order
-        const { data: individualProductsData, error: individualProductsError } = await supabase
-          .from('individual_products')
-          .select('*')
-          .eq('order_id', orderData.id);
+        // Individual products are already included in order items via selected_individual_products field
 
-        console.log('🔍 Individual products for order:', individualProductsData);
-        console.log('🔍 Individual products error:', individualProductsError);
-        console.log('🔍 Order ID being searched:', orderData.id);
-
-        // Update order items with individual products and unit information
+        // Update order items with unit information
         const updatedOrder = {
           ...transformedOrder,
           items: transformedOrder.items.map(item => {
-            const itemIndividualProducts = (individualProductsData || []).filter(ip =>
-              ip.product_id === item.productId
-            );
-            console.log(`🔍 Individual products for item ${item.productName}:`, itemIndividualProducts);
+            // Individual products are already included in the order items via selected_individual_products field
 
             // Find product unit information
             const productData = (productsData || []).find(p => p.id === item.productId);
-            const productUnit = productData?.unit || 'pieces';
+            const productUnit = productData?.unit || (item.productType === 'raw_material' ? 'kg' : 'pieces');
 
             return {
               ...item,
               unit: productUnit, // Add unit information from product data
-              selectedIndividualProducts: itemIndividualProducts.map(ip => ({
-                id: ip.id,
-                qrCode: ip.qr_code,
-                productId: ip.product_id,
-                productName: ip.product_name,
-                manufacturingDate: ip.production_date || ip.completion_date || ip.added_date,
-                dimensions: ip.final_dimensions || ip.dimensions,
-                weight: ip.final_weight || ip.weight,
-                qualityGrade: ip.quality_grade,
-                inspector: ip.inspector,
-                status: ip.status,
-                location: ip.location
-              }))
+              selectedIndividualProducts: item.selectedIndividualProducts || [] // Individual products are already in the order item
             };
           })
         };
@@ -412,13 +481,67 @@ export default function OrderDetails() {
         setEditingOrder(updatedOrder);
 
         // Load all available individual products for selection
-        const { data: allIndividualProducts } = await supabase
-          .from('individual_products')
-          .select('*')
-          .eq('status', 'available');
-        
-        console.log('🔍 All available individual products:', allIndividualProducts);
+        const { data: allIndividualProducts, error: individualProductsError } = await IndividualProductService.getAllAvailableIndividualProducts();
         setAvailableIndividualProducts(allIndividualProducts || []);
+
+        // Now update the order with available stock calculation
+        const finalUpdatedOrder = {
+          ...updatedOrder,
+          items: updatedOrder.items.map(item => {
+            const productData = (productsData || []).find(p => p.id === item.productId);
+            
+            // Calculate available stock (following Supabase logic)
+            let availableStock = 0;
+            if (productData) {
+              // Check if there are individual products for this product
+              const productIndividualProducts = (allIndividualProducts || []).filter(ip => ip.product_id === item.productId);
+              
+              if (productIndividualProducts.length > 0) {
+                // If individual products exist, count only available ones (regardless of tracking setting)
+                availableStock = productIndividualProducts.filter(ip => ip.status === 'available').length;
+              } else {
+                // If no individual products exist, use base_quantity
+                availableStock = productData.base_quantity || 0;
+              }
+            }
+
+            return {
+              ...item,
+              availableStock: availableStock
+            };
+          })
+        };
+        
+        setOrder(finalUpdatedOrder);
+        setEditingOrder(finalUpdatedOrder);
+
+        // Enhance selected individual products with full details
+        const enhancedOrder = {
+          ...transformedOrder,
+          items: transformedOrder.items.map(item => ({
+            ...item,
+            selectedIndividualProducts: item.selectedIndividualProducts.map(selectedIP => {
+              // Find the full individual product details from the loaded data
+              const fullIPDetails = allIndividualProducts?.find(ip => ip.id === selectedIP.id);
+              if (fullIPDetails) {
+                return {
+                  ...selectedIP,
+                  qrCode: fullIPDetails.qr_code,
+                  weight: fullIPDetails.final_weight || fullIPDetails.weight,
+                  manufacturingDate: fullIPDetails.completion_date || fullIPDetails.production_date || fullIPDetails.created_at,
+                  qualityGrade: fullIPDetails.quality_grade,
+                  inspector: fullIPDetails.inspector,
+                  dimensions: `${fullIPDetails.final_length || fullIPDetails.length} x ${fullIPDetails.final_width || fullIPDetails.width}`,
+                  location: fullIPDetails.location
+                };
+              }
+              return selectedIP;
+            })
+          }))
+        };
+        
+        setOrder(enhancedOrder);
+        setEditingOrder(enhancedOrder);
 
     setLoading(false);
       } catch (error) {
@@ -461,7 +584,7 @@ export default function OrderDetails() {
       }
 
       // Update order in Supabase
-      const { error } = await OrderService.updateOrder(orderId!, {
+      const { error } = await MongoDBOrderService.updateOrder(orderId!, {
         paid_amount: editingOrder.paidAmount,
         total_amount: totalAmount,
         outstanding_amount: outstandingAmount,
@@ -523,7 +646,7 @@ export default function OrderDetails() {
       unitPrice: 0,
       totalPrice: 0,
       availableStock: 0,
-      unit: 'pieces',
+      unit: 'pieces', // Default unit, will be updated when product is selected
             selectedIndividualProducts: []
     };
 
@@ -562,8 +685,33 @@ export default function OrderDetails() {
           if (product) {
             updatedItem.productName = product.name;
             updatedItem.unitPrice = product.sellingPrice || product.price || 0;
-            updatedItem.availableStock = product.stock || product.quantity || 0;
-            updatedItem.unit = product.unit || 'pieces';
+            
+            // Calculate available stock (following Supabase logic)
+            if (product.individual_stock_tracking !== false) {
+              // Check if there are individual products for this product
+              const productIndividualProducts = availableIndividualProducts.filter(ip => ip.product_id === value);
+              
+              if (productIndividualProducts.length > 0) {
+                // If individual products exist, count only available ones
+                updatedItem.availableStock = productIndividualProducts.filter(ip => ip.status === 'available').length;
+              } else {
+                // If no individual products exist, use base_quantity
+                updatedItem.availableStock = product.base_quantity || 0;
+              }
+            } else {
+              // For bulk products, check if there are individual products
+              const productIndividualProducts = availableIndividualProducts.filter(ip => ip.product_id === value);
+              
+              if (productIndividualProducts.length > 0) {
+                // If individual products exist, count only available ones
+                updatedItem.availableStock = productIndividualProducts.filter(ip => ip.status === 'available').length;
+              } else {
+                // If no individual products exist, use base_quantity
+                updatedItem.availableStock = product.base_quantity || 0;
+              }
+            }
+            
+            updatedItem.unit = product.unit || (item.productType === 'raw_material' ? 'kg' : 'pieces');
             updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice;
           }
         }
@@ -632,7 +780,7 @@ export default function OrderDetails() {
 
     try {
       // Update payment in Supabase
-      const { error } = await OrderService.updateOrder(orderId!, {
+      const { error } = await MongoDBOrderService.updateOrder(orderId!, {
         paid_amount: editingOrder.paidAmount
       });
 
@@ -667,8 +815,25 @@ export default function OrderDetails() {
     if (!order) return;
 
     try {
+      // Approve order directly
+      await approveOrderDirectly();
+    } catch (error) {
+      console.error('Error approving order:', error);
+      toast({
+        title: "❌ Approval Failed",
+        description: "Failed to approve order. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Direct order approval (called after recipe review)
+  const approveOrderDirectly = async () => {
+    if (!order) return;
+
+    try {
       // Approve order using OrderService
-      const { error } = await OrderService.updateOrder(order.id, {
+      const { error } = await MongoDBOrderService.updateOrder(order.id, {
         status: 'accepted'
       });
       
@@ -696,6 +861,7 @@ export default function OrderDetails() {
         title: "✅ Order Approved",
         description: "Order has been approved and is ready for processing.",
       });
+
     } catch (error) {
       console.error('Error approving order:', error);
       toast({
@@ -717,14 +883,15 @@ export default function OrderDetails() {
       if (rawMaterialItems.length > 0) {
         // Check stock for each raw material item
         for (const item of rawMaterialItems) {
-          const { data: rawMaterials } = await supabase
-            .from('raw_materials')
-            .select('*')
-            .eq('name', item.productName)
-            .order('created_at', { ascending: false });
+          const { data: rawMaterials, error: rawMaterialsError } = await RawMaterialService.getRawMaterials();
+          
+          if (rawMaterialsError) {
+            console.error('Error fetching raw materials:', rawMaterialsError);
+            continue;
+          }
 
-          if (rawMaterials && rawMaterials.length > 0) {
-            const material = rawMaterials[0];
+          const material = rawMaterials?.find(rm => rm.name === item.productName);
+          if (material) {
             const currentStock = material.current_stock || 0;
             const minThreshold = material.min_threshold || 10;
             
@@ -749,9 +916,8 @@ export default function OrderDetails() {
       }
 
       // Dispatch order using OrderService
-      const { error } = await OrderService.updateOrder(order.id, {
-        status: 'dispatched',
-        workflow_step: 'dispatched'
+      const { error } = await MongoDBOrderService.updateOrder(order.id, {
+        status: 'dispatched'
       });
 
       if (error) {
@@ -794,7 +960,7 @@ export default function OrderDetails() {
 
     try {
       // Deliver order using OrderService
-      const { success, error } = await OrderService.deliverOrder(order.id);
+      const { success, error } = await MongoDBOrderService.deliverOrder(order.id);
 
       if (error) {
       toast({
@@ -889,10 +1055,15 @@ export default function OrderDetails() {
   const canModifyItems = order.status === 'accepted'; // Only accepted orders can modify items
   const canModifyPricing = order.status === 'accepted' || (order.status === 'delivered' && (order.outstandingAmount || 0) > 0); // Both can modify pricing, but delivered only if outstanding
 
-  // Check if order is ready for dispatch (all items have selected individual products)
+  // Check if order is ready for dispatch (all items have selected individual products OR are raw materials)
   const isReadyForDispatch = () => {
     if (order.status !== 'accepted') return false;
     return order.items.every(item => {
+      // Raw materials don't need individual product selection
+      if (item.productType === 'raw_material') {
+        return true;
+      }
+      // Products need individual product selection
       const selectedCount = item.selectedIndividualProducts?.length || 0;
       return selectedCount >= item.quantity;
     });
@@ -1071,7 +1242,7 @@ export default function OrderDetails() {
               )}
               
               <div className={`${order.status === 'delivered' ? 'space-y-2' : 'space-y-4'}`}>
-                {currentOrder?.items.map((item, index) => (
+                {currentOrder?.items?.map((item, index) => (
                   <div key={item.id} className={`border rounded-lg ${
                     order.status === 'delivered' ? 'p-3' : 'p-4'
                   } ${
@@ -1106,18 +1277,31 @@ export default function OrderDetails() {
                             <div>
                               <Label>Quantity</Label>
                               <Input
-                                type="number"
+                                type="text"
                                 value={item.quantity}
-                                onChange={(e) => handleUpdateItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                                min="1"
+                                onChange={(e) => {
+                                  // Allow only numbers and leading zeros
+                                  const value = e.target.value;
+                                  if (value === '' || /^\d+$/.test(value)) {
+                                    handleUpdateItem(item.id, 'quantity', parseInt(value) || 0);
+                                  }
+                                }}
+                                placeholder="1"
                               />
                             </div>
                             <div>
                               <Label>Unit Price</Label>
                               <Input
-                                type="number"
+                                type="text"
                                 value={item.unitPrice}
-                                onChange={(e) => handleUpdateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                onChange={(e) => {
+                                  // Allow only numbers, decimals, and leading zeros
+                                  const value = e.target.value;
+                                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                    handleUpdateItem(item.id, 'unitPrice', parseFloat(value) || 0);
+                                  }
+                                }}
+                                placeholder="0"
                               />
                             </div>
                             <div>
@@ -1158,16 +1342,10 @@ export default function OrderDetails() {
                                   Quantity: {item.quantity} {item.unit} • Unit Price: ₹{item.unitPrice.toLocaleString()}
                                 </div>
 
-                                {/* Individual Products Display */}
-                                {(() => {
+                                {/* Individual Products Display - Only for products, not raw materials */}
+                                {item.productType !== 'raw_material' && (() => {
                                   const selectedCount = item.selectedIndividualProducts?.length || 0;
                                   const requiredCount = item.quantity;
-                                  
-                                  console.log(`🔍 Displaying individual products for ${item.productName}:`, {
-                                    selectedCount,
-                                    requiredCount,
-                                    selectedIndividualProducts: item.selectedIndividualProducts
-                                  });
                                   
                                   if (selectedCount > 0) {
                                     return (
@@ -1238,8 +1416,6 @@ export default function OrderDetails() {
                                     );
                                   } else {
                                     const availableProducts = getAvailableIndividualProductsForProduct(item.productId);
-                                    console.log(`🔍 Available products for ${item.productName}:`, availableProducts);
-                                    console.log(`🔍 Order status: ${order.status}, availableProducts.length: ${availableProducts.length}`);
                                     
                                     return (
                                       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
@@ -1301,12 +1477,11 @@ export default function OrderDetails() {
                                           </div>
                                         )}
                                         
-                                        {order.status === 'accepted' && availableProducts.length > 0 && (
+                                        {order.status === 'accepted' && availableProducts.length > 0 && (item.productType as string) !== 'raw_material' && (
                                           <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() => {
-                                              console.log('🔍 Individual product selection button clicked');
                                               setCurrentSelectingItem(item);
                                               setShowIndividualProductSelection(true);
                                             }}
@@ -1317,7 +1492,7 @@ export default function OrderDetails() {
                                           </Button>
                                         )}
                                         
-                                        {order.status === 'accepted' && availableProducts.length === 0 && (
+                                        {order.status === 'accepted' && availableProducts.length === 0 && (item.productType as string) !== 'raw_material' && (
                                           <div className="text-xs text-gray-500 text-center p-2 bg-gray-50 rounded">
                                             No individual products available for selection
                                           </div>
@@ -1394,23 +1569,34 @@ export default function OrderDetails() {
                                     <Label htmlFor={`unitPrice-${item.id}`}>Unit Price (₹)</Label>
                                     <Input
                                       id={`unitPrice-${item.id}`}
-                                      type="number"
+                                      type="text"
                                       value={item.unitPrice}
-                                      onChange={(e) => handleItemChange(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                                      onChange={(e) => {
+                                        // Allow only numbers, decimals, and leading zeros
+                                        const value = e.target.value;
+                                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                          handleItemChange(item.id, 'unitPrice', parseFloat(value) || 0);
+                                        }
+                                      }}
                                       className="w-full"
-                                      min="0"
-                                      step="0.01"
+                                      placeholder="0"
                                     />
                                   </div>
                                   <div>
                                     <Label htmlFor={`quantity-${item.id}`}>Quantity</Label>
                                     <Input
                                       id={`quantity-${item.id}`}
-                                      type="number"
+                                      type="text"
                                       value={item.quantity}
-                                      onChange={(e) => handleItemChange(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                                      onChange={(e) => {
+                                        // Allow only numbers and leading zeros
+                                        const value = e.target.value;
+                                        if (value === '' || /^\d+$/.test(value)) {
+                                          handleItemChange(item.id, 'quantity', parseInt(value) || 1);
+                                        }
+                                      }}
                                       className="w-full"
-                                      min="1"
+                                      placeholder="1"
                                       disabled // Don't allow quantity changes for delivered orders
                                     />
                                   </div>
@@ -1662,6 +1848,30 @@ export default function OrderDetails() {
                   <Calendar className="w-3 h-3" />
                   Expected Delivery: {order.expectedDelivery ? new Date(order.expectedDelivery).toLocaleDateString() : 'N/A'}
                 </div>
+                
+                {/* Delivery Address Information */}
+                <div className="mt-4 pt-3 border-t">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Delivery Address
+                  </h4>
+                  {order.delivery_address ? (
+                    <div className="text-sm text-gray-700">
+                      <div className="font-medium">{order.delivery_address.address}</div>
+                      <div className="text-muted-foreground">
+                        {order.delivery_address.city}, {order.delivery_address.state} - {order.delivery_address.pincode}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">✓ Address stored with this order</div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-700">
+                      <div className="font-medium text-orange-600">No delivery address stored</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        This order was created before delivery address tracking was implemented
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1711,11 +1921,15 @@ export default function OrderDetails() {
                 {isEditingPayment ? (
                   <div className="space-y-2">
                     <Input
-                      type="number"
+                      type="text"
                       value={editingOrder?.paidAmount || 0}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
-                        handleUpdatePayment(value);
+                        // Allow only numbers, decimals, and leading zeros
+                        const value = e.target.value;
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = parseFloat(value) || 0;
+                          handleUpdatePayment(numValue);
+                        }
                       }}
                       className="text-green-600 font-semibold"
                       placeholder="Enter paid amount"
@@ -1753,15 +1967,19 @@ export default function OrderDetails() {
                 {order.status === 'delivered' && isEditing ? (
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
+                      type="text"
                       value={editingOrder?.outstandingAmount || 0}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
-                        setEditingOrder({
-                          ...editingOrder!,
-                          outstandingAmount: value,
-                          paidAmount: (editingOrder?.totalAmount || 0) - value
-                        });
+                        // Allow only numbers, decimals, and leading zeros
+                        const value = e.target.value;
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = parseFloat(value) || 0;
+                          setEditingOrder({
+                            ...editingOrder!,
+                            outstandingAmount: numValue,
+                            paidAmount: (editingOrder?.totalAmount || 0) - numValue
+                          });
+                        }
                       }}
                       className="w-32 text-right font-semibold"
                       min="0"
@@ -1782,16 +2000,20 @@ export default function OrderDetails() {
                   <span className="text-muted-foreground">Total Amount:</span>
                   <div className="flex items-center gap-2">
                     <Input
-                      type="number"
+                      type="text"
                       value={editingOrder?.totalAmount || 0}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value) || 0;
-                        const currentPaid = editingOrder?.paidAmount || 0;
-                        setEditingOrder({
-                          ...editingOrder!,
-                          totalAmount: value,
-                          outstandingAmount: value - currentPaid
-                        });
+                        // Allow only numbers, decimals, and leading zeros
+                        const value = e.target.value;
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          const numValue = parseFloat(value) || 0;
+                          const currentPaid = editingOrder?.paidAmount || 0;
+                          setEditingOrder({
+                            ...editingOrder!,
+                            totalAmount: numValue,
+                            outstandingAmount: numValue - currentPaid
+                          });
+                        }
                       }}
                       className="w-32 text-right font-semibold"
                       min="0"
@@ -2141,6 +2363,7 @@ export default function OrderDetails() {
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

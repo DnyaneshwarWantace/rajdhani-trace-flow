@@ -1,5 +1,17 @@
 import { supabase, supabaseAdmin, handleSupabaseError } from '@/lib/supabase';
 import { IDGenerator } from '@/lib/idGenerator';
+import AuthService from './api/authService';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Helper function to get headers with auth token
+const getHeaders = () => {
+  const token = AuthService.getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+};
 
 export interface WasteItem {
   id: string;
@@ -7,12 +19,12 @@ export interface WasteItem {
   material_name: string;
   quantity: number;
   unit: string;
-  waste_type: 'scrap' | 'defective' | 'excess';
+  waste_type: string;
   can_be_reused: boolean;
   production_batch_id?: string;
   production_product_id?: string;
   notes?: string;
-  status: 'available_for_reuse' | 'added_to_inventory' | 'disposed';
+  status: 'available_for_reuse' | 'added_to_inventory' | 'disposed' | 'reused';
   created_at: string;
   updated_at: string;
 }
@@ -22,7 +34,7 @@ export interface CreateWasteItemData {
   material_name: string;
   quantity: number;
   unit: string;
-  waste_type: 'scrap' | 'defective' | 'excess';
+  waste_type: string;
   can_be_reused?: boolean;
   production_batch_id?: string;
   production_product_id?: string;
@@ -211,27 +223,29 @@ export class WasteManagementService {
   // Get waste statistics
   static async getWasteStats(): Promise<{ data: any; error: string | null }> {
     try {
-      const client = supabaseAdmin || supabase;
-      const { data, error } = await client
-        .from('waste_management')
-        .select('waste_type, status, quantity');
+      const response = await fetch(`${API_BASE_URL}/production/waste`, {
+        headers: getHeaders()
+      });
+      const result = await response.json();
 
-      if (error) {
-        console.error('Error fetching waste stats:', error);
-        return { data: null, error: handleSupabaseError(error) };
+      if (!response.ok) {
+        console.error('Error fetching waste stats:', result.error);
+        return { data: null, error: result.error || 'Failed to fetch waste stats' };
       }
 
+      const data = result.data || [];
+
       const stats = {
-        totalWaste: data?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+        totalWaste: data.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
         byType: {
-          scrap: data?.filter(item => item.waste_type === 'scrap').reduce((sum, item) => sum + item.quantity, 0) || 0,
-          defective: data?.filter(item => item.waste_type === 'defective').reduce((sum, item) => sum + item.quantity, 0) || 0,
-          excess: data?.filter(item => item.waste_type === 'excess').reduce((sum, item) => sum + item.quantity, 0) || 0
+          scrap: data.filter((item: any) => item.waste_type === 'scrap').reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
+          defective: data.filter((item: any) => item.waste_type === 'defective').reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
+          excess: data.filter((item: any) => item.waste_type === 'excess').reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0
         },
         byStatus: {
-          available_for_reuse: data?.filter(item => item.status === 'available_for_reuse').length || 0,
-          added_to_inventory: data?.filter(item => item.status === 'added_to_inventory').length || 0,
-          disposed: data?.filter(item => item.status === 'disposed').length || 0
+          available_for_reuse: data.filter((item: any) => item.status === 'available_for_reuse').length || 0,
+          added_to_inventory: data.filter((item: any) => item.status === 'added_to_inventory').length || 0,
+          disposed: data.filter((item: any) => item.status === 'disposed').length || 0
         }
       };
 

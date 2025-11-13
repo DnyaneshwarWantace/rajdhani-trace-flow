@@ -5,21 +5,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { SidebarProvider, useSidebarContext } from "@/contexts/SidebarContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { cn } from "@/lib/utils";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import NewOrder from "./pages/orders/NewOrder";
 import AddItem from "./pages/orders/AddItem";
 import OrderDetails from "./pages/orders/OrderDetails";
-import Inventory from "./pages/Inventory";
-import FinishedGoods from "./pages/inventory/FinishedGoods";
-import LowStocks from "./pages/inventory/LowStocks";
 
 import Production from "./pages/Production";
 import NewBatch from "./pages/production/NewBatch";
 import ProductionDetail from "./pages/ProductionDetail";
 import Complete from "./pages/production/Complete";
+import ProductionSummary from "./pages/production/ProductionSummary";
 import DynamicProductionFlow from "./pages/production/DynamicProductionFlow";
 import WasteGeneration from "./pages/production/WasteGeneration";
 import Materials from "./pages/Materials";
@@ -30,16 +30,15 @@ import NotFound from "./pages/NotFound";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import ProductStock from "./pages/ProductStock";
-import QRScanner from "./pages/QRScanner";
 import QRResult from "./pages/QRResult";
-import QRRedirect from "./pages/QRRedirect";
 import Settings from "./pages/Settings";
-import DataInitializer from "./components/DataInitializer";
-import BackendInitializer from "./components/BackendInitializer";
+import DropdownMaster from "./pages/DropdownMaster";
+import RecipeCalculator from "./pages/RecipeCalculator";
 import BackendTest from "./pages/BackendTest";
+import AccessDenied from "./pages/AccessDenied";
 
 // import RajdhaniERP from "@/lib/storageUtilsUtils"; // Removed - using Supabase now
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 
 const queryClient = new QueryClient();
@@ -47,25 +46,19 @@ const queryClient = new QueryClient();
 // Create authenticated layout component
 const AuthenticatedLayout: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  const [backendReady, setBackendReady] = useState(false);
-
-  // Handle backend connection success
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setBackendReady(true);
-    }, 3000); // Show backend connection status for 3 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
+  const { isCollapsed } = useSidebarContext();
 
   if (!isAuthenticated) {
     return null; // This shouldn't render if not authenticated due to ProtectedRoute
   }
 
   return (
-          <div className="flex h-screen bg-background">
+          <div className="flex h-screen bg-background overflow-hidden">
             <Sidebar className="hidden md:flex" />
-            <main className="flex-1 overflow-auto min-w-0 w-full md:w-auto">
+            <main className={cn(
+              "flex-1 overflow-y-auto min-w-0 w-full transition-all duration-300",
+              isCollapsed ? "md:ml-16" : "md:ml-64"
+            )}>
               <Routes>
           {/* Dashboard - accessible to all authenticated users */}
           <Route path="/" element={
@@ -74,146 +67,132 @@ const AuthenticatedLayout: React.FC = () => {
             </ProtectedRoute>
           } />
 
-          {/* Orders routes - restricted to orders and admin roles */}
+          {/* Orders routes - restricted to users with orders permission */}
           <Route path="/orders" element={
-            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+            <ProtectedRoute requiredPermission="orders">
               <Orders />
             </ProtectedRoute>
           } />
           <Route path="/orders/new" element={
-            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+            <ProtectedRoute requiredPermission="orders">
               <NewOrder />
             </ProtectedRoute>
           } />
           <Route path="/orders/add-item" element={
-            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+            <ProtectedRoute requiredPermission="orders">
               <AddItem />
             </ProtectedRoute>
           } />
           <Route path="/orders/:orderId" element={
-            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+            <ProtectedRoute requiredPermission="orders">
               <OrderDetails />
             </ProtectedRoute>
           } />
 
-          {/* Inventory routes - restricted to inventory and admin roles only */}
-          <Route path="/inventory" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
-              <Inventory />
-            </ProtectedRoute>
-          } />
-          <Route path="/inventory/finished-goods" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
-              <FinishedGoods />
-            </ProtectedRoute>
-          } />
-          <Route path="/inventory/low-stocks" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
-              <LowStocks />
-            </ProtectedRoute>
-          } />
 
-          {/* Production routes - restricted to production and admin roles */}
+          {/* Production routes - restricted to users with production permission */}
           <Route path="/production" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+            <ProtectedRoute requiredPermission="production">
               <Production />
             </ProtectedRoute>
           } />
           <Route path="/production/new-batch" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+            <ProtectedRoute requiredPermission="production">
               <NewBatch />
             </ProtectedRoute>
           } />
           <Route path="/production-detail/:productId" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+            <ProtectedRoute requiredPermission="production">
               <ProductionDetail />
             </ProtectedRoute>
           } />
-          <Route path="/production/:productId/dynamic-flow" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+          <Route path="/production/:batchId/dynamic-flow" element={
+            <ProtectedRoute requiredPermission="production">
               <DynamicProductionFlow />
             </ProtectedRoute>
           } />
-          <Route path="/production/:productId/waste-generation" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+          <Route path="/production/:batchId/waste-generation" element={
+            <ProtectedRoute requiredPermission="production">
               <WasteGeneration />
             </ProtectedRoute>
           } />
-          <Route path="/production/complete/:productId" element={
-            <ProtectedRoute allowedRoles={['admin', 'production']}>
+          <Route path="/production/complete/:batchId" element={
+            <ProtectedRoute requiredPermission="production">
               <Complete />
             </ProtectedRoute>
           } />
+          <Route path="/production/summary/:productId" element={
+            <ProtectedRoute requiredPermission="production">
+              <ProductionSummary />
+            </ProtectedRoute>
+          } />
 
-          {/* Raw materials routes - restricted to raw_material and admin roles only */}
+          {/* Raw materials routes - restricted to users with materials permission */}
           <Route path="/materials" element={
-            <ProtectedRoute allowedRoles={['admin', 'raw_material']}>
+            <ProtectedRoute requiredPermission="materials">
               <Materials />
             </ProtectedRoute>
           } />
           <Route path="/manage-stock" element={
-            <ProtectedRoute allowedRoles={['admin', 'raw_material']}>
+            <ProtectedRoute requiredPermission="products">
               <ManageStock />
             </ProtectedRoute>
           } />
 
-          {/* Customer routes - restricted to orders and admin roles */}
+          {/* Customer routes - restricted to users with customers OR suppliers permission */}
           <Route path="/customers" element={
-            <ProtectedRoute allowedRoles={['admin', 'orders']}>
+            <ProtectedRoute>
               <Customers />
             </ProtectedRoute>
           } />
 
-          {/* Analytics - accessible to all authenticated users but admin has full access */}
+          {/* Analytics - restricted to users with reports permission */}
           <Route path="/analytics" element={
-            <ProtectedRoute>
+            <ProtectedRoute requiredPermission="reports">
               <Analytics />
             </ProtectedRoute>
           } />
 
-          {/* Product routes - restricted to inventory and admin only */}
+          {/* Product routes - restricted to users with products permission */}
           <Route path="/products" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+            <ProtectedRoute requiredPermission="products">
               <Products />
             </ProtectedRoute>
           } />
           <Route path="/product/:productId" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+            <ProtectedRoute requiredPermission="products">
               <ProductDetail />
             </ProtectedRoute>
           } />
           <Route path="/product-stock/:productId" element={
-            <ProtectedRoute allowedRoles={['admin', 'inventory']}>
+            <ProtectedRoute requiredPermission="products">
               <ProductStock />
             </ProtectedRoute>
           } />
 
-          {/* QR scanner routes - accessible to all authenticated users */}
-          <Route path="/qr-scanner" element={
-            <ProtectedRoute>
-              <QRScanner />
-            </ProtectedRoute>
-          } />
-          <Route path="/qr-result" element={
-            <ProtectedRoute>
-              <QRResult />
-            </ProtectedRoute>
-          } />
-          <Route path="/qr-redirect" element={
-            <ProtectedRoute>
-              <QRRedirect />
+
+          {/* Recipe Calculator - restricted to users with production permission */}
+          <Route path="/recipe-calculator" element={
+            <ProtectedRoute requiredPermission="production">
+              <RecipeCalculator />
             </ProtectedRoute>
           } />
 
-          {/* Settings - requires settings permissions */}
-                <Route path="/settings" element={<Settings />} />
+          {/* Settings - requires settings permission */}
+          <Route path="/settings" element={
+            <ProtectedRoute requiredPermission="settings">
+              <Settings />
+            </ProtectedRoute>
+          } />
+
+          {/* Dropdown Master - requires settings permission */}
+          <Route path="/dropdown-master" element={
+            <ProtectedRoute requiredPermission="settings">
+              <DropdownMaster />
+            </ProtectedRoute>
+          } />
 
           {/* System administration routes - admin only */}
-          <Route path="/data-initializer" element={
-            <ProtectedRoute requiredRole="admin">
-              <DataInitializer />
-            </ProtectedRoute>
-          } />
           <Route path="/backend-test" element={
             <ProtectedRoute requiredRole="admin">
               <BackendTest />
@@ -224,9 +203,6 @@ const AuthenticatedLayout: React.FC = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </main>
-
-          {/* Backend Connection Status - Only show briefly on app start */}
-          {!backendReady && <BackendInitializer />}
     </div>
   );
 };
@@ -240,6 +216,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <SidebarProvider>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -247,6 +224,12 @@ const App = () => {
             <Routes>
               {/* Public login route */}
               <Route path="/login" element={<Login />} />
+              
+              {/* Public QR result route - accessible without authentication */}
+              <Route path="/qr-result" element={<QRResult />} />
+
+              {/* Access Denied page - accessible without authentication (but should be reached via ProtectedRoute) */}
+              <Route path="/access-denied" element={<AccessDenied />} />
 
               {/* All other routes require authentication */}
               <Route path="/*" element={
@@ -257,6 +240,7 @@ const App = () => {
             </Routes>
         </BrowserRouter>
       </TooltipProvider>
+      </SidebarProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

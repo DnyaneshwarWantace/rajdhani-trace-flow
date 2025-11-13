@@ -28,10 +28,10 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
   const materialsData = data?.stats?.materials || data?.materials || {};
   const customersData = data?.stats?.customers || data?.customers || {};
   
-  const totalOrders = ordersData.total || 0;
-  const completedOrders = (ordersData.delivered || 0) + (ordersData.dispatched || 0);
-  const pendingOrders = ordersData.pending || 0;
-  const inProductionOrders = ordersData.inProduction || 0;
+  const totalOrders = ordersData.totalOrders || 0;
+  const completedOrders = ordersData.completedOrders || 0;
+  const pendingOrders = ordersData.pendingOrders || 0;
+  const inProductionOrders = ordersData.inProductionOrders || 0;
   
   // Real revenue from completed orders with full payment
   const totalRevenue = ordersData.totalRevenue || 0;
@@ -39,19 +39,20 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
   const outstandingAmount = ordersData.outstandingAmount || 0;
   
   // Products and materials
-  const totalProducts = productsData.totalProducts || 0;
-  const lowStockProducts = productsData.lowStock || 0;
+  const totalProducts = productsData.total_products || 0;
+  const lowStockProducts = productsData.low_stock_products || 0;
+  const outOfStockProducts = productsData.out_of_stock_products || 0;
   
   // Raw materials count
   const rawMaterials = materialsData.totalMaterials || 0;
-  const materialsLowStock = materialsData.lowStock || 0;
+  const materialsLowStock = materialsData.lowStockMaterials || 0;
   
   // Production efficiency based on completed vs total orders
   const productionEfficiency = totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0;
   
-  // Customer metrics
-  const totalCustomers = customersData.total || 0;
-  const activeCustomers = customersData.active || 0;
+  // Customer metrics - using placeholder data for now
+  const totalCustomers = customersData.totalCustomers || 0;
+  const activeCustomers = customersData.activeCustomers || 0;
   
   // Debug: Log calculated values
   console.log('🔍 ModernStatsGrid - Calculated values:');
@@ -60,6 +61,9 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
   console.log('Raw Materials:', rawMaterials);
   console.log('Total Revenue:', totalRevenue);
   console.log('Total Customers:', totalCustomers);
+  console.log('Orders Data:', ordersData);
+  console.log('Products Data:', productsData);
+  console.log('Materials Data:', materialsData);
 
   const stats = [
     {
@@ -77,12 +81,12 @@ export function ModernStatsGrid({ data, loading }: ModernStatsGridProps) {
       id: "products",
       title: "Total Products",
       value: totalProducts,
-      subtitle: `${lowStockProducts} low stock`,
+      subtitle: `${lowStockProducts} low stock, ${outOfStockProducts} out of stock`,
       icon: Package,
-      color: "text-green-600",
-      bgColor: "bg-green-50",
-      trend: lowStockProducts,
-      trendUp: lowStockProducts === 0
+      color: outOfStockProducts > 0 ? "text-red-600" : lowStockProducts > 0 ? "text-yellow-600" : "text-green-600",
+      bgColor: outOfStockProducts > 0 ? "bg-red-50" : lowStockProducts > 0 ? "bg-yellow-50" : "bg-green-50",
+      trend: lowStockProducts + outOfStockProducts,
+      trendUp: (lowStockProducts + outOfStockProducts) === 0
     },
     {
       id: "materials",

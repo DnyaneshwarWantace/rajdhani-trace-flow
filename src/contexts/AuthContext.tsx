@@ -1,32 +1,31 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import AuthService, { User as AuthUser, Permission } from '@/services/api/authService';
 
-export type UserRole = 'admin' | 'production' | 'inventory' | 'raw_material' | 'orders';
+export type UserRole = 'admin' | 'manager' | 'operator' | 'viewer' | 'production_manager' | 'inventory_manager' | 'sales_manager';
 
 export interface User {
   id: string;
   email: string;
-  name: string;
-  role: UserRole;
-  permissions: string[];
-  isActive: boolean;
-  createdAt: string;
-  lastLogin: string;
+  full_name: string;
+  role: string;
+  status: string;
+  phone?: string;
+  department?: string;
+  avatar?: string;
+  last_login?: string;
+  created_at: string;
 }
-
-export const ROLE_PERMISSIONS = {
-  admin: ['*'],
-  production: ['production.read', 'production.write', 'products.read'],
-  inventory: ['inventory.read', 'inventory.write', 'products.read'],
-  raw_material: ['raw_material.read', 'raw_material.write', 'products.read'],
-  orders: ['orders.read', 'orders.write']
-};
 
 interface AuthContextType {
   user: User | null;
+  permissions: Permission | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
+  hasPageAccess: (page: string) => boolean;
+  setUser: (user: User) => void;
+  setPermissions: (permissions: Permission) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,128 +43,76 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    // Check for existing session on app load
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        setIsAuthenticated(true);
-      } catch (error) {
-        localStorage.removeItem('user');
-      }
+  // Initialize auth state from localStorage synchronously
+  const [user, setUser] = useState<User | null>(() => {
+    const token = AuthService.getToken();
+    const savedUser = AuthService.getUser();
+    if (token && savedUser) {
+      console.log('✅ Session restored from localStorage:', savedUser.email);
+      return savedUser;
     }
-  }, []);
+    return null;
+  });
+
+  const [permissions, setPermissions] = useState<Permission | null>(() => {
+    const token = AuthService.getToken();
+    const savedPermissions = AuthService.getPermissions();
+    if (token && savedPermissions) {
+      return savedPermissions;
+    }
+    return null;
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const token = AuthService.getToken();
+    const savedUser = AuthService.getUser();
+    const savedPermissions = AuthService.getPermissions();
+    return !!(token && savedUser && savedPermissions);
+  });
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication - in real app, this would call your API
-    const demoUsers = [
-      {
-        email: 'admin@rajdhani.com',
-        password: 'admin123',
-        userData: {
-          id: 'admin_001',
-          email: 'admin@rajdhani.com',
-          name: 'Admin User',
-          role: 'admin' as UserRole,
-          permissions: ROLE_PERMISSIONS.admin,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        }
-      },
-      {
-        email: 'production@rajdhani.com',
-        password: 'prod123',
-        userData: {
-          id: 'prod_001',
-          email: 'production@rajdhani.com',
-          name: 'Production Manager',
-          role: 'production' as UserRole,
-          permissions: ROLE_PERMISSIONS.production,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        }
-      },
-      {
-        email: 'inventory@rajdhani.com',
-        password: 'inv123',
-        userData: {
-          id: 'inv_001',
-          email: 'inventory@rajdhani.com',
-          name: 'Inventory Manager',
-          role: 'inventory' as UserRole,
-          permissions: ROLE_PERMISSIONS.inventory,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        }
-      },
-      {
-        email: 'materials@rajdhani.com',
-        password: 'mat123',
-        userData: {
-          id: 'mat_001',
-          email: 'materials@rajdhani.com',
-          name: 'Materials Manager',
-          role: 'raw_material' as UserRole,
-          permissions: ROLE_PERMISSIONS.raw_material,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        }
-      },
-      {
-        email: 'orders@rajdhani.com',
-        password: 'ord123',
-        userData: {
-          id: 'ord_001',
-          email: 'orders@rajdhani.com',
-          name: 'Orders Manager',
-          role: 'orders' as UserRole,
-          permissions: ROLE_PERMISSIONS.orders,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString()
-        }
+    try {
+      const { data, error } = await AuthService.login(email, password);
+      
+      if (error || !data) {
+        return false;
       }
-    ];
-
-    const user = demoUsers.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-      setUser(user.userData);
+      
+      setUser(data.user);
+      setPermissions(data.permissions);
       setIsAuthenticated(true);
-      localStorage.setItem('user', JSON.stringify(user.userData));
       return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await AuthService.logout();
     setUser(null);
+    setPermissions(null);
     setIsAuthenticated(false);
-    localStorage.removeItem('user');
   };
 
-  const hasPermission = (permission: string): boolean => {
-    if (!user) return false;
-    if (user.permissions.includes('*')) return true;
-    return user.permissions.includes(permission);
+  const hasPermission = (action: string): boolean => {
+    return AuthService.hasActionPermission(action);
+  };
+
+  const hasPageAccess = (page: string): boolean => {
+    return AuthService.hasPageAccess(page);
   };
 
   const value: AuthContextType = {
     user,
+    permissions,
     isAuthenticated,
     login,
     logout,
-    hasPermission
+    hasPermission,
+    hasPageAccess,
+    setUser,
+    setPermissions
   };
 
   return (

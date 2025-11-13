@@ -11,12 +11,25 @@ import {
   ArrowLeft, AlertTriangle, Plus, Trash2, Save, Factory, Info
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
-import { RawMaterialService } from "@/services/rawMaterialService";
-import { ProductService } from "@/services/ProductService";
-import { ProductionFlowService } from "@/services/productionFlowService";
-import { WasteManagementService } from "@/services/wasteManagementService";
+import { RawMaterialService as MongoDBRawMaterialService } from "@/services/api/rawMaterialService";
+import ProductService from "@/services/api/productService";
+import RecipeService from "@/services/api/recipeService";
+// TODO: Replace ProductionFlowService with MongoDB implementation when available
+import WasteService from "@/services/api/wasteService";
+import { DropdownService } from "@/services/api/dropdownService";
+import MaterialConsumptionService from "@/services/api/materialConsumptionService";
+import { IndividualProductService } from "@/services/api/individualProductService";
 import ProductionProgressBar from "@/components/production/ProductionProgressBar";
-import { supabase } from "@/lib/supabase";
+import { ProductionService } from "@/services/api/productionService";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+// Supabase removed from this page in favor of MongoDB services
+// Removed Select-based dropdown for Waste Type; using custom chip UI
 
 interface MaterialConsumption {
   materialId: string;
@@ -30,9 +43,10 @@ interface MaterialConsumption {
 interface WasteItem {
   materialId: string;
   materialName: string;
+  materialType?: 'raw_material' | 'product'; // Track if it's a raw material or product
   quantity: number;
   unit: string;
-  wasteType: "scrap" | "defective" | "excess";
+  wasteType: string;
   canBeReused: boolean;
   notes: string;
 }
@@ -55,10 +69,9 @@ interface ProductionProduct {
   expectedProduct: {
     name: string;
     category: string;
-    height: string;
+    length: string;
     width: string;
     weight: string;
-    thickness: string;
     materialComposition: string;
     qualityGrade: string;
   };
@@ -81,10 +94,13 @@ interface RawMaterial {
 }
 
 export default function WasteGeneration() {
-  const { productId } = useParams();
+  const { batchId } = useParams();
+  const productId = batchId; // Alias for backward compatibility with existing code
   const navigate = useNavigate();
   const [productionProduct, setProductionProduct] = useState<ProductionProduct | null>(null);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [recipeMaterials, setRecipeMaterials] = useState<any[]>([]);
   const [isAddingWaste, setIsAddingWaste] = useState(false);
   const [productionFlow, setProductionFlow] = useState<any>(null);
   const [productionSteps, setProductionSteps] = useState<any[]>([]);
@@ -95,225 +111,379 @@ export default function WasteGeneration() {
     materialName: "",
     quantity: "",
     unit: "",
-    wasteType: "scrap" as const,
+    wasteType: "",
     canBeReused: false,
     notes: ""
   });
+  const [wasteTypes, setWasteTypes] = useState<string[]>([]);
+  
+  // Individual product selection for waste tracking
+  const [selectedIndividualProducts, setSelectedIndividualProducts] = useState<any[]>([]);
+  const [availableIndividualProducts, setAvailableIndividualProducts] = useState<any[]>([]);
+  
+  // Track whether we're showing consumed materials or recipe materials
+  const [isShowingConsumedMaterials, setIsShowingConsumedMaterials] = useState(false);
 
-  useEffect(() => {
-    if (productId) {
-      // Load production product from production flow data
-      const loadProductionData = async () => {
-        try {
-          console.log('🔍 Loading production data for productId:', productId);
+  // Load waste type options from MongoDB dropdowns (category: waste_type)
+  const loadWasteTypes = async () => {
+    try {
+      // Prefer consolidated production dropdowns endpoint
+      const prodDropdowns = await DropdownService.getProductionDropdownData();
+      const types = prodDropdowns?.waste_types?.filter((o: any) => o.is_active !== false).map((o: any) => o.value) || [];
+      if (types.length > 0) {
+        setWasteTypes(types);
+        return;
+      }
+    } catch (e) {
+      console.error('Error loading waste types from production dropdowns:', e);
+    }
+    try {
+      // Fallback: direct category fetch
+      const options = await DropdownService.getOptionsByCategory('waste_type');
+      const types = (options || []).filter((o: any) => o.is_active !== false).map((o: any) => o.value);
+      if (types.length > 0) {
+        setWasteTypes(types);
+        return;
+      }
+    } catch (e) {
+      console.error('Error loading waste types from category:', e);
+    }
+    // No hardcoded fallback - show empty if no options available
+    console.warn('⚠️ No waste types found in backend. Please add waste types in Dropdown Master.');
+    setWasteTypes([]);
+  };
+
+  // Load consumed materials from database
+  const loadRecipeMaterials = async (productId: string) => {
+    try {
+      console.log('🔍 Loading consumed materials for production batch:', productId);
+      
+      // Load material consumption from MongoDB using the batch ID
+      const { data: consumptionResp, error: consumptionError } = await MaterialConsumptionService.getMaterialConsumption({
+        production_batch_id: productId
+      });
+      if (consumptionError) {
+        console.error('Error loading material consumption:', consumptionError);
+      }
+      const materialConsumption = consumptionResp?.data || [];
+
+      console.log('✅ Found material consumption records:', materialConsumption.length || 0);
+      if (materialConsumption && materialConsumption.length > 0) {
+        console.log('📋 Materials actually consumed in production:', materialConsumption.map(m => ({
+          name: m.material_name,
+          type: m.material_type,
+          quantity: m.quantity_used,
+          unit: m.unit
+        })));
+      }
+      
+      // If no material consumption found, try to get from recipe as fallback
+      let materialsFromRecipe = [];
+      if (!materialConsumption || materialConsumption.length === 0) {
+        console.log('🔍 No material consumption found, loading from recipe as fallback...');
+        
+        // Get the recipe for this product
+        const { data: recipe, error: recipeError } = await RecipeService.getRecipeByProductId(productId);
+        
+        if (recipeError) {
+          console.error('Error loading recipe:', recipeError);
+          return;
+        }
+
+        if (recipe && recipe.materials) {
+          console.log('✅ Found recipe with materials:', recipe.materials.length);
+          console.log('📋 Recipe materials (fallback):', recipe.materials.map((m: any) => ({
+            name: m.material_name,
+            type: m.material_type,
+            quantity: m.quantity_per_sqm,
+            unit: m.unit
+          })));
+          materialsFromRecipe = recipe.materials;
+        }
+      }
+      
+      // Use material consumption if available, otherwise use recipe materials
+      const materialsToUse = (materialConsumption && materialConsumption.length > 0) ? materialConsumption : materialsFromRecipe;
+      const showingConsumedMaterials = (materialConsumption && materialConsumption.length > 0);
+      setIsShowingConsumedMaterials(showingConsumedMaterials);
+      
+      if (materialsToUse.length > 0) {
+        console.log('✅ Using materials:', materialsToUse.length, (materialConsumption && materialConsumption.length > 0) ? 'from material consumption' : 'from recipe');
+        
+        // Load raw materials and products to get full details
+        const [rawMaterialsResult, productsResult] = await Promise.all([
+          MongoDBRawMaterialService.getRawMaterials(),
+          ProductService.getProducts()
+        ]);
+
+        const rawMaterialsData = rawMaterialsResult?.data || [];
+        const productsData = (productsResult?.data || []).map((product: any) => ({
+          ...product,
+          individual_count: 0 // optionally compute via individual products service if needed
+        }));
+        
+        console.log('📦 Available products for waste tracking:', productsData.map(p => ({
+          id: p.id,
+          name: p.name,
+          individual_count: p.individual_count
+        })));
+
+        // Map materials to full material/product details - properly distinguish between products and raw materials
+        const mappedMaterials = materialsToUse.map((materialData: any) => {
+          // Handle both production materials and recipe materials
+          const materialId = materialData.materialId || materialData.material_id;
+          const materialName = materialData.materialName || materialData.material_name;
+          const quantity = materialData.quantity || materialData.quantity_used || 0;
+          const unit = materialData.unit || 'units';
+          const materialType = materialData.material_type || 'raw_material';
           
-          // First load the production flow to get the actual product ID
-          const flow = await ProductionFlowService.getProductionFlow(productId);
-          console.log('🔍 Production flow loaded:', flow);
+          console.log('🔍 Processing material:', {
+            materialId,
+            materialName,
+            materialType,
+            quantity,
+            unit,
+            rawData: materialData
+          });
           
-          if (flow) {
-            setProductionFlow(flow);
-
-            // Use the same approach as DynamicProductionFlow - create mock production product from flow data
-            console.log('🔍 Creating production product from flow data like DynamicProductionFlow does');
-
-            // Load material consumption from Supabase
-            // First try with batch ID, then fallback to product ID
-            let { data: materialsConsumed, error: materialsError } = await supabase
-              .from('material_consumption')
-              .select('*')
-              .eq('production_product_id', flow.production_product_id);
-
-            // If no records found with batch ID, try with product ID
-            if (!materialsConsumed || materialsConsumed.length === 0) {
-              console.log('No material consumption found with batch ID, trying with product ID...');
-              const productId = flow.flow_name.replace(' Production Flow - Batch PRO-', ' - ').split(' - ')[0];
-              
-              // Get the actual product ID from products table
-              const { data: productData } = await supabase
-                .from('products')
-                .select('id')
-                .eq('name', productId)
-                .single();
-              
-              if (productData) {
-                const { data: fallbackMaterials, error: fallbackError } = await supabase
-                  .from('material_consumption')
-                  .select('*')
-                  .eq('production_product_id', productData.id);
-                
-                if (fallbackMaterials && fallbackMaterials.length > 0) {
-                  materialsConsumed = fallbackMaterials;
-                  console.log('✅ Found material consumption records with product ID:', productData.id);
-                }
-              }
+          // Determine if this is a product or raw material based on material_type from consumption data
+          // If material_type is not set correctly, fallback to checking if it exists in products
+          let isProduct = materialType === 'product';
+          
+          // Fallback: if material_type is 'raw_material' but material_id exists in products, treat as product
+          if (!isProduct && materialType === 'raw_material') {
+            const productExists = productsData.find((p: any) => p.id === materialId);
+            if (productExists) {
+              console.log('🔄 Fallback: Treating as product because material_id exists in products:', materialId);
+              isProduct = true;
+            } else if (materialId.startsWith('PRO-')) {
+              // Additional fallback: if material_id starts with "PRO-", it's likely a product
+              console.log('🔄 Fallback: Treating as product because material_id starts with "PRO-":', materialId);
+              isProduct = true;
             }
-
-            if (materialsError) {
-              console.warn('Error loading materials consumed:', materialsError);
-            }
-
-            // Create production product from flow data (same as DynamicProductionFlow)
-            const productionProduct: ProductionProduct = {
-              id: flow.production_product_id, // This is the batch ID
-              productId: flow.production_product_id, // Use production_product_id as productId
-              productName: flow.flow_name.replace(' Production Flow', ''),
-              category: 'Carpet',
-              color: 'N/A',
-              size: 'N/A',
-              pattern: 'N/A',
-              targetQuantity: 1,
-              priority: 'normal',
-              status: 'active',
-              expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-              createdAt: flow.created_at || new Date().toISOString(),
-              materialsConsumed: (materialsConsumed || []).map((m: any) => ({
-                materialId: m.material_id,
-                materialName: m.material_name || 'Unknown Material',
-                quantity: m.quantity_used || 0, // Use consistent field name
-                unit: m.unit || 'units',
-                cost: m.total_cost || (m.cost_per_unit * m.quantity_used) || 0,
-                consumedAt: m.consumed_at || m.created_at
-              })),
-              wasteGenerated: [],
-              expectedProduct: {
-                name: flow.flow_name.replace(' Production Flow', ''),
-                category: 'Carpet',
-                height: 'N/A',
-                width: 'N/A',
-                weight: 'N/A',
-                thickness: 'N/A',
-                materialComposition: 'N/A',
-                qualityGrade: 'A'
-              },
-              notes: ''
-            };
-            setProductionProduct(productionProduct);
-            console.log('✅ Created production product from flow data:', productionProduct);
-
-            // Load production steps
-            const steps = await ProductionFlowService.getFlowSteps(flow.id);
-            if (steps) {
-              setProductionSteps(steps);
-
-              // Check if waste tracking step exists, if not create it
-              let wasteStep = steps.find(s => s.step_type === 'wastage_tracking');
-              if (!wasteStep) {
-                console.log('Creating waste tracking step');
-                const newWasteStep = await ProductionFlowService.addStepToFlow({
-                  flow_id: flow.id,
-                  step_name: 'Waste Generation',
-                  step_type: 'wastage_tracking',
-                  order_index: steps.length + 1,
-                  machine_id: null,
-                  inspector_name: 'Admin',
-                  notes: 'Track waste generated during production process'
-                });
-                
-                if (newWasteStep) {
-                  // Add to local steps
-                  const newStep = {
-                    id: newWasteStep.id,
-                    flow_id: flow.id,
-                    step_name: 'Waste Generation',
-                    step_type: 'wastage_tracking',
-                    order_index: steps.length + 1,
-                    machine_id: null,
-                    inspector_name: 'Admin',
-                    notes: 'Track waste generated during production process',
-                    status: 'pending' as const,
-                    start_time: null,
-                    end_time: null,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                  };
-                  setProductionSteps([...steps, newStep]);
-                  wasteStep = newStep;
-                }
-              }
-
-              // Auto-set waste tracking step to 'in_progress' if it's pending
-              if (wasteStep && wasteStep.status === 'pending') {
-                // Update step status to in_progress
-                await ProductionFlowService.updateFlowStep(wasteStep.id, {
-                  status: 'in_progress',
-                  start_time: new Date().toISOString()
-                });
-                console.log('Waste tracking step set to in_progress');
-              }
+          }
+          
+          let material = null;
+          
+          if (isProduct) {
+            // For products, find in products data
+            console.log('🔍 Looking for product with ID:', materialId);
+            const product = productsData.find((p: any) => p.id === materialId);
+            console.log('🔍 Found product:', product ? 'YES' : 'NO', product ? { id: product.id, name: product.name } : null);
+            if (product) {
+              material = {
+                id: product.id,
+                name: product.name,
+                current_stock: product.individual_count || 0,
+                cost_per_unit: 0, // Products don't have cost in this context
+                category: product.category || 'Product',
+                brand: '',
+                supplier_name: 'Product Inventory',
+                status: 'in-stock',
+                unit: product.unit || 'units'
+              };
             }
           } else {
-            console.error('❌ No production flow found for productId:', productId);
-            // Set fallback product when no flow is found
-            const fallbackProduct: ProductionProduct = {
-              id: productId || 'unknown',
-              productId: productId || 'unknown',
-              productName: 'Unknown Product',
-              category: 'Unknown',
-              color: 'Unknown',
-              size: 'Unknown',
-              pattern: 'Unknown',
-              targetQuantity: 1,
-              priority: 'normal',
-              status: 'active',
-              expectedCompletion: new Date().toISOString(),
-              createdAt: new Date().toISOString(),
-              materialsConsumed: [],
-              wasteGenerated: [],
-              expectedProduct: {
-                name: 'Unknown Product',
-                category: 'Unknown',
-                height: '',
-                width: '',
-                weight: '',
-                thickness: '',
-                materialComposition: '',
-                qualityGrade: 'A+'
-              },
-              notes: ''
-            };
-            setProductionProduct(fallbackProduct);
+            // For raw materials, find in raw materials data
+            material = rawMaterialsData.find((m: any) => m.id === materialId);
           }
-        } catch (error) {
-          console.error('❌ Error loading production data:', error);
-          // Set a fallback production product to prevent infinite loading
-          const fallbackProduct: ProductionProduct = {
-            id: productId || 'unknown',
-            productId: productId || 'unknown',
-            productName: 'Unknown Product',
-            category: 'Unknown',
-            color: 'Unknown',
-            size: 'Unknown',
-            pattern: 'Unknown',
-            targetQuantity: 1,
-            priority: 'normal',
-            status: 'active',
-            expectedCompletion: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            materialsConsumed: [],
-            wasteGenerated: [],
-            expectedProduct: {
-              name: 'Unknown Product',
-              category: 'Unknown',
-              height: '',
-              width: '',
-              weight: '',
-              thickness: '',
-              materialComposition: '',
-              qualityGrade: 'A+'
-            },
-            notes: ''
-          };
-          setProductionProduct(fallbackProduct);
-        }
-      };
-      loadProductionData();
+          
+          if (material) {
+            return {
+              id: materialId,
+              name: materialName,
+              type: isProduct ? 'product' : 'raw_material', // Properly distinguish between products and raw materials
+              quantity: quantity,
+              unit: unit,
+              currentStock: material.current_stock || 0,
+              costPerUnit: material.cost_per_unit || 0,
+              category: material.category || 'Unknown',
+              brand: (material as any)?.brand || '',
+              supplier: material.supplier_name || '',
+              status: material.status || 'in-stock',
+              isProduct: isProduct, // Keep track if it was originally a product
+              individual_product_ids: materialData.individual_product_ids || [] // Include individual product IDs from consumption data
+            };
+          }
+          
+          return null;
+        }).filter(Boolean);
+
+        setRecipeMaterials(mappedMaterials);
+        console.log('✅ Recipe materials loaded:', mappedMaterials.length);
+        console.log('📋 Final mapped materials:', mappedMaterials.map(m => ({
+          id: m.id,
+          name: m.name,
+          type: m.type,
+          isProduct: m.isProduct,
+          currentStock: m.currentStock
+        })));
+      } else {
+        console.log('⚠️ No recipe found for product:', productId);
+        setRecipeMaterials([]);
+      }
+    } catch (error) {
+      console.error('❌ Error loading recipe materials:', error);
+      setRecipeMaterials([]);
     }
+  };
+
+  useEffect(() => {
+    if (!batchId) {
+      console.error('❌ No batchId provided in route parameters');
+      // Set a fallback to prevent infinite loading
+      const fallbackProduct: ProductionProduct = {
+        id: 'unknown',
+        productId: 'unknown',
+        productName: 'Unknown Batch',
+        category: 'Unknown',
+        color: 'Unknown',
+        size: 'Unknown',
+        pattern: 'Unknown',
+        targetQuantity: 1,
+        priority: 'normal',
+        status: 'active',
+        expectedCompletion: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        materialsConsumed: [],
+        wasteGenerated: [],
+        expectedProduct: {
+          name: 'Unknown Batch',
+          category: 'Unknown',
+          length: '',
+          width: '',
+          weight: '',
+          materialComposition: '',
+          qualityGrade: 'A+'
+        },
+        notes: ''
+      };
+      setProductionProduct(fallbackProduct);
+      return;
+    }
+
+    // Load production product data (MongoDB)
+    const loadProductionData = async () => {
+      try {
+        console.log('🔍 Loading production data for batchId:', batchId);
+        
+        // Load material consumption for this batch to populate materialsConsumed
+        const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+          production_batch_id: batchId
+        });
+        const materialsConsumed = (consumptionResp?.data || []).map((m: any) => ({
+          materialId: m.material_id,
+          materialName: m.material_name || 'Unknown Material',
+          quantity: m.quantity_used || 0,
+          unit: m.unit || 'units',
+          cost: m.total_cost || (m.cost_per_unit || 0) * (m.quantity_used || 0),
+          consumedAt: m.consumed_at
+        }));
+
+        const productionProduct: ProductionProduct = {
+          id: batchId || 'unknown',
+          productId: batchId || 'unknown',
+          productName: 'Production Batch',
+          category: 'Carpet',
+          color: 'N/A',
+          size: 'N/A',
+          pattern: 'N/A',
+          targetQuantity: 1,
+          priority: 'normal',
+          status: 'active',
+          expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date().toISOString(),
+          materialsConsumed,
+          wasteGenerated: [],
+          expectedProduct: {
+            name: 'Production Batch',
+            category: 'Carpet',
+            length: 'N/A',
+            width: 'N/A',
+            weight: 'N/A',
+            materialComposition: 'N/A',
+            qualityGrade: 'A'
+          },
+          notes: ''
+        };
+        setProductionProduct(productionProduct);
+        setProductionFlow(null);
+        setProductionSteps([]);
+        
+        // Load recipe or material list for UI
+        await loadRecipeMaterials(batchId);
+      } catch (error) {
+        console.error('❌ Error loading production data:', error);
+        // Set a fallback production product to prevent infinite loading
+        const fallbackProduct: ProductionProduct = {
+          id: batchId || 'unknown',
+          productId: batchId || 'unknown',
+          productName: 'Unknown Product',
+          category: 'Unknown',
+          color: 'Unknown',
+          size: 'Unknown',
+          pattern: 'Unknown',
+          targetQuantity: 1,
+          priority: 'normal',
+          status: 'active',
+          expectedCompletion: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          materialsConsumed: [],
+          wasteGenerated: [],
+          expectedProduct: {
+            name: 'Unknown Product',
+            category: 'Unknown',
+            length: '',
+            width: '',
+            weight: '',
+            materialComposition: '',
+            qualityGrade: 'A+'
+          },
+          notes: ''
+        };
+        setProductionProduct(fallbackProduct);
+      }
+    };
     
-    // Load raw materials from Supabase
+    loadProductionData();
+    loadWasteTypes();
+  }, [batchId]);
+
+  useEffect(() => {
+    if (!batchId) return;
+
+    const loadFlowAndSteps = async () => {
+      try {
+        // Load flow by batchId
+        const { data: flow } = await ProductionService.getProductionFlowByBatchId(batchId);
+        if (flow) {
+          setProductionFlow(flow);
+          // Load steps for this flow
+          const { data: steps } = await ProductionService.getProductionFlowSteps(flow.id);
+          if (steps) {
+            setProductionSteps(steps);
+          } else {
+            setProductionSteps([]);
+          }
+        } else {
+          setProductionFlow(null);
+          setProductionSteps([]);
+        }
+      } catch (err) {
+        console.error('Error loading production flow/steps for waste page:', err);
+        setProductionFlow(null);
+        setProductionSteps([]);
+      }
+    };
+
+    loadFlowAndSteps();
+  }, [batchId]);
+
+  // Load raw materials from MongoDB
+  useEffect(() => {
     const loadRawMaterials = async () => {
       try {
-        const result = await RawMaterialService.getRawMaterials();
+        const result = await MongoDBRawMaterialService.getRawMaterials();
         if (result?.data) {
           // Map Supabase RawMaterial to local interface
           const mappedMaterials = result.data.map((material: any) => ({
@@ -339,11 +509,11 @@ export default function WasteGeneration() {
     };
 
     loadRawMaterials();
-  }, [productId]);
+  }, []);
 
   // Handle waste material selection change
   const handleWasteMaterialSelection = (materialId: string) => {
-    const selectedMaterial = rawMaterials.find(m => m.id === materialId);
+    const selectedMaterial = recipeMaterials.find(m => m.id === materialId);
     if (selectedMaterial) {
       setNewWaste({
         ...newWaste,
@@ -351,21 +521,90 @@ export default function WasteGeneration() {
         materialName: selectedMaterial.name,
         unit: selectedMaterial.unit
       });
+      
+      // If it's a product, load individual products that were used in production
+      if (selectedMaterial.type === 'product') {
+        // Find the material consumption data for this material
+        const materialConsumptionData = recipeMaterials.find(m => m.id === selectedMaterial.id);
+        console.log('🔍 Selected material:', selectedMaterial);
+        console.log('🔍 Recipe materials:', recipeMaterials);
+        console.log('🔍 Found material consumption data:', materialConsumptionData);
+        
+        if (materialConsumptionData) {
+          loadIndividualProductsForWaste(selectedMaterial.id, materialConsumptionData);
+        } else {
+          console.log('⚠️ No material consumption data found for selected material');
+          setAvailableIndividualProducts([]);
+        }
+      } else {
+        setSelectedIndividualProducts([]);
+        setAvailableIndividualProducts([]);
+      }
+    }
+  };
+
+  // Load individual products that were actually used in production
+  const loadIndividualProductsForWaste = async (productId: string, materialConsumptionData: any) => {
+    try {
+      console.log('🔍 Loading individual products that were used in production:', productId);
+      
+      // Get the individual_product_ids from the material consumption data
+      const individualProductIds = materialConsumptionData.individual_product_ids || [];
+      
+      console.log('🔍 Material consumption data for individual products:', {
+        materialId: productId,
+        materialName: materialConsumptionData.material_name,
+        individual_product_ids: individualProductIds,
+        rawData: materialConsumptionData
+      });
+      
+      if (individualProductIds.length === 0) {
+        console.log('⚠️ No individual products were used for this material in production');
+        console.log('🔍 Available individual_product_ids field:', materialConsumptionData.individual_product_ids);
+        setAvailableIndividualProducts([]);
+        return;
+      }
+      
+      console.log('📋 Individual product IDs used in production:', individualProductIds);
+      
+      // Load only the specific individual products that were used
+      // Fetch individual products by IDs using the service
+      const fetched = await Promise.all(
+        individualProductIds.map((id: string) => IndividualProductService.getIndividualProductById(id))
+      );
+      const individualProducts = fetched
+        .map(r => r.data)
+        .filter(Boolean);
+      console.log('✅ Loaded individual products that were used in production:', individualProducts.length || 0);
+      setAvailableIndividualProducts(individualProducts || []);
+    } catch (error) {
+      console.error('Error loading individual products for waste:', error);
+      setAvailableIndividualProducts([]);
     }
   };
 
   const updateProductionProduct = (updatedProduct: ProductionProduct) => {
-    // TODO: Update production product in Supabase
+    // Local state update only; backend flow integration handled elsewhere
     console.log('Updated production product:', updatedProduct);
     setProductionProduct(updatedProduct);
   };
 
   const addWasteItem = () => {
     if (!productionProduct || !newWaste.materialId || !newWaste.quantity) return;
+    
+    if (!newWaste.wasteType || !newWaste.wasteType.trim()) {
+      alert('Please select a waste type');
+      return;
+    }
+
+    // Find the material from recipeMaterials to get material_type
+    const selectedMaterial = recipeMaterials.find(m => m.id === newWaste.materialId);
+    const materialType = selectedMaterial?.type || selectedMaterial?.isProduct ? 'product' : 'raw_material';
 
     const waste: WasteItem = {
       materialId: newWaste.materialId,
       materialName: newWaste.materialName,
+      materialType: materialType as 'raw_material' | 'product',
       quantity: parseFloat(newWaste.quantity),
       unit: newWaste.unit,
       wasteType: newWaste.wasteType,
@@ -388,7 +627,7 @@ export default function WasteGeneration() {
       materialName: "",
       quantity: "",
       unit: "",
-      wasteType: "scrap",
+      wasteType: "",
       canBeReused: false,
       notes: ""
     });
@@ -409,59 +648,36 @@ export default function WasteGeneration() {
 
   const completeWasteTracking = async () => {
     if (!productionProduct) return;
-    
-    // 1. Record material consumption and deduct from raw material inventory
+
+    // 1. Deduct consumed materials from raw material inventory
+    console.log('🔄 Deducting consumed materials from inventory...');
     if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
-      console.log('📦 Recording material consumption for production:', productionProduct.id);
-      
-      // Record each material consumption using the proper service
       for (const consumed of productionProduct.materialsConsumed) {
         try {
-          const result = await RawMaterialService.recordMaterialConsumption({
-            production_batch_id: productionProduct.id,
-            material_id: consumed.materialId,
-            consumed_quantity: consumed.quantity,
-            waste_quantity: 0, // No waste in this step, waste is tracked separately
-            operator: 'Admin',
-            notes: `Material consumed during production of ${productionProduct.productName}`
-          });
-          
-          if (result.error) {
-            console.error(`❌ Error recording consumption for ${consumed.materialName}:`, result.error);
-          } else {
-            console.log(`✅ Recorded consumption: ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
+          // Find the raw material in the list
+          const material = rawMaterials.find(m => m.id === consumed.materialId);
+          if (material) {
+            const newStock = material.currentStock - consumed.quantity;
+            const newStatus = newStock <= 0 ? "out-of-stock" :
+                            newStock <= 10 ? "low-stock" : "in-stock";
+
+            // Update in backend
+            await MongoDBRawMaterialService.updateRawMaterial(material.id, {
+              current_stock: Math.max(0, newStock)
+            });
+
+            console.log(`✅ Deducted ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
           }
         } catch (error) {
-          console.error(`❌ Error processing material consumption for ${consumed.materialName}:`, error);
+          console.error(`❌ Error deducting material ${consumed.materialName}:`, error);
         }
       }
-      
-      // Reload raw materials to reflect updated stock levels
-      const { data: updatedMaterials } = await RawMaterialService.getRawMaterials();
-      if (updatedMaterials) {
-        const mappedMaterials = updatedMaterials.map((material: any) => ({
-          id: material.id,
-          name: material.name,
-          brand: material.brand || '',
-          category: material.category,
-          currentStock: material.current_stock,
-          unit: material.unit,
-          costPerUnit: material.cost_per_unit,
-          supplier: material.supplier_name || '',
-          supplierId: material.supplier_id || '',
-          status: material.status || 'in-stock',
-          location: material.location,
-          batchNumber: material.batch_number
-        })) as RawMaterial[];
-        setRawMaterials(mappedMaterials);
-        console.log('✅ Raw materials inventory updated');
-      }
     }
-    
+
     // 2. Add waste items to waste management system
     if (productionProduct.wasteGenerated && productionProduct.wasteGenerated.length > 0) {
       console.log('🗑️ Adding waste items to waste management system...');
-      
+
       for (const waste of productionProduct.wasteGenerated) {
         try {
           // Check if this waste is from consumed materials or additional waste
@@ -469,15 +685,31 @@ export default function WasteGeneration() {
             consumed => consumed.materialId === waste.materialId
           );
           
-          const result = await WasteManagementService.createWasteItem({
+          // Calculate waste percentage based on consumed material
+          const consumedMaterial = productionProduct.materialsConsumed?.find(
+            consumed => consumed.materialId === waste.materialId
+          );
+          const wastePercentage = consumedMaterial && consumedMaterial.quantity > 0
+            ? (waste.quantity / consumedMaterial.quantity) * 100
+            : 0;
+
+          const result = await WasteService.createWaste({
             material_id: waste.materialId,
             material_name: waste.materialName,
-        quantity: waste.quantity,
-        unit: waste.unit,
-            waste_type: waste.wasteType,
+            material_type: waste.materialType || 'raw_material', // Include material type
+            quantity: waste.quantity,
+            unit: waste.unit,
+            waste_type: waste.wasteType, // This will be mapped correctly (Scrap/Defective/Excess)
             can_be_reused: waste.canBeReused,
             production_batch_id: productionProduct.id,
             production_product_id: productionProduct.id,
+            product_id: productionFlow?.product_id || productionProduct.productId,
+            product_name: productionFlow?.product_name || productionProduct.productName,
+            waste_category: waste.canBeReused ? 'reusable' : 'disposable', // Set based on can_be_reused
+            waste_percentage: wastePercentage,
+            generation_date: new Date().toISOString(),
+            generation_stage: 'production',
+            reason: waste.notes || 'Waste generated during production',
             notes: `${waste.notes || ''} ${isFromConsumedMaterial ? '(From consumed material)' : '(Additional waste - not deducted from inventory)'}`
           });
           
@@ -494,98 +726,53 @@ export default function WasteGeneration() {
       console.log('✅ All waste items added to waste management system');
     }
     
-    // 3. Mark waste generation step as completed
-    ProductionFlowService.getProductionFlow(productionProduct.id).then(flow => {
-      if (flow) {
-        const wasteStep = productionSteps.find(s => s.step_type === 'wastage_tracking');
-        if (wasteStep && wasteStep.status !== 'completed') {
-          // Update the waste step to completed
-          ProductionFlowService.updateFlowStep(wasteStep.id, {
-            status: 'completed',
-            end_time: new Date().toISOString(),
-            inspector_name: 'Admin',
-            notes: `Waste tracking completed with ${(productionProduct?.wasteGenerated || []).length} items. Materials deducted from inventory.`
-          });
-          
-          // Update local production steps state
-          const updatedSteps = productionSteps.map(step => 
-            step.id === wasteStep.id 
-              ? { 
-                  ...step, 
-                  status: 'completed' as const, 
-                  end_time: new Date().toISOString(),
-                  inspector_name: 'Admin',
-                  notes: `Waste tracking completed with ${(productionProduct?.wasteGenerated || []).length} items. Materials deducted from inventory.`
-                }
-              : step
-          );
-          setProductionSteps(updatedSteps);
-          
-          console.log('Waste tracking step completed');
-        }
+    // 3. Mark waste generation step as completed (persist in MongoDB)
+    const existingWasteStep: any = productionSteps.find((s: any) => s.step_type === 'wastage_tracking');
+    if (existingWasteStep) {
+      try {
+        await ProductionService.updateProductionFlowStep(existingWasteStep.id, {
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          notes: `Waste tracking completed with ${(productionProduct?.wasteGenerated || []).length} items.`
+        } as any);
+      } catch (e) {
+        console.error('Error persisting waste step completion:', e);
       }
-    });
+    } else if (productionFlow?.id) {
+      // Create a waste step as completed if it doesn't exist yet
+      try {
+        const { error: stepError } = await ProductionService.createProductionFlowStep({
+          flow_id: productionFlow.id,
+          step_name: 'Waste Generation',
+          step_type: 'wastage_tracking',
+          status: 'completed',
+          order_index: (productionSteps?.length || 0) + 1,
+          inspector_name: 'Admin',
+          notes: `Waste tracking completed with ${(productionProduct?.wasteGenerated || []).length} items.`
+        });
+        if (stepError) {
+          console.error('Error creating waste step:', stepError);
+        }
+      } catch (e) {
+        console.error('Error creating waste step:', e);
+      }
+    }
     
     // Navigate directly to individual details section (Complete page)
-      navigate(`/production/complete/${productId}`);
+    navigate(`/production/complete/${productId}`);
   };
 
   const skipWasteGeneration = async () => {
     if (!productionFlow) {
-      console.error('No production flow found');
-      return;
+      console.warn('No production flow found; proceeding without step persistence');
     }
 
     try {
-      console.log('Skipping waste generation for flow:', productionFlow.id);
+      console.log('Skipping waste generation for flow:', productionFlow?.id);
       
-      // 1. Deduct consumed materials from raw material inventory (even when skipping waste)
-      if (productionProduct && productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
-        console.log('📦 Recording material consumption for production (skipping waste):', productionProduct.id);
-        
-        // Record each material consumption using the proper service
-        for (const consumed of productionProduct.materialsConsumed) {
-          try {
-            const result = await RawMaterialService.recordMaterialConsumption({
-              production_batch_id: productionProduct.id,
-              material_id: consumed.materialId,
-              consumed_quantity: consumed.quantity,
-              waste_quantity: 0, // No waste when skipping
-              operator: 'Admin',
-              notes: `Material consumed during production of ${productionProduct.productName} (waste generation skipped)`
-            });
-            
-            if (result.error) {
-              console.error(`❌ Error recording consumption for ${consumed.materialName}:`, result.error);
-            } else {
-              console.log(`✅ Recorded consumption: ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
-            }
-          } catch (error) {
-            console.error(`❌ Error processing material consumption for ${consumed.materialName}:`, error);
-          }
-        }
-        
-        // Reload raw materials to reflect updated stock levels
-        const { data: updatedMaterials } = await RawMaterialService.getRawMaterials();
-        if (updatedMaterials) {
-          const mappedMaterials = updatedMaterials.map((material: any) => ({
-            id: material.id,
-            name: material.name,
-            brand: material.brand || '',
-            category: material.category,
-            currentStock: material.current_stock,
-            unit: material.unit,
-            costPerUnit: material.cost_per_unit,
-            supplier: material.supplier_name || '',
-            supplierId: material.supplier_id || '',
-            status: material.status || 'in-stock',
-            location: material.location,
-            batchNumber: material.batch_number
-          })) as RawMaterial[];
-          setRawMaterials(mappedMaterials);
-          console.log('✅ Raw materials inventory updated (waste skipped)');
-        }
-      }
+      // Note: Material consumption was already recorded at the Plan Material stage
+      // Stock deduction happens automatically via the backend
+      console.log('✅ Material consumption already recorded at Plan Material stage (waste skipped)');
       
       // 2. Handle any additional waste items (even when skipping, user might have added some)
       if (productionProduct.wasteGenerated && productionProduct.wasteGenerated.length > 0) {
@@ -593,7 +780,15 @@ export default function WasteGeneration() {
         
         for (const waste of productionProduct.wasteGenerated) {
           try {
-            const result = await WasteManagementService.createWasteItem({
+            // Calculate waste percentage based on consumed material
+            const consumedMaterial = productionProduct.materialsConsumed?.find(
+              consumed => consumed.materialId === waste.materialId
+            );
+            const wastePercentage = consumedMaterial && consumedMaterial.quantity > 0
+              ? (waste.quantity / consumedMaterial.quantity) * 100
+              : 0;
+
+            const result = await WasteService.createWaste({
               material_id: waste.materialId,
               material_name: waste.materialName,
               quantity: waste.quantity,
@@ -602,6 +797,13 @@ export default function WasteGeneration() {
               can_be_reused: waste.canBeReused,
               production_batch_id: productionProduct.id,
               production_product_id: productionProduct.id,
+              product_id: productionFlow?.product_id || productionProduct.productId,
+              product_name: productionFlow?.product_name || productionProduct.productName,
+              waste_category: 'production',
+              waste_percentage: wastePercentage,
+              generation_date: new Date().toISOString(),
+              generation_stage: 'production',
+              reason: waste.notes || 'Waste generated during production (skipped)',
               notes: `${waste.notes || ''} (Additional waste - not deducted from inventory, waste generation skipped)`
             });
             
@@ -618,19 +820,11 @@ export default function WasteGeneration() {
         console.log('✅ Additional waste items added to waste management system');
       }
       
-      // Find the waste tracking step
+      // Find the waste tracking step (local only)
       let wasteStep = productionSteps.find(step => step.stepType === 'wastage_tracking');
       
       if (wasteStep) {
-        // Update the existing waste step to completed (skipped)
-        await ProductionFlowService.updateFlowStep(wasteStep.id, {
-          status: 'completed',
-          end_time: new Date().toISOString(),
-          inspector_name: 'Admin',
-          notes: 'Waste generation skipped - no waste was generated during this production process.'
-        });
-        
-        // Update local production steps state
+        // Update the existing waste step to completed (skipped) locally
         const updatedSteps = productionSteps.map(step => 
           step.id === wasteStep.id 
             ? { 
@@ -643,35 +837,23 @@ export default function WasteGeneration() {
             : step
         );
         setProductionSteps(updatedSteps);
-        
-        console.log('Waste generation step skipped and marked as completed');
-      } else {
-        // Create a new waste tracking step and mark it as completed (skipped)
-        console.log('Creating waste tracking step and marking as skipped');
-        const newWasteStep = await ProductionFlowService.addStepToFlow({
-          flow_id: productionFlow.id,
-          step_name: 'Waste Generation',
-          step_type: 'wastage_tracking',
-          order_index: productionSteps.length + 1,
-          machine_id: null,
-          inspector_name: 'Admin',
-          notes: 'Waste generation skipped - no waste was generated during this production process.'
-        });
-
-        // Update the step to completed status
-        if (newWasteStep) {
-          await ProductionFlowService.updateFlowStep(newWasteStep.id, {
+        // Persist to MongoDB
+        try {
+          await ProductionService.updateProductionFlowStep(wasteStep.id, {
             status: 'completed',
             end_time: new Date().toISOString(),
-            inspector_name: 'Admin',
-            notes: 'Waste generation skipped - no waste was generated during this production process.'
-          });
+            notes: 'Waste generation skipped.'
+          } as any);
+        } catch (e) {
+          console.error('Error persisting waste step skip:', e);
         }
-
-        // Add to local production steps state
+        
+        console.log('Waste generation step skipped and marked as completed (local)');
+      } else {
+        // Create a new waste tracking step locally and mark it as completed (skipped)
         const newStep = {
-          id: newWasteStep?.id || generateUniqueId('STEP'),
-          flow_id: productionFlow.id,
+          id: generateUniqueId('STEP'),
+          flow_id: productionFlow?.id || generateUniqueId('FLOW'),
           step_name: 'Waste Generation',
           step_type: 'wastage_tracking',
           order_index: productionSteps.length + 1,
@@ -684,9 +866,8 @@ export default function WasteGeneration() {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
-        
         setProductionSteps([...productionSteps, newStep]);
-        console.log('Waste generation step created and marked as skipped');
+        console.log('Waste generation step created and marked as skipped (local)');
       }
       
       // Navigate directly to individual details section (Complete page)
@@ -704,11 +885,15 @@ export default function WasteGeneration() {
 
   const totalWasteQuantity = (productionProduct.wasteGenerated || []).reduce((sum, w) => sum + w.quantity, 0);
 
+  // Get inspector name from first machine operation step
+  const inspectorName = productionSteps
+    .find((step: any) => step.step_type === 'machine_operation' && step.inspector_name)?.inspector_name || '';
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <Header 
         title={`Waste Generation: ${productionProduct.productName}`}
-        subtitle="Track waste generated during production process"
+        subtitle={`Track waste generated during production process${inspectorName ? ` • Inspector: ${inspectorName}` : ''}`}
       />
 
       {/* Status Alert */}
@@ -764,6 +949,54 @@ export default function WasteGeneration() {
           Back to Production Flow
         </Button>
       </div>
+
+      {/* Production Recipe Materials */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Factory className="w-5 h-5" />
+            Materials Used in Production
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {recipeMaterials.length > 0 ? (
+            <div className="space-y-3">
+              {recipeMaterials.map((material) => (
+                <div key={material.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{material.name}</span>
+                      <Badge variant={material.type === 'product' ? 'default' : 'secondary'}>
+                        {material.type === 'product' ? 'Product' : 'Raw Material'}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      Required: {material.quantity} {material.unit} • 
+                      Available: {material.currentStock} {material.unit} • 
+                      Category: {material.category}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium">
+                      {material.currentStock >= material.quantity ? (
+                        <span className="text-green-600">✓ Sufficient Stock</span>
+                      ) : (
+                        <span className="text-red-600">⚠ Low Stock</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500">
+              <Factory className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+              <p>No recipe materials found</p>
+              <p className="text-sm">Recipe materials will appear here when available</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Waste Generation Overview */}
       <Card>
@@ -824,54 +1057,142 @@ export default function WasteGeneration() {
                   <span className="text-sm font-medium text-blue-900">Waste Tracking</span>
                 </div>
                 <p className="text-sm text-blue-700">
-                  Track waste generated during production. Materials used in production are shown first for easy selection.
+                  Track waste generated during production. Shows materials and products that were actually consumed in this production batch (including products used as ingredients in recipes).
                 </p>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <Label>Select Material *</Label>
-                  <select
-                    value={newWaste.materialId}
-                    onChange={(e) => handleWasteMaterialSelection(e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    required
-                  >
-                    <option value="">Choose a material...</option>
-                    <optgroup label="Materials Used in Production">
-                      {productionProduct.materialsConsumed?.map((material) => (
-                        <option key={material.materialId} value={material.materialId}>
-                          {material.materialName} - Used: {material.quantity} {material.unit}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="All Raw Materials">
-                      {rawMaterials.map((material) => (
-                        <option key={material.id} value={material.id}>
-                          {material.name} - {material.currentStock} {material.unit} in stock
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
-                <div>
-                  <Label>Material Name</Label>
-                  <Input
-                    value={newWaste.materialName}
-                    onChange={(e) => setNewWaste({...newWaste, materialName: e.target.value})}
-                    placeholder="Auto-filled from selection"
-                    readOnly
-                  />
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Select Material/Product *</Label>
+                  <div className="space-y-2">
+                    {recipeMaterials.length > 0 ? (
+                      recipeMaterials.map((material) => (
+                        <div
+                          key={material.id}
+                          className={`border rounded-lg p-3 cursor-pointer transition-all hover:shadow-md ${
+                            newWaste.materialId === material.id 
+                              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' 
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => handleWasteMaterialSelection(material.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-gray-900">{material.name}</h4>
+                                <Badge variant="secondary" className="text-xs">
+                                  Raw Material
+                                </Badge>
+                                {material.isProduct && (
+                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
+                                    From Product
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600 space-y-1">
+                                <div className="flex items-center gap-4">
+                                  <span>Required: <span className="font-medium">{material.quantity} {material.unit}</span></span>
+                                  <span>Available: <span className={`font-medium ${
+                                    material.currentStock >= material.quantity ? 'text-green-600' : 'text-red-600'
+                                  }`}>{material.currentStock} {material.unit}</span></span>
+                                </div>
+                                {material.isProduct && (
+                                  <div className="text-xs text-blue-600">
+                                    Individual products available for selection
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="ml-3">
+                              <div className={`w-4 h-4 rounded-full border-2 ${
+                                newWaste.materialId === material.id 
+                                  ? 'border-blue-500 bg-blue-500' 
+                                  : 'border-gray-300'
+                              }`}>
+                                {newWaste.materialId === material.id && (
+                                  <div className="w-2 h-2 bg-white rounded-full m-0.5"></div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                        <p>No materials available for waste tracking</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+              
+              {/* Individual Products Used in Production */}
+              {newWaste.materialId && recipeMaterials.find(m => m.id === newWaste.materialId)?.type === 'product' && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Individual Products Used in Production</Label>
+                  
+                  {availableIndividualProducts.length > 0 ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-sm text-green-800 mb-2">
+                        {availableIndividualProducts.length} individual product(s) available for waste tracking:
+                      </div>
+                      <div className="space-y-2">
+                        {availableIndividualProducts.map((product) => (
+                          <div key={product.id} className="flex items-center justify-between bg-white rounded p-2 border">
+                            <div className="flex-1">
+                              <div className="text-sm font-medium text-gray-900">ID: {product.id}</div>
+                              <div className="text-xs text-gray-600">
+                                Weight: {product.finalWeight || 'N/A'}g • 
+                                Width: {product.finalWidth || 'N/A'}cm • Length: {product.finalLength || 'N/A'}cm
+                              </div>
+                            </div>
+                            <div className="ml-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedIndividualProducts.some(p => p.id === product.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedIndividualProducts(prev => [...prev, product]);
+                                  } else {
+                                    setSelectedIndividualProducts(prev => prev.filter(p => p.id !== product.id));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {selectedIndividualProducts.length > 0 && (
+                        <div className="mt-2 text-xs text-green-700">
+                          {selectedIndividualProducts.length} product(s) selected for waste tracking
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <div className="text-sm text-yellow-800">
+                        No individual products were used for this material in production
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label>Waste Quantity *</Label>
                   <Input
-                    type="number"
+                    type="text"
                     value={newWaste.quantity}
-                    onChange={(e) => setNewWaste({...newWaste, quantity: e.target.value})}
+                    onChange={(e) => {
+                      // Allow only numbers, decimals, and leading zeros
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setNewWaste({...newWaste, quantity: value});
+                      }
+                    }}
                     placeholder="0"
                     required
                   />
@@ -887,15 +1208,21 @@ export default function WasteGeneration() {
                 </div>
                 <div>
                   <Label>Waste Type</Label>
-                  <select
+                  <Select
                     value={newWaste.wasteType}
-                    onChange={(e) => setNewWaste({...newWaste, wasteType: e.target.value as any})}
-                    className="w-full border rounded px-3 py-2"
+                    onValueChange={(value) => setNewWaste({ ...newWaste, wasteType: value as any })}
                   >
-                    <option value="scrap">Scrap</option>
-                    <option value="defective">Defective</option>
-                    <option value="excess">Excess</option>
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select waste type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wasteTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
@@ -1020,6 +1347,7 @@ export default function WasteGeneration() {
           </div>
         </CardContent>
       </Card>
+
     </div>
   );
 }

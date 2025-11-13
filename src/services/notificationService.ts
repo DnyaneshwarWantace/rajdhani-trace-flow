@@ -13,7 +13,7 @@ export class NotificationService {
       // Generate a unique ID for the notification
       const notificationWithId = {
         ...notification,
-        id: generateUniqueId('NOTIF')
+        id: await generateUniqueId('NOTIF')
       };
 
       const { data, error } = await client

@@ -2,171 +2,184 @@
 
 export class IDGenerator {
   // Generate Product ID: PRO-YYMMDD-XXX
-  static generateProductId(): string {
+  static async generateProductId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('PRO', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('PRO', dateStr);
     
     return `PRO-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Raw Material ID: RM-YYMMDD-XXX
-  static generateRawMaterialId(): string {
+  static async generateRawMaterialId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('RM', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('RM', dateStr);
     
     return `RM-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Individual Product ID: IPD-YYMMDD-XXX
-  static generateIndividualProductId(): string {
+  static async generateIndividualProductId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('IPD', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('IPD', dateStr);
     
     return `IPD-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate QR Code: QR-YYMMDD-XXX
-  static generateQRCode(): string {
+  static async generateQRCode(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('QR', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('QR', dateStr);
     
     return `QR-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Waste ID: WASTE-YYMMDD-XXX
-  static generateWasteId(): string {
+  static async generateWasteId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('WASTE', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('WASTE', dateStr);
     
     return `WASTE-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Customer ID: CUST-XXX (simple sequential, no date)
-  static generateCustomerId(): string {
-    // Get next sequence number globally (no date component)
-    const sequence = this.getNextSequence('CUST', 'global');
+  static async generateCustomerId(): Promise<string> {
+    // Get next sequence number globally from database
+    const sequence = await this.getNextGlobalSequence('CUST');
 
     return `CUST-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Recipe ID: RECIPE-YYMMDD-XXX
-  static generateRecipeId(): string {
+  static async generateRecipeId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
 
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('RECIPE', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('RECIPE', dateStr);
 
     return `RECIPE-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Generate Recipe Material ID: RECMAT-YYMMDD-XXX
-  static generateRecipeMaterialId(): string {
+  static async generateRecipeMaterialId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
 
-    // Get next sequence number for today
-    const sequence = this.getNextSequence('RECMAT', dateStr);
+    // Get next sequence number for today from database
+    const sequence = await this.getNextSequence('RECMAT', dateStr);
 
     return `RECMAT-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Get next sequence number for a given prefix and date
-  private static getNextSequence(prefix: string, dateStr: string): number {
-    // Use localStorage for sequence management (no database dependency)
-    const storageKey = `id_sequence_${prefix}_${dateStr}`;
-    const existingSequence = localStorage.getItem(storageKey);
-    
-    if (existingSequence) {
-      const nextSequence = parseInt(existingSequence) + 1;
-      localStorage.setItem(storageKey, nextSequence.toString());
-      return nextSequence;
-    } else {
-      // First sequence for this prefix and date
-      localStorage.setItem(storageKey, '1');
-      return 1;
-    }
-  }
-
-  // Helper method to generate globally unique IDs by checking database
-  private static async generateUniqueId(prefix: string, tableName: string, dateStr: string): Promise<string> {
-    let sequence = 1;
-    let newId = `${prefix}-${dateStr}-${sequence.toString().padStart(3, '0')}`;
-    
-    // Import supabase dynamically to avoid circular dependencies
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (supabaseUrl && supabaseKey) {
-      const supabase = createClient(supabaseUrl, supabaseKey);
+  // Get next sequence number using database function (atomic operation)
+  private static async getNextSequence(prefix: string, dateStr: string): Promise<number> {
+    try {
+      // Import the centralized supabase client to avoid multiple instances
+      const { supabase } = await import('@/lib/supabase');
       
-      // Keep generating IDs until we find one that doesn't exist
-      while (true) {
-        const { data, error } = await supabase
-          .from(tableName)
-          .select('id')
-          .eq('id', newId)
-          .single();
-        
-        // If no data found, the ID is unique
-        if (error && error.code === 'PGRST116') {
-          break;
-        }
-        
-        // If we found data, the ID exists, try next sequence
-        sequence++;
-        newId = `${prefix}-${dateStr}-${sequence.toString().padStart(3, '0')}`;
-        
-        // Safety check to prevent infinite loops
-        if (sequence > 999) {
-          console.warn(`⚠️ Reached maximum sequence for ${prefix} today, using timestamp fallback`);
-          newId = `${prefix}-${dateStr}-${Date.now().toString().slice(-3)}`;
-          break;
-        }
+      if (!supabase) {
+        // Fallback to timestamp-based sequence if no Supabase config
+        return parseInt(Date.now().toString().slice(-3));
       }
+      
+      // Use the database function to atomically get next sequence
+      const { data, error } = await supabase.rpc('get_next_sequence', {
+        p_prefix: prefix,
+        p_date_str: dateStr
+      });
+      
+      if (error) {
+        console.warn(`Error calling get_next_sequence function: ${error.message}`);
+        // Check if it's a network error and provide more specific logging
+        if (error.message?.includes('Load failed') || error.message?.includes('network')) {
+          console.warn('Network connection issue detected, using fallback ID generation');
+        }
+        // Fallback to timestamp-based sequence
+        return parseInt(Date.now().toString().slice(-3));
+      }
+      
+      return data || 1;
+      
+    } catch (error) {
+      console.warn(`Error getting sequence from database: ${error}`);
+      // Fallback to timestamp-based sequence
+      return parseInt(Date.now().toString().slice(-3));
     }
-    
-    return newId;
   }
 
-  // Generate globally unique Individual Product ID by checking database
+  // Get next sequence for global sequences (no date component)
+  private static async getNextGlobalSequence(prefix: string): Promise<number> {
+    try {
+      // Import the centralized supabase client to avoid multiple instances
+      const { supabase } = await import('@/lib/supabase');
+      
+      if (!supabase) {
+        // Fallback to timestamp-based sequence if no Supabase config
+        return parseInt(Date.now().toString().slice(-3));
+      }
+      
+      // Use the database function to atomically get next global sequence
+      const { data, error } = await supabase.rpc('get_next_global_sequence', {
+        p_prefix: prefix
+      });
+      
+      if (error) {
+        console.warn(`Error calling get_next_global_sequence function: ${error.message}`);
+        // Check if it's a network error and provide more specific logging
+        if (error.message?.includes('Load failed') || error.message?.includes('network')) {
+          console.warn('Network connection issue detected, using fallback ID generation');
+        }
+        // Fallback to timestamp-based sequence
+        return parseInt(Date.now().toString().slice(-3));
+      }
+      
+      return data || 1;
+      
+    } catch (error) {
+      console.warn(`Error getting global sequence from database: ${error}`);
+      // Fallback to timestamp-based sequence
+      return parseInt(Date.now().toString().slice(-3));
+    }
+  }
+
+
+  // Generate globally unique Individual Product ID using database function
   static async generateUniqueIndividualProductId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -174,10 +187,26 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('IPD', 'individual_products', dateStr);
+    const sequence = await this.getNextSequence('IPD', dateStr);
+    return `IPD-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Product ID by checking database
+  // Generate a simple individual product ID without database checks (for high-concurrency scenarios)
+  static generateIndividualProductIdSimple(): string {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    // Use timestamp + random number for uniqueness
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+    return `IPD-${dateStr}-${timestamp}${random}`;
+  }
+
+  // Generate globally unique Product ID using database function
   static async generateUniqueProductId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -185,10 +214,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('PRO', 'products', dateStr);
+    const sequence = await this.getNextSequence('PRO', dateStr);
+    return `PRO-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Order ID by checking database
+  // Generate globally unique Order ID using database function
   static async generateUniqueOrderId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -196,21 +226,17 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('ORD', 'orders', dateStr);
+    const sequence = await this.getNextSequence('ORD', dateStr);
+    return `ORD-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Customer ID by checking database
+  // Generate globally unique Customer ID using database function
   static async generateUniqueCustomerId(): Promise<string> {
-    const now = new Date();
-    const year = now.getFullYear().toString().slice(-2);
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const dateStr = `${year}${month}${day}`;
-    
-    return this.generateUniqueId('CUST', 'customers', dateStr);
+    const sequence = await this.getNextGlobalSequence('CUST');
+    return `CUST-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Raw Material ID by checking database
+  // Generate globally unique Raw Material ID using database function
   static async generateUniqueRawMaterialId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -218,10 +244,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('RM', 'raw_materials', dateStr);
+    const sequence = await this.getNextSequence('RM', dateStr);
+    return `RM-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Production Flow ID by checking database
+  // Generate globally unique Production Flow ID using database function
   static async generateUniqueProductionFlowId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -229,10 +256,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('FLOW', 'production_flows', dateStr);
+    const sequence = await this.getNextSequence('FLOW', dateStr);
+    return `FLOW-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Production Batch ID by checking database
+  // Generate globally unique Production Batch ID using database function
   static async generateUniqueProductionBatchId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -240,10 +268,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('BATCH', 'production_batches', dateStr);
+    const sequence = await this.getNextSequence('BATCH', dateStr);
+    return `BATCH-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Waste ID by checking database
+  // Generate globally unique Waste ID using database function
   static async generateUniqueWasteId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -251,10 +280,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('WASTE', 'waste_management', dateStr);
+    const sequence = await this.getNextSequence('WASTE', dateStr);
+    return `WASTE-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Recipe ID by checking database
+  // Generate globally unique Recipe ID using database function
   static async generateUniqueRecipeId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -262,10 +292,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('RECIPE', 'product_recipes', dateStr);
+    const sequence = await this.getNextSequence('RECIPE', dateStr);
+    return `RECIPE-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Recipe Material ID by checking database
+  // Generate globally unique Recipe Material ID using database function
   static async generateUniqueRecipeMaterialId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -273,10 +304,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('RECMAT', 'recipe_materials', dateStr);
+    const sequence = await this.getNextSequence('RECMAT', dateStr);
+    return `RECMAT-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Purchase Order ID by checking database
+  // Generate globally unique Purchase Order ID using database function
   static async generateUniquePurchaseOrderId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -284,10 +316,11 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('PO', 'purchase_orders', dateStr);
+    const sequence = await this.getNextSequence('PO', dateStr);
+    return `PO-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
-  // Generate globally unique Supplier ID by checking database
+  // Generate globally unique Supplier ID using database function
   static async generateUniqueSupplierId(): Promise<string> {
     const now = new Date();
     const year = now.getFullYear().toString().slice(-2);
@@ -295,7 +328,8 @@ export class IDGenerator {
     const day = now.getDate().toString().padStart(2, '0');
     const dateStr = `${year}${month}${day}`;
     
-    return this.generateUniqueId('SUP', 'suppliers', dateStr);
+    const sequence = await this.getNextSequence('SUP', dateStr);
+    return `SUP-${dateStr}-${sequence.toString().padStart(3, '0')}`;
   }
 
   // Parse ID to get information
@@ -343,26 +377,26 @@ export class IDGenerator {
   }
 }
 
-// Legacy function for backward compatibility
-export const generateUniqueId = (prefix: string = ''): string => {
+// Legacy function for backward compatibility (now async)
+export const generateUniqueId = async (prefix: string = ''): Promise<string> => {
   switch (prefix.toUpperCase()) {
     case 'PROD':
     case 'PRO':
-      return IDGenerator.generateProductId();
+      return await IDGenerator.generateProductId();
     case 'RM':
-      return IDGenerator.generateRawMaterialId();
+      return await IDGenerator.generateRawMaterialId();
     case 'IND':
     case 'IPD':
-      return IDGenerator.generateIndividualProductId();
+      return await IDGenerator.generateIndividualProductId();
     case 'QR':
-      return IDGenerator.generateQRCode();
+      return await IDGenerator.generateQRCode();
     case 'CUST':
     case 'CUSTOMER':
-      return IDGenerator.generateCustomerId();
+      return await IDGenerator.generateCustomerId();
     case 'RECIPE':
-      return IDGenerator.generateRecipeId();
+      return await IDGenerator.generateRecipeId();
     case 'RECMAT':
-      return IDGenerator.generateRecipeMaterialId();
+      return await IDGenerator.generateRecipeMaterialId();
     default:
       // Fallback to old method for unknown prefixes
       const timestamp = Date.now().toString(36);

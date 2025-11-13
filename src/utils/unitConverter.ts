@@ -1,21 +1,19 @@
 // Unit Conversion Utilities for Carpet Pricing
 // Handles area conversions and pricing calculations
 
-export type AreaUnit = 'sqft' | 'sqm' | 'piece' | 'roll' | 'kg' | 'meter' | 'yard';
-export type VolumeUnit = 'liter' | 'ml' | 'gallon' | 'cubic_meter' | 'cubic_foot';
-export type WeightUnit = 'kg' | 'gram' | 'ton' | 'pound' | 'ounce';
-export type LengthUnit = 'meter' | 'cm' | 'mm' | 'foot' | 'inch' | 'linear_yard';
-export type CountUnit = 'piece' | 'roll' | 'unit' | 'dozen' | 'hundred' | 'thousand';
-export type TextileUnit = 'gsm' | 'denier' | 'tex' | 'oz_per_sqyd' | 'thread_count';
+export type AreaUnit = 'sqft' | 'sqm';
+export type VolumeUnit = never; // Not used anymore
+export type WeightUnit = 'kg';
+export type LengthUnit = never; // Not used anymore
+export type CountUnit = never; // Not used anymore
+export type TextileUnit = 'gsm';
 
 export type PricingUnit = AreaUnit | VolumeUnit | WeightUnit | LengthUnit | CountUnit | TextileUnit;
 
 export interface ProductDimensions {
   // Area/Dimension properties
   width?: number; // in meters
-  height?: number; // in meters
   length?: number; // in meters
-  thickness?: number; // in mm
   
   // Weight properties
   weight?: number; // in kg
@@ -45,271 +43,56 @@ export interface PricingUnitInfo {
 }
 
 export const PRICING_UNITS: PricingUnitInfo[] = [
-  // Area-based pricing (for carpets)
+  // Area-based pricing
   {
     unit: 'sqft',
     label: 'Per Square Foot',
-    description: 'Price per square foot of carpet',
+    description: 'Price per square foot',
     category: 'area',
     requiresDimensions: true,
-    applicableTo: ['carpet', 'finished_good']
+    applicableTo: ['carpet', 'finished_good', 'raw_material']
   },
   {
     unit: 'sqm',
     label: 'Per Square Meter',
-    description: 'Price per square meter of carpet',
+    description: 'Price per square meter',
     category: 'area',
     requiresDimensions: true,
-    applicableTo: ['carpet', 'finished_good']
-  },
-  {
-    unit: 'yard',
-    label: 'Per Square Yard',
-    description: 'Price per square yard of carpet',
-    category: 'area',
-    requiresDimensions: true,
-    applicableTo: ['carpet', 'finished_good']
+    applicableTo: ['carpet', 'finished_good', 'raw_material']
   },
   
-  // Weight-based pricing (for raw materials and bulk products)
+  // Weight-based pricing
   {
     unit: 'kg',
     label: 'Per Kilogram',
     description: 'Price per kilogram',
     category: 'weight',
     requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product', 'carpet']
-  },
-  {
-    unit: 'gram',
-    label: 'Per Gram',
-    description: 'Price per gram',
-    category: 'weight',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  {
-    unit: 'ton',
-    label: 'Per Ton',
-    description: 'Price per metric ton',
-    category: 'weight',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  {
-    unit: 'pound',
-    label: 'Per Pound',
-    description: 'Price per pound',
-    category: 'weight',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
+    applicableTo: ['raw_material', 'bulk_product', 'carpet', 'finished_good']
   },
   
-  // Volume-based pricing (for liquids and bulk materials)
-  {
-    unit: 'liter',
-    label: 'Per Liter',
-    description: 'Price per liter',
-    category: 'volume',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  {
-    unit: 'ml',
-    label: 'Per Milliliter',
-    description: 'Price per milliliter',
-    category: 'volume',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  {
-    unit: 'gallon',
-    label: 'Per Gallon',
-    description: 'Price per gallon',
-    category: 'volume',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  {
-    unit: 'cubic_meter',
-    label: 'Per Cubic Meter',
-    description: 'Price per cubic meter',
-    category: 'volume',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'bulk_product']
-  },
-  
-  // Length-based pricing
-  {
-    unit: 'meter',
-    label: 'Per Meter',
-    description: 'Price per linear meter',
-    category: 'length',
-    requiresDimensions: true,
-    applicableTo: ['carpet', 'raw_material', 'finished_good']
-  },
-  {
-    unit: 'cm',
-    label: 'Per Centimeter',
-    description: 'Price per centimeter',
-    category: 'length',
-    requiresDimensions: true,
-    applicableTo: ['raw_material', 'finished_good']
-  },
-  {
-    unit: 'foot',
-    label: 'Per Foot',
-    description: 'Price per linear foot',
-    category: 'length',
-    requiresDimensions: true,
-    applicableTo: ['carpet', 'raw_material', 'finished_good']
-  },
-  {
-    unit: 'linear_yard',
-    label: 'Per Linear Yard',
-    description: 'Price per linear yard',
-    category: 'length',
-    requiresDimensions: true,
-    applicableTo: ['carpet', 'raw_material', 'finished_good']
-  },
-  
-  // Count-based pricing
-  {
-    unit: 'piece',
-    label: 'Per Piece',
-    description: 'Fixed price per individual piece',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['carpet', 'finished_good', 'raw_material']
-  },
-  {
-    unit: 'roll',
-    label: 'Per Roll',
-    description: 'Price per roll',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['carpet', 'finished_good']
-  },
-  {
-    unit: 'unit',
-    label: 'Per Unit',
-    description: 'Price per unit',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['finished_good', 'raw_material']
-  },
-  {
-    unit: 'dozen',
-    label: 'Per Dozen',
-    description: 'Price per dozen (12 units)',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['finished_good', 'raw_material']
-  },
-  {
-    unit: 'hundred',
-    label: 'Per Hundred',
-    description: 'Price per hundred units',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['finished_good', 'raw_material']
-  },
-  {
-    unit: 'thousand',
-    label: 'Per Thousand',
-    description: 'Price per thousand units',
-    category: 'count',
-    requiresDimensions: false,
-    applicableTo: ['finished_good', 'raw_material']
-  },
-  
-  // Textile-based pricing (for carpets, textiles, and fibers)
+  // Textile-based pricing
   {
     unit: 'gsm',
     label: 'Per GSM',
-    description: 'Price per gram per square meter (carpet weight)',
+    description: 'Price per gram per square meter',
     category: 'textile',
     requiresDimensions: true,
-    applicableTo: ['carpet', 'textile', 'fiber']
-  },
-  {
-    unit: 'denier',
-    label: 'Per Denier',
-    description: 'Price per denier (fiber linear density)',
-    category: 'textile',
-    requiresDimensions: true,
-    applicableTo: ['textile', 'fiber', 'raw_material']
-  },
-  {
-    unit: 'tex',
-    label: 'Per Tex',
-    description: 'Price per tex (grams per 1000 meters)',
-    category: 'textile',
-    requiresDimensions: true,
-    applicableTo: ['textile', 'fiber', 'raw_material']
-  },
-  {
-    unit: 'oz_per_sqyd',
-    label: 'Per Oz/Sq Yd',
-    description: 'Price per ounce per square yard',
-    category: 'textile',
-    requiresDimensions: true,
-    applicableTo: ['carpet', 'textile']
-  },
-  {
-    unit: 'thread_count',
-    label: 'Per Thread Count',
-    description: 'Price per thread count (threads per unit area)',
-    category: 'textile',
-    requiresDimensions: true,
-    applicableTo: ['textile', 'fiber']
+    applicableTo: ['carpet', 'textile', 'fiber', 'finished_good']
   }
 ];
 
-// Conversion factors
-const CONVERSION_FACTORS = {
+// Conversion factors (only for the 4 units we support)
+const CONVERSION_FACTORS: Record<string, number> = {
   // Area conversions (relative to square meters)
   sqm: 1,
   sqft: 10.764, // 1 sqm = 10.764 sqft
-  yard: 1.196, // 1 sqm = 1.196 sq yards
-  
-  // Length conversions (relative to meters)
-  meter: 1,
-  cm: 100, // 1 meter = 100 cm
-  mm: 1000, // 1 meter = 1000 mm
-  foot: 3.281, // 1 meter = 3.281 feet
-  inch: 39.37, // 1 meter = 39.37 inches
-  yard_length: 1.094, // 1 meter = 1.094 yards (for length)
-  linear_yard: 1.094, // 1 meter = 1.094 linear yards
   
   // Weight conversions (relative to kg)
   kg: 1,
-  gram: 1000, // 1 kg = 1000 grams
-  ton: 0.001, // 1 kg = 0.001 tons
-  pound: 2.205, // 1 kg = 2.205 pounds
-  ounce: 35.274, // 1 kg = 35.274 ounces
-  
-  // Volume conversions (relative to liters)
-  liter: 1,
-  ml: 1000, // 1 liter = 1000 ml
-  gallon: 0.264, // 1 liter = 0.264 gallons
-  cubic_meter: 0.001, // 1 liter = 0.001 cubic meters
-  cubic_foot: 0.035, // 1 liter = 0.035 cubic feet
-  
-  // Count conversions (relative to pieces)
-  piece: 1,
-  roll: 1,
-  unit: 1,
-  dozen: 0.083, // 1 piece = 0.083 dozen
-  hundred: 0.01, // 1 piece = 0.01 hundred
-  thousand: 0.001, // 1 piece = 0.001 thousand
   
   // Textile conversions
-  gsm: 1, // grams per square meter (base unit)
-  denier: 1, // denier (grams per 9000 meters)
-  tex: 1, // tex (grams per 1000 meters)
-  oz_per_sqyd: 33.906, // 1 gsm = 33.906 oz/sqyd
-  thread_count: 1 // threads per unit area
+  gsm: 1 // grams per square meter (base unit)
 };
 
 /**
@@ -317,15 +100,6 @@ const CONVERSION_FACTORS = {
  */
 export function convertArea(value: number, fromUnit: AreaUnit, toUnit: AreaUnit): number {
   if (fromUnit === toUnit) return value;
-  
-  // Handle special cases
-  if (fromUnit === 'piece' || fromUnit === 'roll') {
-    return value; // No conversion for piece/roll
-  }
-  
-  if (toUnit === 'piece' || toUnit === 'roll') {
-    return value; // No conversion for piece/roll
-  }
   
   // Convert to square meters first
   let valueInSqm = value;
@@ -350,20 +124,12 @@ export function calculateUnitValue(dimensions: ProductDimensions, unit: PricingU
   
   switch (unitInfo.category) {
     case 'area':
-      if (!dimensions.width || !dimensions.height) return 0;
-      const areaInSqm = dimensions.width * dimensions.height;
+      if (!dimensions.width || !dimensions.length) return 0;
+      const areaInSqm = dimensions.width * dimensions.length;
       return convertUnit(areaInSqm, 'sqm', unit);
       
     case 'volume':
-      if (dimensions.volume) {
-        return convertUnit(dimensions.volume, 'liter', unit);
-      }
-      // Calculate volume from dimensions if available
-      if (dimensions.width && dimensions.height && dimensions.length) {
-        const volumeInCubicMeters = dimensions.width * dimensions.height * dimensions.length;
-        const volumeInLiters = volumeInCubicMeters * 1000; // 1 cubic meter = 1000 liters
-        return convertUnit(volumeInLiters, 'liter', unit);
-      }
+      // No volume-based units supported anymore
       return 0;
       
     case 'weight':
@@ -371,16 +137,12 @@ export function calculateUnitValue(dimensions: ProductDimensions, unit: PricingU
       return convertUnit(dimensions.weight, 'kg', unit);
       
     case 'length':
-      if (unit === 'meter') return dimensions.width || 0;
-      if (unit === 'cm') return (dimensions.width || 0) * 100;
-      if (unit === 'mm') return (dimensions.width || 0) * 1000;
-      if (unit === 'foot') return (dimensions.width || 0) * 3.281;
-      if (unit === 'inch') return (dimensions.width || 0) * 39.37;
-      if (unit === 'linear_yard') return (dimensions.width || 0) * 1.094;
-      return dimensions.width || 0;
+      // No length-based units supported anymore
+      return 0;
       
     case 'count':
-      return 1; // Each piece/unit is 1
+      // No count-based units supported anymore
+      return 0;
       
     case 'textile':
       return calculateTextileValue(dimensions, unit);
@@ -394,71 +156,20 @@ export function calculateUnitValue(dimensions: ProductDimensions, unit: PricingU
  * Calculate textile unit value based on dimensions
  */
 function calculateTextileValue(dimensions: ProductDimensions, unit: PricingUnit): number {
-  switch (unit) {
-    case 'gsm':
-      // GSM is already in grams per square meter
-      return dimensions.gsm || 0;
-      
-    case 'denier':
-      // Denier is grams per 9000 meters of fiber
-      return dimensions.denier || 0;
-      
-    case 'tex':
-      // Tex is grams per 1000 meters of fiber
-      return dimensions.tex || 0;
-      
-    case 'oz_per_sqyd':
-      // Convert GSM to oz/sqyd: 1 gsm = 0.0295 oz/sqyd
-      return (dimensions.gsm || 0) * 0.0295;
-      
-    case 'thread_count':
-      // Thread count per unit area
-      return dimensions.thread_count || 0;
-      
-    default:
-      return 0;
+  if (unit === 'gsm') {
+    // GSM is already in grams per square meter
+    return dimensions.gsm || 0;
   }
+  return 0;
 }
 
 /**
- * Convert between textile units
+ * Convert between textile units (only GSM supported)
  */
 function convertTextileUnit(value: number, fromUnit: PricingUnit, toUnit: PricingUnit): number {
   if (fromUnit === toUnit) return value;
-  
-  // Convert to base unit (GSM for area-based, Denier for linear-based)
-  let baseValue = value;
-  
-  switch (fromUnit) {
-    case 'gsm':
-      baseValue = value;
-      break;
-    case 'oz_per_sqyd':
-      baseValue = value / 0.0295; // Convert to GSM
-      break;
-    case 'denier':
-      baseValue = value;
-      break;
-    case 'tex':
-      baseValue = value * 9; // Convert tex to denier (1 tex = 9 denier)
-      break;
-    default:
-      return value;
-  }
-  
-  // Convert from base unit to target unit
-  switch (toUnit) {
-    case 'gsm':
-      return baseValue;
-    case 'oz_per_sqyd':
-      return baseValue * 0.0295;
-    case 'denier':
-      return baseValue;
-    case 'tex':
-      return baseValue / 9; // Convert denier to tex
-    default:
-      return baseValue;
-  }
+  // Only GSM is supported, so return value as-is
+  return value;
 }
 
 /**
@@ -484,7 +195,7 @@ function convertUnit(value: number, fromUnit: PricingUnit, toUnit: PricingUnit):
  * Check if a unit is a textile unit
  */
 function isTextileUnit(unit: PricingUnit): boolean {
-  return ['gsm', 'denier', 'tex', 'oz_per_sqyd', 'thread_count'].includes(unit);
+  return unit === 'gsm';
 }
 
 /**
@@ -499,29 +210,52 @@ export function calculateTotalPrice(
   const unitInfo = PRICING_UNITS.find(u => u.unit === pricingUnit);
   if (!unitInfo) return 0;
   
-  if (unitInfo.category === 'count') {
-    // Fixed price per piece/unit/dozen/etc.
-    const countMultiplier = getCountMultiplier(pricingUnit);
-    return unitPrice * quantity * countMultiplier;
+  // No count-based units anymore, removed
+  
+  // For GSM pricing: price per GSM * GSM value * total area (SQM) * quantity
+  if (pricingUnit === 'gsm') {
+    const gsm = productDimensions.weight || productDimensions.gsm || 0; // GSM is stored in weight field
+    const areaPerUnit = (productDimensions.length || 0) * (productDimensions.width || 0); // SQM per unit
+    const totalArea = areaPerUnit * quantity; // Total SQM for all units
+    
+    // If GSM or area is 0, return simple calculation as fallback
+    if (gsm <= 0 || areaPerUnit <= 0) {
+      return unitPrice * quantity;
+    }
+    
+    // Price = price per GSM * GSM * total SQM
+    return unitPrice * gsm * totalArea;
   }
   
-  // Calculate unit value based on dimensions
+  // For SQM pricing: price per SQM * SQM per unit * quantity
+  if (pricingUnit === 'sqm') {
+    const areaPerUnit = (productDimensions.length || 0) * (productDimensions.width || 0); // SQM per unit
+    const totalArea = areaPerUnit * quantity; // Total SQM for all units
+    // Price = price per SQM * total SQM
+    return unitPrice * totalArea;
+  }
+  
+  // For KG pricing: calculate weight from GSM and area, then price per kg * total weight
+  if (pricingUnit === 'kg') {
+    const gsm = productDimensions.weight || productDimensions.gsm || 0; // GSM is in weight field
+    const areaPerUnit = (productDimensions.length || 0) * (productDimensions.width || 0); // SQM per unit
+    if (gsm > 0 && areaPerUnit > 0) {
+      // Weight per unit in kg = (GSM × Area in sqm) / 1000
+      const weightPerUnit = (gsm * areaPerUnit) / 1000;
+      const totalWeight = weightPerUnit * quantity;
+      // Price = price per kg * total weight
+      return unitPrice * totalWeight;
+    }
+    return 0;
+  }
+  
+  // Calculate unit value based on dimensions for other units
   const unitValue = calculateUnitValue(productDimensions, pricingUnit);
   const totalValue = unitValue * quantity;
   return unitPrice * totalValue;
 }
 
-/**
- * Get multiplier for count-based units
- */
-function getCountMultiplier(unit: PricingUnit): number {
-  switch (unit) {
-    case 'dozen': return 12;
-    case 'hundred': return 100;
-    case 'thousand': return 1000;
-    default: return 1;
-  }
-}
+// Removed getCountMultiplier - no count-based units
 
 /**
  * Get the unit value of one unit of the product in the specified unit
@@ -577,11 +311,13 @@ export function validateDimensionsForUnit(dimensions: ProductDimensions, unit: P
   
   switch (unitInfo.category) {
     case 'area':
-      return !!(dimensions.width && dimensions.height);
+      // SQM and SQFT require length, width, AND weight (GSM)
+      return !!(dimensions.width && dimensions.length && dimensions.weight);
     case 'volume':
-      return !!(dimensions.volume || (dimensions.width && dimensions.height && dimensions.length));
+      return !!(dimensions.volume);
     case 'weight':
-      return !!(dimensions.weight);
+      // KG requires length, width, and weight (GSM) to calculate
+      return !!(dimensions.width && dimensions.length && dimensions.weight);
     case 'length':
       return !!(dimensions.width);
     case 'count':
@@ -597,20 +333,11 @@ export function validateDimensionsForUnit(dimensions: ProductDimensions, unit: P
  * Validate textile-specific dimensions
  */
 function validateTextileDimensions(dimensions: ProductDimensions, unit: PricingUnit): boolean {
-  switch (unit) {
-    case 'gsm':
-      return !!(dimensions.gsm || (dimensions.width && dimensions.height && dimensions.weight));
-    case 'denier':
-      return !!(dimensions.denier || (dimensions.length && dimensions.weight));
-    case 'tex':
-      return !!(dimensions.tex || (dimensions.length && dimensions.weight));
-    case 'oz_per_sqyd':
-      return !!(dimensions.gsm || (dimensions.width && dimensions.height && dimensions.weight));
-    case 'thread_count':
-      return !!(dimensions.thread_count || (dimensions.width && dimensions.height));
-    default:
-      return true;
+  if (unit === 'gsm') {
+    // GSM is stored in the weight field
+    return !!(dimensions.weight || dimensions.gsm);
   }
+  return false;
 }
 
 /**
@@ -619,60 +346,19 @@ function validateTextileDimensions(dimensions: ProductDimensions, unit: PricingU
 export function getSuggestedPricingUnit(productDimensions: ProductDimensions): PricingUnit {
   const productType = productDimensions.productType;
   
-  // For raw materials, prioritize weight or volume
-  if (productType === 'raw_material') {
-    if (productDimensions.weight) return 'kg';
-    if (productDimensions.volume) return 'liter';
-    return 'unit';
+  // Prioritize GSM if available, then SQM, then kg
+  if (productDimensions.gsm && productDimensions.gsm > 0) {
+    return 'gsm';
+  }
+  if (productDimensions.width && productDimensions.length) {
+    return 'sqm';
+  }
+  if (productDimensions.weight) {
+    return 'kg';
   }
   
-  // For bulk products, prioritize weight or volume
-  if (productType === 'bulk_product') {
-    if (productDimensions.weight) return 'kg';
-    if (productDimensions.volume) return 'liter';
-    return 'unit';
-  }
-  
-  // For carpets, prioritize GSM or area-based pricing
-  if (productType === 'carpet') {
-    if (productDimensions.gsm) return 'gsm';
-    if (productDimensions.width && productDimensions.height) {
-      return 'sqm'; // Default to square meters
-    }
-    if (productDimensions.width) {
-      return 'meter'; // Linear meter if only width available
-    }
-    return 'piece';
-  }
-  
-  // For textiles and fibers, prioritize textile units
-  if (productType === 'textile' || productType === 'fiber') {
-    if (productDimensions.gsm) return 'gsm';
-    if (productDimensions.denier) return 'denier';
-    if (productDimensions.tex) return 'tex';
-    if (productDimensions.thread_count) return 'thread_count';
-    if (productDimensions.weight) return 'kg';
-    return 'unit';
-  }
-  
-  // For finished goods, check dimensions
-  if (productType === 'finished_good') {
-    if (productDimensions.width && productDimensions.height) {
-      return 'sqm';
-    }
-    if (productDimensions.width) {
-      return 'meter';
-    }
-    return 'piece';
-  }
-  
-  // Default logic for unknown product types
-  if (productDimensions.weight) return 'kg';
-  if (productDimensions.volume) return 'liter';
-  if (productDimensions.width && productDimensions.height) return 'sqm';
-  if (productDimensions.width) return 'meter';
-  
-  return 'piece';
+  // Default to SQM
+  return 'sqm';
 }
 
 /**

@@ -1,0 +1,23 @@
+# SUPPLIERS TEMPLATE - Fill this sheet first
+# Each row = One supplier company
+# Required fields: Company Name, Status
+# Optional fields: Contact Person, Email, Phone, Address, City, State, Pincode, GST Number
+
+Company Name,Contact Person,Email,Phone,Full Address,City,State,Pincode,GST Number,Status
+"Textile Suppliers Ltd","John Doe","john@textilesuppliers.com","+91 9876543210","123 Textile Street, Industrial Area","Mumbai","Maharashtra","400001","27ABCDE1234F1Z5","active"
+"Fabric World Industries","Jane Smith","jane@fabricworld.com","+91 9876543211","456 Fabric Avenue, Trade Center","Delhi","Delhi","110001","07FGHIJ5678K2L6","active"
+"Premium Yarns Ltd","Priya Sharma","priya@premiumyarns.com","+91 9876543212","789 Yarn Road, Manufacturing Zone","Ahmedabad","Gujarat","380001","24MNOPQ9012R3S7","active"
+"Quality Fibers Co","Rajesh Patel","rajesh@qualityfibers.com","+91 9876543213","321 Fiber Lane, Business Park","Chennai","Tamil Nadu","600001","33AABCQ5678B2Y6","active"
+"Chemical Solutions Inc","Amit Kumar","amit@chemicalsolutions.com","+91 9876543214","654 Chemical Park, Industrial Estate","Bangalore","Karnataka","560001","29DEFGH1234I5J6","active"
+
+# INSTRUCTIONS:
+# 1. Company Name: Write the full company name (REQUIRED)
+# 2. Contact Person: Name of the main contact person
+# 3. Email: Company email address
+# 4. Phone: Contact phone number with country code
+# 5. Full Address: Complete address of the company
+# 6. City: City name
+# 7. State: State name
+# 8. Pincode: Postal/ZIP code
+# 9. GST Number: GST registration number (if available)
+# 10. Status: Write "active" for working suppliers, "inactive" for closed suppliers

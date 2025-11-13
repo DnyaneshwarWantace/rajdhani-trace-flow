@@ -39,7 +39,7 @@ export class DropdownService {
       if (error) throw error;
       
       // Get unique categories
-      const categories = [...new Set(data?.map(item => item.category) || [])];
+      const categories = [...new Set((data?.map((item: any) => item.category) || []) as string[])];
       return categories;
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -153,24 +153,22 @@ export class DropdownService {
     units: DropdownOption[];
     colors: DropdownOption[];
     patterns: DropdownOption[];
-    thicknesses: DropdownOption[];
     weights: DropdownOption[];
     categories: DropdownOption[];
-    heights: DropdownOption[];
+    lengths: DropdownOption[];
     widths: DropdownOption[];
   }> {
     try {
-      const categories = ['unit', 'color', 'pattern', 'thickness', 'weight', 'category', 'height', 'width'];
+      const categories = ['unit', 'color', 'pattern', 'weight', 'category', 'length', 'width'];
       const data = await this.getMultipleCategories(categories);
 
       return {
         units: data.unit || [],
         colors: data.color || [],
         patterns: data.pattern || [],
-        thicknesses: data.thickness || [],
         weights: data.weight || [],
         categories: data.category || [],
-        heights: data.height || [],
+        lengths: data.length || [],
         widths: data.width || []
       };
     } catch (error) {
@@ -179,10 +177,9 @@ export class DropdownService {
         units: [],
         colors: [],
         patterns: [],
-        thicknesses: [],
         weights: [],
         categories: [],
-        heights: [],
+        lengths: [],
         widths: []
       };
     }

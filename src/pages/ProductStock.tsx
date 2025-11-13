@@ -10,7 +10,7 @@ import {
   ArrowLeft, Package, AlertTriangle, QrCode, Calendar, 
   Edit, Eye, Hash, Image, Search, Filter, Download,
   CheckCircle, Clock, MapPin, Scale, Ruler, Layers,
-  User, Star, Truck, FileText
+  User, Star, Truck, FileText, CheckSquare, Square
 } from "lucide-react";
 import { 
   Select,
@@ -31,7 +31,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { generateUniqueId } from "@/lib/storageUtils";
 import { QRCodeService, IndividualProductQRData, MainProductQRData } from "@/lib/qrCode";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
-import { ProductService } from "@/services/ProductService";
+import { MongoDBProductService, IndividualProductService } from "@/services";
+import { mapMongoDBProductToFrontend, mapMongoDBIndividualProductToFrontend, type Product as FrontendProduct, type IndividualProduct as FrontendIndividualProduct } from "@/utils/typeMapping";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProductMaterial {
   materialName: string;
@@ -40,60 +42,9 @@ interface ProductMaterial {
   cost: number;
 }
 
-interface Product {
-  id: string;
-  qrCode: string;
-  name: string;
-  category: string;
-  color: string;
-  size: string;
-  pattern: string;
-  quantity: number;
-  unit: string;
-  manufacturingDate: string;
-  imageUrl?: string;
-  location: string;
-  weight?: string;
-  thickness?: string;
-  width?: string;
-  height?: string;
-  individualStockTracking?: boolean;
-}
-
-interface IndividualProduct {
-  id: string;
-  qrCode: string;
-  productId: string;
-  productName?: string;
-  manufacturingDate: string;
-  productionDate?: string;
-  addedDate?: string;
-  completionDate?: string;
-  materialsUsed: ProductMaterial[];
-  finalWeight: string;
-  finalThickness: string;
-  finalWidth: string;
-  finalHeight: string;
-  width?: string;
-  height?: string;
-  thickness?: string;
-  weight?: string;
-  color?: string;
-  pattern?: string;
-  qualityGrade: string;
-  inspector: string;
-  notes: string;
-  status: "available" | "sold" | "damaged";
-  location?: string;
-  // Production steps data (kept in background, not displayed in UI)
-  productionSteps?: Array<{
-    stepName: string;
-    machineUsed: string;
-    completedAt: string;
-    inspector: string;
-    qualityNotes?: string;
-  }>;
-}
+// Using imported types from typeMapping
+type Product = FrontendProduct;
+type IndividualProduct = FrontendIndividualProduct;
 
 
 
@@ -101,6 +52,7 @@ interface IndividualProduct {
 export default function ProductStock() {
   const { productId } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [product, setProduct] = useState<Product | null>(null);
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -111,29 +63,65 @@ export default function ProductStock() {
   const [editingItem, setEditingItem] = useState<IndividualProduct | null>(null);
   const [editForm, setEditForm] = useState({
     finalWeight: '',
-    finalThickness: '',
     finalWidth: '',
-    finalHeight: '',
+    finalLength: '',
     qualityGrade: '',
     inspector: '',
     location: '',
     notes: '',
-    status: 'available' as 'available' | 'sold' | 'damaged'
+    status: 'available' as 'available' | 'sold' | 'damaged' | 'returned' | 'in-production' | 'completed'
   });
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedQRIndividualProduct, setSelectedQRIndividualProduct] = useState<IndividualProduct | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // SQM Calculation function
+  const calculateSQM = (length: string, width: string, lengthUnit: string, widthUnit: string): number => {
+    const lengthValue = parseFloat(length) || 0;
+    const widthValue = parseFloat(width) || 0;
+
+    let lengthInMeters = lengthValue;
+    let widthInMeters = widthValue;
+
+    switch (lengthUnit.toLowerCase()) {
+      case 'mm': lengthInMeters = lengthValue / 1000; break;
+      case 'cm': lengthInMeters = lengthValue / 100; break;
+      case 'feet': lengthInMeters = lengthValue * 0.3048; break;
+      case 'inches': lengthInMeters = lengthValue * 0.0254; break;
+      case 'yards': lengthInMeters = lengthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': lengthInMeters = lengthValue; break;
+    }
+
+    switch (widthUnit.toLowerCase()) {
+      case 'mm': widthInMeters = widthValue / 1000; break;
+      case 'cm': widthInMeters = widthValue / 100; break;
+      case 'feet': widthInMeters = widthValue * 0.3048; break;
+      case 'inches': widthInMeters = widthValue * 0.0254; break;
+      case 'yards': widthInMeters = widthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': widthInMeters = widthValue; break;
+    }
+
+    return lengthInMeters * widthInMeters;
+  };
 
   useEffect(() => {
     const loadData = async () => {
       if (productId) {
         try {
-          // Load product from Supabase
-          const productResult = await ProductService.getProducts();
-          const foundProduct = productResult.data?.find((p: any) => p.id === productId);
-          if (foundProduct) {
-            setProduct(foundProduct);
-            // Use individual products from the main product data
-            setIndividualProducts(foundProduct.individual_products || []);
+          // Load product from MongoDB
+          const productResult = await MongoDBProductService.getProductById(productId);
+          if (productResult.data) {
+            const mappedProduct = mapMongoDBProductToFrontend(productResult.data);
+            setProduct(mappedProduct);
+            
+            // Load individual products from MongoDB
+            const individualProductsResult = await IndividualProductService.getIndividualProductsByProductId(productId);
+            if (individualProductsResult.data) {
+              const mappedIndividualProducts = individualProductsResult.data.map(mapMongoDBIndividualProductToFrontend);
+              setIndividualProducts(mappedIndividualProducts);
+            }
           }
         } catch (error) {
           console.error('Error loading data:', error);
@@ -160,12 +148,11 @@ export default function ProductStock() {
       product_name: individualProduct.productName || product?.name || 'Unknown Product',
       batch_id: individualProduct.id, // Using individual product ID as batch ID
       serial_number: individualProduct.qrCode,
-      production_date: individualProduct.productionDate || individualProduct.addedDate || new Date().toISOString().split('T')[0],
+      production_date: individualProduct.productionDate || new Date().toISOString().split('T')[0],
       quality_grade: individualProduct.qualityGrade || 'A',
       dimensions: {
         length: parseFloat(individualProduct.width?.replace(/[^\d.]/g, '') || '0'),
-        width: parseFloat(individualProduct.height?.replace(/[^\d.]/g, '') || '0'),
-        thickness: parseFloat(individualProduct.thickness?.replace(/[^\d.]/g, '') || '0')
+        width: parseFloat(individualProduct.length?.replace(/[^\d.]/g, '') || '0'),
       },
       weight: parseFloat(individualProduct.weight?.replace(/[^\d.]/g, '') || '0'),
       color: individualProduct.color || 'N/A',
@@ -183,7 +170,7 @@ export default function ProductStock() {
       inspector: individualProduct.inspector || 'System',
       location: individualProduct.location || 'Not specified',
       status: individualProduct.status as 'active' | 'sold' | 'damaged' | 'returned',
-      created_at: individualProduct.addedDate || new Date().toISOString()
+      created_at: individualProduct.createdAt || new Date().toISOString()
     };
   };
 
@@ -192,9 +179,8 @@ export default function ProductStock() {
     setEditingItem(item);
     setEditForm({
       finalWeight: item.finalWeight,
-      finalThickness: item.finalThickness,
       finalWidth: item.finalWidth,
-      finalHeight: item.finalHeight,
+      finalLength: item.finalLength,
       qualityGrade: item.qualityGrade,
       inspector: item.inspector,
       location: item.location || '',
@@ -208,8 +194,19 @@ export default function ProductStock() {
     if (!editingItem) return;
     
     try {
-      // Update the individual product in Supabase using ProductService
-      const { data, error } = await ProductService.updateIndividualProduct(editingItem.id, editForm);
+      // Update the individual product in MongoDB
+      const updateData = {
+        final_weight: editForm.finalWeight,
+        final_width: editForm.finalWidth,
+        final_length: editForm.finalLength,
+        quality_grade: editForm.qualityGrade,
+        inspector: editForm.inspector,
+        location: editForm.location,
+        notes: editForm.notes,
+        status: editForm.status === 'completed' ? 'available' : editForm.status
+      };
+      
+      const { data, error } = await IndividualProductService.updateIndividualProduct(editingItem.id, updateData);
       
       if (error) {
         console.error('Error updating individual product:', error);
@@ -260,6 +257,172 @@ export default function ProductStock() {
     return getIndividualProducts(productId || "").filter(item => item.qualityGrade === grade).length;
   };
 
+  // Handle product selection
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllProducts = () => {
+    const allIds = filteredItems.map(item => item.id);
+    setSelectedProducts(new Set(allIds));
+  };
+
+  const clearSelection = () => {
+    setSelectedProducts(new Set());
+  };
+
+  // Create QR code image with product name and ID text below
+  const createQRCodeWithText = async (
+    qrCodeDataURL: string,
+    productName: string,
+    productId: string
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      const qrImage = new window.Image();
+      qrImage.onload = () => {
+        // Set canvas dimensions
+        const qrSize = 256; // QR code size
+        const padding = 20;
+        const textHeight = 60; // Space for text below QR code
+        const lineHeight = 20;
+        
+        canvas.width = qrSize + (padding * 2);
+        canvas.height = qrSize + textHeight + (padding * 2);
+
+        // Fill white background
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw QR code
+        ctx.drawImage(qrImage, padding, padding, qrSize, qrSize);
+
+        // Draw text below QR code
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        
+        // Draw product name (truncate if too long)
+        const maxWidth = qrSize;
+        const productNameText = productName.length > 30 
+          ? productName.substring(0, 27) + '...' 
+          : productName;
+        ctx.fillText(productNameText, canvas.width / 2, qrSize + padding + 10, maxWidth);
+
+        // Draw product ID
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#666666';
+        ctx.fillText(`ID: ${productId}`, canvas.width / 2, qrSize + padding + 10 + lineHeight, maxWidth);
+
+        // Convert to data URL
+        const dataURL = canvas.toDataURL('image/png');
+        resolve(dataURL);
+      };
+
+      qrImage.onerror = () => {
+        reject(new Error('Failed to load QR code image'));
+      };
+
+      qrImage.src = qrCodeDataURL;
+    });
+  };
+
+  // Download QR codes
+  const downloadQRCodes = async (productIds: string[]) => {
+    setIsExporting(true);
+    try {
+      // Generate QR codes for all selected products
+      const qrPromises = productIds.map(async (id) => {
+        const item = individualProducts.find(ip => ip.id === id);
+        if (!item) return null;
+        
+        const qrData = generateIndividualProductQRData(item);
+        const qrCodeDataURL = await QRCodeService.generateIndividualProductQR(qrData);
+        
+        // Create QR code with text
+        const qrWithText = await createQRCodeWithText(
+          qrCodeDataURL,
+          item.productName || product?.name || 'Unknown Product',
+          item.id
+        );
+        
+        return {
+          id: item.id,
+          qrCode: item.qrCode,
+          dataURL: qrWithText,
+          productName: item.productName || product?.name || 'Unknown'
+        };
+      });
+
+      const qrCodes = (await Promise.all(qrPromises)).filter(Boolean) as Array<{
+        id: string;
+        qrCode: string;
+        dataURL: string;
+        productName: string;
+      }>;
+
+      // Download each QR code
+      for (const qr of qrCodes) {
+        const filename = `${qr.qrCode || qr.id}`;
+        QRCodeService.downloadQRCode(qr.dataURL, filename);
+        // Add a small delay between downloads to avoid browser blocking
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      // Show success toast
+      toast({
+        title: "QR Codes Downloaded",
+        description: `Successfully downloaded ${qrCodes.length} QR code(s) with product details.`,
+        variant: "default",
+      });
+      
+      setShowExportDialog(false);
+      clearSelection();
+    } catch (error) {
+      console.error('Error downloading QR codes:', error);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download QR codes. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportAll = () => {
+    const allIds = filteredItems.map(item => item.id);
+    downloadQRCodes(allIds);
+  };
+
+  const handleExportSelected = () => {
+    if (selectedProducts.size === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select at least one product to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+    downloadQRCodes(Array.from(selectedProducts));
+  };
+
   if (!product) {
     return (
       <div className="flex-1 space-y-6 p-6">
@@ -297,9 +460,9 @@ export default function ProductStock() {
             <Eye className="w-4 h-4 mr-2" />
             View Product Details
           </Button>
-          <Button>
-            <Download className="w-4 h-4 mr-2" />
-            Export Stock Report
+          <Button onClick={() => setShowExportDialog(true)}>
+            <QrCode className="w-4 h-4 mr-2" />
+            Export QR Codes
           </Button>
         </div>
       </div>
@@ -338,16 +501,12 @@ export default function ProductStock() {
               <p className="text-sm text-blue-700">{product.weight}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-800">Thickness</p>
-              <p className="text-sm text-blue-700">{product.thickness}</p>
-            </div>
-            <div className="space-y-1">
               <p className="text-sm font-medium text-blue-800">Width</p>
               <p className="text-sm text-blue-700">{product.width}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-800">Height</p>
-              <p className="text-sm text-blue-700">{product.height}</p>
+              <p className="text-sm font-medium text-blue-800">Length</p>
+              <p className="text-sm text-blue-700">{product.length}</p>
             </div>
           </div>
         </CardContent>
@@ -372,15 +531,23 @@ export default function ProductStock() {
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-semibold">{product.name}</h3>
-              <p className="text-muted-foreground">{product.color} • {product.width}x{product.height} • {product.pattern}</p>
+              <p className="text-muted-foreground">{product.color} • {product.width}x{product.length} • {product.pattern}</p>
                              <div className="flex items-center gap-4 mt-2">
                  <div className="flex items-center gap-2">
                    <Hash className="w-4 h-4 text-muted-foreground" />
-                   <span className="text-sm font-medium">Total Stock: {product.quantity} {product.unit || 'pieces'}</span>
+                   <span className="text-sm font-medium">Total Stock: {individualProducts.length} Products</span>
                  </div>
                  <div className="flex items-center gap-2">
                    <CheckCircle className="w-4 h-4 text-success" />
-                   <span className="text-sm text-success">Available: {getStatusCount("available")} {product.unit || 'pieces'}</span>
+                   <span className="text-sm text-success">Available: {getStatusCount("available")} Products</span>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="text-sm font-medium">Total SQM: {(individualProducts.length * calculateSQM(
+                     product.length || '0',
+                     product.width || '0',
+                     product.lengthUnit || 'feet',
+                     product.widthUnit || 'feet'
+                   )).toFixed(4)} SQM</span>
                  </div>
                </div>
             </div>
@@ -489,11 +656,31 @@ export default function ProductStock() {
             <table className="w-full">
               <thead>
                 <tr className="border-b">
+                  <th className="text-left p-3 font-medium text-muted-foreground w-12">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (selectedProducts.size === filteredItems.length) {
+                          clearSelection();
+                        } else {
+                          selectAllProducts();
+                        }
+                      }}
+                      title="Select All"
+                    >
+                      {selectedProducts.size === filteredItems.length && filteredItems.length > 0 ? (
+                        <CheckSquare className="w-4 h-4" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </th>
                   <th className="text-left p-3 font-medium text-muted-foreground">ID</th>
                   <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">QR Code</th>
                   <th className="text-left p-3 font-medium text-muted-foreground hidden md:table-cell">Manufacturing Date</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Final Width</th>
-                  <th className="text-left p-3 font-medium text-muted-foreground">Final Height</th>
+                  <th className="text-left p-3 font-medium text-muted-foreground">Final Length</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Quality Grade</th>
                   <th className="text-left p-3 font-medium text-muted-foreground hidden lg:table-cell">Inspector</th>
                   <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
@@ -503,6 +690,20 @@ export default function ProductStock() {
               <tbody>
                 {filteredItems.map((item) => (
                   <tr key={item.id} className="border-b hover:bg-muted/50">
+                    <td className="p-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleProductSelection(item.id)}
+                        title="Select"
+                      >
+                        {selectedProducts.has(item.id) ? (
+                          <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </td>
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <Hash className="w-4 h-4 text-muted-foreground" />
@@ -529,10 +730,24 @@ export default function ProductStock() {
                       </div>
                     </td>
                     <td className="p-3 text-sm hidden md:table-cell">
-                      {(item.manufacturingDate) && item.manufacturingDate !== 'null' ? new Date(item.manufacturingDate).toLocaleDateString() : (item.productionDate) && item.productionDate !== 'null' ? new Date(item.productionDate).toLocaleDateString() : (item.completionDate) && item.completionDate !== 'null' ? new Date(item.completionDate).toLocaleDateString() : 'N/A'}
+                      {(item.productionDate) && item.productionDate !== 'null' ? new Date(item.productionDate).toLocaleDateString() : (item.completionDate) && item.completionDate !== 'null' ? new Date(item.completionDate).toLocaleDateString() : 'N/A'}
                     </td>
-                    <td className="p-3 text-sm">{item.finalWidth}</td>
-                    <td className="p-3 text-sm">{item.finalHeight}</td>
+                    <td className="p-3 text-sm">
+                      {item.finalWidth ? (
+                        // Check if the value already contains a unit
+                        item.finalWidth.includes(' ') ? item.finalWidth : 
+                        // If not, combine with product unit
+                        `${item.finalWidth} ${product.widthUnit || 'feet'}`
+                      ) : 'N/A'}
+                    </td>
+                    <td className="p-3 text-sm">
+                      {item.finalLength ? (
+                        // Check if the value already contains a unit
+                        item.finalLength.includes(' ') ? item.finalLength : 
+                        // If not, combine with product unit
+                        `${item.finalLength} ${product.lengthUnit || 'feet'}`
+                      ) : 'N/A'}
+                    </td>
                     <td className="p-3">
                       <Badge variant={item.qualityGrade === "A+" ? "default" : "secondary"}>
                         {item.qualityGrade}
@@ -615,7 +830,7 @@ export default function ProductStock() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium">Manufacturing Date</Label>
-                  <p className="text-sm">{new Date(selectedItem.manufacturingDate).toLocaleDateString()}</p>
+                  <p className="text-sm">{(selectedItem.productionDate) && selectedItem.productionDate !== 'null' ? new Date(selectedItem.productionDate).toLocaleDateString() : (selectedItem.completionDate) && selectedItem.completionDate !== 'null' ? new Date(selectedItem.completionDate).toLocaleDateString() : 'N/A'}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Quality Grade</Label>
@@ -642,19 +857,30 @@ export default function ProductStock() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Final Weight</Label>
-                  <p className="text-sm">{selectedItem.finalWeight}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Final Thickness</Label>
-                  <p className="text-sm">{selectedItem.finalThickness}</p>
+                  <p className="text-sm">
+                    {selectedItem.finalWeight ? (
+                      /[a-zA-Z]/.test(selectedItem.finalWeight) ? selectedItem.finalWeight :
+                      `${selectedItem.finalWeight} ${product.weightUnit || 'kg'}`
+                    ) : 'N/A'}
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Final Width</Label>
-                  <p className="text-sm">{selectedItem.finalWidth}</p>
+                  <p className="text-sm">
+                    {selectedItem.finalWidth ? (
+                      /[a-zA-Z]/.test(selectedItem.finalWidth) ? selectedItem.finalWidth :
+                      `${selectedItem.finalWidth} ${product.widthUnit || 'feet'}`
+                    ) : 'N/A'}
+                  </p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Final Height</Label>
-                  <p className="text-sm">{selectedItem.finalHeight}</p>
+                  <Label className="text-sm font-medium">Final Length</Label>
+                  <p className="text-sm">
+                    {selectedItem.finalLength ? (
+                      /[a-zA-Z]/.test(selectedItem.finalLength) ? selectedItem.finalLength :
+                      `${selectedItem.finalLength} ${product.lengthUnit || 'feet'}`
+                    ) : 'N/A'}
+                  </p>
                 </div>
               </div>
 
@@ -710,15 +936,6 @@ export default function ProductStock() {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="finalThickness">Final Thickness</Label>
-              <Input
-                id="finalThickness"
-                value={editForm.finalThickness}
-                onChange={(e) => setEditForm({...editForm, finalThickness: e.target.value})}
-                placeholder="e.g., 2.5 cm"
-              />
-            </div>
             
             <div className="space-y-2">
               <Label htmlFor="finalWidth">Final Width</Label>
@@ -731,11 +948,11 @@ export default function ProductStock() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="finalHeight">Final Height</Label>
+              <Label htmlFor="finalLength">Final Length</Label>
               <Input
-                id="finalHeight"
-                value={editForm.finalHeight}
-                onChange={(e) => setEditForm({...editForm, finalHeight: e.target.value})}
+                id="finalLength"
+                value={editForm.finalLength}
+                onChange={(e) => setEditForm({...editForm, finalLength: e.target.value})}
                 placeholder="e.g., 2.74m"
               />
             </div>
@@ -830,7 +1047,7 @@ export default function ProductStock() {
                 <p><strong>QR Code:</strong> {selectedQRIndividualProduct.qrCode}</p>
                 <p><strong>Status:</strong> {selectedQRIndividualProduct.status}</p>
                 <p><strong>Quality Grade:</strong> {selectedQRIndividualProduct.qualityGrade}</p>
-                <p><strong>Manufacturing Date:</strong> {(selectedQRIndividualProduct.manufacturingDate) && selectedQRIndividualProduct.manufacturingDate !== 'null' ? new Date(selectedQRIndividualProduct.manufacturingDate).toLocaleDateString() : (selectedQRIndividualProduct.productionDate) && selectedQRIndividualProduct.productionDate !== 'null' ? new Date(selectedQRIndividualProduct.productionDate).toLocaleDateString() : (selectedQRIndividualProduct.completionDate) && selectedQRIndividualProduct.completionDate !== 'null' ? new Date(selectedQRIndividualProduct.completionDate).toLocaleDateString() : 'N/A'}</p>
+                <p><strong>Manufacturing Date:</strong> {(selectedQRIndividualProduct.productionDate) && selectedQRIndividualProduct.productionDate !== 'null' ? new Date(selectedQRIndividualProduct.productionDate).toLocaleDateString() : (selectedQRIndividualProduct.completionDate) && selectedQRIndividualProduct.completionDate !== 'null' ? new Date(selectedQRIndividualProduct.completionDate).toLocaleDateString() : 'N/A'}</p>
                 <p><strong>Inspector:</strong> {selectedQRIndividualProduct.inspector}</p>
                 <p><strong>Location:</strong> {selectedQRIndividualProduct.location || 'Not specified'}</p>
               </div>
@@ -846,6 +1063,59 @@ export default function ProductStock() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowQRCode(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export QR Codes Dialog */}
+      <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Export QR Codes</DialogTitle>
+            <DialogDescription>
+              Choose how you want to export QR codes for individual products
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {selectedProducts.size > 0 
+                  ? `${selectedProducts.size} product(s) selected`
+                  : 'No products selected'}
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={handleExportAll}
+                disabled={isExporting || filteredItems.length === 0}
+                className="w-full"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isExporting ? 'Exporting...' : `Export All (${filteredItems.length} products)`}
+              </Button>
+              
+              <Button
+                onClick={handleExportSelected}
+                disabled={isExporting || selectedProducts.size === 0}
+                variant="outline"
+                className="w-full"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isExporting ? 'Exporting...' : `Export Selected (${selectedProducts.size} products)`}
+              </Button>
+            </div>
+            
+            <div className="text-xs text-muted-foreground pt-2 border-t">
+              <p>💡 Tip: Select products using the checkboxes in the table, then click "Export Selected"</p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowExportDialog(false)}>
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 // Rajdhani ERP Services - Main exports
 
+// MongoDB Services (Primary)
 export { CustomerService, type CreateCustomerData, type UpdateCustomerData } from './customerService';
 export { OrderService, type CreateOrderData, type CreateOrderItemData, type UpdateOrderData } from './orderService';
 export { RawMaterialService, type CreateRawMaterialData, type UpdateRawMaterialData, type MaterialConsumptionData, type CreateSupplierData } from './rawMaterialService';
@@ -10,6 +11,15 @@ export { PurchaseOrderService, type CreatePurchaseOrderData, type UpdatePurchase
 export { NotificationService } from './notificationService';
 export { AuditService, logAudit } from './auditService';
 export { ProductRecipeService } from './productRecipeService';
+
+// MongoDB API Services
+export { ProductService as MongoDBProductService, type Product as MongoDBProduct, type CreateProductData as MongoDBCreateProductData, type UpdateProductData as MongoDBUpdateProductData, type ProductStats } from './api/productService';
+export { IndividualProductService, type IndividualProduct as MongoDBIndividualProduct, type CreateIndividualProductData as MongoDBCreateIndividualProductData, type UpdateIndividualProductData as MongoDBUpdateIndividualProductData } from './api/individualProductService';
+export { DropdownService } from './api/dropdownService';
+export { PurchaseOrderService as MongoDBPurchaseOrderService } from './api/purchaseOrderService';
+export { RawMaterialService as MongoDBRawMaterialService } from './api/rawMaterialService';
+export { SupplierService } from './api/supplierService';
+export { ManageStockService } from './api/manageStockService';
 
 // Re-export types from supabase client
 export type {

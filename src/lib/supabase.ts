@@ -1,57 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+// SUPABASE REMOVED - Now using MongoDB via backend API
+// This file is kept for type definitions only
 
-// Get Supabase configuration from environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_API_KEY;
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Check if Supabase is configured
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
-export const isServiceRoleConfigured = !!(supabaseUrl && supabaseServiceRoleKey);
-
-if (!isSupabaseConfigured) {
-  console.warn('⚠️ Supabase configuration missing. App will run in local storage mode.');
-  console.warn('Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file');
-}
-
-if (!isServiceRoleConfigured) {
-  console.warn('⚠️ Supabase service role key missing. RLS policies will apply.');
-  console.warn('Please set VITE_SUPABASE_SERVICE_ROLE_KEY in your .env file to bypass RLS');
-}
-
-// Create Supabase client (with fallback for missing config)
-export const supabase = isSupabaseConfigured ? createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  },
-  db: {
-    schema: 'public'
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'rajdhani-trace-flow'
-    }
-  }
-}) : null;
-
-// Create Supabase service role client (bypasses RLS)
-export const supabaseAdmin = isServiceRoleConfigured ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    detectSessionInUrl: false
-  },
-  db: {
-    schema: 'public'
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'rajdhani-trace-flow-admin'
-    }
-  }
-}) : null;
+export const isSupabaseConfigured = false;
+export const isServiceRoleConfigured = false;
+export const supabase = null;
+export const supabaseAdmin = null;
 
 // Database types for TypeScript
 export interface Database {
@@ -166,6 +119,18 @@ export interface Customer {
   company_name?: string;
   credit_limit: number;
   outstanding_amount: number;
+  permanent_address?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
+  delivery_address?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  };
   created_at: string;
   updated_at: string;
 }
@@ -195,7 +160,6 @@ export interface IndividualProduct {
   batch_number?: string;
   production_date: string;
   final_weight?: string;
-  final_thickness?: string;
   quality_grade: 'A+' | 'A' | 'B' | 'C';
   inspector?: string;
   status: 'available' | 'sold' | 'damaged' | 'reserved';
@@ -210,7 +174,7 @@ export interface IndividualProduct {
 export interface RawMaterial {
   id: string;
   name: string;
-  brand?: string;
+  type: string;
   category: string;
   current_stock: number;
   unit: string;
@@ -277,6 +241,13 @@ export interface Order {
   delivered_at?: string;
   created_at: string;
   updated_at: string;
+  // Delivery address stored with each order
+  delivery_address?: {
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
 }
 
 export interface OrderItem {
@@ -294,7 +265,7 @@ export interface OrderItem {
   pricing_unit: 'piece' | 'roll' | 'sqft' | 'sqm' | 'yard' | 'kg' | 'meter';
   unit_area?: number; // Area of one unit in the pricing unit
   product_width?: number; // Product width in meters
-  product_height?: number; // Product height in meters
+  product_length?: number; // Product length in meters
   product_weight?: number; // Product weight in kg
   created_at: string;
   updated_at: string;
@@ -337,27 +308,32 @@ export interface ProductionStep {
 }
 
 export interface MaterialConsumption {
-  id: string;
-  production_batch_id: string;
+  id?: string;
+  production_batch_id?: string;
+  production_product_id?: string; // New field for production batch tracking
   production_step_id?: string;
   material_id: string;
   material_name: string;
+  material_type?: 'product' | 'raw_material'; // New field for material type
   individual_product_id?: string;
-  consumed_quantity: number;
-  waste_quantity: number;
+  individual_product_ids?: string[]; // New field for array of individual product IDs
+  consumed_quantity?: number;
+  quantity_used?: number; // New field for quantity used
+  waste_quantity?: number;
   unit: string;
-  cost_per_unit: number;
-  consumption_date: string;
+  cost_per_unit?: number;
+  consumption_date?: string;
+  consumed_at?: string; // New field for consumption timestamp
   operator?: string;
   notes?: string;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface ProductRecipe {
   id: string;
   product_id: string;
   product_name: string;
-  total_cost: number;
+  base_unit: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -368,10 +344,9 @@ export interface RecipeMaterial {
   recipe_id: string;
   material_id: string;
   material_name: string;
+  material_type: 'raw_material' | 'product';
   quantity: number;
   unit: string;
-  cost_per_unit: number;
-  total_cost: number;
   created_at: string;
 }
 
@@ -446,9 +421,9 @@ export interface ProductionFlowStep {
   updated_at: string;
 }
 
-// Utility function to handle Supabase errors
+                                        // Utility function to handle errors (kept for backward compatibility with old services)
 export const handleSupabaseError = (error: any) => {
-  console.error('Supabase error:', error);
+  console.error('Error:', error);
   if (error?.message) {
     return error.message;
   }
@@ -465,38 +440,10 @@ export const generateUniqueId = (prefix: string = ''): string => {
   return prefix ? `${prefix}_${timestamp}_${randomStr}` : `${timestamp}_${randomStr}`;
 };
 
-// Connection test function with timeout
+// Keep for backward compatibility - always returns false now
 export const testSupabaseConnection = async () => {
-  // If Supabase is not configured, return false immediately
-  if (!isSupabaseConfigured || !supabase) {
-    console.warn('⚠️ Supabase not configured - running in local storage mode');
-    return false;
-  }
-
-  try {
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Connection timeout')), 5000);
-    });
-
-    const connectionPromise = supabase
-      .from('customers')
-      .select('id')
-      .limit(1);
-
-    const { data, error } = await Promise.race([connectionPromise, timeoutPromise]) as any;
-
-    if (error) {
-      console.error('Supabase connection test failed:', error);
-      return false;
-    }
-
-    console.log('✅ Supabase connection successful');
-    return true;
-  } catch (error) {
-    console.error('Supabase connection test failed:', error);
-    return false;
-  }
+  console.warn('⚠️ Supabase removed - now using MongoDB via backend API');
+  return false;
 };
 
-export default supabase;
+export default null;

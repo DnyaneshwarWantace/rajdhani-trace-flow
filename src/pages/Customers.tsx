@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
-import { CustomerService } from "@/services/customerService";
-import { OrderService } from "@/services/orderService";
+import { useNavigate } from "react-router-dom";
+import { CustomerService, CreateCustomerData } from "@/services/customerService";
+import { SupplierService, CreateSupplierData } from "@/services/supplierService";
+import { MongoDBOrderService } from "@/services/api/orderService";
 import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/layout/Header";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,31 +21,60 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, Phone, Mail, MapPin, ShoppingBag, Save, X, Calendar, DollarSign, Package, User, Building, RefreshCw } from "lucide-react";
+import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, Phone, Mail, MapPin, ShoppingBag, Save, X, Calendar, DollarSign, Package, User, Building, RefreshCw, CheckCircle, AlertTriangle, Truck } from "lucide-react";
+import { GSTApiService } from "@/services/gstApiService";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Customer {
   id: string;
   name: string;
   email: string;
   phone: string;
-  address: string;
+  address: string; // Keep for backward compatibility
   city: string;
   state: string;
   pincode: string;
-  customerType: "individual" | "business";
-  status: "active" | "inactive";
-  totalOrders: number;
-  totalValue: number;
-  lastOrderDate: string;
-  registrationDate: string;
-  gstNumber?: string;
-  companyName?: string;
+  customer_type: "individual" | "business";
+  status: "active" | "inactive" | "suspended" | "new";
+  total_orders: number;
+  total_value: string;
+  last_order_date?: string;
+  registration_date: string;
+  gst_number?: string;
+  company_name?: string;
+  credit_limit: string;
+  outstanding_amount: string;
+  // Address fields (stored as JSON strings)
+  permanent_address?: string;
+  delivery_address?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface Supplier {
+  id: string;
+  name: string;
+  contact_person?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  gst_number?: string;
+  performance_rating: number;
+  total_orders: number;
+  total_value: number;
+  status: "active" | "inactive" | "suspended";
+  created_at: string;
+  updated_at: string;
 }
 
 
@@ -53,16 +85,86 @@ const statusStyles = {
 
 export default function Customers() {
   const { toast } = useToast();
+  const { user, hasPageAccess, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showAddCustomerDialog, setShowAddCustomerDialog] = useState(false);
+  const [showAddSupplierDialog, setShowAddSupplierDialog] = useState(false);
+  
+  // Check permissions
+  // Page access = full access (create, edit, view) - delete is separate
+  const hasCustomerAccess = hasPageAccess('customers');
+  const hasSupplierAccess = hasPageAccess('suppliers');
+  // Also check if user has orders access (grants customer access)
+  const hasOrdersAccess = hasPageAccess('orders');
+  
+  // If user has orders access, they can also manage customers
+  const canAccessCustomers = hasCustomerAccess || hasOrdersAccess;
+  const canAccessSuppliers = hasSupplierAccess;
+  
+  // Create/edit permissions: if you have page access, you can create/edit
+  const canCreateCustomer = canAccessCustomers;
+  const canEditCustomer = canAccessCustomers;
+  const canDeleteCustomer = hasPermission('customer_delete'); // Delete requires explicit permission
+  const canCreateSupplier = canAccessSuppliers;
+  const canEditSupplier = canAccessSuppliers;
+  const canDeleteSupplier = hasPermission('supplier_delete'); // Delete requires explicit permission
+  
+  // Determine default tab based on permissions
+  const getDefaultTab = () => {
+    // If user has ONLY supplier permission → go to suppliers
+    if (canAccessSuppliers && !canAccessCustomers) return 'suppliers';
+    // If user has ONLY customer permission → go to customers
+    if (canAccessCustomers && !canAccessSuppliers) return 'customers';
+    // If user has BOTH → default to customers
+    if (canAccessCustomers && canAccessSuppliers) return 'customers';
+    // Default fallback
+    return 'customers';
+  };
+  
+  // Initialize tab based on permissions
+  const getInitialTab = () => {
+    // If user has ONLY supplier permission → suppliers tab
+    if (canAccessSuppliers && !canAccessCustomers) return 'suppliers';
+    // If user has ONLY customer permission → customers tab
+    if (canAccessCustomers && !canAccessSuppliers) return 'customers';
+    // If user has BOTH → default to customers
+    if (canAccessCustomers && canAccessSuppliers) return 'customers';
+    // Fallback (shouldn't reach here)
+    return 'customers';
+  };
+  
+  const [activeTab, setActiveTab] = useState<string>(getInitialTab());
+  
+  // Update tab when permissions are loaded
+  useEffect(() => {
+    const defaultTab = getDefaultTab();
+    // Only update if current tab is invalid for user's permissions
+    if ((activeTab === 'customers' && !canAccessCustomers) || 
+        (activeTab === 'suppliers' && !canAccessSuppliers)) {
+      setActiveTab(defaultTab);
+    }
+  }, [canAccessCustomers, canAccessSuppliers]);
+  
+  // Redirect if no access at all
+  useEffect(() => {
+    if (!canAccessCustomers && !canAccessSuppliers) {
+      navigate('/access-denied', { state: { pageName: 'Customers & Suppliers' } });
+    }
+  }, [canAccessCustomers, canAccessSuppliers, navigate]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
+  const [showSupplierDetails, setShowSupplierDetails] = useState(false);
   const [showEditCustomerDialog, setShowEditCustomerDialog] = useState(false);
+  const [showEditSupplierDialog, setShowEditSupplierDialog] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: "",
     email: "",
@@ -71,15 +173,105 @@ export default function Customers() {
     city: "",
     state: "",
     pincode: "",
-    customerType: "individual" as "individual" | "business",
-    gstNumber: "",
-    companyName: ""
+    customer_type: "individual" as "individual" | "business",
+    gst_number: "",
+    company_name: "",
+    credit_limit: "0.00",
+    notes: "",
+    // New address fields
+    permanentAddress: {
+      address: "",
+      city: "",
+      state: "",
+      pincode: ""
+    },
+    deliveryAddress: {
+      address: "",
+      city: "",
+      state: "",
+      pincode: ""
+    },
+    sameAsPermanent: true // Checkbox for same address
   });
+
+  const [newSupplierForm, setNewSupplierForm] = useState({
+    name: "",
+    contact_person: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    gst_number: ""
+  });
+
+  // GST API Integration State
+  const [isFetchingGST, setIsFetchingGST] = useState(false);
+  const [gstFetchError, setGstFetchError] = useState<string | null>(null);
+  const [gstAutoFilled, setGstAutoFilled] = useState(false);
+
+  // GST API Integration Functions
+  const handleGSTNumberChange = async (gstNumber: string) => {
+    setNewCustomerForm({...newCustomerForm, gst_number: gstNumber});
+    setGstFetchError(null);
+    setGstAutoFilled(false);
+
+    // Only fetch if GST number is complete (15 characters)
+    if (gstNumber.length === 15) {
+      setIsFetchingGST(true);
+      try {
+        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstNumber);
+        
+        if (error) {
+          setGstFetchError(error);
+        } else if (data) {
+          // Auto-fill customer details
+          // Use company name as customer name (GST doesn't have individual customer names)
+          const permanentAddress = {
+            address: data.address,
+            city: data.city,
+            state: data.state,
+            pincode: data.pincode
+          };
+          
+          setNewCustomerForm({
+            ...newCustomerForm,
+            gst_number: data.gstNumber,
+            name: data.companyName, // Use company name as customer name
+            company_name: data.companyName,
+            address: data.address, // Keep for backward compatibility
+            city: data.city,
+            state: data.state,
+            pincode: data.pincode,
+            permanentAddress: permanentAddress,
+            deliveryAddress: newCustomerForm.sameAsPermanent ? permanentAddress : newCustomerForm.deliveryAddress
+            // Note: Email and phone are not in GST data, user must enter manually
+          });
+          setGstAutoFilled(true);
+        }
+      } catch (error) {
+        console.error('Error fetching GST details:', error);
+        setGstFetchError('Failed to fetch GST details');
+      } finally {
+        setIsFetchingGST(false);
+      }
+    }
+  };
+
+  const clearGSTAutoFill = () => {
+    setGstAutoFilled(false);
+    setGstFetchError(null);
+  };
 
   const loadCustomers = async () => {
     try {
-      // Load customers from Supabase
-      const { data: supabaseCustomers, error } = await CustomerService.getCustomers();
+      // Load customers from MongoDB backend
+      const { data: customersData, error } = await CustomerService.getCustomers({
+        search: searchTerm,
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        customer_type: typeFilter !== 'all' ? typeFilter : undefined
+      });
       
       if (error) {
         console.error('Error loading customers:', error);
@@ -91,29 +283,9 @@ export default function Customers() {
         return;
       }
 
-      if (supabaseCustomers) {
-        // Convert from Supabase format to local format
-        const localCustomers: Customer[] = supabaseCustomers.map(customer => ({
-          id: customer.id,
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          address: customer.address || '',
-          city: customer.city || '',
-          state: customer.state || '',
-          pincode: customer.pincode || '',
-          customerType: customer.customer_type,
-          status: customer.status === 'active' ? 'active' : 'inactive',
-          totalOrders: customer.total_orders,
-          totalValue: customer.total_value,
-          lastOrderDate: customer.last_order_date || '',
-          registrationDate: customer.registration_date,
-          gstNumber: customer.gst_number,
-          companyName: customer.company_name
-        }));
-        
-        setCustomers(localCustomers);
-        console.log('✅ Loaded', localCustomers.length, 'customers from Supabase');
+      if (customersData) {
+        setCustomers(customersData);
+        console.log('✅ Loaded', customersData.length, 'customers from MongoDB');
       }
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -125,13 +297,42 @@ export default function Customers() {
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      // Load suppliers from MongoDB backend
+      const { data: suppliersData, error } = await SupplierService.getSuppliers({
+        search: searchTerm,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      });
+
+      if (error) {
+        console.error('Error loading suppliers:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load suppliers from database",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSuppliers(suppliersData || []);
+      console.log('✅ Loaded', suppliersData?.length || 0, 'suppliers from MongoDB');
+    } catch (error) {
+      console.error('Error loading suppliers:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load suppliers. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const loadOrders = async () => {
     try {
-      // Load orders from Supabase
-      const { data: ordersData, error } = await OrderService.getOrders();
+      const { data: ordersData, error: ordersError } = await MongoDBOrderService.getOrders();
       
-      if (error) {
-        console.error('Error loading orders:', error);
+      if (ordersError) {
+        console.error('Error loading orders:', ordersError);
         toast({
           title: "Error",
           description: "Failed to load orders from database.",
@@ -140,42 +341,37 @@ export default function Customers() {
         setOrders([]);
         return;
       }
-      
-      if (ordersData) {
-        // Transform Supabase data to match expected format
-        const transformedOrders = ordersData.map(order => ({
-          id: order.id,
-          orderNumber: order.order_number,
-          customerId: order.customer_id,
-          customerName: order.customer_name,
-          customerEmail: order.customer_email,
-          customerPhone: order.customer_phone,
-          orderDate: order.order_date,
-          expectedDelivery: order.expected_delivery,
-          status: order.status,
-          workflowStep: order.workflow_step,
-          priority: order.priority,
-          subtotal: order.subtotal,
-          gstRate: order.gst_rate,
-          gstAmount: order.gst_amount,
-          discountAmount: order.discount_amount,
-          totalAmount: order.total_amount,
-          paidAmount: order.paid_amount,
-          outstandingAmount: order.outstanding_amount,
-          specialInstructions: order.special_instructions,
-          acceptedAt: order.accepted_at,
-          dispatchedAt: order.dispatched_at,
-          deliveredAt: order.delivered_at,
-          createdAt: order.created_at,
-          updatedAt: order.updated_at,
-          items: order.items || []
-        }));
-        
-        setOrders(transformedOrders);
-        console.log('✅ Loaded orders from Supabase:', transformedOrders.length);
-      } else {
-        setOrders([]);
-      }
+
+      // Map MongoDB orders to the expected format for customer stats
+      const mappedOrders = (ordersData || []).map((order: any) => ({
+        id: order.id,
+        orderNumber: order.order_number || order.id,
+        customerId: order.customer_id || null,
+        customerName: order.customer_name || '',
+        totalAmount: parseFloat(order.total_amount || 0),
+        paidAmount: parseFloat(order.paid_amount || 0),
+        outstandingAmount: parseFloat(order.outstanding_amount || 0),
+        orderDate: order.order_date || order.created_at || new Date().toISOString(),
+        status: order.status || 'pending',
+        acceptedAt: order.accepted_at,
+        dispatchedAt: order.dispatched_at,
+        deliveredAt: order.delivered_at,
+        items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          productId: item.product_id,
+          productName: item.product_name || '',
+          productType: item.product_type || 'product',
+          quantity: item.quantity || 0,
+          unitPrice: parseFloat(item.unit_price || 0),
+          totalPrice: parseFloat(item.total_price || item.unit_price * item.quantity || 0),
+          qualityGrade: item.quality_grade,
+          specifications: item.specifications,
+          selectedProducts: item.selected_individual_products || []
+        }))
+      }));
+
+      setOrders(mappedOrders);
+      console.log('✅ Loaded', mappedOrders.length, 'orders');
     } catch (error) {
       console.error('Error in loadOrders:', error);
       toast({
@@ -187,16 +383,32 @@ export default function Customers() {
     }
   };
 
-  // Load customers and orders from Supabase on component mount
+  // Load customers, suppliers and orders from Supabase on component mount
   useEffect(() => {
     loadCustomers();
+    loadSuppliers();
     loadOrders();
   }, [toast]);
 
 
   // Get customer orders
   const getCustomerOrders = (customerId: string) => {
-    return orders.filter(order => order.customerId === customerId);
+    // Find the customer to get their name for fallback matching
+    const customer = customers.find(c => c.id === customerId);
+    const customerName = customer?.name || '';
+    
+    return orders.filter(order => {
+      // Match by customer ID if available
+      if (order.customerId && order.customerId === customerId) {
+        return true;
+      }
+      // Fallback: match by customer name if customer_id is null or doesn't match
+      if (!order.customerId && customerName && order.customerName && 
+          order.customerName.toLowerCase().trim() === customerName.toLowerCase().trim()) {
+        return true;
+      }
+      return false;
+    });
   };
 
   // Get customer order statistics
@@ -243,10 +455,12 @@ export default function Customers() {
         city: editingCustomer.city.trim() || undefined,
         state: editingCustomer.state.trim() || undefined,
         pincode: editingCustomer.pincode.trim() || undefined,
-        customer_type: editingCustomer.customerType,
+        customer_type: editingCustomer.customer_type,
         status: editingCustomer.status === 'active' ? 'active' as const : 'inactive' as const,
-        gst_number: editingCustomer.gstNumber?.trim() || undefined,
-        company_name: editingCustomer.companyName?.trim() || undefined
+        gst_number: editingCustomer.gst_number?.trim() || undefined,
+        company_name: editingCustomer.company_name?.trim() || undefined,
+        permanent_address: editingCustomer.permanent_address ? JSON.stringify(JSON.parse(editingCustomer.permanent_address)) : undefined,
+        delivery_address: editingCustomer.delivery_address ? JSON.stringify(JSON.parse(editingCustomer.delivery_address)) : undefined
       };
 
       // Update customer in Supabase
@@ -263,25 +477,8 @@ export default function Customers() {
       }
 
       if (updatedCustomer) {
-        // Convert from Supabase format to local format
-        const localUpdatedCustomer: Customer = {
-          id: updatedCustomer.id,
-          name: updatedCustomer.name,
-          email: updatedCustomer.email,
-          phone: updatedCustomer.phone,
-          address: updatedCustomer.address || '',
-          city: updatedCustomer.city || '',
-          state: updatedCustomer.state || '',
-          pincode: updatedCustomer.pincode || '',
-          customerType: updatedCustomer.customer_type,
-          status: updatedCustomer.status === 'active' ? 'active' : 'inactive',
-          totalOrders: updatedCustomer.total_orders,
-          totalValue: updatedCustomer.total_value,
-          lastOrderDate: updatedCustomer.last_order_date || '',
-          registrationDate: updatedCustomer.registration_date,
-          gstNumber: updatedCustomer.gst_number,
-          companyName: updatedCustomer.company_name
-        };
+        // Use the updated customer directly from MongoDB
+        const localUpdatedCustomer: Customer = updatedCustomer;
 
         // Update local state
     const updatedCustomers = customers.map(customer => 
@@ -361,7 +558,7 @@ export default function Customers() {
     const matchesSearch = (customer.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (customer.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (customer.phone || '').includes(searchTerm);
-    const matchesType = typeFilter === "all" || customer.customerType === typeFilter;
+    const matchesType = typeFilter === "all" || customer.customer_type === typeFilter;
     const matchesStatus = statusFilter === "all" || customer.status === statusFilter;
     
     return matchesSearch && matchesType && matchesStatus;
@@ -370,23 +567,34 @@ export default function Customers() {
   const handleAddCustomer = async () => {
     // Basic validation
     if (!newCustomerForm.name.trim() || !newCustomerForm.email.trim() || !newCustomerForm.phone.trim()) {
-      console.error('Please fill in required fields: Name, Email, and Phone');
+      toast({
+        title: "Error",
+        description: "Please fill in required fields: Name, Email, and Phone",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
       // Create new customer using CustomerService
-      const customerData = {
-      name: newCustomerForm.name.trim(),
-      email: newCustomerForm.email.trim(),
-      phone: newCustomerForm.phone.trim(),
+      const customerData: CreateCustomerData = {
+        name: newCustomerForm.name.trim(),
+        email: newCustomerForm.email.trim(),
+        phone: newCustomerForm.phone.trim(),
         address: newCustomerForm.address.trim() || undefined,
         city: newCustomerForm.city.trim() || undefined,
         state: newCustomerForm.state.trim() || undefined,
         pincode: newCustomerForm.pincode.trim() || undefined,
-        customer_type: newCustomerForm.customerType,
-        gst_number: newCustomerForm.gstNumber.trim() || undefined,
-        company_name: newCustomerForm.companyName.trim() || undefined
+        customer_type: newCustomerForm.customer_type,
+        gst_number: newCustomerForm.gst_number.trim() || undefined,
+        company_name: newCustomerForm.company_name.trim() || undefined,
+        credit_limit: newCustomerForm.credit_limit || "0.00",
+        notes: newCustomerForm.notes?.trim() || undefined,
+        // Address fields as JSON strings
+        permanent_address: newCustomerForm.permanentAddress ? JSON.stringify(newCustomerForm.permanentAddress) : undefined,
+        delivery_address: newCustomerForm.sameAsPermanent 
+          ? (newCustomerForm.permanentAddress ? JSON.stringify(newCustomerForm.permanentAddress) : undefined)
+          : (newCustomerForm.deliveryAddress ? JSON.stringify(newCustomerForm.deliveryAddress) : undefined)
       };
 
       const { data: newCustomer, error } = await CustomerService.createCustomer(customerData);
@@ -402,33 +610,13 @@ export default function Customers() {
       }
 
       if (newCustomer) {
-        // Add to customers array (convert from Supabase format to local format)
-        const localCustomer: Customer = {
-          id: newCustomer.id,
-          name: newCustomer.name,
-          email: newCustomer.email,
-          phone: newCustomer.phone,
-          address: newCustomer.address || '',
-          city: newCustomer.city || '',
-          state: newCustomer.state || '',
-          pincode: newCustomer.pincode || '',
-          customerType: newCustomer.customer_type,
-          status: newCustomer.status === 'active' ? 'active' : 'inactive',
-          totalOrders: newCustomer.total_orders,
-          totalValue: newCustomer.total_value,
-          lastOrderDate: newCustomer.last_order_date || '',
-          registrationDate: newCustomer.registration_date,
-          gstNumber: newCustomer.gst_number,
-          companyName: newCustomer.company_name
-        };
-
-        const updatedCustomers = [...customers, localCustomer];
-    setCustomers(updatedCustomers);
-    
-    // Reset form and close dialog
-    resetForm();
-    setShowAddCustomerDialog(false);
-    
+        // Add to customers array
+        setCustomers(prev => [newCustomer, ...prev]);
+        
+        // Reset form and close dialog
+        resetForm();
+        setShowAddCustomerDialog(false);
+        
         toast({
           title: "Success",
           description: "Customer created successfully!",
@@ -455,27 +643,182 @@ export default function Customers() {
       city: "",
       state: "",
       pincode: "",
-      customerType: "individual",
-      gstNumber: "",
-      companyName: ""
+      customer_type: "individual",
+      gst_number: "",
+      company_name: "",
+      credit_limit: "0.00",
+      notes: "",
+      permanentAddress: {
+        address: "",
+        city: "",
+        state: "",
+        pincode: ""
+      },
+      deliveryAddress: {
+        address: "",
+        city: "",
+        state: "",
+        pincode: ""
+      },
+      sameAsPermanent: true
     });
+  };
+
+  const resetSupplierForm = () => {
+    setNewSupplierForm({
+      name: "",
+      contact_person: "",
+      email: "",
+      phone: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
+      gst_number: ""
+    });
+  };
+
+  // Supplier management functions
+  const handleAddSupplier = async () => {
+    // Basic validation
+    if (!newSupplierForm.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Supplier name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Create new supplier using SupplierService
+      const supplierData: CreateSupplierData = {
+        name: newSupplierForm.name.trim(),
+        contact_person: newSupplierForm.contact_person.trim() || undefined,
+        email: newSupplierForm.email.trim() || undefined,
+        phone: newSupplierForm.phone.trim() || undefined,
+        address: newSupplierForm.address.trim() || undefined,
+        city: newSupplierForm.city.trim() || undefined,
+        state: newSupplierForm.state.trim() || undefined,
+        pincode: newSupplierForm.pincode.trim() || undefined,
+        gst_number: newSupplierForm.gst_number.trim() || undefined
+      };
+
+      const { data: newSupplier, error } = await SupplierService.createSupplier(supplierData);
+
+      if (error) {
+        console.error('Error creating supplier:', error);
+        toast({
+          title: "Error",
+          description: error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (newSupplier) {
+        setSuppliers(prev => [newSupplier, ...prev]);
+        resetSupplierForm();
+        setShowAddSupplierDialog(false);
+        
+        toast({
+          title: "Success",
+          description: "Supplier created successfully!",
+        });
+        
+        console.log('Supplier added successfully:', newSupplier);
+      }
+    } catch (error) {
+      console.error('Error creating supplier:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create supplier. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditSupplier = (supplier: Supplier) => {
+    setEditingSupplier({ ...supplier });
+    setShowEditSupplierDialog(true);
+  };
+
+  const handleSaveSupplier = async () => {
+    if (!editingSupplier) return;
+    
+    try {
+      const { data, error } = await SupplierService.updateSupplier(editingSupplier.id, {
+        name: editingSupplier.name.trim(),
+        contact_person: editingSupplier.contact_person?.trim() || undefined,
+        email: editingSupplier.email?.trim() || undefined,
+        phone: editingSupplier.phone?.trim() || undefined,
+        address: editingSupplier.address?.trim() || undefined,
+        city: editingSupplier.city?.trim() || undefined,
+        state: editingSupplier.state?.trim() || undefined,
+        pincode: editingSupplier.pincode?.trim() || undefined,
+        gst_number: editingSupplier.gst_number?.trim() || undefined,
+        status: editingSupplier.status
+      });
+
+      if (error) {
+        console.error('Error updating supplier:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update supplier",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data) {
+        const updatedSuppliers = suppliers.map(supplier => 
+          supplier.id === editingSupplier.id ? data : supplier
+        );
+        setSuppliers(updatedSuppliers);
+        setShowEditSupplierDialog(false);
+        setEditingSupplier(null);
+        
+        toast({
+          title: "Success",
+          description: "Supplier updated successfully!",
+        });
+        
+        console.log('Supplier updated successfully:', data);
+      }
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update supplier. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewSupplier = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setShowSupplierDetails(true);
   };
 
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter(c => c.status === "active").length;
-  const businessCustomers = customers.filter(c => c.customerType === "business").length;
-  const totalRevenue = customers.reduce((sum, c) => sum + c.totalValue, 0);
+  const businessCustomers = customers.filter(c => c.customer_type === "business").length;
+  const totalRevenue = customers.reduce((sum, c) => sum + parseFloat(c.total_value), 0);
+
+  const totalSuppliers = suppliers.length;
+  const activeSuppliers = suppliers.filter(s => s.status === "active").length;
 
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <Header 
-        title="Customer Management" 
-        subtitle="Manage customer information and relationships"
+        title="Customer & Supplier Management" 
+        subtitle="Manage customer and supplier information and relationships"
       />
         <Button 
           onClick={() => {
             loadCustomers();
+            loadSuppliers();
             loadOrders();
           }}
           variant="outline" 
@@ -486,6 +829,52 @@ export default function Customers() {
           Refresh Data
         </Button>
       </div>
+
+      <Tabs value={activeTab} onValueChange={(value) => {
+        // Prevent switching to tab if user doesn't have permission
+        if (value === 'customers' && !hasCustomerAccess) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to access the Customers section. You can only access Suppliers.",
+            variant: "destructive"
+          });
+          return;
+        }
+        if (value === 'suppliers' && !hasSupplierAccess) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to access the Suppliers section. You can only access Customers.",
+            variant: "destructive"
+          });
+          return;
+        }
+        setActiveTab(value);
+      }} className="w-full">
+        <TabsList className={`grid w-full ${(hasCustomerAccess ? 1 : 0) + (hasSupplierAccess ? 1 : 0) === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {hasCustomerAccess && (
+            <TabsTrigger 
+              value="customers" 
+              className="flex items-center gap-2"
+              disabled={!hasCustomerAccess}
+            >
+              <User className="h-4 w-4" />
+              Customers ({totalCustomers})
+            </TabsTrigger>
+          )}
+          {hasSupplierAccess && (
+            <TabsTrigger 
+              value="suppliers" 
+              className="flex items-center gap-2"
+              disabled={!hasSupplierAccess}
+            >
+              <Truck className="h-4 w-4" />
+              Suppliers ({totalSuppliers})
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        {hasCustomerAccess && (
+        <TabsContent value="customers" className="space-y-6">
 
       {/* Statistics */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -579,10 +968,12 @@ export default function Customers() {
           </Button>
         </div>
         
-        <Button onClick={() => setShowAddCustomerDialog(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Customer
-        </Button>
+        {canCreateCustomer && (
+          <Button onClick={() => setShowAddCustomerDialog(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Customer
+          </Button>
+        )}
       </div>
 
       {/* Customers Grid */}
@@ -593,8 +984,8 @@ export default function Customers() {
               <div className="flex items-start justify-between">
                 <div>
                   <CardTitle className="text-lg">{customer.name}</CardTitle>
-                  {customer.companyName && (
-                    <p className="text-sm text-muted-foreground mt-1">{customer.companyName}</p>
+                  {customer.company_name && (
+                    <p className="text-sm text-muted-foreground mt-1">{customer.company_name}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -602,7 +993,7 @@ export default function Customers() {
                     {customer.status}
                   </Badge>
                   <Badge variant="outline">
-                    {customer.customerType}
+                    {customer.customer_type}
                   </Badge>
                 </div>
               </div>
@@ -626,10 +1017,10 @@ export default function Customers() {
                 </div>
               </div>
 
-              {customer.gstNumber && (
+              {customer.gst_number && (
                 <div className="text-sm">
                   <span className="text-muted-foreground">GST: </span>
-                  <span className="font-mono text-xs">{customer.gstNumber}</span>
+                  <span className="font-mono text-xs">{customer.gst_number}</span>
                 </div>
               )}
 
@@ -656,7 +1047,7 @@ export default function Customers() {
                     </div>
                     <div>
                       <span className="text-muted-foreground">Customer Since:</span>
-                      <p className="font-medium text-xs">{customer.registrationDate}</p>
+                      <p className="font-medium text-xs">{customer.registration_date}</p>
                     </div>
                   </div>
                 );
@@ -715,15 +1106,17 @@ export default function Customers() {
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1"
-                  onClick={() => handleEditCustomer(customer)}
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
+                {canEditCustomer && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleEditCustomer(customer)}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
@@ -776,9 +1169,9 @@ export default function Customers() {
             <div className="space-y-3">
               <Label className="text-sm font-medium">Customer Type *</Label>
               <Select 
-                value={newCustomerForm.customerType} 
+                value={newCustomerForm.customer_type} 
                 onValueChange={(value: "individual" | "business") => 
-                  setNewCustomerForm({...newCustomerForm, customerType: value})
+                  setNewCustomerForm({...newCustomerForm, customer_type: value})
                 }
               >
                 <SelectTrigger>
@@ -831,28 +1224,180 @@ export default function Customers() {
                   <Label htmlFor="gstNumber">GST Number</Label>
                   <Input
                     id="gstNumber"
-                    value={newCustomerForm.gstNumber}
-                    onChange={(e) => setNewCustomerForm({...newCustomerForm, gstNumber: e.target.value})}
-                    placeholder="Enter GST number (optional)"
+                    value={newCustomerForm.gst_number}
+                    onChange={(e) => handleGSTNumberChange(e.target.value)}
+                    placeholder="Enter GST number"
+                    maxLength={15}
                   />
                 </div>
               </div>
 
-              {newCustomerForm.customerType === "business" && (
+              {newCustomerForm.customer_type === "business" && (
                 <div className="space-y-2">
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
                     id="companyName"
-                    value={newCustomerForm.companyName}
-                    onChange={(e) => setNewCustomerForm({...newCustomerForm, companyName: e.target.value})}
+                    value={newCustomerForm.company_name}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, company_name: e.target.value})}
                     placeholder="Enter company name"
                   />
                 </div>
               )}
             </div>
 
-            {/* Address Information */}
+            {/* Permanent Address Information */}
             <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Permanent Address
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="permanentAddress">Address</Label>
+                <Textarea
+                  id="permanentAddress"
+                  value={newCustomerForm.permanentAddress.address}
+                  onChange={(e) => setNewCustomerForm({
+                    ...newCustomerForm, 
+                    permanentAddress: {...newCustomerForm.permanentAddress, address: e.target.value}
+                  })}
+                  placeholder="Enter permanent address"
+                  rows={2}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="permanentCity">City</Label>
+                  <Input
+                    id="permanentCity"
+                    value={newCustomerForm.permanentAddress.city}
+                    onChange={(e) => setNewCustomerForm({
+                      ...newCustomerForm, 
+                      permanentAddress: {...newCustomerForm.permanentAddress, city: e.target.value}
+                    })}
+                    placeholder="Enter city"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="permanentState">State</Label>
+                  <Input
+                    id="permanentState"
+                    value={newCustomerForm.permanentAddress.state}
+                    onChange={(e) => setNewCustomerForm({
+                      ...newCustomerForm, 
+                      permanentAddress: {...newCustomerForm.permanentAddress, state: e.target.value}
+                    })}
+                    placeholder="Enter state"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="permanentPincode">Pincode</Label>
+                  <Input
+                    id="permanentPincode"
+                    value={newCustomerForm.permanentAddress.pincode}
+                    onChange={(e) => setNewCustomerForm({
+                      ...newCustomerForm, 
+                      permanentAddress: {...newCustomerForm.permanentAddress, pincode: e.target.value}
+                    })}
+                    placeholder="Enter pincode"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Address Information */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Delivery Address
+                </h3>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="sameAsPermanent"
+                    checked={newCustomerForm.sameAsPermanent}
+                    onChange={(e) => {
+                      const sameAsPermanent = e.target.checked;
+                      setNewCustomerForm({
+                        ...newCustomerForm,
+                        sameAsPermanent,
+                        deliveryAddress: sameAsPermanent ? newCustomerForm.permanentAddress : newCustomerForm.deliveryAddress
+                      });
+                    }}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="sameAsPermanent" className="text-sm">
+                    Same as permanent address
+                  </Label>
+                </div>
+              </div>
+              
+              {!newCustomerForm.sameAsPermanent && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="deliveryAddress">Address</Label>
+                    <Textarea
+                      id="deliveryAddress"
+                      value={newCustomerForm.deliveryAddress.address}
+                      onChange={(e) => setNewCustomerForm({
+                        ...newCustomerForm, 
+                        deliveryAddress: {...newCustomerForm.deliveryAddress, address: e.target.value}
+                      })}
+                      placeholder="Enter delivery address"
+                      rows={2}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryCity">City</Label>
+                      <Input
+                        id="deliveryCity"
+                        value={newCustomerForm.deliveryAddress.city}
+                        onChange={(e) => setNewCustomerForm({
+                          ...newCustomerForm, 
+                          deliveryAddress: {...newCustomerForm.deliveryAddress, city: e.target.value}
+                        })}
+                        placeholder="Enter city"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryState">State</Label>
+                      <Input
+                        id="deliveryState"
+                        value={newCustomerForm.deliveryAddress.state}
+                        onChange={(e) => setNewCustomerForm({
+                          ...newCustomerForm, 
+                          deliveryAddress: {...newCustomerForm.deliveryAddress, state: e.target.value}
+                        })}
+                        placeholder="Enter state"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryPincode">Pincode</Label>
+                      <Input
+                        id="deliveryPincode"
+                        value={newCustomerForm.deliveryAddress.pincode}
+                        onChange={(e) => setNewCustomerForm({
+                          ...newCustomerForm, 
+                          deliveryAddress: {...newCustomerForm.deliveryAddress, pincode: e.target.value}
+                        })}
+                        placeholder="Enter pincode"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Legacy Address Fields (Hidden but kept for backward compatibility) */}
+            <div className="hidden">
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
                 <Textarea
@@ -959,15 +1504,15 @@ export default function Customers() {
                         {selectedCustomer.address}, {selectedCustomer.city}, {selectedCustomer.state} - {selectedCustomer.pincode}
                       </span>
                     </div>
-                    {selectedCustomer.gstNumber && (
+                    {selectedCustomer.gst_number && (
                       <div className="flex items-center gap-2">
                         <Building className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">GST: {selectedCustomer.gstNumber}</span>
+                        <span className="text-sm">GST: {selectedCustomer.gst_number}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm">Customer since: {selectedCustomer.registrationDate}</span>
+                      <span className="text-sm">Customer since: {selectedCustomer.registration_date}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -1176,7 +1721,7 @@ export default function Customers() {
                                       )}
                                     </div>
                                     <div className="text-sm font-medium">
-                                      ₹{item.totalPrice.toLocaleString()}
+                                      ₹{(item.totalPrice || 0).toLocaleString()}
                                     </div>
                                   </div>
                                 ))}
@@ -1223,7 +1768,7 @@ export default function Customers() {
                                 {order.items.map((item, index) => (
                                   <div key={index} className="flex justify-between text-sm">
                                     <span>{item.productName} x {item.quantity}</span>
-                                    <span>₹{item.totalPrice.toLocaleString()}</span>
+                                    <span>₹{(item.totalPrice || 0).toLocaleString()}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1305,9 +1850,9 @@ export default function Customers() {
                 <div className="space-y-2">
                   <Label htmlFor="edit-customer-type">Customer Type *</Label>
                   <Select 
-                    value={editingCustomer.customerType} 
+                    value={editingCustomer.customer_type} 
                     onValueChange={(value: "individual" | "business") => 
-                      setEditingCustomer({...editingCustomer, customerType: value})
+                      setEditingCustomer({...editingCustomer, customer_type: value})
                     }
                   >
                     <SelectTrigger>
@@ -1343,8 +1888,8 @@ export default function Customers() {
                   <Input
                     id="edit-registration-date"
                     type="date"
-                    value={editingCustomer.registrationDate}
-                    onChange={(e) => setEditingCustomer({...editingCustomer, registrationDate: e.target.value})}
+                    value={editingCustomer.registration_date}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, registration_date: e.target.value})}
                   />
                 </div>
               </div>
@@ -1392,14 +1937,180 @@ export default function Customers() {
                 </div>
               </div>
 
+              {/* Permanent Address */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold">Permanent Address</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-permanent-address">Permanent Address</Label>
+                  <Textarea
+                    id="edit-permanent-address"
+                    value={editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).address || "" : ""}
+                    onChange={(e) => setEditingCustomer({
+                      ...editingCustomer, 
+                      permanent_address: JSON.stringify({
+                        address: e.target.value,
+                        city: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).city || "" : "",
+                        state: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).state || "" : "",
+                        pincode: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).pincode || "" : ""
+                      })
+                    })}
+                    placeholder="Enter permanent address"
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-permanent-city">City</Label>
+                    <Input
+                      id="edit-permanent-city"
+                      value={editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).city || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        permanent_address: JSON.stringify({
+                          address: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).address || "" : "",
+                          city: e.target.value,
+                          state: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).state || "" : "",
+                          pincode: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).pincode || "" : ""
+                        })
+                      })}
+                      placeholder="Enter city"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-permanent-state">State</Label>
+                    <Input
+                      id="edit-permanent-state"
+                      value={editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).state || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        permanent_address: JSON.stringify({
+                          address: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).address || "" : "",
+                          city: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).city || "" : "",
+                          state: e.target.value,
+                          pincode: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).pincode || "" : ""
+                        })
+                      })}
+                      placeholder="Enter state"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-permanent-pincode">Pincode</Label>
+                    <Input
+                      id="edit-permanent-pincode"
+                      value={editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).pincode || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        permanent_address: JSON.stringify({
+                          address: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).address || "" : "",
+                          city: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).city || "" : "",
+                          state: editingCustomer.permanent_address ? JSON.parse(editingCustomer.permanent_address).state || "" : "",
+                          pincode: e.target.value
+                        })
+                      })}
+                      placeholder="Enter pincode"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Address */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-green-600" />
+                  <h3 className="text-lg font-semibold">Delivery Address</h3>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-delivery-address">Delivery Address</Label>
+                  <Textarea
+                    id="edit-delivery-address"
+                    value={editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).address || "" : ""}
+                    onChange={(e) => setEditingCustomer({
+                      ...editingCustomer, 
+                      delivery_address: JSON.stringify({
+                        address: e.target.value,
+                        city: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).city || "" : "",
+                        state: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).state || "" : "",
+                        pincode: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).pincode || "" : ""
+                      })
+                    })}
+                    placeholder="Enter delivery address"
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-delivery-city">City</Label>
+                    <Input
+                      id="edit-delivery-city"
+                      value={editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).city || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        delivery_address: JSON.stringify({
+                          address: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).address || "" : "",
+                          city: e.target.value,
+                          state: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).state || "" : "",
+                          pincode: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).pincode || "" : ""
+                        })
+                      })}
+                      placeholder="Enter city"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-delivery-state">State</Label>
+                    <Input
+                      id="edit-delivery-state"
+                      value={editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).state || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        delivery_address: JSON.stringify({
+                          address: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).address || "" : "",
+                          city: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).city || "" : "",
+                          state: e.target.value,
+                          pincode: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).pincode || "" : ""
+                        })
+                      })}
+                      placeholder="Enter state"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-delivery-pincode">Pincode</Label>
+                    <Input
+                      id="edit-delivery-pincode"
+                      value={editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).pincode || "" : ""}
+                      onChange={(e) => setEditingCustomer({
+                        ...editingCustomer, 
+                        delivery_address: JSON.stringify({
+                          address: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).address || "" : "",
+                          city: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).city || "" : "",
+                          state: editingCustomer.delivery_address ? JSON.parse(editingCustomer.delivery_address).state || "" : "",
+                          pincode: e.target.value
+                        })
+                      })}
+                      placeholder="Enter pincode"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Business Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-company">Company Name</Label>
                   <Input
                     id="edit-company"
-                    value={editingCustomer.companyName || ""}
-                    onChange={(e) => setEditingCustomer({...editingCustomer, companyName: e.target.value})}
+                    value={editingCustomer.company_name || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, company_name: e.target.value})}
                     placeholder="Enter company name (optional)"
                   />
                 </div>
@@ -1408,8 +2119,8 @@ export default function Customers() {
                   <Label htmlFor="edit-gst">GST Number</Label>
                   <Input
                     id="edit-gst"
-                    value={editingCustomer.gstNumber || ""}
-                    onChange={(e) => setEditingCustomer({...editingCustomer, gstNumber: e.target.value})}
+                    value={editingCustomer.gst_number || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, gst_number: e.target.value})}
                     placeholder="Enter GST number (optional)"
                   />
                 </div>
@@ -1421,7 +2132,7 @@ export default function Customers() {
                   <Label htmlFor="edit-total-orders">Total Orders</Label>
                   <Input
                     id="edit-total-orders"
-                    value={editingCustomer.totalOrders}
+                    value={editingCustomer.total_orders}
                     readOnly
                     className="bg-gray-50"
                     placeholder="Auto-calculated"
@@ -1433,7 +2144,7 @@ export default function Customers() {
                   <Label htmlFor="edit-total-value">Total Value</Label>
                   <Input
                     id="edit-total-value"
-                    value={editingCustomer.totalValue}
+                    value={editingCustomer.total_value}
                     readOnly
                     className="bg-gray-50"
                     placeholder="Auto-calculated"
@@ -1457,6 +2168,576 @@ export default function Customers() {
             <Button 
               onClick={handleSaveCustomer}
               disabled={!editingCustomer?.name.trim() || !editingCustomer?.email.trim() || !editingCustomer?.phone.trim()}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        </TabsContent>
+        )}
+
+        {hasSupplierAccess && (
+        <TabsContent value="suppliers" className="space-y-6">
+          {/* Supplier Statistics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <Truck className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="text-2xl font-bold">{totalSuppliers}</p>
+                    <p className="text-sm text-muted-foreground">Total Suppliers</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <Truck className="w-8 h-8 text-success" />
+                  <div>
+                    <p className="text-2xl font-bold">{activeSuppliers}</p>
+                    <p className="text-sm text-muted-foreground">Active</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Supplier Actions Bar */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between">
+            <div className="flex gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input 
+                  placeholder="Search suppliers..." 
+                  className="pl-10 w-64"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {canCreateSupplier && (
+              <Button onClick={() => setShowAddSupplierDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Supplier
+              </Button>
+            )}
+          </div>
+
+          {/* Suppliers Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {suppliers
+              .filter(supplier => {
+                const matchesSearch = (supplier.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                   (supplier.contact_person || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                   (supplier.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                   (supplier.phone || '').includes(searchTerm);
+                const matchesStatus = statusFilter === "all" || supplier.status === statusFilter;
+                return matchesSearch && matchesStatus;
+              })
+              .map((supplier) => (
+              <Card key={supplier.id} className="overflow-hidden">
+                <CardHeader className="pb-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="text-lg">{supplier.name}</CardTitle>
+                      {supplier.contact_person && (
+                        <p className="text-sm text-muted-foreground mt-1">Contact: {supplier.contact_person}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge className={statusStyles[supplier.status]}>
+                        {supplier.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  <div className="space-y-2 text-sm">
+                    {supplier.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <span className="truncate">{supplier.email}</span>
+                      </div>
+                    )}
+                    {supplier.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <span>{supplier.phone}</span>
+                      </div>
+                    )}
+                    {supplier.address && (
+                      <div className="flex items-start gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <span className="text-xs">
+                          {supplier.address}, {supplier.city}, {supplier.state} - {supplier.pincode}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {supplier.gst_number && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">GST: </span>
+                      <span className="font-mono text-xs">{supplier.gst_number}</span>
+                    </div>
+                  )}
+
+                  <div className="text-sm text-muted-foreground">
+                    Added: {new Date(supplier.created_at).toLocaleDateString()}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="flex-1"
+                      onClick={() => handleViewSupplier(supplier)}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </Button>
+                    {canEditSupplier && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleEditSupplier(supplier)}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {suppliers.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Truck className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-medium mb-2">No suppliers found</h3>
+                <p className="text-muted-foreground">Add your first supplier to get started</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        )}
+      </Tabs>
+
+      {/* Add Supplier Dialog */}
+      <Dialog open={showAddSupplierDialog} onOpenChange={setShowAddSupplierDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Supplier</DialogTitle>
+            <DialogDescription>
+              Enter the supplier details to add them to your supplier database.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-name">Supplier Name *</Label>
+                  <Input
+                    id="supplier-name"
+                    value={newSupplierForm.name}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, name: e.target.value})}
+                    placeholder="Enter supplier company name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="contact-person">Contact Person</Label>
+                  <Input
+                    id="contact-person"
+                    value={newSupplierForm.contact_person}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, contact_person: e.target.value})}
+                    placeholder="Enter contact person name"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-email">Email Address</Label>
+                  <Input
+                    id="supplier-email"
+                    type="email"
+                    value={newSupplierForm.email}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, email: e.target.value})}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-phone">Phone Number</Label>
+                  <Input
+                    id="supplier-phone"
+                    value={newSupplierForm.phone}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, phone: e.target.value})}
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="supplier-gst">GST Number</Label>
+                <Input
+                  id="supplier-gst"
+                  value={newSupplierForm.gst_number}
+                  onChange={(e) => setNewSupplierForm({...newSupplierForm, gst_number: e.target.value})}
+                  placeholder="Enter GST number"
+                  maxLength={15}
+                />
+              </div>
+            </div>
+
+            {/* Address Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Address Information
+              </h3>
+              
+              <div className="space-y-2">
+                <Label htmlFor="supplier-address">Address</Label>
+                <Textarea
+                  id="supplier-address"
+                  value={newSupplierForm.address}
+                  onChange={(e) => setNewSupplierForm({...newSupplierForm, address: e.target.value})}
+                  placeholder="Enter full address"
+                  rows={2}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-city">City</Label>
+                  <Input
+                    id="supplier-city"
+                    value={newSupplierForm.city}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, city: e.target.value})}
+                    placeholder="Enter city"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-state">State</Label>
+                  <Input
+                    id="supplier-state"
+                    value={newSupplierForm.state}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, state: e.target.value})}
+                    placeholder="Enter state"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-pincode">Pincode</Label>
+                  <Input
+                    id="supplier-pincode"
+                    value={newSupplierForm.pincode}
+                    onChange={(e) => setNewSupplierForm({...newSupplierForm, pincode: e.target.value})}
+                    placeholder="Enter pincode"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                resetSupplierForm();
+                setShowAddSupplierDialog(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddSupplier}
+              disabled={!newSupplierForm.name.trim()}
+            >
+              <Save className="w-4 h-4 mr-2" />
+              Add Supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Supplier Details Dialog */}
+      <Dialog open={showSupplierDetails} onOpenChange={setShowSupplierDetails}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="w-5 h-5" />
+              Supplier Details - {selectedSupplier?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Complete supplier information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSupplier && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Truck className="w-5 h-5" />
+                      Company Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">{selectedSupplier.name}</span>
+                    </div>
+                    {selectedSupplier.contact_person && (
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span>{selectedSupplier.contact_person}</span>
+                      </div>
+                    )}
+                    {selectedSupplier.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <span>{selectedSupplier.email}</span>
+                      </div>
+                    )}
+                    {selectedSupplier.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-muted-foreground" />
+                        <span>{selectedSupplier.phone}</span>
+                      </div>
+                    )}
+                    {selectedSupplier.gst_number && (
+                      <div className="flex items-center gap-2">
+                        <Building className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">GST: {selectedSupplier.gst_number}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">Added: {new Date(selectedSupplier.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MapPin className="w-5 h-5" />
+                      Address Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {selectedSupplier.address ? (
+                      <>
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                          <span className="text-sm">
+                            {selectedSupplier.address}
+                          </span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {selectedSupplier.city}, {selectedSupplier.state} - {selectedSupplier.pincode}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        No address information available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowSupplierDetails(false)}
+            >
+              Close
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowSupplierDetails(false);
+                handleEditSupplier(selectedSupplier!);
+              }}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Supplier Dialog */}
+      <Dialog open={showEditSupplierDialog} onOpenChange={setShowEditSupplierDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Supplier - {editingSupplier?.name}</DialogTitle>
+            <DialogDescription>
+              Update supplier information and details
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingSupplier && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-name">Supplier Name *</Label>
+                  <Input
+                    id="edit-supplier-name"
+                    value={editingSupplier.name}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, name: e.target.value})}
+                    placeholder="Enter supplier name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-contact-person">Contact Person</Label>
+                  <Input
+                    id="edit-contact-person"
+                    value={editingSupplier.contact_person || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, contact_person: e.target.value})}
+                    placeholder="Enter contact person name"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-email">Email</Label>
+                  <Input
+                    id="edit-supplier-email"
+                    type="email"
+                    value={editingSupplier.email || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, email: e.target.value})}
+                    placeholder="Enter email address"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-phone">Phone</Label>
+                  <Input
+                    id="edit-supplier-phone"
+                    value={editingSupplier.phone || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, phone: e.target.value})}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-status">Status</Label>
+                  <Select 
+                    value={editingSupplier.status} 
+                    onValueChange={(value: "active" | "inactive") => 
+                      setEditingSupplier({...editingSupplier, status: value})
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-gst">GST Number</Label>
+                  <Input
+                    id="edit-supplier-gst"
+                    value={editingSupplier.gst_number || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, gst_number: e.target.value})}
+                    placeholder="Enter GST number"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-supplier-address">Address</Label>
+                <Textarea
+                  id="edit-supplier-address"
+                  value={editingSupplier.address || ""}
+                  onChange={(e) => setEditingSupplier({...editingSupplier, address: e.target.value})}
+                  placeholder="Enter full address"
+                  rows={2}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-city">City</Label>
+                  <Input
+                    id="edit-supplier-city"
+                    value={editingSupplier.city || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, city: e.target.value})}
+                    placeholder="Enter city"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-state">State</Label>
+                  <Input
+                    id="edit-supplier-state"
+                    value={editingSupplier.state || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, state: e.target.value})}
+                    placeholder="Enter state"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-supplier-pincode">Pincode</Label>
+                  <Input
+                    id="edit-supplier-pincode"
+                    value={editingSupplier.pincode || ""}
+                    onChange={(e) => setEditingSupplier({...editingSupplier, pincode: e.target.value})}
+                    placeholder="Enter pincode"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowEditSupplierDialog(false);
+                setEditingSupplier(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveSupplier}
+              disabled={!editingSupplier?.name.trim()}
             >
               <Save className="w-4 h-4 mr-2" />
               Save Changes

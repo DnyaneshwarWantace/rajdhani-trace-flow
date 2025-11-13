@@ -116,7 +116,7 @@ export const getMachines = async (): Promise<Machine[]> => {
 export const saveMachine = async (machine: Omit<Machine, 'id' | 'createdAt' | 'updatedAt'>): Promise<Machine> => {
   const newMachine: Machine = {
     ...machine,
-    id: generateUniqueId('MACH'),
+    id: await generateUniqueId('MACH'),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -258,9 +258,9 @@ export const createDefaultProductionFlow = async (productionProductId: string): 
   const machines = await getMachines();
   const testingMachine = machines.find(m => m.type === 'testing');
 
-  const defaultSteps: ProductionStep[] = [
+  const defaultSteps: ProductionStep[] = await Promise.all([
     {
-      id: generateUniqueId('STEP'),
+      id: await generateUniqueId('STEP'),
       stepNumber: 1,
       name: 'Raw Material Selection',
       description: 'Select and prepare raw materials for production',
@@ -273,7 +273,7 @@ export const createDefaultProductionFlow = async (productionProductId: string): 
       createdAt: new Date().toISOString(),
     },
     {
-      id: generateUniqueId('STEP'),
+      id: await generateUniqueId('STEP'),
       stepNumber: 2,
       name: 'Initial Processing',
       description: 'First stage of carpet processing - select machine',
@@ -286,7 +286,7 @@ export const createDefaultProductionFlow = async (productionProductId: string): 
       createdAt: new Date().toISOString(),
     },
     {
-      id: generateUniqueId('STEP'),
+      id: await generateUniqueId('STEP'),
       stepNumber: 3,
       name: 'Raw Material Wastage',
       description: 'Track and record raw material wastage during production',
@@ -299,7 +299,7 @@ export const createDefaultProductionFlow = async (productionProductId: string): 
       createdAt: new Date().toISOString(),
     },
     {
-      id: generateUniqueId('STEP'),
+      id: await generateUniqueId('STEP'),
       stepNumber: 4,
       name: 'Testing & Individual Product Details',
       description: 'Final quality testing and individual product details entry',
@@ -311,10 +311,10 @@ export const createDefaultProductionFlow = async (productionProductId: string): 
       stepType: 'testing_individual',
       createdAt: new Date().toISOString(),
     },
-  ];
+  ]);
 
   const flow: ProductionFlow = {
-    id: generateUniqueId('FLOW'),
+    id: await generateUniqueId('FLOW'),
     productionProductId,
     steps: defaultSteps,
     currentStepIndex: 0,
@@ -342,7 +342,7 @@ export const updateProductionStep = async (
     if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime;
     if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
     if (updates.inspectorName !== undefined) dbUpdates.inspector_name = updates.inspectorName;
-    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.qualityNotes !== undefined) dbUpdates.notes = updates.qualityNotes;
     // Only include quality_notes if the column exists (will be added via SQL script)
     if (updates.qualityNotes !== undefined) {
       dbUpdates.quality_notes = updates.qualityNotes;
@@ -400,7 +400,7 @@ export const addProductionStep = async (
 
     const newStep: ProductionStep = {
       ...stepData,
-      id: generateUniqueId('STEP'),
+      id: await generateUniqueId('STEP'),
       stepNumber: flow.steps.length,
       createdAt: new Date().toISOString(),
       isFixedStep: false,

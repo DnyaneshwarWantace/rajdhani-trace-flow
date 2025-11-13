@@ -25,7 +25,6 @@ interface ProductionCompletionQRProps {
 interface ProductEntry {
   dimensions: string;
   weight: string;
-  thickness: string;
   qualityGrade: 'A+' | 'A' | 'B' | 'C';
   inspector: string;
   notes: string;
@@ -52,7 +51,6 @@ export function ProductionCompletionQR({
     const initialProducts = Array.from({ length: plannedQuantity }, () => ({
       dimensions: '',
       weight: '',
-      thickness: '',
       qualityGrade: 'A' as const,
       inspector: '',
       notes: ''
@@ -104,7 +102,6 @@ export function ProductionCompletionQR({
           batch_number: batchId,
           production_date: new Date().toISOString().split('T')[0],
           final_weight: product.weight,
-          final_thickness: product.thickness,
           quality_grade: product.qualityGrade,
           inspector: product.inspector,
           production_notes: product.notes
@@ -273,8 +270,7 @@ export function ProductionCompletionQR({
                     quality_grade: product.quality_grade,
                     dimensions: {
                       length: parseFloat(product.final_width || '0'),
-                      width: parseFloat(product.final_height || '0'),
-                      thickness: parseFloat(product.final_thickness || '0')
+                      width: parseFloat(product.final_length || '0'),
                     },
                     weight: parseFloat(product.final_weight || '0'),
                     color: '',
@@ -371,15 +367,6 @@ export function ProductionCompletionQR({
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor={`thickness-${index}`}>Thickness (mm)</Label>
-                    <Input
-                      id={`thickness-${index}`}
-                      placeholder="e.g., 12"
-                      value={product.thickness}
-                      onChange={(e) => updateProduct(index, 'thickness', e.target.value)}
-                    />
-                  </div>
 
 
                   <div>

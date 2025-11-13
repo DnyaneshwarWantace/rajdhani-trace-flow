@@ -1,0 +1,6 @@
+name,category,color,size,pattern,base_quantity,individual_stock_tracking,min_stock_level,max_stock_level,weight,thickness,width,height,image_url,notes
+"Premium Carpet 6x9","plain paper print","Red","6x9","Persian Medallion",10,true,5,50,"400 GSM","8mm","6 feet","9 feet","","High quality Persian design carpet"
+"Luxury Rug 8x10","degital print","Blue","8x10","Geometric",5,true,2,25,"500 GSM","10mm","8 feet","10 feet","","Modern geometric pattern rug"
+"Traditional Mat 3x5","backing","Green","3x5","Traditional",20,true,10,100,"300 GSM","5mm","3 feet","5 feet","","Traditional Indian design mat"
+"Office Carpet 12x15","felt","Gray","12x15","Modern",8,true,3,40,"600 GSM","15mm","12 feet","15 feet","","Durable office carpet"
+"Kids Play Mat 4x6","plain paper print","Multi-color","4x6","Abstract",15,true,8,75,"350 GSM","6mm","4 feet","6 feet","","Colorful play mat for children"

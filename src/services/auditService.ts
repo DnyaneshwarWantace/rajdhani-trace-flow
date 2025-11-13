@@ -11,41 +11,114 @@ export class AuditService {
     newValues?: any,
     userId: string = 'admin'
   ): Promise<{ success: boolean; error: string | null }> {
-    try {
-      const auditData = {
-        id: IDGenerator.generateQRCode(), // Use QR code generator for audit logs
-        action: action.toLowerCase().replace(/\s+/g, '_'),
-        table_name: tableName,
-        record_id: recordId, // Use record_id as expected by database
-        old_values: oldValues ? JSON.stringify(oldValues) : null,
-        new_values: newValues ? JSON.stringify(newValues) : null,
-        user_id: userId,
-        timestamp: new Date().toISOString(),
-        // Also populate legacy fields for compatibility
-        module: tableName,
-        entity_id: recordId,
-        entity_name: recordId,
-        previous_state: oldValues ? JSON.stringify(oldValues) : null,
-        new_state: newValues ? JSON.stringify(newValues) : null
-      };
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        
+        // Generate unique audit log ID using database function
+        const auditId = await AuditService.generateAuditLogId();
+        
+        const auditData = {
+          id: auditId,
+          action: action.toLowerCase().replace(/\s+/g, '_'),
+          table_name: tableName,
+          record_id: recordId, // Use record_id as expected by database
+          old_values: oldValues ? JSON.stringify(oldValues) : null,
+          new_values: newValues ? JSON.stringify(newValues) : null,
+          user_id: userId,
+          timestamp: new Date().toISOString(),
+          // Also populate legacy fields for compatibility
+          module: tableName,
+          entity_id: recordId,
+          entity_name: recordId,
+          previous_state: oldValues ? JSON.stringify(oldValues) : null,
+          new_state: newValues ? JSON.stringify(newValues) : null
+        };
 
-      console.log('🔍 Logging audit:', auditData);
+        console.log(`🔍 Logging audit (attempt ${attempts}/${maxAttempts}):`, auditData);
 
-      const { error } = await supabase
-        .from('audit_logs')
-        .insert(auditData);
+        const { error } = await supabase
+          .from('audit_logs')
+          .insert(auditData);
 
-      if (error) {
-        console.error('❌ Error logging audit:', error);
-        return { success: false, error: handleSupabaseError(error) };
+        if (error) {
+          // Check if it's a duplicate key error
+          if (error.code === '23505' && error.message.includes('duplicate key value violates unique constraint')) {
+            console.warn(`⚠️ Duplicate key error on attempt ${attempts}, retrying with new ID...`);
+            
+            if (attempts < maxAttempts) {
+              // Add a small delay before retry
+              await new Promise(resolve => setTimeout(resolve, 100 * attempts));
+              continue; // Retry with new ID
+            } else {
+              console.error('❌ Max retries reached for duplicate key error');
+              return { success: false, error: `Failed to log audit after ${maxAttempts} attempts due to duplicate key conflicts` };
+            }
+          }
+          
+          console.error('❌ Error logging audit:', error);
+          return { success: false, error: handleSupabaseError(error) };
+        }
+
+        console.log(`✅ Audit logged: ${action} in ${tableName} for record ${recordId}`);
+        return { success: true, error: null };
+
+      } catch (error) {
+        console.error(`❌ Exception in logAudit (attempt ${attempts}):`, error);
+        
+        if (attempts >= maxAttempts) {
+          return { success: false, error: 'Failed to log audit entry' };
+        }
+        
+        // Add delay before retry
+        await new Promise(resolve => setTimeout(resolve, 100 * attempts));
       }
+    }
+    
+    return { success: false, error: `Failed to log audit after ${maxAttempts} attempts` };
+  }
 
-      console.log(`✅ Audit logged: ${action} in ${tableName} for record ${recordId}`);
-      return { success: true, error: null };
-
+  // Generate unique audit log ID using database function
+  private static async generateAuditLogId(): Promise<string> {
+    try {
+      // Import the centralized supabase client to avoid multiple instances
+      const { supabase } = await import('@/lib/supabase');
+      
+      if (!supabase) {
+        // Fallback to timestamp-based ID if no Supabase config
+        const timestamp = Date.now().toString().slice(-6);
+        return `AUDIT-${timestamp}`;
+      }
+      
+      // Use the database function to atomically get next sequence for audit logs
+      const { data, error } = await supabase.rpc('get_next_sequence', {
+        p_prefix: 'AUDIT',
+        p_date_str: new Date().toISOString().slice(2, 10).replace(/-/g, '') // YYMMDD format
+      });
+      
+      if (error) {
+        console.warn(`Error calling get_next_sequence function for audit: ${error.message}`);
+        // Fallback to timestamp-based ID
+        const timestamp = Date.now().toString().slice(-6);
+        return `AUDIT-${timestamp}`;
+      }
+      
+      const now = new Date();
+      const year = now.getFullYear().toString().slice(-2);
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const dateStr = `${year}${month}${day}`;
+      
+      return `AUDIT-${dateStr}-${(data || 1).toString().padStart(3, '0')}`;
+      
     } catch (error) {
-      console.error('❌ Exception in logAudit:', error);
-      return { success: false, error: 'Failed to log audit entry' };
+      console.warn(`Error generating audit log ID: ${error}`);
+      // Fallback to timestamp-based ID
+      const timestamp = Date.now().toString().slice(-6);
+      return `AUDIT-${timestamp}`;
     }
   }
 

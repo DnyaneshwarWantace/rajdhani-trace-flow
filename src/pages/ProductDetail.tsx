@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ProductService } from "@/services/ProductService";
-import { ProductRecipeService } from "@/services/productRecipeService";
-import { supabase } from "@/lib/supabase";
+import { MongoDBProductService, IndividualProductService } from "@/services";
+import { MongoDBRecipeService } from "@/services/api/recipeService";
+import { RawMaterialService } from "@/services/api/rawMaterialService";
+import { mapMongoDBProductToFrontend, mapMongoDBIndividualProductToFrontend, type Product as FrontendProduct, type IndividualProduct as FrontendIndividualProduct } from "@/utils/typeMapping";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,47 +20,12 @@ interface ProductMaterial {
   materialName: string;
   quantity: number;
   unit: string;
-  cost: number;
   recipeQuantity?: number; // Optional recipe quantity for reference
 }
 
-interface Product {
-  id: string;
-  qrCode: string;
-  name: string;
-  category: string;
-  color: string;
-  pattern: string;
-  quantity: number;
-  unit: string;
-  manufacturingDate: string;
-  expiryDate?: string;
-  materialsUsed: ProductMaterial[];
-  status: "in-stock" | "low-stock" | "out-of-stock" | "expired";
-  notes: string;
-  imageUrl?: string;
-  weight: string;
-  thickness: string;
-  width: string;
-  height: string;
-  individualStockTracking?: boolean;
-}
-
-interface IndividualProduct {
-  id: string;
-  qrCode: string;
-  productId: string;
-  manufacturingDate: string;
-  materialsUsed: ProductMaterial[];
-  finalWeight: string;
-  finalThickness: string;
-  finalWidth: string;
-  finalHeight: string;
-  qualityGrade: string;
-  inspector: string;
-  notes: string;
-  status: "available" | "sold" | "damaged";
-}
+// Using imported types from typeMapping
+type Product = FrontendProduct;
+type IndividualProduct = FrontendIndividualProduct;
 
 const statusStyles = {
   "in-stock": "bg-green-100 text-green-800 border-green-200",
@@ -75,7 +41,38 @@ export default function ProductDetail() {
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [recipeMaterials, setRecipeMaterials] = useState<ProductMaterial[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // SQM Calculation function
+  const calculateSQM = (length: string, width: string, lengthUnit: string, widthUnit: string): number => {
+    const lengthValue = parseFloat(length) || 0;
+    const widthValue = parseFloat(width) || 0;
+
+    let lengthInMeters = lengthValue;
+    let widthInMeters = widthValue;
+
+    switch (lengthUnit.toLowerCase()) {
+      case 'mm': lengthInMeters = lengthValue / 1000; break;
+      case 'cm': lengthInMeters = lengthValue / 100; break;
+      case 'feet': lengthInMeters = lengthValue * 0.3048; break;
+      case 'inches': lengthInMeters = lengthValue * 0.0254; break;
+      case 'yards': lengthInMeters = lengthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': lengthInMeters = lengthValue; break;
+    }
+
+    switch (widthUnit.toLowerCase()) {
+      case 'mm': widthInMeters = widthValue / 1000; break;
+      case 'cm': widthInMeters = widthValue / 100; break;
+      case 'feet': widthInMeters = widthValue * 0.3048; break;
+      case 'inches': widthInMeters = widthValue * 0.0254; break;
+      case 'yards': widthInMeters = widthValue * 0.9144; break;
+      case 'm': case 'meter': case 'meters': widthInMeters = widthValue; break;
+    }
+
+    return lengthInMeters * widthInMeters;
+  };
 
   useEffect(() => {
     const loadProductData = async () => {
@@ -83,71 +80,99 @@ export default function ProductDetail() {
         setLoading(true);
     console.log('ProductDetail - Looking for productId:', productId);
     
-        // Load product from Supabase
-        const { data: productData, error: productError } = await ProductService.getProductById(productId);
-        if (productError) {
-          console.error('Error loading product:', productError);
+        // Load product from MongoDB
+        const productResult = await MongoDBProductService.getProductById(productId);
+        if (productResult.error) {
+          console.error('Error loading product:', productResult.error);
           return;
         }
         
-        console.log('ProductDetail - Found product:', productData);
+        console.log('ProductDetail - Found product:', productResult.data);
         
-        if (productData) {
-          setProduct(productData);
-          setSelectedImage(productData.imageUrl || "");
+        if (productResult.data) {
+          const mappedProduct = mapMongoDBProductToFrontend(productResult.data);
+          setProduct(mappedProduct);
+          setSelectedImage(mappedProduct.imageUrl || "");
         }
 
-        // Load individual products for this product from Supabase
-        const { data: individualProductsData, error: individualError } = await ProductService.getIndividualProducts({
-          product_id: productId
-        });
+        // Load individual products for this product from MongoDB
+        const individualProductsResult = await IndividualProductService.getIndividualProductsByProductId(productId);
         
-        if (individualError) {
-          console.error('Error loading individual products:', individualError);
+        if (individualProductsResult.error) {
+          console.error('Error loading individual products:', individualProductsResult.error);
           return;
         }
         
-        console.log('ProductDetail - Individual products:', individualProductsData);
-        setIndividualProducts(individualProductsData || []);
+        console.log('ProductDetail - Individual products:', individualProductsResult.data);
+        if (individualProductsResult.data) {
+          const mappedIndividualProducts = individualProductsResult.data.map(mapMongoDBIndividualProductToFrontend);
+          setIndividualProducts(mappedIndividualProducts);
+        }
         
+        // Load raw materials and products to get actual stock
+        const [rawMaterialsResult, productsResult] = await Promise.all([
+          RawMaterialService.getRawMaterials(),
+          MongoDBProductService.getProducts()
+        ]);
+        
+        const rawMaterialsData = rawMaterialsResult?.data || [];
+        const productsData = (productsResult?.data || []).map((p: any) => ({
+          ...p,
+          individual_count: 0 // Will be computed if needed
+        }));
+        
+        setRawMaterials(rawMaterialsData);
+        setProducts(productsData);
+
         // Load recipe materials for this product
-        if (productData) {
+        if (productResult.data) {
           try {
-            const recipeResult = await ProductRecipeService.getRecipeByProductId(productData.id);
-            if (recipeResult.data && recipeResult.data.recipe_materials && recipeResult.data.recipe_materials.length > 0) {
-              // Fetch actual stock quantities for each material
+            const recipeResult = await MongoDBRecipeService.getRecipeByProductId(productResult.data.id);
+            if (recipeResult.data && recipeResult.data.materials && recipeResult.data.materials.length > 0) {
+              // Map recipe materials to the expected format with actual stock (async)
               const materialsWithStock = await Promise.all(
-                recipeResult.data.recipe_materials.map(async (material: any) => {
-                  try {
-                    // Fetch the actual material from raw_materials table to get current stock
-                    const { data: rawMaterial } = await supabase
-                      .from('raw_materials')
-                      .select('current_stock, cost_per_unit')
-                      .eq('id', material.material_id)
-                      .single();
-                    
-        return {
-                      materialName: material.material_name,
-                      quantity: rawMaterial?.current_stock || 0, // Show actual stock quantity
-          unit: material.unit,
-                      cost: rawMaterial?.cost_per_unit || material.cost_per_unit || 0,
-                      recipeQuantity: material.quantity // Keep recipe quantity for reference
-        };
-                  } catch (error) {
-                    console.error(`Error fetching stock for material ${material.material_name}:`, error);
-        return {
-                      materialName: material.material_name,
-                      quantity: 0, // Default to 0 if can't fetch
-          unit: material.unit,
-                      cost: material.cost_per_unit || 0,
-                      recipeQuantity: material.quantity
-                    };
+                recipeResult.data.materials.map(async (material: any) => {
+                  const materialId = material.material_id;
+                  const materialType = material.material_type;
+                  
+                  // Find the actual material/product to get current stock
+                  let currentStock = 0;
+                  if (materialType === 'raw_material') {
+                    const rawMaterial = rawMaterialsData.find((rm: any) => rm.id === materialId);
+                    currentStock = rawMaterial?.current_stock || 0;
+                  } else if (materialType === 'product') {
+                    const productMaterial = productsData.find((p: any) => p.id === materialId);
+                    if (productMaterial) {
+                      // For products with individual stock tracking, count available individual products
+                      if (productMaterial.individual_stock_tracking) {
+                        try {
+                          const { data: individualProducts } = await IndividualProductService.getIndividualProductsByProductId(materialId);
+                          const availableCount = individualProducts?.filter((ip: any) => ip.status === 'available').length || 0;
+                          currentStock = availableCount;
+                        } catch (error) {
+                          console.error(`Error loading individual products for ${materialId}:`, error);
+                          currentStock = productMaterial?.individual_products_count || 0;
+                        }
+                      } else {
+                        // For bulk products, use base_quantity or current_stock
+                        currentStock = productMaterial?.base_quantity || productMaterial?.current_stock || 0;
+                      }
+                    }
                   }
+                  
+                  return {
+                    materialName: material.material_name,
+                    materialId: materialId,
+                    materialType: materialType,
+                    quantity: currentStock, // Actual current stock
+                    unit: material.unit,
+                    recipeQuantity: material.quantity_per_sqm // Recipe quantity per SQM
+                  };
                 })
               );
               
               setRecipeMaterials(materialsWithStock);
-              console.log('ProductDetail - Loaded recipe materials with stock:', materialsWithStock);
+              console.log('ProductDetail - Loaded recipe materials with actual stock:', materialsWithStock);
             } else {
               setRecipeMaterials([]);
               console.log('ProductDetail - No recipe found for product');
@@ -168,8 +193,44 @@ export default function ProductDetail() {
   }, [productId]);
 
   const getAvailablePieces = (productId: string) => {
-    // Use the same simple logic as Products page - just return product.quantity
-    return product?.quantity || 0;
+    if (!product) return 0;
+
+    // For products with individual stock tracking, count only available individual products
+    if (product.individualStockTracking && individualProducts && individualProducts.length > 0) {
+      const availableCount = individualProducts.filter((ip: any) => ip.status === 'available').length;
+      return availableCount;
+    }
+
+    // For bulk products, use baseQuantity, quantity, or actual_quantity as fallback
+    // Use nullish coalescing to avoid treating 0 as falsy
+    const qty = product.baseQuantity ?? product.quantity ?? (product as any).actual_quantity ?? 0;
+    return typeof qty === 'number' ? qty : 0;
+  };
+
+  const calculateProductStatus = () => {
+    if (!product) return 'in-stock';
+
+    if (product.individualStockTracking) {
+      // For individual tracking products, check available individual products
+      const availableCount = individualProducts?.filter((ip: any) => ip.status === 'available').length || 0;
+      if (availableCount === 0) {
+        return 'out-of-stock';
+      } else if (availableCount <= (product.minStockLevel || 10)) {
+        return 'low-stock';
+      } else {
+        return 'in-stock';
+      }
+    } else {
+      // For bulk products, check base quantity
+      const baseQty = product.baseQuantity ?? product.quantity ?? 0;
+      if (baseQty === 0) {
+        return 'out-of-stock';
+      } else if (baseQty <= (product.minStockLevel || 10)) {
+        return 'low-stock';
+      } else {
+        return 'in-stock';
+      }
+    }
   };
 
   if (loading) {
@@ -258,8 +319,8 @@ export default function ProductDetail() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Status</span>
-                  <Badge className={`${statusStyles[product.status]} border`}>
-                    {product.status.replace("-", " ").toUpperCase()}
+                  <Badge className={`${statusStyles[calculateProductStatus()]} border`}>
+                    {calculateProductStatus().replace("-", " ").toUpperCase()}
               </Badge>
             </div>
                 <div className="flex items-center justify-between">
@@ -267,8 +328,19 @@ export default function ProductDetail() {
                   <span className="font-medium">{product.category}</span>
           </div>
               <div className="flex items-center justify-between">
-                  <span className="text-slate-600">Available</span>
-                  <span className="font-medium">{getAvailablePieces(product.id)} {product.unit}</span>
+                  <span className="text-slate-600">Available Products</span>
+                  <span className="font-medium">{getAvailablePieces(product.id)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Total SQM</span>
+                  <span className="font-medium">
+                    {(getAvailablePieces(product.id) * calculateSQM(
+                      product.length || '0',
+                      product.width || '0',
+                      product.lengthUnit || 'feet',
+                      product.widthUnit || 'feet'
+                    )).toFixed(4)} SQM
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600">Color</span>
@@ -291,13 +363,13 @@ export default function ProductDetail() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-            <Button 
-                    className="w-full" 
+            <Button
+                    className="w-full"
               size="lg"
               onClick={() => navigate(`/product-stock/${product.id}`)}
             >
                     <Eye className="w-5 h-5 mr-2" />
-                    View Individual Stock ({getAvailablePieces(product.id)} {product.unit})
+                    View Individual Stock ({getAvailablePieces(product.id)} Products)
             </Button>
                 </CardContent>
               </Card>
@@ -366,22 +438,13 @@ export default function ProductDetail() {
                       </div>
                     </div>
                     )}
-                      {product.height && product.height !== "NA" && (
+                      {product.length && product.length !== "NA" && (
                         <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
                           <Ruler className="w-6 h-6 text-slate-600" />
                     <div>
-                            <p className="font-medium text-slate-900">Height</p>
-                            <p className="text-slate-600">{product.height}</p>
+                            <p className="font-medium text-slate-900">Length</p>
+                            <p className="text-slate-600">{product.length}</p>
                     </div>
-                      </div>
-                      )}
-                      {product.thickness && product.thickness !== "NA" && (
-                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg">
-                          <Layers className="w-6 h-6 text-slate-600" />
-                      <div>
-                            <p className="font-medium text-slate-900">Thickness</p>
-                            <p className="text-slate-600">{product.thickness}</p>
-                      </div>
                       </div>
                       )}
                       {product.unit && product.unit !== "NA" && (
@@ -426,22 +489,17 @@ export default function ProductDetail() {
                               <p className="text-slate-600 text-sm">
                             Current Stock: <span className="font-medium">{material.quantity} {material.unit}</span>
                           </p>
-                              {material.recipeQuantity && (
-                                <p className="text-slate-500 text-xs">
-                                  Recipe requires: {material.recipeQuantity} {material.unit}
-                                </p>
-                              )}
                         </div>
                             <div className="text-right">
-                              <p className="font-medium text-slate-900">₹{material.cost.toLocaleString()}</p>
-                              <p className="text-slate-600 text-sm">per unit</p>
+                              <p className="font-medium text-slate-900">{material.recipeQuantity} {material.unit}</p>
+                              <p className="text-slate-600 text-sm">base quantity</p>
                         </div>
                       </div>
                     ))}
                         <div className="flex justify-between items-center p-4 bg-primary/10 rounded-lg border border-primary/20">
-                          <p className="font-semibold text-slate-900">Total Stock Value</p>
+                          <p className="font-semibold text-slate-900">Total Materials</p>
                           <p className="font-bold text-lg text-primary">
-                            ₹{recipeMaterials.reduce((sum, m) => sum + (m.quantity * m.cost), 0).toLocaleString()}
+                            {recipeMaterials.length} materials
                           </p>
                     </div>
                   </div>
@@ -472,21 +530,24 @@ export default function ProductDetail() {
                           <QrCode className="w-6 h-6 text-primary" />
                           <h4 className="font-semibold text-slate-900">Product QR Code</h4>
                         </div>
-                        
+
                         <div className="flex justify-center mb-6">
                           <div className="bg-white p-6 rounded-xl shadow-lg border-2 border-slate-200">
-                            <img 
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(product.qrCode)}`}
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/qr-result?data=${encodeURIComponent(JSON.stringify({
+                                type: 'main',
+                                productId: product.id
+                              }))}`)}`}
                               alt={`QR Code for ${product.name}`}
                               className="w-48 h-48"
                             />
                           </div>
                       </div>
-                        
-                        <div className="font-mono text-sm bg-white p-4 rounded-lg border max-w-md mx-auto shadow-sm">
-                        {product.qrCode}
+
+                        <div className="font-mono text-sm bg-white p-4 rounded-lg border max-w-md mx-auto shadow-sm break-all">
+                        {product.id}
                       </div>
-                        
+
                         <p className="text-slate-600 mt-4">
                           Scan this QR code to access detailed product information
                       </p>
