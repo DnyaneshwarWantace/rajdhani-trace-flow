@@ -85,6 +85,7 @@ export interface CreateMaterialConsumptionRequest {
 
 export interface MaterialConsumptionFilters {
   production_batch_id?: string;
+  production_product_id?: string; // For backward compatibility
   production_flow_id?: string;
   material_type?: 'product' | 'raw_material';
   material_id?: string;

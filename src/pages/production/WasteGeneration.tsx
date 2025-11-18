@@ -160,12 +160,15 @@ export default function WasteGeneration() {
       console.log('🔍 Loading consumed materials for production batch:', productId);
       
       // Load material consumption from MongoDB using the batch ID
+      // Backend automatically checks both production_batch_id and production_product_id in $or query
       const { data: consumptionResp, error: consumptionError } = await MaterialConsumptionService.getMaterialConsumption({
         production_batch_id: productId
       });
+      
       if (consumptionError) {
         console.error('Error loading material consumption:', consumptionError);
       }
+      
       const materialConsumption = consumptionResp?.data || [];
 
       console.log('✅ Found material consumption records:', materialConsumption.length || 0);
@@ -213,12 +216,16 @@ export default function WasteGeneration() {
         
         // Load raw materials and products to get full details
         const [rawMaterialsResult, productsResult] = await Promise.all([
-          MongoDBRawMaterialService.getRawMaterials(),
-          ProductService.getProducts()
+          MongoDBRawMaterialService.getRawMaterials({ limit: 10000 }),
+          ProductService.getProducts({ limit: 10000 })
         ]);
 
         const rawMaterialsData = rawMaterialsResult?.data || [];
         let productsData = productsResult?.data || [];
+        
+        console.log('📦 Loaded raw materials:', rawMaterialsData.length);
+        console.log('📦 Loaded products:', productsData.length);
+        console.log('🔍 Looking for materials with IDs:', materialsToUse.map((m: any) => m.material_id || m.materialId));
         
         // Calculate individual counts for products that are in the recipe
         // Get all material IDs from the recipe
@@ -374,6 +381,13 @@ export default function WasteGeneration() {
           } else {
             // For raw materials, find in raw materials data
             material = rawMaterialsData.find((m: any) => m.id === materialId);
+            
+            if (!material) {
+              console.log('⚠️ Raw material not found in rawMaterialsData:', materialId);
+              console.log('🔍 Available raw material IDs:', rawMaterialsData.slice(0, 10).map((m: any) => m.id));
+            } else {
+              console.log('✅ Found raw material:', materialId, material.name);
+            }
           }
           
           if (material) {
@@ -394,9 +408,30 @@ export default function WasteGeneration() {
             };
           }
           
+          // If material not found, still return it with basic info from consumption data
+          if (!material) {
+            console.log('⚠️ Material not found in inventory, using consumption data only:', materialId);
+            return {
+              id: materialId,
+              name: materialName,
+              type: isProduct ? 'product' : 'raw_material',
+              quantity: quantity,
+              unit: unit,
+              currentStock: 0, // Unknown stock
+              costPerUnit: 0,
+              category: 'Unknown',
+              brand: '',
+              supplier: '',
+              status: 'unknown',
+              isProduct: isProduct,
+              individual_product_ids: materialData.individual_product_ids || []
+            };
+          }
+          
           return null;
         }).filter(Boolean);
 
+        console.log('✅ Mapped materials count:', mappedMaterials.length);
         setRecipeMaterials(mappedMaterials);
         console.log('✅ Recipe materials loaded:', mappedMaterials.length);
         console.log('📋 Final mapped materials:', mappedMaterials.map(m => ({

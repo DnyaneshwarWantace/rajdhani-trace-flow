@@ -445,7 +445,7 @@ export default function NewOrder() {
       quantity: 1,
       unit_price: 0,
       total_price: 0,
-      pricing_unit: 'piece', // Default pricing unit
+      pricing_unit: 'sqm', // Default pricing unit for carpet
       product_dimensions: {
         productType: 'carpet'
       },
