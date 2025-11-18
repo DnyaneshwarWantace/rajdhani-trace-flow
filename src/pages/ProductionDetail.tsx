@@ -25,6 +25,16 @@ import { ProductionService } from "@/services/api/productionService";
 import { MongoDBNotificationService } from "@/services/api/notificationService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loading } from "@/components/ui/loading";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import React from "react";
 import { 
   Select,
   SelectContent,
@@ -118,6 +128,12 @@ export default function ProductionDetail() {
   const [materialSearchTerm, setMaterialSearchTerm] = useState("");
   const [selectedMaterials, setSelectedMaterials] = useState<Array<RawMaterial & { selectedQuantity: number }>>([]);
   const [materialTypeFilter, setMaterialTypeFilter] = useState<'all' | 'materials' | 'products' | 'individual'>('all');
+  
+  // Pagination state for material selection popup
+  const [materialCurrentPage, setMaterialCurrentPage] = useState(1);
+  const [materialItemsPerPage] = useState(50);
+  const [totalRawMaterialsCount, setTotalRawMaterialsCount] = useState(0);
+  const [totalProductsCount, setTotalProductsCount] = useState(0);
   const [selectedIndividualProducts, setSelectedIndividualProducts] = useState<{[key: string]: any[]}>({});
   const [showIndividualProductDetails, setShowIndividualProductDetails] = useState(false);
   const [selectedIndividualProductDetails, setSelectedIndividualProductDetails] = useState<any>(null);
@@ -323,75 +339,14 @@ export default function ProductionDetail() {
     
     loadProductData();
     
-    // Load raw materials from Supabase
-    const loadRawMaterials = async () => {
-      try {
-        const { data: materials, error } = await MongoDBRawMaterialService.getRawMaterials();
-        if (error) {
-          console.error('Error loading raw materials:', error);
-        } else {
-          // Use materials directly from Supabase (already in correct format)
-          const mappedMaterials = materials || [];
-          setRawMaterials(mappedMaterials);
-          console.log('✅ Loaded', mappedMaterials.length, 'raw materials from Supabase');
-          return mappedMaterials;
-        }
-      } catch (error) {
-        console.error('Error loading raw materials:', error);
-      }
-      return [];
-    };
-
-    // Load products for recipe ingredients
-    const loadProducts = async () => {
-      try {
-        // Load products from MongoDB
-        const { data: productsData, error } = await ProductService.getProducts();
-        
-        if (error) {
-          console.error('Error loading products:', error);
-        } else {
-          // Map products to include individual product count
-          const productsWithIndividualCount = (productsData || []).map(product => ({
-            ...product,
-            individual_count: 0 // TODO: Calculate from individual products
-          }));
-          
-          setProducts(productsWithIndividualCount);
-          console.log('✅ Loaded', productsWithIndividualCount?.length || 0, 'products for recipe ingredients');
-          return productsWithIndividualCount || [];
-        }
-      } catch (error) {
-        console.error('Error loading products:', error);
-      }
-      return [];
-    };
-
-    // Load individual products for products with individual tracking
-    const loadIndividualProducts = async () => {
-      try {
-        const { data: individualProductsData, error } = await IndividualProductService.getAllAvailableIndividualProducts();
-        if (error) {
-          console.error('Error loading individual products:', error);
-        } else {
-          setIndividualProducts(individualProductsData || []);
-          console.log('✅ Loaded', individualProductsData?.length || 0, 'individual products');
-          return individualProductsData || [];
-        }
-      } catch (error) {
-        console.error('Error loading individual products:', error);
-      }
-      return [];
-    };
-
     // Load all data first, then load recipe AFTER product is loaded
+    // Don't load all individual products upfront - only load counts for products in recipe
     Promise.all([
-      loadRawMaterials(),
-      loadProducts(),
-      loadIndividualProducts()
-    ]).then(async () => {
+      loadRawMaterials(1),
+      loadProducts(1)
+    ]).then(async (results) => {
       // Wait a bit for productionProduct to be set, then load recipe
-      // Recipe loading will recalculate if productionProduct is available
+      // Recipe loading will load individual product counts only for products in the recipe
       setTimeout(() => {
         if (productId) {
           const actualProductId = productId;
@@ -431,6 +386,58 @@ export default function ProductionDetail() {
     
     // Production flow functionality removed
   }, [productId, navigate]);
+
+  // Load raw materials from Supabase with pagination (accessible outside useEffect)
+  const loadRawMaterials = async (page: number = 1) => {
+    try {
+      const { data: materials, error, count } = await MongoDBRawMaterialService.getRawMaterials({
+        limit: materialItemsPerPage,
+        offset: (page - 1) * materialItemsPerPage
+      });
+      if (error) {
+        console.error('Error loading raw materials:', error);
+      } else {
+        // Use materials directly from Supabase (already in correct format)
+        const mappedMaterials = materials || [];
+        setRawMaterials(mappedMaterials);
+        setTotalRawMaterialsCount(count || mappedMaterials.length);
+        console.log('✅ Loaded', mappedMaterials.length, 'raw materials from Supabase (total:', count || mappedMaterials.length, ')');
+        return mappedMaterials;
+      }
+    } catch (error) {
+      console.error('Error loading raw materials:', error);
+    }
+    return [];
+  };
+
+  // Load products for recipe ingredients with pagination (accessible outside useEffect)
+  const loadProducts = async (page: number = 1) => {
+    try {
+      // Load products from MongoDB
+      const { data: productsData, error, count } = await ProductService.getProducts({
+        limit: materialItemsPerPage,
+        offset: (page - 1) * materialItemsPerPage
+      });
+      
+      if (error) {
+        console.error('Error loading products:', error);
+      } else {
+        // Map products - individual_count will be calculated after individualProducts are loaded
+        const productsWithIndividualCount = (productsData || []).map(product => ({
+          ...product,
+          individual_count: 0 // Will be calculated after individualProducts are loaded
+        }));
+        
+        setProducts(productsWithIndividualCount);
+        setTotalProductsCount(count || productsWithIndividualCount.length);
+        console.log('✅ Loaded', productsWithIndividualCount?.length || 0, 'products for recipe ingredients (total:', count || productsWithIndividualCount.length, ')');
+        return productsWithIndividualCount || [];
+      }
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+    return [];
+  };
 
   // Auto-fill inspector name when machine selection dialog opens
   useEffect(() => {
@@ -548,18 +555,13 @@ export default function ProductionDetail() {
           let currentProducts = products;
           if (currentProducts.length === 0) {
             try {
-              // Use the same query as loadProducts to ensure individual_count is included
-              const { data: productsData, error } = await ProductService.getProducts();
+              const { data: productsData, error, count: productsCount } = await ProductService.getProducts({ limit: 10000 });
               
               if (error) {
                 console.error('Error fetching products for recipe:', error);
                 currentProducts = [];
               } else {
-                // Map products to include individual product count
-                currentProducts = (productsData || []).map(product => ({
-                  ...product,
-                  individual_count: 0 // TODO: Calculate from individual products
-                }));
+                currentProducts = productsData || [];
                 console.log('Fetched products for recipe loading:', currentProducts.length);
               }
             } catch (error) {
@@ -568,7 +570,64 @@ export default function ProductionDetail() {
             }
           }
           
-          console.log('Available products for recipe:', currentProducts.map(p => ({ id: p.id, name: p.name })));
+          // Extract product IDs from recipe materials that are products
+          const productIdsInRecipe = recipe.materials
+            .filter((m: any) => {
+              // Check if this material is a product (not a raw material)
+              return currentProducts.some(p => p.id === m.material_id);
+            })
+            .map((m: any) => m.material_id);
+          
+          console.log('Product IDs in recipe:', productIdsInRecipe);
+          
+          // Load individual product counts ONLY for products in the recipe (in parallel)
+          const individualCountPromises = productIdsInRecipe.map(async (productId: string) => {
+            try {
+              const { data: individualProductsData, error } = await IndividualProductService.getIndividualProductsByProductId(
+                productId,
+                { status: 'available' }
+              );
+              
+              if (error) {
+                console.warn(`Error loading individual products for ${productId}:`, error);
+                return { productId, count: 0 };
+              }
+              
+              const count = individualProductsData?.length || 0;
+              console.log(`✅ Loaded count for product ${productId}: ${count} individual products`);
+              return { productId, count };
+            } catch (error) {
+              console.warn(`Error loading individual products for ${productId}:`, error);
+              return { productId, count: 0 };
+            }
+          });
+          
+          // Wait for all counts to load in parallel
+          const individualCounts = await Promise.all(individualCountPromises);
+          const countMap = new Map(individualCounts.map(c => [c.productId, c.count]));
+          
+          // Update products with individual counts
+          currentProducts = currentProducts.map(product => ({
+            ...product,
+            individual_count: countMap.get(product.id) || product.individual_count || 0
+          }));
+          
+          // Also update the global products state so UI reflects the counts immediately
+          setProducts(prevProducts => {
+            return prevProducts.map(product => {
+              const count = countMap.get(product.id);
+              if (count !== undefined) {
+                return { ...product, individual_count: count };
+              }
+              return product;
+            });
+          });
+          
+          console.log('Available products for recipe with counts:', currentProducts.map(p => ({ 
+            id: p.id, 
+            name: p.name, 
+            individual_count: p.individual_count 
+          })));
 
           // Wait for productionProduct to have dimensions before calculating
           // If dimensions are not available yet, the useEffect will recalculate later
@@ -585,6 +644,7 @@ export default function ProductionDetail() {
               
               let stockValue = 0;
               if (productMaterial) {
+                // Use individual_count from product (already loaded)
                 stockValue = productMaterial.individual_count || 0;
               } else if (rawMaterial) {
                 stockValue = rawMaterial.current_stock || 0;
@@ -627,27 +687,12 @@ export default function ProductionDetail() {
             // Determine stock based on material type
             let stockValue = 0;
             if (productMaterial) {
-              // For products, use individual product count
+              // For products, use individual product count (already loaded above)
               stockValue = productMaterial.individual_count || 0;
-              
-              // If individual_count is 0, try to fetch individual products directly
-              if (stockValue === 0) {
-                try {
-                  const { data: individualProducts, error } = await IndividualProductService.getIndividualProductsByProductId(material.material_id);
-                  
-                  if (!error && individualProducts) {
-                    stockValue = individualProducts.length;
-                    console.log(`📦 Fetched individual products directly for ${material.material_name}:`, stockValue);
-                  }
-                } catch (error) {
-                  console.warn(`Error fetching individual products for ${material.material_name}:`, error);
-                }
-              }
               
               console.log(`📦 Product in recipe: ${material.material_name}`, {
                 id: material.material_id,
                 individual_count: productMaterial.individual_count,
-                individual_products: productMaterial.individual_products,
                 stockValue,
                 material_type: 'product'
               });
@@ -738,19 +783,10 @@ export default function ProductionDetail() {
       const materialProduct = products.find(p => p.id === material.material_id);
 
       if (materialProduct) {
-        // This is a product - convert SQM to pieces based on product dimensions
-        const matLength = parseFloat((materialProduct.length || "0").toString().replace(/[^\d.]/g, '')) || 0;
-        const matWidth = parseFloat((materialProduct.width || "0").toString().replace(/[^\d.]/g, '')) || 0;
-        const sqmPerPiece = matLength * matWidth; // sqm per piece of this product
-
-        if (sqmPerPiece > 0) {
-          // Convert sqm to pieces: total sqm needed ÷ sqm per piece
-          const piecesNeeded = requiredQuantity / sqmPerPiece;
-          console.log(`  - 🔄 ${material.material_name} (PRODUCT): ${requiredQuantity} sqm ÷ ${sqmPerPiece} sqm/piece = ${piecesNeeded} pieces`);
-          requiredQuantity = piecesNeeded;
-        } else {
-          console.log(`  - ⚠️ ${material.material_name} (PRODUCT): No dimensions, treating as ${requiredQuantity} units`);
-        }
+        // This is a product - quantity_per_sqm is already in pieces per sqm
+        // requiredQuantity = pieces per sqm * total sqm = total pieces needed
+        // No conversion needed - requiredQuantity is already in pieces
+        console.log(`  - 🔄 ${material.material_name} (PRODUCT): ${materialQuantityPerSqm} pieces/sqm × ${totalArea} sqm = ${requiredQuantity} pieces`);
       } else {
         console.log(`  - ${material.material_name} (RAW MATERIAL): ${materialQuantityPerSqm} ${material.unit} for 1 sqm × ${totalArea} sqm = ${requiredQuantity} ${material.unit}`);
       }
@@ -825,7 +861,7 @@ export default function ProductionDetail() {
       let currentRawMaterials = rawMaterials;
       if (currentRawMaterials.length === 0) {
         // Try to get fresh data
-        MongoDBRawMaterialService.getRawMaterials().then(({ data: materials }) => {
+        MongoDBRawMaterialService.getRawMaterials({ limit: 10000 }).then(({ data: materials, count }) => {
           currentRawMaterials = materials || [];
           updateMaterialsFromCalculation(calculatedMaterials, currentRawMaterials);
         });
@@ -861,22 +897,8 @@ export default function ProductionDetail() {
       // Determine stock based on material type
       let stockValue = 0;
       if (productMaterial) {
-        // For products, use individual product count
+        // For products, use individual product count (should already be loaded)
         stockValue = productMaterial.individual_count || 0;
-        
-        // If individual_count is 0, try to fetch individual products directly
-        if (stockValue === 0) {
-          try {
-            const { data: individualProducts, error } = await IndividualProductService.getIndividualProductsByProductId(material.material_id);
-            
-            if (!error && individualProducts) {
-              stockValue = individualProducts.length;
-              console.log(`📦 Fetched individual products directly for ${material.material_name}:`, stockValue);
-            }
-          } catch (error) {
-            console.warn(`Error fetching individual products for ${material.material_name}:`, error);
-          }
-        }
       } else if (rawMaterial) {
         stockValue = rawMaterial.current_stock || 0;
       }
@@ -955,36 +977,15 @@ export default function ProductionDetail() {
 
           if (isBaseQuantity) {
             // User changed base quantity (per 1 sqm), calculate total based on total area
+            // For products, baseQuantity is in pieces per sqm, so totalQuantity = baseQuantity * totalArea (already in pieces)
             newBaseQuantity = newTotalQuantity;
-            newTotalQuantityCalculated = newBaseQuantity * totalArea; // Multiply by total sqm
-
-            // If it's a product, convert SQM to pieces
-            if (materialProduct) {
-              const matLength = parseFloat((materialProduct.length || "0").toString().replace(/[^\d.]/g, '')) || 0;
-              const matWidth = parseFloat((materialProduct.width || "0").toString().replace(/[^\d.]/g, '')) || 0;
-              const sqmPerPiece = matLength * matWidth;
-
-              if (sqmPerPiece > 0) {
-                newTotalQuantityCalculated = newTotalQuantityCalculated / sqmPerPiece; // Convert to pieces
-              }
-            }
+            newTotalQuantityCalculated = newBaseQuantity * totalArea; // Already in pieces for products, units for raw materials
+            // No conversion needed - if it's a product, baseQuantity is pieces/sqm, so totalQuantity is pieces
           } else {
             // User changed total quantity, calculate base
+            // For products, totalQuantity is in pieces, so baseQuantity = totalQuantity / totalArea (pieces per sqm)
             newTotalQuantityCalculated = newTotalQuantity;
-
-            // If it's a product, convert pieces back to SQM for base calculation
-            let sqmForBaseCalc = newTotalQuantity;
-            if (materialProduct) {
-              const matLength = parseFloat((materialProduct.length || "0").toString().replace(/[^\d.]/g, '')) || 0;
-              const matWidth = parseFloat((materialProduct.width || "0").toString().replace(/[^\d.]/g, '')) || 0;
-              const sqmPerPiece = matLength * matWidth;
-
-              if (sqmPerPiece > 0) {
-                sqmForBaseCalc = newTotalQuantity * sqmPerPiece; // Convert pieces to SQM
-              }
-            }
-
-            newBaseQuantity = totalArea > 0 ? sqmForBaseCalc / totalArea : 0;
+            newBaseQuantity = totalArea > 0 ? newTotalQuantity / totalArea : 0; // Pieces per sqm for products
           }
 
           return {
@@ -1035,6 +1036,7 @@ export default function ProductionDetail() {
   };
 
   // Auto-calculate recipe ratio for products (same as Products.tsx)
+  // Returns: how many source products (in SQM) are needed per 1 SQM of target product
   const calculateProductRatio = (sourceProduct: any, targetProduct: any): number => {
     if (!sourceProduct || !targetProduct) return 0;
     
@@ -1057,10 +1059,40 @@ export default function ProductionDetail() {
       targetWidthUnit
     );
     
-    console.log(`🔄 Ratio calculation: Source (${sourceProduct.length} ${sourceLengthUnit} × ${sourceProduct.width} ${sourceWidthUnit} = ${sourceSQM.toFixed(4)} SQM) / Target (${targetProduct.length} ${targetLengthUnit} × ${targetProduct.width} ${targetWidthUnit} = ${targetSQM.toFixed(4)} SQM) = ${targetSQM > 0 && sourceSQM > 0 ? (targetSQM / sourceSQM).toFixed(4) : '0'}`);
+    // Ratio = how many source SQM per 1 SQM of target
+    // For 1 sqm of target, we need: 1 / sourceSQM (if sourceSQM is the area of one source product)
+    // Actually: if target is 2 sqm and source is 12 sqm, for 1 sqm of target we need: 1/12 = 0.0833 source products
+    // But we want SQM of source, not pieces. So: 1 sqm of target needs (1 / sourceSQM) * sourceSQM = 1 sqm of source? No.
     
-    if (sourceSQM === 0) return 0;
-    return targetSQM / sourceSQM;
+    // Correct calculation: For 1 sqm of target, how many sqm of source?
+    // If 1 target product (targetSQM sqm) needs 1 source product (sourceSQM sqm)
+    // Then for 1 sqm of target, we need: (1 / targetSQM) * sourceSQM = sourceSQM / targetSQM
+    
+    // But wait, the user says for 1 sqm of target (2 sqm product), they need 0.0833 of source (12 sqm product)
+    // 0.0833 = 1/12, which is 1 / sourceSQM
+    // So the ratio should be: 1 / sourceSQM (pieces of source per 1 sqm of target)
+    // But we're storing it as SQM, so we need to convert: (1 / sourceSQM) * sourceSQM = 1
+    
+    // Actually, I think the issue is different. The ratio should be:
+    // For 1 sqm of target, how many pieces of source? = 1 / sourceSQM
+    // But we want to store it as SQM ratio, so: (1 / sourceSQM) * sourceSQM = 1
+    
+    // Let me reconsider: The baseQuantity is "per 1 sqm", so if we need 0.0833 pieces of source per 1 sqm of target,
+    // and each source piece is 12 sqm, then we need: 0.0833 * 12 = 1 sqm of source per 1 sqm of target
+    
+    // So the ratio should be: 1 (meaning 1 sqm of source per 1 sqm of target)
+    // But that doesn't match what the user is seeing (0.0833)
+    
+    // I think the confusion is: the ratio stored should be in pieces, not SQM, when it's a product.
+    // But we're storing it as a decimal that represents pieces per sqm.
+    
+    // Correct formula: For 1 sqm of target, how many pieces of source?
+    // = 1 / sourceSQM (pieces per sqm of target)
+    const ratio = sourceSQM > 0 ? 1 / sourceSQM : 0;
+    
+    console.log(`🔄 Ratio calculation: For 1 SQM of target, need ${ratio.toFixed(4)} pieces of source (${sourceSQM.toFixed(4)} SQM each) = ${(ratio * sourceSQM).toFixed(4)} SQM of source`);
+    
+    return ratio;
   };
 
   // Get available materials (in stock)
@@ -1131,17 +1163,12 @@ export default function ProductionDetail() {
     const isProduct = products.some(p => p.id === material.id);
 
     if (materialProduct) {
-      // This is a product - convert SQM to pieces based on product dimensions
-      const matLength = parseFloat((materialProduct.length || "0").toString().replace(/[^\d.]/g, '')) || 0;
-      const matWidth = parseFloat((materialProduct.width || "0").toString().replace(/[^\d.]/g, '')) || 0;
-      const sqmPerPiece = matLength * matWidth; // sqm per piece of this product
-
-      if (sqmPerPiece > 0) {
-        // Convert sqm to pieces: total sqm needed ÷ sqm per piece
-        const piecesNeeded = totalQuantity / sqmPerPiece;
-        console.log(`  - 🔄 ${material.name} (PRODUCT): ${totalQuantity} sqm ÷ ${sqmPerPiece} sqm/piece = ${piecesNeeded} pieces`);
-        totalQuantity = piecesNeeded;
-      }
+      // This is a product - the quantityPerSqm is already in pieces per sqm
+      // totalQuantity is currently in "pieces per sqm * total sqm" = total pieces needed
+      // So we don't need to convert again - totalQuantity is already correct
+      // The baseQuantity (quantityPerSqm) is pieces per 1 sqm, and totalQuantity is total pieces
+      console.log(`  - 🔄 ${material.name} (PRODUCT): ${quantityPerSqm} pieces/sqm × ${totalArea} sqm = ${totalQuantity} pieces`);
+      // totalQuantity is already correct (pieces), no conversion needed
     }
 
     if (existingIndex >= 0) {
@@ -1972,7 +1999,17 @@ export default function ProductionDetail() {
         // Persist to backend as planned (no stock deduction yet)
         const savePromises = selectedMaterials.map(async (material) => {
           try {
-            const quantityUsed = material.selectedQuantity || material.totalQuantity || 0;
+            // For products: quantity_used = whole product count (number of individual products selected)
+            // actual_consumed_quantity = actual fractional consumption (e.g., 0.4)
+            // For raw materials: quantity_used = actual consumed quantity
+            const isProduct = material.material_type === 'product';
+            const actualConsumedQuantity = material.selectedQuantity || material.totalQuantity || 0;
+            const wholeProductCount = isProduct && material.selectedIndividualProducts?.length 
+              ? material.selectedIndividualProducts.length 
+              : Math.ceil(actualConsumedQuantity);
+            
+            const quantityUsed = isProduct ? wholeProductCount : actualConsumedQuantity;
+            
             const materialConsumptionData: any = {
               production_batch_id: batchIdForConsumption,
               production_product_id: batchIdForConsumption,
@@ -1980,13 +2017,14 @@ export default function ProductionDetail() {
               material_id: material.id,
               material_name: material.name,
               material_type: material.material_type || 'raw_material',
-              quantity_used: quantityUsed,
+              quantity_used: quantityUsed, // Whole product count for products, actual quantity for raw materials
+              actual_consumed_quantity: isProduct ? actualConsumedQuantity : undefined, // Actual fractional consumption for products
               unit: material.unit,
               operator: 'Production Operator',
               individual_product_ids: material.selectedIndividualProducts?.map((p: any) => p.id) || [],
               waste_quantity: 0,
               waste_type: 'normal' as const,
-              notes: `Planned at PLAN MATERIAL stage for batch ${batchIdForConsumption} (${productionProduct.productName})`,
+              notes: `Planned at PLAN MATERIAL stage for batch ${batchIdForConsumption} (${productionProduct.productName}). ${isProduct ? `Actual consumed: ${actualConsumedQuantity} product(s), Whole products: ${wholeProductCount}` : ''}`,
               deduct_now: false
             };
             const { data: savedConsumption, error: consumptionError } = await MaterialConsumptionService.createMaterialConsumption(materialConsumptionData);
@@ -2648,7 +2686,10 @@ export default function ProductionDetail() {
                                 ? 'text-green-600' 
                                 : 'text-red-600'
                             }`}>
-                              {material.current_stock} {material.unit}
+                              {material.material_type === 'product' 
+                                ? `${material.current_stock} ${material.current_stock === 1 ? 'product' : 'products'}`
+                                : `${material.current_stock} ${material.unit}`
+                              }
                             </span>
                             {material.current_stock < (material.totalQuantity || material.selectedQuantity) && (
                               <Badge variant="destructive" className="text-xs flex-shrink-0">
@@ -2771,11 +2812,33 @@ export default function ProductionDetail() {
                           )}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {material.quantity} {material.unit} • {new Date(material.consumedAt).toLocaleDateString()}
+                          {productMaterial 
+                            ? `${material.quantity} ${material.quantity === 1 ? 'product' : 'products'} • ${new Date(material.consumedAt).toLocaleDateString()}`
+                            : `${material.quantity} ${material.unit} • ${new Date(material.consumedAt).toLocaleDateString()}`
+                          }
                       </div>
                         <div className="text-sm text-gray-500">
-                          Available: {currentStock} {material.unit}
+                          Available: {productMaterial 
+                            ? `${currentStock} ${currentStock === 1 ? 'product' : 'products'}`
+                            : `${currentStock} ${material.unit}`
+                          }
                       </div>
+                      {/* Show individual product IDs if this is a product material */}
+                      {productMaterial && (material as any).individualProductIds && (material as any).individualProductIds.length > 0 && (
+                        <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-1">
+                          <span className="font-medium">Individual Products:</span>
+                          {(material as any).individualProductIds.slice(0, 5).map((id: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              {id}
+                            </Badge>
+                          ))}
+                          {(material as any).individualProductIds.length > 5 && (
+                            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              +{(material as any).individualProductIds.length - 5} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     {!isAvailable && (
                       <div className="text-xs text-red-600 flex items-center gap-1 mt-1">
                         <AlertTriangle className="w-3 h-3" />
@@ -2838,6 +2901,9 @@ export default function ProductionDetail() {
               </div>
               <div className="text-sm text-gray-500">
                 {getFilteredMaterials().length} items found
+                {materialTypeFilter === 'all' && ` (${totalRawMaterialsCount} materials, ${totalProductsCount} products)`}
+                {materialTypeFilter === 'materials' && ` (${totalRawMaterialsCount} total)`}
+                {materialTypeFilter === 'products' && ` (${totalProductsCount} total)`}
               </div>
             </div>
             
@@ -2846,23 +2912,36 @@ export default function ProductionDetail() {
               <Button
                 variant={materialTypeFilter === 'all' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setMaterialTypeFilter('all')}
+                onClick={() => {
+                  setMaterialTypeFilter('all');
+                  setMaterialCurrentPage(1);
+                  loadRawMaterials(1);
+                  loadProducts(1);
+                }}
               >
-                All ({rawMaterials.length + products.filter(p => p.id !== productionProduct?.productId).length})
+                All ({totalRawMaterialsCount + totalProductsCount})
               </Button>
               <Button
                 variant={materialTypeFilter === 'materials' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setMaterialTypeFilter('materials')}
+                onClick={() => {
+                  setMaterialTypeFilter('materials');
+                  setMaterialCurrentPage(1);
+                  loadRawMaterials(1);
+                }}
               >
-                Raw Materials ({rawMaterials.length})
+                Raw Materials ({totalRawMaterialsCount})
               </Button>
               <Button
                 variant={materialTypeFilter === 'products' ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setMaterialTypeFilter('products')}
+                onClick={() => {
+                  setMaterialTypeFilter('products');
+                  setMaterialCurrentPage(1);
+                  loadProducts(1);
+                }}
               >
-                Products ({products.filter(p => p.id !== productionProduct?.productId).length})
+                Products ({totalProductsCount})
               </Button>
               <Button
                 variant={materialTypeFilter === 'individual' ? 'default' : 'outline'}
@@ -2960,6 +3039,132 @@ export default function ProductionDetail() {
               </div>
             )}
           </div>
+
+          {/* Pagination */}
+          {((materialTypeFilter === 'all' && (totalRawMaterialsCount + totalProductsCount > materialItemsPerPage)) ||
+            (materialTypeFilter === 'materials' && totalRawMaterialsCount > materialItemsPerPage) ||
+            (materialTypeFilter === 'products' && totalProductsCount > materialItemsPerPage)) && (
+            <div className="mt-4 pt-4 flex items-center justify-between border-t">
+              <div className="text-sm text-muted-foreground">
+                {(() => {
+                  const total = materialTypeFilter === 'all' 
+                    ? totalRawMaterialsCount + totalProductsCount 
+                    : materialTypeFilter === 'materials' 
+                    ? totalRawMaterialsCount 
+                    : totalProductsCount;
+                  const start = (materialCurrentPage - 1) * materialItemsPerPage + 1;
+                  const end = Math.min(materialCurrentPage * materialItemsPerPage, total);
+                  return `Showing ${start} to ${end} of ${total} items`;
+                })()}
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (materialCurrentPage > 1) {
+                          const newPage = materialCurrentPage - 1;
+                          setMaterialCurrentPage(newPage);
+                          if (materialTypeFilter === 'materials') {
+                            loadRawMaterials(newPage);
+                          } else if (materialTypeFilter === 'products') {
+                            loadProducts(newPage);
+                          } else {
+                            loadRawMaterials(newPage);
+                            loadProducts(newPage);
+                          }
+                        }
+                      }}
+                      className={materialCurrentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                    />
+                  </PaginationItem>
+                  {(() => {
+                    const total = materialTypeFilter === 'all' 
+                      ? totalRawMaterialsCount + totalProductsCount 
+                      : materialTypeFilter === 'materials' 
+                      ? totalRawMaterialsCount 
+                      : totalProductsCount;
+                    const totalPages = Math.ceil(total / materialItemsPerPage);
+                    return Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        return page === 1 || 
+                               page === totalPages ||
+                               (page >= materialCurrentPage - 1 && page <= materialCurrentPage + 1);
+                      })
+                      .map((page, index, array) => {
+                        const showEllipsisBefore = index > 0 && array[index - 1] !== page - 1;
+                        return (
+                          <React.Fragment key={page}>
+                            {showEllipsisBefore && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setMaterialCurrentPage(page);
+                                  if (materialTypeFilter === 'materials') {
+                                    loadRawMaterials(page);
+                                  } else if (materialTypeFilter === 'products') {
+                                    loadProducts(page);
+                                  } else {
+                                    loadRawMaterials(page);
+                                    loadProducts(page);
+                                  }
+                                }}
+                                isActive={materialCurrentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </React.Fragment>
+                        );
+                      });
+                  })()}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const total = materialTypeFilter === 'all' 
+                          ? totalRawMaterialsCount + totalProductsCount 
+                          : materialTypeFilter === 'materials' 
+                          ? totalRawMaterialsCount 
+                          : totalProductsCount;
+                        const totalPages = Math.ceil(total / materialItemsPerPage);
+                        if (materialCurrentPage < totalPages) {
+                          const newPage = materialCurrentPage + 1;
+                          setMaterialCurrentPage(newPage);
+                          if (materialTypeFilter === 'materials') {
+                            loadRawMaterials(newPage);
+                          } else if (materialTypeFilter === 'products') {
+                            loadProducts(newPage);
+                          } else {
+                            loadRawMaterials(newPage);
+                            loadProducts(newPage);
+                          }
+                        }
+                      }}
+                      className={(() => {
+                        const total = materialTypeFilter === 'all' 
+                          ? totalRawMaterialsCount + totalProductsCount 
+                          : materialTypeFilter === 'materials' 
+                          ? totalRawMaterialsCount 
+                          : totalProductsCount;
+                        const totalPages = Math.ceil(total / materialItemsPerPage);
+                        return materialCurrentPage >= totalPages ? 'pointer-events-none opacity-50' : '';
+                      })()}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
 
           {/* Selected Materials Summary */}
           {selectedMaterials.length > 0 && (

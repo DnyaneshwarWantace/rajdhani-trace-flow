@@ -49,6 +49,7 @@ interface WasteItem {
   wasteType: string;
   canBeReused: boolean;
   notes: string;
+  individualProductIds?: string[]; // For products - which individual products are wasted
 }
 
 interface ProductionProduct {
@@ -217,15 +218,89 @@ export default function WasteGeneration() {
         ]);
 
         const rawMaterialsData = rawMaterialsResult?.data || [];
-        const productsData = (productsResult?.data || []).map((product: any) => ({
-          ...product,
-          individual_count: 0 // optionally compute via individual products service if needed
-        }));
+        let productsData = productsResult?.data || [];
+        
+        // Calculate individual counts for products that are in the recipe
+        // Get all material IDs from the recipe
+        const materialIdsInRecipe = materialsToUse.map((m: any) => m.material_id || m.materialId);
+        
+        // Find which material IDs correspond to products (check if they exist in productsData)
+        const productIdsInRecipe = materialIdsInRecipe.filter((materialId: string) => {
+          // Check if material_type is explicitly 'product'
+          const materialData = materialsToUse.find((m: any) => (m.material_id || m.materialId) === materialId);
+          if (materialData && (materialData.material_type || 'raw_material') === 'product') {
+            return true;
+          }
+          // Also check if the material_id exists in productsData (fallback detection)
+          return productsData.some((p: any) => p.id === materialId);
+        });
+        
+        if (productIdsInRecipe.length > 0) {
+          console.log('📦 Loading individual product counts for products in recipe:', productIdsInRecipe);
+          
+          // Load individual products for each product in the recipe
+          const individualCountsMap = new Map<string, number>();
+          
+          try {
+            const countPromises = productIdsInRecipe.map(async (productId: string) => {
+              try {
+                const { data: individualProducts, error } = await IndividualProductService.getIndividualProductsByProductId(productId);
+                if (!error && individualProducts) {
+                  const availableCount = individualProducts.filter((ip: any) => ip.status === 'available').length;
+                  individualCountsMap.set(productId, availableCount);
+                  console.log(`✅ Product ${productId}: ${availableCount} individual products available`);
+                  return { productId, count: availableCount };
+                } else {
+                  console.warn(`⚠️ Error loading individual products for ${productId}:`, error);
+                }
+              } catch (error) {
+                console.warn(`⚠️ Error loading individual products for ${productId}:`, error);
+              }
+              return { productId, count: 0 };
+            });
+            
+            await Promise.all(countPromises);
+            console.log('📊 Individual counts map:', Array.from(individualCountsMap.entries()));
+          } catch (error) {
+            console.error('❌ Error loading individual product counts:', error);
+          }
+          
+          // Update productsData with calculated individual counts
+          productsData = productsData.map((product: any) => {
+            const count = individualCountsMap.get(product.id);
+            if (count !== undefined) {
+              console.log(`📦 Updating product ${product.id} with count: ${count}`);
+              return {
+                ...product,
+                individual_count: count, // For frontend use
+                individual_products_count: count // Match backend field name
+              };
+            }
+            // Use individual_products_count from backend if available, otherwise calculate
+            const backendCount = product.individual_products_count || product.individual_count || 0;
+            return {
+              ...product,
+              individual_count: backendCount, // For frontend use
+              individual_products_count: backendCount // Match backend field name
+            };
+          });
+        } else {
+          console.log('⚠️ No products found in recipe, skipping individual count calculation');
+          // No products in recipe, use backend values or set to 0
+          productsData = productsData.map((product: any) => {
+            const backendCount = product.individual_products_count || product.individual_count || 0;
+            return {
+              ...product,
+              individual_count: backendCount, // For frontend use
+              individual_products_count: backendCount // Match backend field name
+            };
+          });
+        }
         
         console.log('📦 Available products for waste tracking:', productsData.map(p => ({
           id: p.id,
           name: p.name,
-          individual_count: p.individual_count
+          individual_count: (p as any).individual_count || p.individual_products_count || 0
         })));
 
         // Map materials to full material/product details - properly distinguish between products and raw materials
@@ -233,9 +308,20 @@ export default function WasteGeneration() {
           // Handle both production materials and recipe materials
           const materialId = materialData.materialId || materialData.material_id;
           const materialName = materialData.materialName || materialData.material_name;
-          const quantity = materialData.quantity || materialData.quantity_used || 0;
-          const unit = materialData.unit || 'units';
           const materialType = materialData.material_type || 'raw_material';
+          
+          // For products: use actual_consumed_quantity (fractional) if available, otherwise use quantity_used
+          // For raw materials: use quantity_used
+          let quantity = 0;
+          if (materialType === 'product') {
+            quantity = materialData.actual_consumed_quantity !== undefined 
+              ? materialData.actual_consumed_quantity 
+              : (materialData.quantity || materialData.quantity_used || 0);
+          } else {
+            quantity = materialData.quantity || materialData.quantity_used || 0;
+          }
+          
+          const unit = materialData.unit || 'units';
           
           console.log('🔍 Processing material:', {
             materialId,
@@ -271,10 +357,12 @@ export default function WasteGeneration() {
             const product = productsData.find((p: any) => p.id === materialId);
             console.log('🔍 Found product:', product ? 'YES' : 'NO', product ? { id: product.id, name: product.name } : null);
             if (product) {
+              // Use individual_products_count from backend, fallback to individual_count, then 0
+              const productCount = product.individual_products_count || (product as any).individual_count || 0;
               material = {
                 id: product.id,
                 name: product.name,
-                current_stock: product.individual_count || 0,
+                current_stock: productCount,
                 cost_per_unit: 0, // Products don't have cost in this context
                 category: product.category || 'Product',
                 brand: '',
@@ -512,29 +600,70 @@ export default function WasteGeneration() {
   }, []);
 
   // Handle waste material selection change
-  const handleWasteMaterialSelection = (materialId: string) => {
+  const handleWasteMaterialSelection = async (materialId: string) => {
     const selectedMaterial = recipeMaterials.find(m => m.id === materialId);
     if (selectedMaterial) {
+      // For products, get actual consumed quantity and auto-calculate wastage
+      let autoWasteQuantity = '';
+      let actualConsumedQuantity = selectedMaterial.quantity || 0;
+      
+      if (selectedMaterial.type === 'product') {
+        // Get actual consumed quantity from material consumption record
+        // For products: use actual_consumed_quantity (fractional, e.g., 0.4) if available, otherwise use quantity_used
+        try {
+          const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+            production_batch_id: batchId,
+            material_id: materialId
+          });
+          
+          if (consumptionResp?.data && consumptionResp.data.length > 0) {
+            const consumptionRecord = consumptionResp.data[0] as any;
+            // Use actual_consumed_quantity if available (fractional consumption), otherwise fall back to quantity_used
+            actualConsumedQuantity = consumptionRecord.actual_consumed_quantity !== undefined 
+              ? consumptionRecord.actual_consumed_quantity 
+              : (consumptionRecord.quantity_used || selectedMaterial.quantity || 0);
+            console.log('📊 Consumption record:', {
+              quantity_used: consumptionRecord.quantity_used,
+              actual_consumed_quantity: consumptionRecord.actual_consumed_quantity,
+              using: actualConsumedQuantity
+            });
+          }
+        } catch (error) {
+          console.warn('Could not fetch consumption record, using material quantity:', error);
+        }
+        
+        // Calculate whole products needed (round up)
+        const wholeProductsNeeded = Math.ceil(actualConsumedQuantity);
+        
+        // Auto-calculate wastage: whole products - actual consumed
+        if (wholeProductsNeeded > actualConsumedQuantity) {
+          autoWasteQuantity = (wholeProductsNeeded - actualConsumedQuantity).toFixed(4);
+        } else {
+          autoWasteQuantity = '0';
+        }
+      }
+      
       setNewWaste({
         ...newWaste,
         materialId: selectedMaterial.id,
         materialName: selectedMaterial.name,
-        unit: selectedMaterial.unit
+        unit: selectedMaterial.type === 'product' ? 'product' : selectedMaterial.unit,
+        quantity: autoWasteQuantity // Auto-fill wastage quantity for products
       });
       
       // If it's a product, load individual products that were used in production
       if (selectedMaterial.type === 'product') {
-        // Find the material consumption data for this material
-        const materialConsumptionData = recipeMaterials.find(m => m.id === selectedMaterial.id);
+        // Use the selectedMaterial which already has individual_product_ids from loadRecipeMaterials
         console.log('🔍 Selected material:', selectedMaterial);
-        console.log('🔍 Recipe materials:', recipeMaterials);
-        console.log('🔍 Found material consumption data:', materialConsumptionData);
+        console.log('🔍 Individual product IDs from material:', selectedMaterial.individual_product_ids);
+        console.log('🔍 Actual consumed quantity:', actualConsumedQuantity);
         
-        if (materialConsumptionData) {
-          loadIndividualProductsForWaste(selectedMaterial.id, materialConsumptionData);
+        if (selectedMaterial.individual_product_ids && selectedMaterial.individual_product_ids.length > 0) {
+          await loadIndividualProductsForWaste(selectedMaterial.id, selectedMaterial, actualConsumedQuantity);
         } else {
-          console.log('⚠️ No material consumption data found for selected material');
-          setAvailableIndividualProducts([]);
+          console.log('⚠️ No individual product IDs found for selected material, trying to load from material consumption...');
+          // Fallback: try to load from material consumption directly
+          await loadIndividualProductsForWaste(selectedMaterial.id, selectedMaterial, actualConsumedQuantity);
         }
       } else {
         setSelectedIndividualProducts([]);
@@ -544,24 +673,45 @@ export default function WasteGeneration() {
   };
 
   // Load individual products that were actually used in production
-  const loadIndividualProductsForWaste = async (productId: string, materialConsumptionData: any) => {
+  const loadIndividualProductsForWaste = async (productId: string, materialConsumptionData: any, actualConsumedQuantity: number = 0) => {
     try {
       console.log('🔍 Loading individual products that were used in production:', productId);
+      console.log('🔍 Actual consumed quantity:', actualConsumedQuantity);
       
       // Get the individual_product_ids from the material consumption data
-      const individualProductIds = materialConsumptionData.individual_product_ids || [];
+      let individualProductIds = materialConsumptionData.individual_product_ids || [];
+      
+      // If no individual_product_ids in the material data, try to load from material consumption API
+      if (individualProductIds.length === 0) {
+        console.log('⚠️ No individual_product_ids in material data, fetching from material consumption API...');
+        try {
+          const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+            production_batch_id: batchId,
+            material_id: productId
+          });
+          
+          if (consumptionResp?.data && consumptionResp.data.length > 0) {
+            const consumptionRecord = consumptionResp.data[0];
+            individualProductIds = consumptionRecord.individual_product_ids || [];
+            console.log('✅ Found individual_product_ids from API:', individualProductIds.length);
+          }
+        } catch (apiError) {
+          console.warn('⚠️ Error fetching from material consumption API:', apiError);
+        }
+      }
       
       console.log('🔍 Material consumption data for individual products:', {
         materialId: productId,
-        materialName: materialConsumptionData.material_name,
+        materialName: materialConsumptionData.name || materialConsumptionData.material_name,
         individual_product_ids: individualProductIds,
+        actualConsumedQuantity,
         rawData: materialConsumptionData
       });
       
       if (individualProductIds.length === 0) {
         console.log('⚠️ No individual products were used for this material in production');
-        console.log('🔍 Available individual_product_ids field:', materialConsumptionData.individual_product_ids);
         setAvailableIndividualProducts([]);
+        setSelectedIndividualProducts([]);
         return;
       }
       
@@ -577,9 +727,18 @@ export default function WasteGeneration() {
         .filter(Boolean);
       console.log('✅ Loaded individual products that were used in production:', individualProducts.length || 0);
       setAvailableIndividualProducts(individualProducts || []);
+      
+      // Auto-select individual products based on whole products needed
+      // If 2.3 products were consumed, we need 3 whole products, so auto-select all 3
+      const wholeProductsNeeded = Math.ceil(actualConsumedQuantity);
+      const productsToSelect = individualProducts.slice(0, wholeProductsNeeded);
+      
+      console.log(`🔄 Auto-selecting ${productsToSelect.length} individual products (${actualConsumedQuantity} consumed, ${wholeProductsNeeded} whole products needed)`);
+      setSelectedIndividualProducts(productsToSelect);
     } catch (error) {
       console.error('Error loading individual products for waste:', error);
       setAvailableIndividualProducts([]);
+      setSelectedIndividualProducts([]);
     }
   };
 
@@ -601,6 +760,12 @@ export default function WasteGeneration() {
     const selectedMaterial = recipeMaterials.find(m => m.id === newWaste.materialId);
     const materialType = selectedMaterial?.type || selectedMaterial?.isProduct ? 'product' : 'raw_material';
 
+    // For products, if individual products are selected, use those IDs
+    let individualProductIds: string[] = [];
+    if (materialType === 'product' && selectedIndividualProducts.length > 0) {
+      individualProductIds = selectedIndividualProducts.map(p => p.id);
+    }
+
     const waste: WasteItem = {
       materialId: newWaste.materialId,
       materialName: newWaste.materialName,
@@ -609,7 +774,8 @@ export default function WasteGeneration() {
       unit: newWaste.unit,
       wasteType: newWaste.wasteType,
       canBeReused: newWaste.canBeReused,
-      notes: newWaste.notes
+      notes: newWaste.notes,
+      individualProductIds: individualProductIds.length > 0 ? individualProductIds : undefined
     };
 
     const updatedProduct: ProductionProduct = {
@@ -631,6 +797,8 @@ export default function WasteGeneration() {
       canBeReused: false,
       notes: ""
     });
+    setSelectedIndividualProducts([]);
+    setAvailableIndividualProducts([]);
     setIsAddingWaste(false);
   };
 
@@ -649,24 +817,41 @@ export default function WasteGeneration() {
   const completeWasteTracking = async () => {
     if (!productionProduct) return;
 
-    // 1. Deduct consumed materials from raw material inventory
+    // 1. Deduct consumed materials from inventory (both raw materials and products)
+    // This is when materials are actually consumed - mark individual products as consumed
     console.log('🔄 Deducting consumed materials from inventory...');
     if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
       for (const consumed of productionProduct.materialsConsumed) {
         try {
-          // Find the raw material in the list
-          const material = rawMaterials.find(m => m.id === consumed.materialId);
-          if (material) {
-            const newStock = material.currentStock - consumed.quantity;
-            const newStatus = newStock <= 0 ? "out-of-stock" :
-                            newStock <= 10 ? "low-stock" : "in-stock";
-
-            // Update in backend
-            await MongoDBRawMaterialService.updateRawMaterial(material.id, {
-              current_stock: Math.max(0, newStock)
+          // Get the material consumption record for this material
+          const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+            production_batch_id: productionProduct.id,
+            material_id: consumed.materialId
+          });
+          
+          if (consumptionResp?.data && consumptionResp.data.length > 0) {
+            const consumptionRecord = consumptionResp.data[0];
+            
+            // Update the consumption record to trigger actual deduction
+            // This will mark individual products as consumed if they exist
+            await MaterialConsumptionService.updateMaterialConsumption(consumptionRecord.id, {
+              // Trigger actual deduction by updating the record
+              // The backend will handle marking individual products as consumed
+              notes: `${consumptionRecord.notes || ''}\nActual consumption completed at waste generation step`
             });
-
-            console.log(`✅ Deducted ${consumed.quantity} ${consumed.unit} of ${consumed.materialName}`);
+            
+            // For raw materials, deduct stock manually (same as before)
+            const material = rawMaterials.find(m => m.id === consumed.materialId);
+            if (material) {
+              const newStock = material.currentStock - consumed.quantity;
+              await MongoDBRawMaterialService.updateRawMaterial(material.id, {
+                current_stock: Math.max(0, newStock)
+              });
+              console.log(`✅ Deducted ${consumed.quantity} ${consumed.unit} of ${consumed.materialName} (raw material)`);
+            } else {
+              // For products, the backend will handle deduction when we trigger it
+              console.log(`✅ Processing product consumption: ${consumed.materialName}`);
+            }
           }
         } catch (error) {
           console.error(`❌ Error deducting material ${consumed.materialName}:`, error);
@@ -693,6 +878,7 @@ export default function WasteGeneration() {
             ? (waste.quantity / consumedMaterial.quantity) * 100
             : 0;
 
+          // 1. Create waste record in ProductionWaste table
           const result = await WasteService.createWaste({
             material_id: waste.materialId,
             material_name: waste.materialName,
@@ -710,13 +896,58 @@ export default function WasteGeneration() {
             generation_date: new Date().toISOString(),
             generation_stage: 'production',
             reason: waste.notes || 'Waste generated during production',
-            notes: `${waste.notes || ''} ${isFromConsumedMaterial ? '(From consumed material)' : '(Additional waste - not deducted from inventory)'}`
-          });
+            notes: `${waste.notes || ''} ${isFromConsumedMaterial ? '(From consumed material)' : '(Additional waste - not deducted from inventory)'}`,
+            individual_product_ids: waste.individualProductIds || [] // Pass individual product IDs for products
+          } as any);
           
           if (result.error) {
             console.error(`❌ Error creating waste item for ${waste.materialName}:`, result.error);
           } else {
             console.log(`✅ Added waste item: ${waste.quantity} ${waste.unit} of ${waste.materialName} (${waste.wasteType})`);
+          }
+
+          // 2. Update material consumption record with waste_quantity
+          // Find the material consumption record for this material and batch
+          try {
+            const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+              production_batch_id: productionProduct.id,
+              material_id: waste.materialId
+            });
+            
+            if (consumptionResp?.data && consumptionResp.data.length > 0) {
+              // Update the most recent consumption record with waste quantity
+              const consumptionRecord = consumptionResp.data[0];
+              
+              // Map waste type from ProductionWaste enum to MaterialConsumption enum
+              let wasteTypeForConsumption: 'scrap' | 'defective' | 'excess' | 'normal' = 'normal';
+              if (waste.wasteType === 'cutting_waste' || waste.wasteType === 'scrap') {
+                wasteTypeForConsumption = 'scrap';
+              } else if (waste.wasteType === 'defective_products' || waste.wasteType === 'defective') {
+                wasteTypeForConsumption = 'defective';
+              } else if (waste.wasteType === 'excess_material' || waste.wasteType === 'excess') {
+                wasteTypeForConsumption = 'excess';
+              }
+              
+              // Update consumption record with waste details and individual product IDs from waste
+              const updateData: any = {
+                waste_quantity: waste.quantity,
+                waste_type: wasteTypeForConsumption,
+                notes: `${consumptionRecord.notes || ''}\nWaste: ${waste.quantity} ${waste.unit} (${waste.wasteType})`
+              };
+              
+              // If waste has individual_product_ids, update the consumption record with them
+              // This ensures the backend knows which individual products to mark as consumed
+              if (waste.individualProductIds && waste.individualProductIds.length > 0) {
+                updateData.individual_product_ids = waste.individualProductIds;
+              }
+              
+              await MaterialConsumptionService.updateMaterialConsumption(consumptionRecord.id, updateData);
+              
+              console.log(`✅ Updated material consumption record with waste: ${waste.quantity} ${waste.unit}`);
+            }
+          } catch (updateError) {
+            console.error(`⚠️ Could not update material consumption with waste for ${waste.materialName}:`, updateError);
+            // Don't fail the whole process if this update fails
           }
         } catch (error) {
           console.error(`❌ Error processing waste item ${waste.materialName}:`, error);
@@ -770,9 +1001,48 @@ export default function WasteGeneration() {
     try {
       console.log('Skipping waste generation for flow:', productionFlow?.id);
       
+      // 1. Deduct consumed materials from inventory (both raw materials and products)
+      // This is when materials are actually consumed - mark individual products as consumed (same as raw materials)
+      console.log('🔄 Deducting consumed materials from inventory (wastage step skipped but materials still consumed)...');
+      if (productionProduct.materialsConsumed && productionProduct.materialsConsumed.length > 0) {
+        for (const consumed of productionProduct.materialsConsumed) {
+          try {
+            // Get the material consumption record for this material
+            const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+              production_batch_id: productionProduct.id,
+              material_id: consumed.materialId
+            });
+            
+            if (consumptionResp?.data && consumptionResp.data.length > 0) {
+              const consumptionRecord = consumptionResp.data[0];
+              
+              // Update the consumption record - this will trigger marking individual products as consumed
+              await MaterialConsumptionService.updateMaterialConsumption(consumptionRecord.id, {
+                notes: `${consumptionRecord.notes || ''}\nActual consumption completed at waste generation step (waste skipped)`
+              });
+              
+              // For raw materials, deduct stock manually
+              const material = rawMaterials.find(m => m.id === consumed.materialId);
+              if (material) {
+                const newStock = material.currentStock - consumed.quantity;
+                await MongoDBRawMaterialService.updateRawMaterial(material.id, {
+                  current_stock: Math.max(0, newStock)
+                });
+                console.log(`✅ Deducted ${consumed.quantity} ${consumed.unit} of ${consumed.materialName} (raw material)`);
+              } else {
+                // For products, the backend will handle marking individual products as consumed
+                console.log(`✅ Processing product consumption: ${consumed.materialName} - individual products will be marked as consumed`);
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error deducting material ${consumed.materialName}:`, error);
+          }
+        }
+      }
+      
       // Note: Material consumption was already recorded at the Plan Material stage
       // Stock deduction happens automatically via the backend
-      console.log('✅ Material consumption already recorded at Plan Material stage (waste skipped)');
+      console.log('✅ Material consumption completed (waste skipped)');
       
       // 2. Handle any additional waste items (even when skipping, user might have added some)
       if (productionProduct.wasteGenerated && productionProduct.wasteGenerated.length > 0) {
@@ -791,6 +1061,7 @@ export default function WasteGeneration() {
             const result = await WasteService.createWaste({
               material_id: waste.materialId,
               material_name: waste.materialName,
+              material_type: waste.materialType || 'raw_material',
               quantity: waste.quantity,
               unit: waste.unit,
               waste_type: waste.wasteType,
@@ -804,13 +1075,51 @@ export default function WasteGeneration() {
               generation_date: new Date().toISOString(),
               generation_stage: 'production',
               reason: waste.notes || 'Waste generated during production (skipped)',
-              notes: `${waste.notes || ''} (Additional waste - not deducted from inventory, waste generation skipped)`
-            });
+              notes: `${waste.notes || ''} (Additional waste - not deducted from inventory, waste generation skipped)`,
+              individual_product_ids: waste.individualProductIds || [] // Pass individual product IDs for products
+            } as any);
             
             if (result.error) {
               console.error(`❌ Error creating waste item for ${waste.materialName}:`, result.error);
             } else {
               console.log(`✅ Added waste item: ${waste.quantity} ${waste.unit} of ${waste.materialName} (${waste.wasteType})`);
+            }
+
+            // Update material consumption record with waste_quantity
+            try {
+              const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
+                production_batch_id: productionProduct.id,
+                material_id: waste.materialId
+              });
+              
+              if (consumptionResp?.data && consumptionResp.data.length > 0) {
+                const consumptionRecord = consumptionResp.data[0];
+                
+                let wasteTypeForConsumption: 'scrap' | 'defective' | 'excess' | 'normal' = 'normal';
+                if (waste.wasteType === 'cutting_waste' || waste.wasteType === 'scrap') {
+                  wasteTypeForConsumption = 'scrap';
+                } else if (waste.wasteType === 'defective_products' || waste.wasteType === 'defective') {
+                  wasteTypeForConsumption = 'defective';
+                } else if (waste.wasteType === 'excess_material' || waste.wasteType === 'excess') {
+                  wasteTypeForConsumption = 'excess';
+                }
+                
+                // Update consumption record with waste details and individual product IDs from waste
+                const updateData: any = {
+                  waste_quantity: waste.quantity,
+                  waste_type: wasteTypeForConsumption,
+                  notes: `${consumptionRecord.notes || ''}\nWaste: ${waste.quantity} ${waste.unit} (${waste.wasteType}) - skipped`
+                };
+                
+                // If waste has individual_product_ids, update the consumption record with them
+                if (waste.individualProductIds && waste.individualProductIds.length > 0) {
+                  updateData.individual_product_ids = waste.individualProductIds;
+                }
+                
+                await MaterialConsumptionService.updateMaterialConsumption(consumptionRecord.id, updateData);
+              }
+            } catch (updateError) {
+              console.error(`⚠️ Could not update material consumption with waste for ${waste.materialName}:`, updateError);
             }
           } catch (error) {
             console.error(`❌ Error processing waste item ${waste.materialName}:`, error);
@@ -971,10 +1280,31 @@ export default function WasteGeneration() {
                       </Badge>
                     </div>
                     <div className="text-sm text-gray-500">
-                      Required: {material.quantity} {material.unit} • 
-                      Available: {material.currentStock} {material.unit} • 
+                      Consumed: {material.type === 'product' 
+                        ? `${material.quantity} ${material.quantity === 1 ? 'product' : 'products'}`
+                        : `${material.quantity} ${material.unit}`
+                      } • 
+                      Available: {material.type === 'product'
+                        ? `${material.currentStock} ${material.currentStock === 1 ? 'product' : 'products'}`
+                        : `${material.currentStock} ${material.unit}`
+                      } • 
                       Category: {material.category}
                     </div>
+                    {material.type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0 && (
+                      <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-1 items-center">
+                        <span>Individual Products:</span>
+                        {material.individual_product_ids.slice(0, 3).map((id: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            {id}
+                          </Badge>
+                        ))}
+                        {material.individual_product_ids.length > 3 && (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            +{material.individual_product_ids.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium">
@@ -1080,25 +1410,40 @@ export default function WasteGeneration() {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-medium text-gray-900">{material.name}</h4>
-                                <Badge variant="secondary" className="text-xs">
-                                  Raw Material
+                                <Badge variant={material.type === 'product' ? 'default' : 'secondary'} className="text-xs">
+                                  {material.type === 'product' ? 'Product' : 'Raw Material'}
                                 </Badge>
-                                {material.isProduct && (
-                                  <Badge variant="outline" className="text-xs text-blue-600 border-blue-200">
-                                    From Product
-                                  </Badge>
-                                )}
                               </div>
                               <div className="text-sm text-gray-600 space-y-1">
                                 <div className="flex items-center gap-4">
-                                  <span>Required: <span className="font-medium">{material.quantity} {material.unit}</span></span>
+                                  <span>Consumed: <span className="font-medium">
+                                    {material.type === 'product' 
+                                      ? `${material.quantity} ${material.quantity === 1 ? 'product' : 'products'}`
+                                      : `${material.quantity} ${material.unit}`
+                                    }
+                                  </span></span>
                                   <span>Available: <span className={`font-medium ${
                                     material.currentStock >= material.quantity ? 'text-green-600' : 'text-red-600'
-                                  }`}>{material.currentStock} {material.unit}</span></span>
+                                  }`}>
+                                    {material.type === 'product'
+                                      ? `${material.currentStock} ${material.currentStock === 1 ? 'product' : 'products'}`
+                                      : `${material.currentStock} ${material.unit}`
+                                    }
+                                  </span></span>
                                 </div>
-                                {material.isProduct && (
-                                  <div className="text-xs text-blue-600">
-                                    Individual products available for selection
+                                {material.type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0 && (
+                                  <div className="text-xs text-blue-600 flex flex-wrap gap-1 items-center">
+                                    <span>Individual Products:</span>
+                                    {material.individual_product_ids.slice(0, 3).map((id: string, idx: number) => (
+                                      <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        {id}
+                                      </Badge>
+                                    ))}
+                                    {material.individual_product_ids.length > 3 && (
+                                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                                        +{material.individual_product_ids.length - 3} more
+                                      </Badge>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -1196,6 +1541,20 @@ export default function WasteGeneration() {
                     placeholder="0"
                     required
                   />
+                  {newWaste.materialId && recipeMaterials.find(m => m.id === newWaste.materialId)?.type === 'product' && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      {(() => {
+                        const material = recipeMaterials.find(m => m.id === newWaste.materialId);
+                        if (material) {
+                          const consumed = material.quantity || 0;
+                          const wholeNeeded = Math.ceil(consumed);
+                          const wastage = wholeNeeded > consumed ? (wholeNeeded - consumed).toFixed(4) : '0';
+                          return `Consumed: ${consumed} product(s) • Whole products needed: ${wholeNeeded} • Auto-calculated wastage: ${wastage} product(s)`;
+                        }
+                        return 'For products: Individual products auto-selected based on consumption';
+                      })()}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label>Unit</Label>
@@ -1273,8 +1632,26 @@ export default function WasteGeneration() {
                 <div className="flex-1">
                   <div className="font-medium">{waste.materialName}</div>
                   <div className="text-sm text-gray-500">
-                    {waste.quantity} {waste.unit} • {waste.wasteType} • {waste.canBeReused ? "Reusable" : "Non-reusable"}
+                    {waste.materialType === 'product'
+                      ? `${waste.quantity} ${waste.quantity === 1 ? 'product' : 'products'}`
+                      : `${waste.quantity} ${waste.unit}`
+                    } • {waste.wasteType} • {waste.canBeReused ? "Reusable" : "Non-reusable"}
                   </div>
+                  {waste.individualProductIds && waste.individualProductIds.length > 0 && (
+                    <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-1">
+                      <span className="font-medium">Individual Products:</span>
+                      {waste.individualProductIds.slice(0, 5).map((id: string, idx: number) => (
+                        <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          {id}
+                        </Badge>
+                      ))}
+                      {waste.individualProductIds.length > 5 && (
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          +{waste.individualProductIds.length - 5} more
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                   {waste.notes && <div className="text-sm text-gray-600 mt-1">{waste.notes}</div>}
                 </div>
                 <div className="flex items-center gap-2">

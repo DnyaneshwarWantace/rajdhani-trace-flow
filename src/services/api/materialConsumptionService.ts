@@ -1,6 +1,6 @@
 import AuthService from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {
@@ -68,6 +68,7 @@ export interface CreateMaterialConsumptionRequest {
   material_name: string;
   material_type: 'product' | 'raw_material';
   quantity_used: number;
+  actual_consumed_quantity?: number; // For products: actual fractional consumption (e.g., 0.4)
   unit: string;
   cost_per_unit?: number;
   operator?: string;

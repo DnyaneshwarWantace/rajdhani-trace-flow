@@ -442,18 +442,6 @@ export default function Complete() {
     // Data is automatically saved to MongoDB when completing production
   };
 
-  const skipIndividualProductDetails = async () => {
-    try {
-      console.log('Skipping individual product details');
-      // Navigate back to production overview
-      navigate('/production');
-    } catch (error) {
-      console.error('Error skipping individual product details:', error);
-      // Still navigate back even if there's an error
-      navigate('/production');
-    }
-  };
-
   const handleCompleteProduction = async () => {
     // Prevent multiple clicks
     if (isCompleting) {
@@ -1094,15 +1082,6 @@ export default function Complete() {
               })()}
           </div>
             <div className="flex gap-3">
-              <Button 
-                onClick={skipIndividualProductDetails}
-                variant="outline"
-                className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                size="lg"
-              >
-                <AlertTriangle className="w-5 h-5 mr-2" />
-                Skip Individual Products
-              </Button>
         <Button 
           onClick={handleCompleteProduction}
           className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"

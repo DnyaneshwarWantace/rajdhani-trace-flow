@@ -55,6 +55,16 @@ import {
   Edit, Eye, Filter, SortAsc, SortDesc, Hash, Play, RefreshCw,
   Bell, Factory, Clock, ArrowRight, Copy, Trash2, ChevronDown
 } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import React from "react";
 
 interface ProductMaterial {
   materialId: string;
@@ -80,6 +90,7 @@ export default function Products() {
   const { user, hasPageAccess } = useAuth();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   
   // Check page permission
   const hasProductsAccess = hasPageAccess('products');
@@ -105,6 +116,20 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState<FrontendProduct | null>(null);
   const [duplicateProduct, setDuplicateProduct] = useState<FrontendProduct | null>(null);
   const [products, setProducts] = useState<FrontendProduct[]>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [totalProductsCount, setTotalProductsCount] = useState(0);
+
+  // Stats state (from backend - total database values)
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    lowStockCount: 0,
+    outOfStockCount: 0,
+    availableStock: 0
+  });
+
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -248,40 +273,137 @@ export default function Products() {
     );
   };
 
-  
-  // Load products and dropdown options from Supabase on component mount
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        // Load dropdown options first
-        await loadDropdownOptions();
-        
-        // Load unit options
-        await loadUnitOptions();
-        
-        const result = await MongoDBProductService.getProducts();
-        console.log("Loaded products from MongoDB:", result);
-        if (result.error) {
-          console.error("Error loading products:", result.error);
-          setProducts([]);
-        } else {
-          const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
-          setProducts(mappedProducts);
-          
-          // Load individual products for each product
-          await loadIndividualProductsForAllProducts(mappedProducts);
-          
-          // Check which products have recipes
-          await checkProductsWithRecipes(result.data || []);
-        }
-      } catch (error) {
-        console.error("Error loading products:", error);
-        setProducts([]);
+  // Load products with filters from backend
+  const loadProducts = async () => {
+    try {
+      // Build filters object for backend
+      const filters: any = {
+        limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage
+      };
+
+      // Add search filter (use debounced search term)
+      if (debouncedSearchTerm && debouncedSearchTerm.trim()) {
+        filters.search = debouncedSearchTerm.trim();
       }
+
+      // Add category filter
+      if (categoryFilter && categoryFilter !== 'all') {
+        filters.category = categoryFilter;
+      }
+
+      // Add status filter
+      if (statusFilter && statusFilter !== 'all') {
+        filters.status = statusFilter;
+      }
+
+      console.log("Loading products with filters:", filters);
+      const result = await MongoDBProductService.getProducts(filters);
+      console.log("Loaded products from MongoDB:", result);
+
+      if (result.error) {
+        console.error("Error loading products:", result.error);
+        setProducts([]);
+        setTotalProductsCount(0);
+      } else {
+        const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
+        setProducts(mappedProducts);
+        setTotalProductsCount(result.count || mappedProducts.length);
+
+        // Load individual products for each product
+        await loadIndividualProductsForAllProducts(mappedProducts);
+
+        // Skip recipe checking on initial load to avoid 404 errors
+        // Recipes will be checked on-demand when user interacts with products (edit, duplicate, etc.)
+        // This prevents 404 errors from showing in console for products without recipes
+        setProductsWithRecipes(new Set<string>());
+      }
+    } catch (error) {
+      console.error("Error loading products:", error);
+      setProducts([]);
+      setTotalProductsCount(0);
+    }
+  };
+
+  // Load stats from backend (shows TOTAL database values)
+  const loadStats = async () => {
+    try {
+      console.log("Loading stats from backend...");
+      const result = await MongoDBProductService.getProductStats();
+      console.log("Stats result from backend:", result);
+      if (result.data) {
+        console.log("Stats data:", result.data);
+        // Backend returns snake_case, map to camelCase
+        const statsData = result.data as any;
+        // Use only snake_case from backend - prioritize total_products (backend field)
+        // Don't use totalProducts (camelCase) as it might be a duplicate or incorrect value
+        const totalProductsValue = typeof statsData.total_products === 'number' ? statsData.total_products : 0;
+        const lowStockValue = typeof statsData.low_stock_products === 'number' ? statsData.low_stock_products : 0;
+        const outOfStockValue = typeof statsData.out_of_stock_products === 'number' ? statsData.out_of_stock_products : 0;
+        const availableStockValue = typeof statsData.available_individual_products === 'number' ? statsData.available_individual_products : 0;
+        
+        console.log("Raw stats data from backend:", statsData);
+        console.log("Extracted values:", {
+          total_products: statsData.total_products,
+          totalProducts: statsData.totalProducts,
+          totalProductsValue
+        });
+        
+        setStats({
+          totalProducts: totalProductsValue,
+          lowStockCount: lowStockValue,
+          outOfStockCount: outOfStockValue,
+          availableStock: availableStockValue
+        });
+        console.log("Stats state updated:", {
+          totalProducts: totalProductsValue,
+          lowStockCount: lowStockValue,
+          outOfStockCount: outOfStockValue,
+          availableStock: availableStockValue
+        });
+      } else if (result.error) {
+        console.error("Stats error from backend:", result.error);
+      }
+    } catch (error) {
+      console.error("Error loading stats:", error);
+    }
+  };
+
+  // Initial load: stats first (for immediate display), then dropdown options, units, and products
+  useEffect(() => {
+    const init = async () => {
+      // Load stats first so they display immediately
+      loadStats().catch(err => console.error("Error loading stats:", err));
+      
+      // Load other data in parallel
+      await Promise.all([
+        loadDropdownOptions(),
+        loadUnitOptions()
+      ]);
+      
+      await loadProducts();
     };
-    
-    loadProducts();
+    init();
   }, []);
+
+  // Debounce search term to avoid rapid API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when filters change (but not pagination)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, categoryFilter, statusFilter]);
+
+  // Reload products when filters or pagination change
+  useEffect(() => {
+    loadProducts();
+  }, [currentPage, debouncedSearchTerm, categoryFilter, statusFilter]);
 
   // Calculate product status based on available stock
   const calculateProductStatus = (product: any) => {
@@ -362,8 +484,9 @@ export default function Products() {
     setProducts(updatedProducts);
   };
 
-  // Check which products have recipes using MongoDB
-  const checkProductsWithRecipes = async (products: any[]) => {
+  // Check which products have recipes using MongoDB (only check when needed, suppress 404 errors)
+  // This function is now optional - only checks recipes when explicitly needed
+  const checkProductsWithRecipes = async (products: any[], skipIfNoRecipes = true) => {
     const productsWithRecipesSet = new Set<string>();
     
     // Only check recipes if we have products
@@ -372,25 +495,43 @@ export default function Products() {
       return;
     }
     
+    // Skip recipe checking if not needed - this prevents 404 errors for products without recipes
+    // Recipes will be checked on-demand when user interacts with products
+    if (skipIfNoRecipes) {
+      setProductsWithRecipes(productsWithRecipesSet);
+      return;
+    }
+    
+    // Only check recipes for the current page (50 products max) to avoid too many API calls
+    // For products without recipes, 404s are expected and should be silent
     console.log('🔍 Checking recipes for', products.length, 'products using MongoDB...');
     
-    for (const product of products) {
-      try {
-        const { data: recipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
-        // Only log if there's an actual error (not a 404, which is expected for products without recipes)
-        if (error) {
-          // Only log non-404 errors
-          if (!error.includes('404') && !error.includes('Not Found')) {
-            console.warn(`⚠️ Error checking recipe for product ${product.name}:`, error);
+    // Use Promise.allSettled to handle all requests, including 404s gracefully
+    // Process in smaller batches to avoid overwhelming the server
+    const batchSize = 10;
+    for (let i = 0; i < products.length; i += batchSize) {
+      const batch = products.slice(i, i + batchSize);
+      const recipeChecks = batch.map(async (product) => {
+        try {
+          const { data: recipe } = await MongoDBRecipeService.getRecipeByProductId(product.id);
+          // 404s return { data: null, error: null } from the service, so we check for recipe data
+          if (recipe && recipe.materials && recipe.materials.length > 0) {
+            productsWithRecipesSet.add(product.id);
+            return { productId: product.id, hasRecipe: true };
           }
-        } else if (recipe && recipe.materials && recipe.materials.length > 0) {
-          productsWithRecipesSet.add(product.id);
-          console.log('✅ Found MongoDB recipe for product:', product.name);
+          return { productId: product.id, hasRecipe: false };
+        } catch (error: any) {
+          // Silently ignore all errors (404s are expected for products without recipes)
+          return { productId: product.id, hasRecipe: false };
         }
-        // Silently ignore 404s (no recipe found) - this is expected and normal
-      } catch (error) {
-        // Silently handle recipe errors - don't spam console
-        // 404 errors are expected for products without recipes
+      });
+      
+      // Wait for batch to complete (404s won't cause failures)
+      await Promise.allSettled(recipeChecks);
+      
+      // Small delay between batches to avoid overwhelming the server
+      if (i + batchSize < products.length) {
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
     }
     
@@ -788,10 +929,12 @@ export default function Products() {
       
       console.log("Duplicated product:", duplicatedProduct);
 
-      // Load the recipe from the original product
+      // Load the recipe from the original product (user-initiated action)
+      // Handle 404s silently - if no recipe exists, that's normal
       try {
         const { data: existingRecipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
-        if (existingRecipe && existingRecipe.materials) {
+        // Only proceed if we got a recipe (404s return { data: null, error: null })
+        if (existingRecipe && existingRecipe.materials && existingRecipe.materials.length > 0) {
           // Convert recipe materials to product materials format
           const recipeMaterials = existingRecipe.materials.map((material: any) => ({
             materialId: material.material_id,
@@ -803,11 +946,11 @@ export default function Products() {
           setDuplicateProductMaterials(recipeMaterials);
           console.log("✅ Loaded recipe with", recipeMaterials.length, "materials for duplication");
         } else {
+          // No recipe found - this is normal, don't log errors
           setDuplicateProductMaterials([]);
-          console.log("ℹ️ No recipe found for original product");
         }
       } catch (recipeError) {
-        console.error("Error loading recipe for duplication:", recipeError);
+        // Silently handle errors - 404s are expected for products without recipes
         setDuplicateProductMaterials([]);
       }
       
@@ -1009,10 +1152,12 @@ export default function Products() {
     setImagePreview("");
     setImageUrl(product.imageUrl || "");
     
-    // Load existing recipe for this product using MongoDB
+    // Load existing recipe for this product using MongoDB (user-initiated action)
+    // Handle 404s silently - if no recipe exists, that's normal
     try {
       const { data: existingRecipe, error } = await MongoDBRecipeService.getRecipeByProductId(product.id);
-      if (existingRecipe && existingRecipe.materials) {
+      // Only proceed if we got a recipe (404s return { data: null, error: null })
+      if (existingRecipe && existingRecipe.materials && existingRecipe.materials.length > 0) {
         // Convert recipe materials to product materials format
         const recipeMaterials = existingRecipe.materials.map((material: any) => ({
           materialId: material.material_id,
@@ -1024,21 +1169,19 @@ export default function Products() {
         setProductMaterials(recipeMaterials);
         console.log('✅ Loaded existing MongoDB recipe for product:', product.name, recipeMaterials);
       } else {
-        // No existing recipe, use product's materialsUsed if available
+        // No existing recipe found - this is normal, don't log errors
+        // Use product's materialsUsed if available, otherwise empty
         if (product.materialsUsed && product.materialsUsed.length > 0) {
           setProductMaterials(product.materialsUsed);
-          console.log('ℹ️ Using product materialsUsed for:', product.name);
         } else {
           setProductMaterials([]);
-          console.log('ℹ️ No materials found for product:', product.name);
         }
       }
     } catch (error) {
-      console.log('ℹ️ No recipe found for product:', product.name, '(this is normal)');
-      // Fallback to product's materialsUsed
+      // Silently handle errors - 404s are expected for products without recipes
+      // Only use materialsUsed if available
       if (product.materialsUsed && product.materialsUsed.length > 0) {
         setProductMaterials(product.materialsUsed);
-        console.log('ℹ️ Using product materialsUsed as fallback for:', product.name);
       } else {
         setProductMaterials([]);
       }
@@ -1131,10 +1274,12 @@ export default function Products() {
            };
          });
 
-        // Check if recipe exists
+        // Check if recipe exists (user-initiated action - saving recipe)
+        // Handle 404s silently - if no recipe exists, we'll create one
         const { data: existingRecipe } = await MongoDBRecipeService.getRecipeByProductId(selectedProduct.id);
 
-        if (existingRecipe) {
+        // Only update if recipe actually exists (404s return { data: null })
+        if (existingRecipe && existingRecipe.id) {
           // Update existing recipe
           const { error: recipeError } = await MongoDBRecipeService.updateRecipe(existingRecipe.id, {
             materials: mappedMaterials
@@ -1161,11 +1306,18 @@ export default function Products() {
           }
         }
       } else {
-        // If no materials, delete the recipe if it exists
-        const { data: existingRecipe } = await MongoDBRecipeService.getRecipeByProductId(selectedProduct.id);
-        if (existingRecipe) {
-          await MongoDBRecipeService.deleteRecipe(existingRecipe.id);
-          console.log('Recipe deleted for product:', selectedProduct.name);
+        // If no materials, delete the recipe if it exists (user-initiated action)
+        // Handle 404s silently - if no recipe exists, nothing to delete
+        try {
+          const { data: existingRecipe } = await MongoDBRecipeService.getRecipeByProductId(selectedProduct.id);
+          // Only delete if recipe actually exists (404s return { data: null })
+          if (existingRecipe && existingRecipe.id) {
+            await MongoDBRecipeService.deleteRecipe(existingRecipe.id);
+            console.log('Recipe deleted for product:', selectedProduct.name);
+          }
+          // If no recipe exists, silently continue - no error needed
+        } catch (error) {
+          // Silently handle errors - 404s are expected if recipe doesn't exist
         }
       }
 
@@ -1631,7 +1783,8 @@ export default function Products() {
           await loadIndividualProductsForAllProducts(mappedProducts);
           
           // Check which products have recipes
-          await checkProductsWithRecipes(result.data || []);
+          // Skip recipe checking to avoid 404 errors - recipes checked on-demand
+          setProductsWithRecipes(new Set<string>());
           
           console.log('✅ Products reloaded with updated quantities');
         }
@@ -2298,36 +2451,17 @@ export default function Products() {
     setDuplicateProductMaterials(duplicateProductMaterials.filter((_, i) => i !== index));
   };
 
-  // Filter and sort products
+  // Products are already filtered by backend, just sort them
   const filteredProducts = (products || [])
-    .filter(product => {
-      if (!product) return false;
-      
-      const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (product.qrCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           (product.color || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = categoryFilter === "all" || product.category === categoryFilter;
-      const matchesSubcategory = subcategoryFilter === "all" || (product.subcategory && product.subcategory === subcategoryFilter);
-      
-      let matchesStatus = true;
-      if (statusFilter === "low-stock") {
-        matchesStatus = product.actual_status === "low-stock";
-      } else if (statusFilter === "out-of-stock") {
-        matchesStatus = product.actual_status === "out-of-stock";
-      } else if (statusFilter === "in-stock") {
-        matchesStatus = product.actual_status === "in-stock";
-      } else if (statusFilter === "in-production") {
-        matchesStatus = product.actual_status === "in-production";
-      }
-      
-      return matchesSearch && matchesCategory && matchesSubcategory && matchesStatus;
-    })
+    .filter(product => product) // Remove null/undefined
     .sort((a, b) => (a?.name || '').localeCompare(b?.name || ''));
 
   const dynamicCategories = [...new Set((products || []).map(p => p?.category).filter(Boolean))];
   const dynamicSubcategories = [...new Set((products || []).map(p => p?.subcategory).filter(Boolean))];
-  const totalProducts = (products || []).length;
-  const lowStockCount = (products || []).filter(p => p?.actual_status === "low-stock" || p?.actual_status === "out-of-stock").length;
+
+  // Stats come from backend - TOTAL database values, not filtered products
+  const totalProducts = stats.totalProducts; // Total products in database from backend stats API
+  const lowStockCount = stats.lowStockCount + stats.outOfStockCount; // Total low stock from backend stats API
 
   // Calculate available pieces for each product (excluding sold and damaged)
   const getAvailablePieces = (productId: string) => {
@@ -2530,7 +2664,7 @@ export default function Products() {
   };
 
   return (
-    <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
+    <div className="w-full space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
       <Header 
         title="Product Inventory"
         subtitle="Track products & manage inventory"
@@ -4186,21 +4320,21 @@ export default function Products() {
               <CardHeader>
                 <CardTitle>Product Inventory</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
+              <CardContent className="!p-6">
+                <div className="w-full">
                   <table className="w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-4 font-medium text-muted-foreground">Product</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground">QR Code</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground">Category</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground">Stock</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                        <th className="text-left p-4 font-medium text-muted-foreground">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredProducts.map((product, index) => (
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-medium text-muted-foreground">Product</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">QR Code</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Category</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Stock</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredProducts.map((product, index) => (
                         <tr key={product?.id || `product-${index}`} className="border-b hover:bg-muted/50">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -4226,9 +4360,11 @@ export default function Products() {
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {product.color || 'Unknown'} • {product.pattern || 'Unknown'}
-                                </div>
+                                {(product.color || product.pattern) && (
+                                  <div className="text-sm text-muted-foreground">
+                                    {[product.color, product.pattern].filter(Boolean).join(' • ')}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -4353,10 +4489,82 @@ export default function Products() {
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody>
+                </table>
                 </div>
+
+                {/* Pagination */}
+                {totalProductsCount > itemsPerPage && (
+                  <div className="mt-6 pt-6 flex items-center justify-between border-t">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalProductsCount)} of {totalProductsCount} products
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage > 1) {
+                                setCurrentPage(currentPage - 1);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }
+                            }}
+                            className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(totalProductsCount / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            // Show first page, last page, current page, and pages around current
+                            return page === 1 || 
+                                   page === Math.ceil(totalProductsCount / itemsPerPage) ||
+                                   (page >= currentPage - 1 && page <= currentPage + 1);
+                          })
+                          .map((page, index, array) => {
+                            // Add ellipsis if there's a gap
+                            const showEllipsisBefore = index > 0 && array[index - 1] !== page - 1;
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setCurrentPage(page);
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    isActive={currentPage === page}
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage < Math.ceil(totalProductsCount / itemsPerPage)) {
+                                setCurrentPage(currentPage + 1);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }
+                            }}
+                            className={currentPage >= Math.ceil(totalProductsCount / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

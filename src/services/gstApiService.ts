@@ -41,7 +41,7 @@ interface GSTData {
 
 interface GSTApiResponse {
   success: boolean;
-  data: GSTData[];
+  data: GSTData[] | GSTData; // Can be array or single object
   generatedTimeStamps?: number;
 }
 
@@ -97,14 +97,28 @@ export class GSTApiService {
       const result: GSTApiResponse = await response.json();
       console.log('✅ GST API Response:', result);
 
-      if (!result.success || !result.data || result.data.length === 0) {
+      if (!result.success || !result.data) {
         return {
           data: null,
           error: 'No GST details found for this number. Please verify the GST number or enter details manually.'
         };
       }
 
-      const gstData = result.data[0];
+      // Handle both array and object response formats
+      let gstData: GSTData;
+      if (Array.isArray(result.data)) {
+        if (result.data.length === 0) {
+          return {
+            data: null,
+            error: 'No GST details found for this number. Please verify the GST number or enter details manually.'
+          };
+        }
+        gstData = result.data[0];
+      } else {
+        // Data is an object, not an array
+        gstData = result.data as GSTData;
+      }
+
       const customerDetails = this.transformGSTDataToCustomerDetails(gstData, gstNumber);
 
       return {
@@ -125,9 +139,11 @@ export class GSTApiService {
    * Transform GST API data to customer details format
    */
   private static transformGSTDataToCustomerDetails(gstData: GSTData, gstNumber: string): CustomerDetails {
-    const address = gstData.principalAddress?.address;
+    // Safely access principalAddress - handle cases where it might be missing
+    const principalAddress = gstData.principalAddress;
+    const address = principalAddress?.address;
     
-    // Build address string
+    // Build address string from available address fields
     const addressParts = [
       address?.buildingNumber,
       address?.buildingName,
@@ -136,15 +152,22 @@ export class GSTApiService {
       address?.locality
     ].filter(Boolean);
     
-    const fullAddress = addressParts.join(', ');
+    const fullAddress = addressParts.length > 0 
+      ? addressParts.join(', ')
+      : ''; // Return empty string if no address parts available
+
+    // Extract city, state, and pincode with fallbacks
+    const city = address?.district || address?.location || address?.city || '';
+    const state = address?.stateCode || '';
+    const pincode = address?.pincode || '';
 
     return {
       name: gstData.legalName || gstData.tradeName || '',
       companyName: gstData.tradeName || gstData.legalName || '',
       address: fullAddress,
-      city: address?.district || address?.location || '',
-      state: address?.stateCode || '',
-      pincode: address?.pincode || '',
+      city: city,
+      state: state,
+      pincode: pincode,
       gstNumber: gstNumber,
       businessType: gstData.constitutionOfBusiness || '',
       status: gstData.status || 'Active'

@@ -1,6 +1,6 @@
 import AuthService from './authService';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,15 @@ import { generateUniqueId } from "@/lib/storageUtils";
 import ProductService from "@/services/api/productService";
 import { ProductionService } from "@/services/api/productionService";
 import { DropdownService } from "@/services/api/dropdownService";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface ProductMaterial {
   materialName: string;
@@ -99,7 +108,13 @@ export default function NewBatch() {
   const [expectedCompletion, setExpectedCompletion] = useState("");
   const [notes, setNotes] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const [allProductsForFilters, setAllProductsForFilters] = useState<Product[]>([]); // For filter options
   const [priorityOptions, setPriorityOptions] = useState<string[]>([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalProducts, setTotalProducts] = useState(0);
   
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -134,11 +149,61 @@ export default function NewBatch() {
     setPriorityOptions(['normal', 'high', 'urgent']);
   };
 
+  // Load all products for filter options (without pagination)
+  const loadAllProductsForFilters = async () => {
+    try {
+      const response = await ProductService.getProducts({ 
+        limit: 10000, 
+        offset: 0,
+        individual_stock_tracking: true 
+      });
+      const apiProducts = response.data || [];
+      const normalized: Product[] = apiProducts.map((p: any) => ({
+        id: p.id,
+        qrCode: p.qr_code || '',
+        name: p.name || '',
+        category: p.category || '',
+        subcategory: p.subcategory || '',
+        color: p.color || '',
+        size: p.size || '',
+        length: p.length || p.dimensions?.length || '',
+        width: p.width || p.dimensions?.width || '',
+        pattern: p.pattern || '',
+        quantity: (p.current_stock ?? p.base_quantity ?? 0),
+        unit: p.unit || 'pcs',
+        expiryDate: p.expiry_date || undefined,
+        materialsUsed: [],
+        totalCost: p.total_cost || 0,
+        sellingPrice: p.selling_price || 0,
+        status: p.status || 'in-stock',
+        location: p.location || '',
+        createdAt: p.created_at || new Date().toISOString(),
+        updatedAt: p.updated_at || new Date().toISOString(),
+        individualStocks: [],
+        individualStockTracking: p.individual_stock_tracking !== false,
+      }));
+      setAllProductsForFilters(normalized);
+    } catch (error) {
+      console.error('Error loading all products for filters:', error);
+      setAllProductsForFilters([]);
+    }
+  };
+
+  // Load paginated products
   useEffect(() => {
-    // Load products from MongoDB service
     const loadProducts = async () => {
       try {
-        const response = await ProductService.getProducts();
+        // Build filters for API call
+        const filters: any = {
+          limit: itemsPerPage,
+          offset: (currentPage - 1) * itemsPerPage,
+          individual_stock_tracking: true
+        };
+        
+        if (searchTerm) filters.search = searchTerm;
+        if (selectedCategory !== 'all') filters.category = selectedCategory;
+        
+        const response = await ProductService.getProducts(filters);
         const apiProducts = response.data || [];
         const normalized: Product[] = apiProducts.map((p: any) => ({
           id: p.id,
@@ -165,13 +230,20 @@ export default function NewBatch() {
           individualStockTracking: p.individual_stock_tracking !== false,
         }));
         setProducts(normalized);
+        setTotalProducts(response.count || normalized.length);
       } catch (error) {
         console.error('Error loading products:', error);
         setProducts([]);
+        setTotalProducts(0);
       }
     };
     
     loadProducts();
+  }, [currentPage, itemsPerPage, searchTerm, selectedCategory]);
+
+  // Load all products for filters on initial load
+  useEffect(() => {
+    loadAllProductsForFilters();
     loadPriorityOptions();
 
     // Check if a product was pre-selected from the inventory page
@@ -180,10 +252,17 @@ export default function NewBatch() {
     }
   }, [location.state]);
 
-  // Get unique values for filters
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, selectedCategory]);
+
+  // Get unique values for filters (use allProductsForFilters, not just current page)
   const getUniqueCategories = () => {
     const categories = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.category && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         categories.add(p.category);
       }
@@ -193,7 +272,7 @@ export default function NewBatch() {
 
   const getUniqueColors = () => {
     const colors = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.color && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         colors.add(p.color);
       }
@@ -203,7 +282,7 @@ export default function NewBatch() {
 
   const getUniquePatterns = () => {
     const patterns = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.pattern && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         patterns.add(p.pattern);
       }
@@ -213,7 +292,7 @@ export default function NewBatch() {
 
   const getUniqueLengths = () => {
     const lengths = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.length && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         lengths.add(p.length);
       }
@@ -223,7 +302,7 @@ export default function NewBatch() {
 
   const getUniqueWidths = () => {
     const widths = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.width && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         widths.add(p.width);
       }
@@ -233,7 +312,7 @@ export default function NewBatch() {
 
   const getUniqueSubcategories = () => {
     const subcategories = new Set<string>();
-    products.forEach(p => {
+    allProductsForFilters.forEach(p => {
       if (p.subcategory && p.category !== "Raw Material" && p.individualStockTracking !== false) {
         subcategories.add(p.subcategory);
       }
@@ -421,7 +500,7 @@ export default function NewBatch() {
                   Select Product
                   {getActiveFiltersCount() > 0 && (
                     <Badge variant="secondary" className="ml-2">
-                      {filteredProducts.length} of {products.filter(p => p.category !== "Raw Material" && p.individualStockTracking !== false).length}
+                      {filteredProducts.length} of {totalProducts}
                     </Badge>
                   )}
                 </CardTitle>
@@ -579,7 +658,7 @@ export default function NewBatch() {
             )}
 
             {/* Products List */}
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className="space-y-2">
               {filteredProducts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -596,65 +675,145 @@ export default function NewBatch() {
                   )}
                 </div>
               ) : (
-                filteredProducts.map((product) => (
-                  <div
-                    key={product.id}
-                    onClick={() => handleProductSelect(product)}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                      selectedProduct?.id === product.id
-                        ? 'border-blue-500 bg-blue-50 shadow-md'
-                        : 'border-gray-200 hover:border-gray-400 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
-                          {selectedProduct?.id === product.id && (
-                            <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                <>
+                  {filteredProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      onClick={() => handleProductSelect(product)}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                        selectedProduct?.id === product.id
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:border-gray-400 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-gray-900 truncate">{product.name}</h4>
+                            {selectedProduct?.id === product.id && (
+                              <CheckCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 mb-2">
+                            <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                            {product.color && (
+                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">{product.color}</Badge>
+                            )}
+                            {product.pattern && (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">{product.pattern}</Badge>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+                            <div>
+                              <span className="font-medium">Length:</span> {product.length || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="font-medium">Width:</span> {product.width || 'N/A'}
+                            </div>
+                            <div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <Badge 
+                            variant={product.quantity > 0 ? "default" : "destructive"}
+                            className="text-xs font-medium"
+                          >
+                            {product.quantity} Products
+                          </Badge>
+                          {product.status && (
+                            <Badge 
+                              variant={
+                                product.status === 'in-stock' ? 'default' :
+                                product.status === 'low-stock' ? 'secondary' : 'destructive'
+                              }
+                              className="text-xs"
+                            >
+                              {product.status === 'in-stock' ? 'In Stock' :
+                               product.status === 'low-stock' ? 'Low Stock' : 'Out of Stock'}
+                            </Badge>
                           )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 mb-2">
-                          <Badge variant="outline" className="text-xs">{product.category}</Badge>
-                          <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">{product.color}</Badge>
-                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700">{product.pattern}</Badge>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
-                          <div>
-                            <span className="font-medium">Length:</span> {product.length || 'N/A'}
-                          </div>
-                          <div>
-                            <span className="font-medium">Width:</span> {product.width || 'N/A'}
-                          </div>
-                          <div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                        <Badge 
-                          variant={product.quantity > 0 ? "default" : "destructive"}
-                          className="text-xs font-medium"
-                        >
-                          {product.quantity} Products
-                        </Badge>
-                        {product.status && (
-                          <Badge 
-                            variant={
-                              product.status === 'in-stock' ? 'default' :
-                              product.status === 'low-stock' ? 'secondary' : 'destructive'
-                            }
-                            className="text-xs"
-                          >
-                            {product.status === 'in-stock' ? 'In Stock' :
-                             product.status === 'low-stock' ? 'Low Stock' : 'Out of Stock'}
-                          </Badge>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  
+                  {/* Pagination */}
+                  {totalProducts > itemsPerPage && (
+                    <div className="mt-4 pt-4 flex items-center justify-between border-t">
+                      <div className="text-sm text-muted-foreground">
+                        Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious 
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage > 1) {
+                                  setCurrentPage(currentPage - 1);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }
+                              }}
+                              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: Math.ceil(totalProducts / itemsPerPage) }, (_, i) => i + 1)
+                            .filter(page => {
+                              // Show first page, last page, current page, and pages around current
+                              const totalPages = Math.ceil(totalProducts / itemsPerPage);
+                              if (totalPages <= 7) return true;
+                              if (page === 1 || page === totalPages) return true;
+                              if (Math.abs(page - currentPage) <= 1) return true;
+                              return false;
+                            })
+                            .map((page, index, array) => {
+                              // Add ellipsis if there's a gap
+                              const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
+                              return (
+                                <React.Fragment key={page}>
+                                  {showEllipsisBefore && (
+                                    <PaginationItem>
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem>
+                                    <PaginationLink
+                                      href="#"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        setCurrentPage(page);
+                                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                                      }}
+                                      isActive={currentPage === page}
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                </React.Fragment>
+                              );
+                            })}
+                          <PaginationItem>
+                            <PaginationNext 
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage < Math.ceil(totalProducts / itemsPerPage)) {
+                                  setCurrentPage(currentPage + 1);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }
+                              }}
+                              className={currentPage >= Math.ceil(totalProducts / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
-              </div>
+            </div>
           </CardContent>
         </Card>
 

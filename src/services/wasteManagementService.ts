@@ -2,7 +2,7 @@ import { supabase, supabaseAdmin, handleSupabaseError } from '@/lib/supabase';
 import { IDGenerator } from '@/lib/idGenerator';
 import AuthService from './api/authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {

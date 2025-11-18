@@ -1,7 +1,7 @@
 import { RawMaterial, Supplier } from '@/lib/supabase';
 import AuthService from './api/authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {
@@ -61,13 +61,40 @@ class RawMaterialService {
     return response.json();
   }
 
-  // Get all raw materials
-  async getRawMaterials(): Promise<RawMaterialResponse> {
+  // Get all raw materials with optional filtering and pagination
+  async getRawMaterials(filters?: {
+    search?: string;
+    category?: string;
+    status?: string;
+    supplier_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<RawMaterialResponse & { count?: number }> {
     try {
-      const response = await fetch(`${API_BASE_URL}/raw-materials`, {
-        headers: getHeaders()
+      const params = new URLSearchParams();
+      
+      // Add filters
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.category) params.append('category', filters.category);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.supplier_id) params.append('supplier_id', filters.supplier_id);
+      
+      // Add pagination
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset !== undefined) params.append('offset', filters.offset.toString());
+      
+      // Cache busting
+      params.append('_t', Date.now().toString());
+      
+      const response = await fetch(`${API_BASE_URL}/raw-materials?${params}`, {
+        headers: {
+          ...getHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
-      const result = await this.handleResponse<RawMaterialResponse>(response);
+      const result = await this.handleResponse<RawMaterialResponse & { count?: number }>(response);
       return result;
     } catch (error) {
       console.error('Error fetching raw materials:', error);

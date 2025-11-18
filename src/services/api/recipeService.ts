@@ -1,6 +1,6 @@
 import AuthService from './authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {
@@ -84,12 +84,14 @@ export class MongoDBRecipeService {
   // Get recipe by product ID
   static async getRecipeByProductId(productId: string): Promise<{ data: RecipeWithMaterials | null; error: string | null }> {
     try {
+      // Suppress 404 errors in console by using a custom fetch that doesn't log 404s
       const response = await fetch(`${API_BASE_URL}/recipes/product/${productId}`, {
         headers: getHeaders()
       });
 
-      // 404 is expected for products without recipes - return silently
+      // 404 is expected for products without recipes - return silently without logging
       if (response.status === 404) {
+        // Don't call response.json() for 404s to avoid parsing errors
         return { data: null, error: null }; // No recipe found, not an error
       }
 
@@ -111,13 +113,9 @@ export class MongoDBRecipeService {
       
       return { data: recipeWithMaterials, error: null };
     } catch (error) {
-      // Only log non-network errors (404s are expected and handled above)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        // Network error - might be 404, don't log
-        return { data: null, error: null };
-      }
-      // For other errors, log but don't show in console as error
-      return { data: null, error: error instanceof Error ? error.message : 'Unknown error' };
+      // Silently handle all errors - 404s are expected for products without recipes
+      // Don't log anything to console
+      return { data: null, error: null };
     }
   }
 

@@ -1,6 +1,6 @@
 import AuthService from './authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {
@@ -27,6 +27,7 @@ export interface Product {
   min_stock_level: number;
   max_stock_level: number;
   weight?: string;
+  weight_unit?: string;
   width: string;
   length: string;
   length_unit: string;
@@ -52,6 +53,7 @@ export interface CreateProductData {
   max_stock_level?: number;
   base_quantity?: number;
   weight?: string;
+  weight_unit?: string;
   width: string;
   length: string;
   length_unit: string;
@@ -119,9 +121,17 @@ export class ProductService {
       }
       if (filters?.limit) params.append('limit', filters.limit.toString());
       if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      // Add cache-busting timestamp to prevent browser caching
+      params.append('_t', Date.now().toString());
 
       const response = await fetch(`${API_BASE_URL}/products?${params}`, {
-        headers: getHeaders()
+        headers: {
+          ...getHeaders(),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
       const result = await response.json();
 

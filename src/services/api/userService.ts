@@ -1,4 +1,4 @@
-const API_URL = 'https://rajdhani.wantace.com/api';
+const API_URL = 'http://localhost:8000/api';
 import AuthService, { User } from './authService';
 
 export interface CreateUserData {

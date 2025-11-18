@@ -908,18 +908,41 @@ export default function DynamicProductionFlow() {
         <CardContent>
           {materialConsumption.length > 0 ? (
             <div className="space-y-3">
-              {materialConsumption.map((material, index) => (
+              {materialConsumption.map((material, index) => {
+                // Get correct unit for raw materials - try to find from rawMaterials list first
+                let displayUnit = material.unit;
+                if (material.material_type === 'raw_material') {
+                  const rawMaterial = rawMaterials.find(rm => rm.id === material.material_id);
+                  if (rawMaterial && rawMaterial.unit) {
+                    displayUnit = rawMaterial.unit;
+                  }
+                }
+                
+                return (
                 <div key={material.id || index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">{material.material_name}</div>
                     <div className="text-sm text-gray-600">
-                      {material.quantity_used || material.consumed_quantity} {material.unit} • 
+                      {material.material_type === 'product' 
+                        ? `${material.quantity_used || material.consumed_quantity} ${(material.quantity_used || material.consumed_quantity) === 1 ? 'product' : 'products'}`
+                        : `${material.quantity_used || material.consumed_quantity} ${displayUnit}`
+                      } • 
                       {material.material_type === 'product' ? ' Product Material' : ' Raw Material'} • 
                       Consumed: {new Date(material.consumed_at).toLocaleDateString()}
                     </div>
                     {material.individual_product_ids && material.individual_product_ids.length > 0 && (
-                      <div className="text-xs text-blue-600 mt-1">
-                        Individual Products: {material.individual_product_ids.length} selected
+                      <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-1 items-center">
+                        <span className="font-medium">Individual Products:</span>
+                        {material.individual_product_ids.slice(0, 5).map((id: string, idx: number) => (
+                          <Badge key={idx} variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            {id}
+                          </Badge>
+                        ))}
+                        {material.individual_product_ids.length > 5 && (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                            +{material.individual_product_ids.length - 5} more
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>
@@ -935,7 +958,8 @@ export default function DynamicProductionFlow() {
                     </Button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">

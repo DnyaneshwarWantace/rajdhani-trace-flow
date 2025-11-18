@@ -28,6 +28,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, TrendingDown, Package, AlertTriangle, Recycle, ShoppingCart, History, Upload, Image, X, Download, FileSpreadsheet, CheckCircle, AlertCircle, Clock, RotateCcw, Trash2, Bell } from "lucide-react";
+import React from "react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { useNavigate, useLocation } from "react-router-dom";
 import { rawMaterialService } from "@/services/rawMaterialService";
 import MongoDBNotificationService from "@/services/api/notificationService";
@@ -402,12 +412,18 @@ export default function Materials() {
 
   // State management
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [allMaterialsForStats, setAllMaterialsForStats] = useState<RawMaterial[]>([]); // For stats calculation
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [totalMaterials, setTotalMaterials] = useState(0);
   const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
   const [isAddToInventoryOpen, setIsAddToInventoryOpen] = useState(false);
   const [isImportInventoryOpen, setIsImportInventoryOpen] = useState(false);
@@ -595,53 +611,105 @@ export default function Materials() {
     }
   };
 
+  // Helper function to map MongoDB data to UI format
+  const mapMongoDBToUI = (materials: any[]): RawMaterial[] => {
+    const mappedMaterials = materials.map((item: any) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type || '',
+      category: item.category,
+      currentStock: parseFloat(item.current_stock) || 0,
+      unit: item.unit,
+      minThreshold: parseFloat(item.min_threshold) || 0,
+      maxCapacity: parseFloat(item.max_capacity) || 0,
+      reorderPoint: parseFloat(item.reorder_point) || 0,
+      lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
+      dailyUsage: parseFloat(item.daily_usage) || 0,
+      status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
+      supplier: item.supplier_name || '',
+      supplierId: item.supplier_id || '',
+      costPerUnit: parseFloat(item.cost_per_unit) || 0,
+      totalValue: parseFloat(item.total_value) || 0,
+      batchNumber: item.batch_number || '',
+      qualityGrade: item.quality_grade,
+      color: item.color,
+      imageUrl: item.image_url,
+      materialsUsed: [],
+      supplierPerformance: parseFloat(item.supplier_performance) || 0
+    }));
+    return removeDuplicateBatchNumbers(mappedMaterials);
+  };
+
+  // Load materials with filters and pagination
+  const loadMaterials = async () => {
+    try {
+      const offset = (currentPage - 1) * itemsPerPage;
+      
+      // Build filter object
+      const filters: any = {
+        limit: itemsPerPage,
+        offset: offset
+      };
+      
+      if (searchTerm) filters.search = searchTerm;
+      if (categoryFilter !== 'all') filters.category = categoryFilter;
+      if (statusFilter !== 'all') filters.status = statusFilter;
+      
+      const materialsResponse = await rawMaterialService.getRawMaterials(filters);
+      
+      if (materialsResponse.success && materialsResponse.data) {
+        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+        const uniqueMaterials = mapMongoDBToUI(materials);
+        setRawMaterials(uniqueMaterials);
+        
+        // Update total count from backend
+        if (materialsResponse.count !== undefined) {
+          setTotalMaterials(materialsResponse.count);
+        }
+        
+        console.log(`✅ Loaded ${uniqueMaterials.length} raw materials (page ${currentPage}, total: ${materialsResponse.count || 0})`);
+      } else {
+        console.error('Error loading raw materials:', materialsResponse.error);
+        toast({
+          title: "Error",
+          description: "Failed to load raw materials from database",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error loading materials:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load materials",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Load all materials for stats calculation (without pagination)
+  const loadAllMaterialsForStats = async () => {
+    try {
+      const materialsResponse = await rawMaterialService.getRawMaterials({ limit: 10000, offset: 0 });
+      if (materialsResponse.success && materialsResponse.data) {
+        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
+        const uniqueMaterials = mapMongoDBToUI(materials);
+        setAllMaterialsForStats(uniqueMaterials);
+      }
+    } catch (error) {
+      console.error('Error loading all materials for stats:', error);
+    }
+  };
+
   // Initialize and load data from MongoDB
   useEffect(() => {
     const loadInitialData = async () => {
       setLoading(true);
       try {
-        // Load raw materials from MongoDB
-        const materialsResponse = await rawMaterialService.getRawMaterials();
-        if (materialsResponse.success && materialsResponse.data) {
-          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-          
-          // Map MongoDB data to UI format
-          const mappedMaterials = materials.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            type: item.type || '',
-            category: item.category,
-            currentStock: parseFloat(item.current_stock) || 0,
-            unit: item.unit,
-            minThreshold: parseFloat(item.min_threshold) || 0,
-            maxCapacity: parseFloat(item.max_capacity) || 0,
-            reorderPoint: parseFloat(item.reorder_point) || 0,
-            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-            dailyUsage: parseFloat(item.daily_usage) || 0,
-            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-            supplier: item.supplier_name || '',
-            supplierId: item.supplier_id || '',
-            costPerUnit: parseFloat(item.cost_per_unit) || 0,
-            totalValue: parseFloat(item.total_value) || 0,
-            batchNumber: item.batch_number || '',
-            qualityGrade: item.quality_grade,
-            color: item.color,
-            imageUrl: item.image_url,
-            materialsUsed: [],
-            supplierPerformance: parseFloat(item.supplier_performance) || 0
-          }));
-          
-          const uniqueMaterials = removeDuplicateBatchNumbers(mappedMaterials);
-        setRawMaterials(uniqueMaterials);
-          console.log('✅ Loaded', uniqueMaterials.length, 'raw materials from MongoDB');
-        } else {
-          console.error('Error loading raw materials:', materialsResponse.error);
-          toast({
-            title: "Error",
-            description: "Failed to load raw materials from database",
-            variant: "destructive",
-          });
-        }
+        // Load all materials for stats
+        await loadAllMaterialsForStats();
+        
+        // Load paginated materials
+        await loadMaterials();
 
         // Load suppliers from MongoDB
         const suppliersResponse = await rawMaterialService.getSuppliers();
@@ -715,45 +783,27 @@ export default function Materials() {
     loadInitialData();
   }, [location.state, toast]);
 
+  // Reload materials when filters or pagination changes
+  useEffect(() => {
+    if (!loading) {
+      loadMaterials();
+    }
+  }, [currentPage, itemsPerPage, searchTerm, categoryFilter, statusFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    if (currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm, categoryFilter, statusFilter]);
+
   // Refresh data when component becomes visible
   useEffect(() => {
     const handleFocus = async () => {
       console.log('🔄 Refreshing materials data on page focus');
       try {
-        // Load materials from MongoDB
-        const materialsResponse = await rawMaterialService.getRawMaterials();
-        if (materialsResponse.success && materialsResponse.data) {
-          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-          
-          // Map MongoDB data to UI format
-          const mappedMaterials = materials.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            type: item.type || '',
-            category: item.category,
-            currentStock: parseFloat(item.current_stock) || 0,
-            unit: item.unit,
-            minThreshold: parseFloat(item.min_threshold) || 0,
-            maxCapacity: parseFloat(item.max_capacity) || 0,
-            reorderPoint: parseFloat(item.reorder_point) || 0,
-            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-            dailyUsage: parseFloat(item.daily_usage) || 0,
-            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-            supplier: item.supplier_name || '',
-            supplierId: item.supplier_id || '',
-            costPerUnit: parseFloat(item.cost_per_unit) || 0,
-            totalValue: parseFloat(item.total_value) || 0,
-            batchNumber: item.batch_number || '',
-            qualityGrade: item.quality_grade,
-            color: item.color,
-            imageUrl: item.image_url,
-            materialsUsed: [],
-            supplierPerformance: parseFloat(item.supplier_performance) || 0
-          }));
-          
-          const uniqueMaterials = removeDuplicateBatchNumbers(mappedMaterials);
-        setRawMaterials(uniqueMaterials);
-        }
+        await loadAllMaterialsForStats();
+        await loadMaterials();
       } catch (error) {
         console.error('Error refreshing materials data:', error);
       }
@@ -773,7 +823,7 @@ export default function Materials() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [currentPage, itemsPerPage, searchTerm, categoryFilter, statusFilter]);
 
   // Get waste recovery count for the dashboard
   const getWasteRecoveryCount = async () => {
@@ -824,27 +874,20 @@ export default function Materials() {
     return "in-stock";
   };
 
-  // Get filtered materials
-  const filteredMaterials = rawMaterials.filter(material => {
-    const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         material.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         material.supplier.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === "all" || material.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" || material.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  // Materials are already filtered on the server, so use rawMaterials directly
+  const filteredMaterials = rawMaterials;
 
-  // Get stock statistics
+  // Get stock statistics from all materials (not just current page)
   const stockStats = {
-    inStock: rawMaterials.filter(m => m.status === "in-stock").length,
-    lowStock: rawMaterials.filter(m => m.status === "low-stock").length,
-    outOfStock: rawMaterials.filter(m => m.status === "out-of-stock").length,
-    overstock: rawMaterials.filter(m => m.status === "overstock").length
+    inStock: allMaterialsForStats.filter(m => m.status === "in-stock").length,
+    lowStock: allMaterialsForStats.filter(m => m.status === "low-stock").length,
+    outOfStock: allMaterialsForStats.filter(m => m.status === "out-of-stock").length,
+    overstock: allMaterialsForStats.filter(m => m.status === "overstock").length
   };
 
-  // Get unique categories and units for filters
-  const categories = [...new Set(rawMaterials.map(m => m.category))];
-  const units = [...new Set(rawMaterials.map(m => m.unit))];
+  // Get unique categories and units for filters (from all materials, not just current page)
+  const categories = [...new Set(allMaterialsForStats.map(m => m.category))];
+  const units = [...new Set(allMaterialsForStats.map(m => m.unit))];
 
   // Load material categories and units from MongoDB
   const loadMaterialDropdowns = async () => {
@@ -1238,38 +1281,8 @@ export default function Materials() {
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const materialsResponse = await rawMaterialService.getRawMaterials();
-      if (materialsResponse.success && materialsResponse.data) {
-        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-        
-        // Map MongoDB data to UI format
-        const mappedMaterials = materials.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          type: item.type || '',
-          category: item.category,
-          currentStock: parseFloat(item.current_stock) || 0,
-          unit: item.unit,
-          minThreshold: parseFloat(item.min_threshold) || 0,
-          maxCapacity: parseFloat(item.max_capacity) || 0,
-          reorderPoint: parseFloat(item.reorder_point) || 0,
-          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-          dailyUsage: parseFloat(item.daily_usage) || 0,
-          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-          supplier: item.supplier_name || '',
-          supplierId: item.supplier_id || '',
-          costPerUnit: parseFloat(item.cost_per_unit) || 0,
-          totalValue: parseFloat(item.total_value) || 0,
-          batchNumber: item.batch_number || '',
-          qualityGrade: item.quality_grade,
-          color: item.color,
-          imageUrl: item.image_url,
-          materialsUsed: [],
-          supplierPerformance: parseFloat(item.supplier_performance) || 0
-        }));
-        
-        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
-      }
+      await loadAllMaterialsForStats();
+      await loadMaterials();
 
       // Reset forms and close dialog
       setNewMaterial({
@@ -1363,38 +1376,8 @@ export default function Materials() {
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const materialsResponse = await rawMaterialService.getRawMaterials();
-      if (materialsResponse.success && materialsResponse.data) {
-        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-        
-        // Map MongoDB data to UI format
-        const mappedMaterials = materials.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          type: item.type || '',
-          category: item.category,
-          currentStock: parseFloat(item.current_stock) || 0,
-          unit: item.unit,
-          minThreshold: parseFloat(item.min_threshold) || 0,
-          maxCapacity: parseFloat(item.max_capacity) || 0,
-          reorderPoint: parseFloat(item.reorder_point) || 0,
-          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-          dailyUsage: parseFloat(item.daily_usage) || 0,
-          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-          supplier: item.supplier_name || '',
-          supplierId: item.supplier_id || '',
-          costPerUnit: parseFloat(item.cost_per_unit) || 0,
-          totalValue: parseFloat(item.total_value) || 0,
-          batchNumber: item.batch_number || '',
-          qualityGrade: item.quality_grade,
-          color: item.color,
-          imageUrl: item.image_url,
-          materialsUsed: [],
-          supplierPerformance: parseFloat(item.supplier_performance) || 0
-        }));
-        
-        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
-      }
+      await loadAllMaterialsForStats();
+      await loadMaterials();
 
       // Reset form and close dialog
       setNewInventoryMaterial({
@@ -1501,38 +1484,8 @@ export default function Materials() {
       await updateLastStockUpdate(new Date().toISOString());
 
       // Refresh materials list
-      const materialsResponse = await rawMaterialService.getRawMaterials();
-      if (materialsResponse.success && materialsResponse.data) {
-        const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-        
-        // Map MongoDB data to UI format
-        const mappedMaterials = materials.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          type: item.type || '',
-          category: item.category,
-          currentStock: parseFloat(item.current_stock) || 0,
-          unit: item.unit,
-          minThreshold: parseFloat(item.min_threshold) || 0,
-          maxCapacity: parseFloat(item.max_capacity) || 0,
-          reorderPoint: parseFloat(item.reorder_point) || 0,
-          lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-          dailyUsage: parseFloat(item.daily_usage) || 0,
-          status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-          supplier: item.supplier_name || '',
-          supplierId: item.supplier_id || '',
-          costPerUnit: parseFloat(item.cost_per_unit) || 0,
-          totalValue: parseFloat(item.total_value) || 0,
-          batchNumber: item.batch_number || '',
-          qualityGrade: item.quality_grade,
-          color: item.color,
-          imageUrl: item.image_url,
-          materialsUsed: [],
-          supplierPerformance: parseFloat(item.supplier_performance) || 0
-        }));
-        
-        setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
-      }
+      await loadAllMaterialsForStats();
+      await loadMaterials();
 
       setIsImportInventoryOpen(false);
       toast({
@@ -1719,38 +1672,8 @@ export default function Materials() {
       
       if (result.success) {
         // Reload raw materials and trigger waste data refresh
-        const materialsResponse = await rawMaterialService.getRawMaterials();
-        if (materialsResponse.success && materialsResponse.data) {
-          const materials = Array.isArray(materialsResponse.data) ? materialsResponse.data : [materialsResponse.data];
-          
-          // Map MongoDB data to UI format
-          const mappedMaterials = materials.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            type: item.type || '',
-            category: item.category,
-            currentStock: parseFloat(item.current_stock) || 0,
-            unit: item.unit,
-            minThreshold: parseFloat(item.min_threshold) || 0,
-            maxCapacity: parseFloat(item.max_capacity) || 0,
-            reorderPoint: parseFloat(item.reorder_point) || 0,
-            lastRestocked: item.last_restocked || new Date().toISOString().split('T')[0],
-            dailyUsage: parseFloat(item.daily_usage) || 0,
-            status: item.status as "in-stock" | "low-stock" | "out-of-stock" | "overstock" | "in-transit",
-            supplier: item.supplier_name || '',
-            supplierId: item.supplier_id || '',
-            costPerUnit: parseFloat(item.cost_per_unit) || 0,
-            totalValue: parseFloat(item.total_value) || 0,
-            batchNumber: item.batch_number || '',
-            qualityGrade: item.quality_grade,
-            color: item.color,
-            imageUrl: item.image_url,
-            materialsUsed: [],
-            supplierPerformance: parseFloat(item.supplier_performance) || 0
-          }));
-          
-          setRawMaterials(removeDuplicateBatchNumbers(mappedMaterials));
-        }
+        await loadAllMaterialsForStats();
+        await loadMaterials();
         setWasteRecoveryRefresh(prev => prev + 1);
         
         // Update waste recovery count
@@ -2982,6 +2905,78 @@ export default function Materials() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Pagination */}
+            {totalMaterials > itemsPerPage && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalMaterials)} of {totalMaterials} materials
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage > 1) {
+                            setCurrentPage(currentPage - 1);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: Math.ceil(totalMaterials / itemsPerPage) }, (_, i) => i + 1)
+                      .filter(page => {
+                        // Show first page, last page, current page, and pages around current
+                        return page === 1 || 
+                               page === Math.ceil(totalMaterials / itemsPerPage) ||
+                               (page >= currentPage - 1 && page <= currentPage + 1);
+                      })
+                      .map((page, index, array) => {
+                        // Add ellipsis if there's a gap
+                        const showEllipsisBefore = index > 0 && array[index - 1] !== page - 1;
+                        return (
+                          <React.Fragment key={page}>
+                            {showEllipsisBefore && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  setCurrentPage(page);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                isActive={currentPage === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </React.Fragment>
+                        );
+                      })}
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentPage < Math.ceil(totalMaterials / itemsPerPage)) {
+                            setCurrentPage(currentPage + 1);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={currentPage >= Math.ceil(totalMaterials / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="inventory">
@@ -2993,7 +2988,6 @@ export default function Materials() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
@@ -3091,7 +3085,78 @@ export default function Materials() {
                       })}
                     </tbody>
                   </table>
-                </div>
+
+                {/* Pagination */}
+                {totalMaterials > itemsPerPage && (
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalMaterials)} of {totalMaterials} materials
+                    </div>
+                    <Pagination>
+                      <PaginationContent>
+                        <PaginationItem>
+                          <PaginationPrevious 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage > 1) {
+                                setCurrentPage(currentPage - 1);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }
+                            }}
+                            className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                          />
+                        </PaginationItem>
+                        {Array.from({ length: Math.ceil(totalMaterials / itemsPerPage) }, (_, i) => i + 1)
+                          .filter(page => {
+                            // Show first page, last page, current page, and pages around current
+                            return page === 1 || 
+                                   page === Math.ceil(totalMaterials / itemsPerPage) ||
+                                   (page >= currentPage - 1 && page <= currentPage + 1);
+                          })
+                          .map((page, index, array) => {
+                            // Add ellipsis if there's a gap
+                            const showEllipsisBefore = index > 0 && array[index - 1] !== page - 1;
+                            return (
+                              <React.Fragment key={page}>
+                                {showEllipsisBefore && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setCurrentPage(page);
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    isActive={currentPage === page}
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </React.Fragment>
+                            );
+                          })}
+                        <PaginationItem>
+                          <PaginationNext 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (currentPage < Math.ceil(totalMaterials / itemsPerPage)) {
+                                setCurrentPage(currentPage + 1);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }
+                            }}
+                            className={currentPage >= Math.ceil(totalMaterials / itemsPerPage) ? 'pointer-events-none opacity-50' : ''}
+                          />
+                        </PaginationItem>
+                      </PaginationContent>
+                    </Pagination>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

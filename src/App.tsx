@@ -30,6 +30,7 @@ import NotFound from "./pages/NotFound";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
 import ProductStock from "./pages/ProductStock";
+import ProductWastage from "./pages/ProductWastage";
 import QRResult from "./pages/QRResult";
 import Settings from "./pages/Settings";
 import DropdownMaster from "./pages/DropdownMaster";
@@ -53,10 +54,10 @@ const AuthenticatedLayout: React.FC = () => {
   }
 
   return (
-          <div className="flex h-screen bg-background overflow-hidden">
+          <div className="flex min-h-screen bg-background">
             <Sidebar className="hidden md:flex" />
             <main className={cn(
-              "flex-1 overflow-y-auto min-w-0 w-full transition-all duration-300",
+              "flex-1 min-w-0 w-full transition-all duration-300",
               isCollapsed ? "md:ml-16" : "md:ml-64"
             )}>
               <Routes>
@@ -167,6 +168,11 @@ const AuthenticatedLayout: React.FC = () => {
           <Route path="/product-stock/:productId" element={
             <ProtectedRoute requiredPermission="products">
               <ProductStock />
+            </ProtectedRoute>
+          } />
+          <Route path="/product-wastage" element={
+            <ProtectedRoute requiredPermission="products">
+              <ProductWastage />
             </ProtectedRoute>
           } />
 

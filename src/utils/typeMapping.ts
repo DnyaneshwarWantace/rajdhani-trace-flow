@@ -87,7 +87,7 @@ export function mapMongoDBProductToFrontend(mongoProduct: MongoDBProduct): Produ
     weight: mongoProduct.weight || '', // Default empty string
     width: mongoProduct.width,
     length: mongoProduct.length,
-    weightUnit: 'GSM', // Default unit
+    weightUnit: mongoProduct.weight_unit || 'GSM', // Use weight_unit from database, default to GSM
     widthUnit: mongoProduct.width_unit,
     lengthUnit: mongoProduct.length_unit,
     materialsUsed: [], // Default empty array
@@ -151,6 +151,7 @@ export function mapFrontendProductToMongoDB(frontendProduct: Partial<Product>): 
     max_stock_level: frontendProduct.maxStockLevel,
     base_quantity: frontendProduct.baseQuantity,
     weight: frontendProduct.weight,
+    weight_unit: frontendProduct.weightUnit,
     width: frontendProduct.width,
     length: frontendProduct.length,
     length_unit: frontendProduct.lengthUnit || 'feet',

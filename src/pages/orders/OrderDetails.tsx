@@ -237,7 +237,7 @@ export default function OrderDetails() {
       }));
 
       // Use the correct API endpoint for updating individual product selections
-      const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
       const token = AuthService.getToken(); // Use AuthService instead of direct localStorage
       if (!token) {
         toast({
