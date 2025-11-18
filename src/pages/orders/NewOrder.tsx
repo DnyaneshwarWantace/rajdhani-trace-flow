@@ -24,7 +24,7 @@ import { usePricingCalculator } from "@/hooks/usePricingCalculator";
 import { ExtendedOrderItem, OrderFormData } from "@/types/orderTypes";
 import { PricingUnit, ProductDimensions, getSuggestedPricingUnit, getAvailablePricingUnits } from "@/utils/unitConverter";
 import { GSTApiService } from "@/services/gstApiService";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -32,6 +32,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 // Legacy interface for backward compatibility - will be replaced with ExtendedOrderItem
 interface OrderItem {
@@ -166,6 +175,16 @@ export default function NewOrder() {
   const [productColorFilter, setProductColorFilter] = useState("all");
   const [productSizeFilter, setProductSizeFilter] = useState("all");
 
+  // Pagination states for products
+  const [productPage, setProductPage] = useState(1);
+  const [productItemsPerPage] = useState(50);
+  const [productTotalCount, setProductTotalCount] = useState(0);
+
+  // Pagination states for raw materials
+  const [materialPage, setMaterialPage] = useState(1);
+  const [materialItemsPerPage] = useState(50);
+  const [materialTotalCount, setMaterialTotalCount] = useState(0);
+
   // GST API Integration State
   const [isFetchingGST, setIsFetchingGST] = useState(false);
   const [gstFetchError, setGstFetchError] = useState<string | null>(null);
@@ -249,179 +268,165 @@ export default function NewOrder() {
     };
 
     loadCustomers();
-    
-    // Load products and raw materials from MongoDB
-    const loadProductsAndMaterials = async () => {
-      try {
-        // Load products from MongoDB
-        const { data: products, error: productsError } = await ProductService.getProducts();
-        
-        if (productsError) {
-          console.error('Error loading products:', productsError);
-        } else {
-          console.log('✅ Loaded', products?.length || 0, 'products from MongoDB');
-        }
 
-        // Load raw materials from MongoDB
-        const { data: rawMaterials, error: materialsError } = await RawMaterialService.getRawMaterials();
-        
-        if (materialsError) {
-          console.error('Error loading raw materials:', materialsError);
-        } else {
-          console.log('✅ Loaded', rawMaterials?.length || 0, 'raw materials from MongoDB');
-        }
-
-        // Individual products will be loaded per product when needed
-        console.log('✅ Individual products will be loaded per product when needed');
-
-        return { products: products || [], rawMaterials: rawMaterials || [], individualProducts: [] };
-      } catch (error) {
-        console.error('Error loading data from MongoDB:', error);
-        return { products: [], rawMaterials: [], individualProducts: [] };
-      }
-    };
-
-    // Load all data from MongoDB
-    const loadAllData = async () => {
-      try {
-        // Load products from MongoDB
-        const { data: productsData, error: productsError } = await ProductService.getProducts();
-
-        if (productsError) {
-          console.error('Error loading products:', productsError);
-          throw productsError;
-        }
-
-        // Individual products will be loaded per product when needed
-        console.log('✅ Individual products will be loaded per product when needed');
-
-        // Load raw materials from MongoDB
-        const { data: rawMaterialsData, error: rawMaterialsError } = await RawMaterialService.getRawMaterials();
-
-        if (rawMaterialsError) {
-          console.error('Error loading raw materials:', rawMaterialsError);
-          throw rawMaterialsError;
-        }
-
-        // Transform products to match the expected format
-        const transformedProducts = (productsData || []).map((product: any) => {
-          // Calculate stock based on individual tracking setting
-          let calculatedStock = 0;
-          if (product.individual_stock_tracking === false) {
-            // For bulk products, use base_quantity
-            calculatedStock = product.base_quantity || 0;
-          } else {
-            // For individual tracking products, we'll load individual products separately
-            // For now, use base_quantity as fallback - will be updated when individual products are loaded
-            calculatedStock = product.base_quantity || 0;
-          }
-
-          console.log(`📊 Stock calculation for ${product.name}:`, {
-            individual_tracking: product.individual_stock_tracking,
-            base_quantity: product.base_quantity,
-            calculated_stock: calculatedStock
-          });
-
-          return {
-            id: product.id,
-            name: product.name,
-            price: 0, // No fixed pricing - will be set per order
-            stock: calculatedStock,
-            category: product.category,
-            subcategory: product.subcategory || "",
-            color: product.color,
-            size: product.pattern, // Map pattern to size for compatibility
-            pattern: product.pattern,
-            dimensions: `${product.width} x ${product.length}`,
-            weight: product.weight,
-            imageUrl: product.image_url || "",
-            status: "in-stock", // Default status
-            location: "Warehouse", // Default location
-            unit: product.unit || "units",
-            individualStockTracking: product.individual_stock_tracking,
-            width: product.width,
-            length: product.length
-          };
-        });
-
-        // Transform raw materials to match the expected format
-        const transformedRawMaterials = (rawMaterialsData || []).map((material: any) => {
-          const stock = material.current_stock || 0;
-          
-          console.log(`🧱 Raw material ${material.name}:`, {
-            current_stock: material.current_stock,
-            calculated_stock: stock,
-            unit: material.unit
-          });
-
-          return {
-            id: material.id,
-            name: material.name,
-            price: material.cost_per_unit || 0,
-            stock: stock,
-            category: material.category,
-            brand: material.brand,
-            unit: material.unit,
-            supplier: material.supplier_name || "Unknown",
-            status: material.status || "in-stock",
-            location: material.location || 'Warehouse'
-          };
-        });
-
-        // Individual products will be loaded per product when needed
-        // Load individual products for stock calculation
-        console.log('📦 Loading individual products for stock calculation...');
-        const { data: individualProductsData, error: individualProductsError } = await IndividualProductService.getAllAvailableIndividualProducts();
-        
-        if (individualProductsError) {
-          console.error('Error loading individual products:', individualProductsError);
-          // Continue without individual products - stock will show base_quantity
-        } else {
-          console.log('✅ Loaded individual products:', individualProductsData?.length || 0);
-        }
-
-        // Set all data
-        setRealProducts(transformedProducts);
-        setRawMaterials(transformedRawMaterials);
-        setIndividualProducts(individualProductsData || []);
-        
-        // Update product stock after individual products are loaded
-        const updatedProducts = transformedProducts.map(product => {
-          const productIndividualProducts = (individualProductsData || []).filter(ip => ip.product_id === product.id);
-          
-          if (productIndividualProducts.length > 0) {
-            // If individual products exist, count only available ones
-            const availableCount = productIndividualProducts.filter(ip => ip.status === 'available').length;
-            return { ...product, stock: availableCount };
-          } else {
-            // If no individual products exist, use base_quantity
-            return { ...product, stock: product.stock };
-          }
-        });
-        
-        setRealProducts(updatedProducts);
-        
-        console.log('✅ Loaded products from MongoDB:', transformedProducts.length);
-        console.log('🔍 Individual products will be loaded per product when needed');
-        console.log('🧱 Loaded raw materials from MongoDB:', transformedRawMaterials.length);
-        
-        // Debug: Log stock values for first few products
-        transformedProducts.slice(0, 3).forEach(product => {
-          console.log(`📊 Product "${product.name}" stock: ${product.stock}, individual tracking: ${product.individualStockTracking}`);
-        });
-      } catch (error) {
-        console.error('Error loading data from MongoDB:', error);
-        // Fallback to empty arrays if MongoDB fails
-        setRealProducts([]);
-        setRawMaterials([]);
-        setIndividualProducts([]);
-        
-        console.log('⚠️ Fallback: Using empty data arrays');
-      }
-    };
-
-    loadAllData();
+    // Load first page of products and materials on mount
+    loadProductsWithFilters();
+    loadRawMaterialsWithFilters();
   }, [toast]);
+
+  // Load products with filters and pagination from backend
+  const loadProductsWithFilters = async () => {
+    try {
+      // Build filters object for backend
+      const filters: any = {
+        limit: productItemsPerPage,
+        offset: (productPage - 1) * productItemsPerPage,
+      };
+
+      // Add search filter
+      if (productSearchTerm && productSearchTerm.trim()) {
+        filters.search = productSearchTerm.trim();
+      }
+
+      // Add category filter
+      if (productCategoryFilter && productCategoryFilter !== 'all') {
+        filters.category = productCategoryFilter;
+      }
+
+      // Add color filter
+      if (productColorFilter && productColorFilter !== 'all') {
+        filters.color = productColorFilter;
+      }
+
+      console.log("Loading products with filters:", filters);
+      const { data: productsData, error: productsError, count } = await ProductService.getProducts(filters);
+
+      if (productsError) {
+        console.error('Error loading products:', productsError);
+        return;
+      }
+
+      setProductTotalCount(count || 0);
+      console.log('✅ Product pagination - Page:', productPage, 'Total:', count, 'Items:', productsData?.length);
+      console.log('📊 Setting productTotalCount to:', count);
+
+      // Transform products to match the expected format
+      const transformedProducts = (productsData || []).map((product: any) => {
+        let calculatedStock = 0;
+        if (product.individual_stock_tracking === false) {
+          calculatedStock = product.base_quantity || 0;
+        } else {
+          calculatedStock = product.base_quantity || 0;
+        }
+
+        return {
+          id: product.id,
+          name: product.name,
+          price: 0,
+          stock: calculatedStock,
+          category: product.category,
+          subcategory: product.subcategory || "",
+          color: product.color,
+          size: product.pattern,
+          pattern: product.pattern,
+          dimensions: `${product.width} x ${product.length}`,
+          weight: product.weight,
+          imageUrl: product.image_url || "",
+          status: "in-stock",
+          location: "Warehouse",
+          unit: product.unit || "units",
+          individualStockTracking: product.individual_stock_tracking,
+          width: product.width,
+          length: product.length
+        };
+      });
+
+      // Load individual products for stock calculation
+      const { data: individualProductsData } = await IndividualProductService.getAllAvailableIndividualProducts();
+
+      // Update product stock after individual products are loaded
+      const updatedProducts = transformedProducts.map(product => {
+        const productIndividualProducts = (individualProductsData || []).filter((ip: any) => ip.product_id === product.id);
+
+        if (productIndividualProducts.length > 0) {
+          const availableCount = productIndividualProducts.filter((ip: any) => ip.status === 'available').length;
+          return { ...product, stock: availableCount };
+        } else {
+          return { ...product, stock: product.stock };
+        }
+      });
+
+      setRealProducts(updatedProducts);
+      setIndividualProducts(individualProductsData || []);
+
+      console.log('✅ Loaded products with pagination:', updatedProducts.length, 'of', count);
+    } catch (error) {
+      console.error('Error loading products:', error);
+    }
+  };
+
+  // Load raw materials with filters and pagination from backend
+  const loadRawMaterialsWithFilters = async () => {
+    try {
+      // Build filters object for backend
+      const filters: any = {
+        limit: materialItemsPerPage,
+        offset: (materialPage - 1) * materialItemsPerPage,
+      };
+
+      // Add search filter
+      if (productSearchTerm && productSearchTerm.trim()) {
+        filters.search = productSearchTerm.trim();
+      }
+
+      console.log("Loading raw materials with filters:", filters);
+      const { data: rawMaterialsData, error: rawMaterialsError, count } = await RawMaterialService.getRawMaterials(filters);
+
+      if (rawMaterialsError) {
+        console.error('Error loading raw materials:', rawMaterialsError);
+        return;
+      }
+
+      setMaterialTotalCount(count || 0);
+      console.log('✅ Material pagination - Page:', materialPage, 'Total:', count, 'Items:', rawMaterialsData?.length);
+
+      // Transform raw materials to match the expected format
+      const transformedRawMaterials = (rawMaterialsData || []).map((material: any) => {
+        const stock = material.current_stock || 0;
+
+        return {
+          id: material.id,
+          name: material.name,
+          price: material.cost_per_unit || 0,
+          stock: stock,
+          category: material.category,
+          brand: material.brand,
+          unit: material.unit,
+          supplier: material.supplier_name || "Unknown",
+          status: material.status || "in-stock",
+          location: material.location || 'Warehouse'
+        };
+      });
+
+      setRawMaterials(transformedRawMaterials);
+
+      console.log('✅ Loaded raw materials with pagination:', transformedRawMaterials.length, 'of', count);
+    } catch (error) {
+      console.error('Error loading raw materials:', error);
+    }
+  };
+
+  // Reload products when page changes
+  useEffect(() => {
+    console.log('📦 Reloading products - page:', productPage);
+    loadProductsWithFilters();
+  }, [productPage]);
+
+  // Reload materials when page changes
+  useEffect(() => {
+    console.log('🧱 Reloading materials - page:', materialPage);
+    loadRawMaterialsWithFilters();
+  }, [materialPage]);
 
   // Auto-calculate recipe requirements when order items change
   useEffect(() => {
@@ -1296,6 +1301,18 @@ export default function NewOrder() {
                   products={realProducts}
                   rawMaterials={rawMaterials}
                   individualProducts={individualProducts}
+                  productPagination={{
+                    currentPage: productPage,
+                    itemsPerPage: productItemsPerPage,
+                    totalCount: productTotalCount,
+                    onPageChange: setProductPage
+                  }}
+                  materialPagination={{
+                    currentPage: materialPage,
+                    itemsPerPage: materialItemsPerPage,
+                    totalCount: materialTotalCount,
+                    onPageChange: setMaterialPage
+                  }}
                   onProductSearch={(item) => {
                     setCurrentOrderItem(item as any);
                                    setShowProductSearch(true);
@@ -1784,12 +1801,14 @@ export default function NewOrder() {
       <Dialog open={showProductSearch} onOpenChange={(open) => {
         setShowProductSearch(open);
         if (!open) {
-          // Reset filters when dialog closes
+          // Reset filters and pagination when dialog closes
           setProductSearchTerm("");
           setProductCategoryFilter("all");
           setProductSubcategoryFilter("all");
           setProductColorFilter("all");
           setProductSizeFilter("all");
+          setProductPage(1);
+          setMaterialPage(1);
         }
       }}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
@@ -1867,36 +1886,6 @@ export default function NewOrder() {
             {/* Product Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
               {(currentOrderItem?.product_type === 'raw_material' ? rawMaterials : realProducts)
-                .filter((product) => {
-                  if (currentOrderItem?.product_type === 'raw_material') {
-                    // For raw materials, only filter by search term
-                    if (productSearchTerm) {
-                      const search = productSearchTerm.toLowerCase();
-                      return (
-                        product.name?.toLowerCase().includes(search) ||
-                        product.category?.toLowerCase().includes(search) ||
-                        product.brand?.toLowerCase().includes(search) ||
-                        product.unit?.toLowerCase().includes(search)
-                      );
-                    }
-                    return true;
-                  } else {
-                    // For products, filter by all criteria
-                    const matchesSearch = !productSearchTerm || 
-                      product.name?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-                      product.category?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-                      (product.subcategory && product.subcategory.toLowerCase().includes(productSearchTerm.toLowerCase())) ||
-                      product.color?.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
-                      product.size?.toLowerCase().includes(productSearchTerm.toLowerCase());
-                    
-                    const matchesCategory = productCategoryFilter === "all" || product.category === productCategoryFilter;
-                    const matchesSubcategory = productSubcategoryFilter === "all" || (product.subcategory && product.subcategory === productSubcategoryFilter);
-                    const matchesColor = productColorFilter === "all" || product.color === productColorFilter;
-                    const matchesSize = productSizeFilter === "all" || product.size === productSizeFilter;
-                    
-                    return matchesSearch && matchesCategory && matchesSubcategory && matchesColor && matchesSize;
-                  }
-                })
                 .map((product) => (
                 <div
                   key={product.id}
@@ -2037,12 +2026,117 @@ export default function NewOrder() {
               </div>
             )}
 
-            {/* Quick Stats */}
-            {realProducts.length > 0 && (
-            <div className="flex items-center justify-between text-sm text-muted-foreground border-t pt-4">
-              <span>Showing {realProducts.length} products</span>
-              <span>Click on a product to select it for your order</span>
-            </div>
+            {/* Pagination */}
+            {(() => {
+              const totalCount = currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount;
+              const perPage = currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage;
+              console.log('🔍 Pagination check:', { totalCount, perPage, shouldShow: totalCount > perPage, productType: currentOrderItem?.product_type });
+              return totalCount > perPage;
+            })() && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                  <span>
+                    Showing {((currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage) - 1) * (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage) + 1} to {Math.min((currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage) * (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage), (currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount))} of {currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount} {currentOrderItem?.product_type === 'raw_material' ? 'materials' : 'products'}
+                  </span>
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (currentOrderItem?.product_type === 'raw_material') {
+                            if (materialPage > 1) setMaterialPage(materialPage - 1);
+                          } else {
+                            if (productPage > 1) setProductPage(productPage - 1);
+                          }
+                        }}
+                        className={
+                          (currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage) === 1
+                            ? 'pointer-events-none opacity-50'
+                            : ''
+                        }
+                      />
+                    </PaginationItem>
+
+                    {/* Page numbers */}
+                    {Array.from(
+                      { length: Math.ceil((currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount) / (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage)) },
+                      (_, i) => i + 1
+                    )
+                      .filter(page => {
+                        const currentP = currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage;
+                        const totalPages = Math.ceil((currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount) / (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage));
+                        return page === 1 || page === totalPages || (page >= currentP - 1 && page <= currentP + 1);
+                      })
+                      .map((page, index, array) => {
+                        const currentP = currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage;
+                        if (index > 0 && array[index - 1] !== page - 1) {
+                          return [
+                            <PaginationItem key={`ellipsis-${page}`}>
+                              <PaginationEllipsis />
+                            </PaginationItem>,
+                            <PaginationItem key={page}>
+                              <PaginationLink
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (currentOrderItem?.product_type === 'raw_material') {
+                                    setMaterialPage(page);
+                                  } else {
+                                    setProductPage(page);
+                                  }
+                                }}
+                                isActive={currentP === page}
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          ];
+                        }
+                        return (
+                          <PaginationItem key={page}>
+                            <PaginationLink
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentOrderItem?.product_type === 'raw_material') {
+                                  setMaterialPage(page);
+                                } else {
+                                  setProductPage(page);
+                                }
+                              }}
+                              isActive={currentP === page}
+                            >
+                              {page}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const totalPages = Math.ceil((currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount) / (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage));
+                          if (currentOrderItem?.product_type === 'raw_material') {
+                            if (materialPage < totalPages) setMaterialPage(materialPage + 1);
+                          } else {
+                            if (productPage < totalPages) setProductPage(productPage + 1);
+                          }
+                        }}
+                        className={
+                          (currentOrderItem?.product_type === 'raw_material' ? materialPage : productPage) >= Math.ceil((currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount) / (currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage))
+                            ? 'pointer-events-none opacity-50'
+                            : ''
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
             )}
           </div>
 

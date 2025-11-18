@@ -17,9 +17,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { ExtendedOrderItem, PricingCalculation } from '@/types/orderTypes';
 import { PricingUnit, ProductDimensions, PRICING_UNITS, getSuggestedPricingUnit } from '@/utils/unitConverter';
 import { usePricingCalculator } from '@/hooks/usePricingCalculator';
+
+interface PaginationData {
+  currentPage: number;
+  itemsPerPage: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+}
 
 interface EnhancedPricingFormProps {
   item: ExtendedOrderItem;
@@ -29,18 +45,22 @@ interface EnhancedPricingFormProps {
   products?: any[];
   rawMaterials?: any[];
   individualProducts?: any[];
+  productPagination?: PaginationData;
+  materialPagination?: PaginationData;
   onProductSearch?: (item: ExtendedOrderItem) => void;
   onIndividualProductSelection?: (item: ExtendedOrderItem) => void;
 }
 
-export function EnhancedPricingForm({ 
-  item, 
-  onUpdate, 
-  onRemove, 
+export function EnhancedPricingForm({
+  item,
+  onUpdate,
+  onRemove,
   isEditing = false,
   products = [],
   rawMaterials = [],
   individualProducts = [],
+  productPagination,
+  materialPagination,
   onProductSearch,
   onIndividualProductSelection
 }: EnhancedPricingFormProps) {
@@ -864,7 +884,7 @@ export function EnhancedPricingForm({
 
 
             {/* Calculation Display - Show only for valid pricing units (sqft, sqm, kg, gsm) */}
-            {calculation && localItem.pricing_unit && localItem.pricing_unit !== 'unit' && 
+            {calculation && localItem.pricing_unit && 
              ['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit) && calculation.isValid && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1127,7 +1147,7 @@ export function EnhancedPricingForm({
 
       {/* Product Selection Modal */}
       <Dialog open={showProductModal} onOpenChange={setShowProductModal}>
-        <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-6xl h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {localItem.product_type === 'raw_material' ? (
@@ -1384,11 +1404,12 @@ export function EnhancedPricingForm({
               )}
             </div>
 
-            {/* Product Grid */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Product Grid with Pagination */}
+            <div className="flex-1 overflow-y-auto min-h-0">
               {getAvailableItems.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {getAvailableItems.map((product) => {
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-1">
+                    {getAvailableItems.map((product) => {
                     const actualStock = localItem.product_type === 'raw_material'
                       ? (product.stock ?? 0)
                       : (product.stock ?? 0);
@@ -1485,6 +1506,99 @@ export function EnhancedPricingForm({
                     );
                   })}
                 </div>
+
+                {/* Pagination - appears after products when scrolling */}
+                {(() => {
+                  const pagination = localItem.product_type === 'raw_material' ? materialPagination : productPagination;
+                  console.log('🔍 EnhancedPricingForm Pagination check:', {
+                    productType: localItem.product_type,
+                    pagination,
+                    totalCount: pagination?.totalCount,
+                    itemsPerPage: pagination?.itemsPerPage,
+                    shouldShow: pagination && pagination.totalCount > pagination.itemsPerPage
+                  });
+                  if (!pagination || pagination.totalCount <= pagination.itemsPerPage) return null;
+
+                  const { currentPage, itemsPerPage, totalCount, onPageChange } = pagination;
+                  const totalPages = Math.ceil(totalCount / itemsPerPage);
+
+                  return (
+                    <div className="border-t pt-4 mt-4 bg-white">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground mb-4 px-1">
+                        <span>
+                          Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} {localItem.product_type === 'raw_material' ? 'materials' : 'products'}
+                        </span>
+                      </div>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage > 1) onPageChange(currentPage - 1);
+                              }}
+                              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                            />
+                          </PaginationItem>
+
+                          {/* Page numbers */}
+                          {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter(page => {
+                              return page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1);
+                            })
+                            .map((page, index, array) => {
+                              if (index > 0 && array[index - 1] !== page - 1) {
+                                return [
+                                  <PaginationItem key={`ellipsis-${page}`}>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>,
+                                  <PaginationItem key={page}>
+                                    <PaginationLink
+                                      href="#"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        onPageChange(page);
+                                      }}
+                                      isActive={currentPage === page}
+                                    >
+                                      {page}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                ];
+                              }
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      onPageChange(page);
+                                    }}
+                                    isActive={currentPage === page}
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
+
+                          <PaginationItem>
+                            <PaginationNext
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (currentPage < totalPages) onPageChange(currentPage + 1);
+                              }}
+                              className={currentPage >= totalPages ? 'pointer-events-none opacity-50' : ''}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  );
+                })()}
+              </>
               ) : (
                 <div className="p-8 text-center text-gray-500">
                   <Package className="w-12 h-12 mx-auto mb-3 opacity-50" />
