@@ -1,4 +1,4 @@
-const API_URL = 'https://rajdhani.wantace.com/api/auth';
+const API_URL = 'http://localhost:8000/api/auth';
 
 export interface User {
   id: string;
