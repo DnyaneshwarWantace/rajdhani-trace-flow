@@ -103,7 +103,7 @@ export default function NewBatch() {
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [targetQuantity, setTargetQuantity] = useState(1);
+  const [targetQuantity, setTargetQuantity] = useState<string>("1");
   const [priority, setPriority] = useState<"normal" | "high" | "urgent">("normal");
   const [expectedCompletion, setExpectedCompletion] = useState("");
   const [notes, setNotes] = useState("");
@@ -388,11 +388,18 @@ export default function NewBatch() {
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
-    setTargetQuantity(1);
+    setTargetQuantity("1");
   };
 
   const handleCreateProduction = async () => {
     if (!selectedProduct) return;
+
+    // Validate quantity - convert string to number and check it's greater than 0
+    const quantityNum = Number(targetQuantity);
+    if (!targetQuantity || targetQuantity.trim() === '' || isNaN(quantityNum) || quantityNum <= 0) {
+      alert('Please enter a valid quantity greater than 0');
+      return;
+    }
 
     // Generate unique production batch ID to avoid reusing completed flows
     const productionBatchId = `PRO-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -405,7 +412,7 @@ export default function NewBatch() {
       color: selectedProduct.color,
       size: selectedProduct.size,
       pattern: selectedProduct.pattern,
-      targetQuantity,
+      targetQuantity: quantityNum,
       priority,
       status: "planning",
       currentStep: 1,
@@ -426,7 +433,7 @@ export default function NewBatch() {
     const { data: createdBatch, error } = await ProductionService.createProductionBatch({
       product_id: selectedProduct.id,
       product_name: selectedProduct.name,
-      batch_size: targetQuantity,
+      batch_size: quantityNum,
       unit: selectedProduct.unit || 'pieces',
       status: 'planned',
       priority: mappedPriority as any,
@@ -448,13 +455,13 @@ export default function NewBatch() {
     
     // Get the batch ID from created batch (use the ID returned from the API)
     const batchId = createdBatch?.id || productionBatchId;
-    console.log('✅ Created production batch with ID:', batchId, 'batch_size:', targetQuantity);
+    console.log('✅ Created production batch with ID:', batchId, 'batch_size:', quantityNum);
 
     // Navigate directly to production detail page for planning
     // Pass the actual product ID, batch ID, and target quantity
     navigate(`/production-detail/${selectedProduct.id}`, {
       state: { 
-        targetQuantity,
+        targetQuantity: quantityNum,
         batchId: batchId // Pass batch ID so ProductionDetail can find the correct batch
       }
     });
@@ -857,10 +864,21 @@ export default function NewBatch() {
                   type="text"
                       value={targetQuantity}
                       onChange={(e) => {
-                        // Allow only numbers and leading zeros
+                        // Allow only numbers, allow empty string for clearing
                         const value = e.target.value;
+                        // Allow empty string or valid positive integers
                         if (value === '' || /^\d+$/.test(value)) {
-                          setTargetQuantity(Number(value) || 1);
+                          setTargetQuantity(value);
+                        }
+                      }}
+                      onBlur={() => {
+                        // When user leaves the field, ensure it's not empty or 0
+                        const numValue = Number(targetQuantity);
+                        if (!targetQuantity || targetQuantity.trim() === '' || isNaN(numValue) || numValue <= 0) {
+                          setTargetQuantity("1");
+                        } else {
+                          // Remove leading zeros (e.g., "01" becomes "1")
+                          setTargetQuantity(String(numValue));
                         }
                       }}
                       placeholder="1"
