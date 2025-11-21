@@ -1,7 +1,7 @@
 import { RawMaterial, Supplier } from '@/lib/supabase';
 import AuthService from './api/authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
 // Helper function to get headers with auth token
 const getHeaders = () => {
