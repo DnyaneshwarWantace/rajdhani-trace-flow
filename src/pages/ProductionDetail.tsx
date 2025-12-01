@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { 
   ArrowLeft, Package, Factory, Plus, Trash2, Save,
   Truck, AlertTriangle, FileSpreadsheet, CheckCircle, Info, Search,
-  XCircle, X, Settings, User, QrCode
+  XCircle, X, Settings, User, QrCode, RefreshCw
   } from "lucide-react";
   import { generateUniqueId } from "@/lib/storageUtils";
 import ProductService from "@/services/api/productService";
@@ -148,6 +148,7 @@ export default function ProductionDetail() {
   const [selectedQRProduct, setSelectedQRProduct] = useState<any>(null);
   const [materialsFromRecipe, setMaterialsFromRecipe] = useState(false);
   const [productRecipe, setProductRecipe] = useState<any>(null);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   
   // Machine selection popup states
   const [showMachineSelectionPopup, setShowMachineSelectionPopup] = useState(false);
@@ -339,21 +340,20 @@ export default function ProductionDetail() {
     
     loadProductData();
     
-    // Load all data first, then load recipe AFTER product is loaded
-    // Don't load all individual products upfront - only load counts for products in recipe
+    // Load recipe IMMEDIATELY and in parallel with other data
+    // This ensures recipe loads fast if available
+    if (productId) {
+      const actualProductId = productId;
+      console.log('🚀 Loading recipe immediately for product:', actualProductId);
+      loadProductRecipe(actualProductId);
+    }
+    
+    // Load raw materials and products in parallel (but don't wait for them before loading recipe)
     Promise.all([
       loadRawMaterials(1),
       loadProducts(1)
-    ]).then(async (results) => {
-      // Wait a bit for productionProduct to be set, then load recipe
-      // Recipe loading will load individual product counts only for products in the recipe
-      setTimeout(() => {
-        if (productId) {
-          const actualProductId = productId;
-          console.log('Loading recipe after all data is ready...');
-          loadProductRecipe(actualProductId);
-        }
-      }, 100);
+    ]).catch(error => {
+      console.error('Error loading materials/products:', error);
     });
 
     // Load machines from MongoDB
@@ -510,7 +510,9 @@ export default function ProductionDetail() {
 
   // Load product recipe
   const loadProductRecipe = async (productId: string) => {
+    setIsLoadingRecipe(true);
     try {
+      console.log('🔍 Loading recipe for product:', productId);
       const recipeResponse = await RecipeService.getRecipeByProductId(productId);
       if (recipeResponse && recipeResponse.data) {
         const recipe = recipeResponse.data;
@@ -539,49 +541,69 @@ export default function ProductionDetail() {
 
         // Auto-populate materials from recipe if available
         if (recipe.materials && recipe.materials.length > 0) {
-          // Get current raw materials - either from state or fetch fresh
+          // Get material IDs from recipe first (fast - no API calls)
+          const recipeMaterialIds = recipe.materials.map((m: any) => m.material_id);
+          console.log('📋 Recipe material IDs:', recipeMaterialIds);
+          
+          // Get current raw materials - either from state or fetch ONLY needed ones
           let currentRawMaterials = rawMaterials;
-          if (currentRawMaterials.length === 0) {
+          const missingRawMaterialIds = recipeMaterialIds.filter((id: string) => 
+            !currentRawMaterials.some(rm => rm.id === id)
+          );
+          
+          if (missingRawMaterialIds.length > 0 && currentRawMaterials.length === 0) {
+            // Only fetch if we don't have any materials yet
             try {
               const { data: materials } = await MongoDBRawMaterialService.getRawMaterials();
               currentRawMaterials = materials || [];
-              console.log('Fetched raw materials for recipe loading:', currentRawMaterials.length);
+              console.log('✅ Fetched raw materials for recipe:', currentRawMaterials.length);
             } catch (error) {
               console.error('Error fetching raw materials for recipe:', error);
             }
           }
 
-          // Get current products - either from state or fetch fresh
+          // Get current products - either from state or fetch ONLY products in recipe
           let currentProducts = products;
-          if (currentProducts.length === 0) {
+          const productIdsInRecipe = recipe.materials
+            .map((m: any) => m.material_id)
+            .filter((id: string) => !currentRawMaterials.some(rm => rm.id === id));
+          
+          const missingProductIds = productIdsInRecipe.filter((id: string) => 
+            !currentProducts.some(p => p.id === id)
+          );
+          
+          if (missingProductIds.length > 0) {
+            // Only fetch products that are in the recipe and not already loaded
             try {
-              const { data: productsData, error, count: productsCount } = await ProductService.getProducts({ limit: 10000 });
+              // Fetch only the specific products we need (much faster)
+              const productPromises = missingProductIds.map(async (id: string) => {
+                try {
+                  const { data: product } = await ProductService.getProductById(id);
+                  return product;
+                } catch (error) {
+                  console.warn(`Error fetching product ${id}:`, error);
+                  return null;
+                }
+              });
               
-              if (error) {
-                console.error('Error fetching products for recipe:', error);
-                currentProducts = [];
-              } else {
-                currentProducts = productsData || [];
-                console.log('Fetched products for recipe loading:', currentProducts.length);
-              }
+              const fetchedProducts = (await Promise.all(productPromises)).filter(Boolean);
+              currentProducts = [...currentProducts, ...fetchedProducts];
+              console.log('✅ Fetched products for recipe (only needed ones):', fetchedProducts.length);
             } catch (error) {
               console.error('Error fetching products for recipe:', error);
-              currentProducts = [];
             }
           }
           
-          // Extract product IDs from recipe materials that are products
-          const productIdsInRecipe = recipe.materials
-            .filter((m: any) => {
-              // Check if this material is a product (not a raw material)
-              return currentProducts.some(p => p.id === m.material_id);
-            })
-            .map((m: any) => m.material_id);
+          // Use the productIdsInRecipe already calculated above
+          // Filter to only include products that exist in currentProducts
+          const productIdsInRecipeFiltered = productIdsInRecipe.filter((id: string) => 
+            currentProducts.some(p => p.id === id)
+          );
           
-          console.log('Product IDs in recipe:', productIdsInRecipe);
+          console.log('Product IDs in recipe:', productIdsInRecipeFiltered);
           
           // Load individual product counts ONLY for products in the recipe (in parallel)
-          const individualCountPromises = productIdsInRecipe.map(async (productId: string) => {
+          const individualCountPromises = productIdsInRecipeFiltered.map(async (productId: string) => {
             try {
               const { data: individualProductsData, error } = await IndividualProductService.getIndividualProductsByProductId(
                 productId,
@@ -739,12 +761,21 @@ export default function ProductionDetail() {
             title: "Recipe loaded",
             description: `${recipe.materials.length} materials loaded for ${productionProduct?.targetQuantity || 1} ${productionProduct?.unit}`,
           });
+        } else {
+          console.log('✅ Recipe loaded but has no materials');
         }
       } else {
-        console.log('No recipe found for product:', productId);
+        console.log('ℹ️ No recipe found for product:', productId);
       }
     } catch (error) {
-      console.error('Error loading product recipe:', error);
+      console.error('❌ Error loading product recipe:', error);
+      toast({
+        title: "Recipe loading failed",
+        description: "Could not load recipe. You can still add materials manually.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingRecipe(false);
     }
   };
 
@@ -2571,13 +2602,31 @@ export default function ProductionDetail() {
                        <Button
                          variant="outline"
                          size="sm"
-              onClick={() => setIsMaterialSelectionOpen(true)}
+                         onClick={() => setIsMaterialSelectionOpen(true)}
+                         disabled={isLoadingRecipe}
                        >
-              <Plus className="w-4 h-4 mr-2" />
-              Select Materials & Products
+                         {isLoadingRecipe ? (
+                           <>
+                             <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                             Loading Recipe...
+                           </>
+                         ) : (
+                           <>
+                             <Plus className="w-4 h-4 mr-2" />
+                             Select Materials & Products
+                           </>
+                         )}
                        </Button>
                   </div>
-                  {materialsFromRecipe && productRecipe && (
+                  {isLoadingRecipe && (
+                    <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-sm text-blue-700">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Loading recipe... Please wait before adding materials manually.</span>
+                      </div>
+                    </div>
+                  )}
+                  {materialsFromRecipe && productRecipe && !isLoadingRecipe && (
                     <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center gap-2 text-sm text-green-700">
                         <CheckCircle className="w-4 h-4" />

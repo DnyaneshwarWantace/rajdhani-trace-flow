@@ -32,6 +32,7 @@ import { MachineService, Machine } from "@/services/api/machineService";
 import { ProductionService } from "@/services/api/productionService";
 import { RawMaterialService } from "@/services/api/rawMaterialService";
 import MaterialConsumptionService from "@/services/api/materialConsumptionService";
+import AuthService from "@/services/api/authService";
 
 
 interface ProductionStep {
@@ -247,20 +248,41 @@ export default function DynamicProductionFlow() {
       // Otherwise, try to get product ID from production batch
       // First try to get product from production batch
       let productData = null;
+      let batchData = null;
       try {
-        // Try to get production batch to find product_id
-        const { data: batches, error: batchError } = await ProductionService.getProductionBatches({
-          // We can't filter by batch ID directly, so we'll need to get all and filter
-        });
+        // Load batch by ID directly
+        const { data: batch, error: batchError } = await ProductionService.getProductionBatchById(batchId);
         
-        if (!batchError && batches) {
-          const batch = batches.find((b: any) => b.id === batchId);
-          if (batch?.product_id) {
+        if (!batchError && batch) {
+          batchData = batch;
+          console.log('✅ Found batch data:', batchData);
+          
+          if (batch.product_id) {
             // Load product by ID
             const { data: product } = await ProductService.getProductById(batch.product_id);
             if (product) {
               productData = product;
               console.log('✅ Found product data from batch:', productData);
+            }
+          }
+        } else {
+          // Fallback: try to get production batch from list
+          const { data: batches, error: batchListError } = await ProductionService.getProductionBatches({
+            // We can't filter by batch ID directly, so we'll need to get all and filter
+          });
+          
+          if (!batchListError && batches) {
+            const batch = batches.find((b: any) => b.id === batchId);
+            if (batch) {
+              batchData = batch;
+              if (batch.product_id) {
+                // Load product by ID
+                const { data: product } = await ProductService.getProductById(batch.product_id);
+                if (product) {
+                  productData = product;
+                  console.log('✅ Found product data from batch list:', productData);
+                }
+              }
             }
           }
         }
@@ -305,6 +327,9 @@ export default function DynamicProductionFlow() {
       }
 
       // Create production product from flow and product data (or use minimal data if product not found)
+      // Use batch_size from batchData if available
+      const targetQuantity = batchData?.batch_size || 1;
+      
       if (productData) {
         const productionProduct = {
           id: batchId, // Use the batch ID
@@ -314,7 +339,7 @@ export default function DynamicProductionFlow() {
           color: productData.color || 'N/A',
           size: productData.length && productData.width ? `${productData.length} x ${productData.width}` : 'N/A',
           pattern: productData.pattern || 'N/A',
-          targetQuantity: 1, // Default quantity
+          targetQuantity: targetQuantity, // Use batch_size from database
           priority: 'normal' as const,
           status: 'active' as const,
           expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -335,6 +360,7 @@ export default function DynamicProductionFlow() {
         
         setProductionProduct(productionProduct);
         console.log('✅ Created production product from flow and database data:', productionProduct);
+        console.log('✅ Target quantity from batch:', targetQuantity);
       } else {
         // Create minimal production product from flow data only
         const flowName = flow.flow_name || '';
@@ -348,7 +374,7 @@ export default function DynamicProductionFlow() {
           color: 'N/A',
           size: 'N/A',
           pattern: 'N/A',
-          targetQuantity: 1,
+          targetQuantity: targetQuantity, // Use batch_size from database
           priority: 'normal' as const,
           status: 'active' as const,
           expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -369,6 +395,7 @@ export default function DynamicProductionFlow() {
         
         setProductionProduct(productionProduct);
         console.log('⚠️ Created minimal production product from flow data only:', productionProduct);
+        console.log('✅ Target quantity from batch:', targetQuantity);
       }
 
         // Load production steps for this flow
@@ -837,15 +864,44 @@ export default function DynamicProductionFlow() {
     return <div className="p-6">Loading...</div>;
   }
 
-  // Get inspector name from first machine operation step
-  const inspectorName = productionSteps
-    .find(step => step.stepType === 'machine_operation' && step.inspector)?.inspector || '';
+  // Get current logged-in user
+  const currentUser = AuthService.getUser();
+  const currentUserName = currentUser?.full_name || currentUser?.email || 'Unknown User';
+  
+  // Get inspector name from completed machine operation steps
+  // Prefer the most recently completed machine step, but fallback to current logged-in user
+  const completedMachineSteps = productionSteps
+    .filter(step => step.stepType === 'machine_operation' && step.status === 'completed' && step.inspector)
+    .sort((a, b) => {
+      // Sort by endTime descending (most recent first)
+      const timeA = a.endTime ? new Date(a.endTime).getTime() : 0;
+      const timeB = b.endTime ? new Date(b.endTime).getTime() : 0;
+      return timeB - timeA;
+    });
+  
+  // Use the inspector from completed steps, or fallback to current logged-in user
+  const inspectorName = completedMachineSteps.length > 0 
+    ? completedMachineSteps[0].inspector 
+    : productionSteps.find(step => step.stepType === 'machine_operation' && step.inspector)?.inspector 
+    || currentUserName; // Fallback to current logged-in user
+  
+  // Get all unique inspectors who worked on machine operations
+  const machineOperators = Array.from(new Set(
+    productionSteps
+      .filter(step => step.stepType === 'machine_operation' && step.inspector)
+      .map(step => step.inspector)
+  ));
+  
+  // If no operators found in steps, add current user
+  if (machineOperators.length === 0 && currentUserName !== 'Unknown User') {
+    machineOperators.push(currentUserName);
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
       <Header
         title="Production Flow - Machine Operations"
-        subtitle={`${productionProduct.productName} - Target: ${productionProduct.targetQuantity} pieces${inspectorName ? ` • Inspector: ${inspectorName}` : ''}`}
+        subtitle={productionProduct?.productName || "Loading..."}
       />
 
       <div className="flex items-center gap-4 mb-6">
@@ -870,6 +926,46 @@ export default function DynamicProductionFlow() {
       {/* Main Content - only show when not loading */}
       {!isLoading && (
         <>
+          {/* Production Summary Card */}
+          {productionProduct && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Production Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm text-gray-500">Product Name</Label>
+                    <p className="font-medium">{productionProduct.productName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-500">Target Quantity</Label>
+                    <p className="font-medium">{productionProduct.targetQuantity} pieces</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-500">Machine Stage Operator</Label>
+                    <div>
+                      <p className="font-medium">{inspectorName}</p>
+                      {machineOperators.length > 1 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {machineOperators.length} operators involved
+                        </p>
+                      )}
+                      {currentUser && inspectorName === currentUserName && (
+                        <p className="text-xs text-blue-600 mt-1">
+                          ✓ You are working on this step
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Progress Overview */}
           <Card>
         <CardHeader>

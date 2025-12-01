@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-  ArrowLeft, AlertTriangle, Plus, Trash2, Save, Factory, Info
+  ArrowLeft, AlertTriangle, Plus, Trash2, Save, Factory, Info, Package
 } from "lucide-react";
 import { generateUniqueId } from "@/lib/storageUtils";
 import { RawMaterialService as MongoDBRawMaterialService } from "@/services/api/rawMaterialService";
@@ -21,6 +21,7 @@ import MaterialConsumptionService from "@/services/api/materialConsumptionServic
 import { IndividualProductService } from "@/services/api/individualProductService";
 import ProductionProgressBar from "@/components/production/ProductionProgressBar";
 import { ProductionService } from "@/services/api/productionService";
+import AuthService from "@/services/api/authService";
 import {
   Select,
   SelectContent,
@@ -490,6 +491,35 @@ export default function WasteGeneration() {
       try {
         console.log('🔍 Loading production data for batchId:', batchId);
         
+        // Load batch data first to get batch_size and product details
+        let batchData: any = null;
+        let productData: any = null;
+        try {
+          const { data: batchResp, error: batchError } = await ProductionService.getProductionBatchById(batchId);
+          
+          if (batchError) {
+            console.error('❌ Error loading batch:', batchError);
+          } else {
+            batchData = batchResp || null;
+            console.log('📦 Batch data loaded:', batchData);
+            console.log('📦 Batch size from API:', batchData?.batch_size);
+            console.log('📦 Batch size type:', typeof batchData?.batch_size);
+            
+            // If batch_size is missing, log a warning
+            if (!batchData?.batch_size && batchData?.batch_size !== 0) {
+              console.warn('⚠️ WARNING: batch_size is missing or undefined in batch data!', batchData);
+            }
+            
+            if (batchData?.product_id) {
+              const { data: prod } = await ProductService.getProductById(batchData.product_id);
+              productData = prod || null;
+              console.log('📦 Product data loaded:', productData);
+            }
+          }
+        } catch (e) {
+          console.error('❌ Error loading batch/product data:', e);
+        }
+        
         // Load material consumption for this batch to populate materialsConsumed
         const { data: consumptionResp } = await MaterialConsumptionService.getMaterialConsumption({
           production_batch_id: batchId
@@ -503,15 +533,32 @@ export default function WasteGeneration() {
           consumedAt: m.consumed_at
         }));
 
+        // Get target quantity from batch data - ensure it's a number
+        // Check multiple possible field names for batch size
+        const batchSize = batchData?.batch_size ?? batchData?.planned_quantity ?? batchData?.target_quantity;
+        const targetQuantity = batchSize 
+          ? (typeof batchSize === 'number' ? batchSize : (typeof batchSize === 'string' ? parseInt(batchSize, 10) : 1))
+          : 1;
+        
+        console.log('✅ Setting target quantity:', targetQuantity);
+        console.log('✅ From batch_size:', batchData?.batch_size);
+        console.log('✅ From planned_quantity:', batchData?.planned_quantity);
+        console.log('✅ Final batchData:', batchData);
+        
+        if (targetQuantity === 1 && batchData) {
+          console.warn('⚠️ WARNING: Target quantity is defaulting to 1 even though batch data exists!');
+          console.warn('⚠️ Batch data keys:', Object.keys(batchData));
+        }
+        
         const productionProduct: ProductionProduct = {
           id: batchId || 'unknown',
-          productId: batchId || 'unknown',
-          productName: 'Production Batch',
-          category: 'Carpet',
-          color: 'N/A',
-          size: 'N/A',
-          pattern: 'N/A',
-          targetQuantity: 1,
+          productId: (batchData?.product_id) || batchId || 'unknown',
+          productName: (productData?.name) || (batchData?.product_name) || 'Production Batch',
+          category: productData?.category || 'Carpet',
+          color: productData?.color || 'N/A',
+          size: productData?.size || 'N/A',
+          pattern: productData?.pattern || 'N/A',
+          targetQuantity: targetQuantity, // Use batch_size from database
           priority: 'normal',
           status: 'active',
           expectedCompletion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -519,16 +566,17 @@ export default function WasteGeneration() {
           materialsConsumed,
           wasteGenerated: [],
           expectedProduct: {
-            name: 'Production Batch',
-            category: 'Carpet',
-            length: 'N/A',
-            width: 'N/A',
-            weight: 'N/A',
+            name: (productData?.name) || 'Production Batch',
+            category: productData?.category || 'Carpet',
+            length: productData?.length || productData?.dimensions?.length || 'N/A',
+            width: productData?.width || productData?.dimensions?.width || 'N/A',
+            weight: productData?.weight || 'N/A',
             materialComposition: 'N/A',
             qualityGrade: 'A'
           },
           notes: ''
         };
+        console.log('✅ Production product created with targetQuantity:', productionProduct.targetQuantity);
         setProductionProduct(productionProduct);
         setProductionFlow(null);
         setProductionSteps([]);
@@ -1229,15 +1277,44 @@ export default function WasteGeneration() {
 
   const totalWasteQuantity = (productionProduct.wasteGenerated || []).reduce((sum, w) => sum + w.quantity, 0);
 
-  // Get inspector name from first machine operation step
-  const inspectorName = productionSteps
-    .find((step: any) => step.step_type === 'machine_operation' && step.inspector_name)?.inspector_name || '';
+  // Get current logged-in user
+  const currentUser = AuthService.getUser();
+  const currentUserName = currentUser?.full_name || currentUser?.email || 'Unknown User';
+  
+  // Get inspector name from completed machine operation steps
+  // Prefer the most recently completed machine step, but fallback to current logged-in user
+  const completedMachineSteps = productionSteps
+    .filter((step: any) => step.step_type === 'machine_operation' && step.status === 'completed' && step.inspector_name)
+    .sort((a: any, b: any) => {
+      // Sort by end_time descending (most recent first)
+      const timeA = a.end_time ? new Date(a.end_time).getTime() : 0;
+      const timeB = b.end_time ? new Date(b.end_time).getTime() : 0;
+      return timeB - timeA;
+    });
+  
+  // Use the inspector from completed steps, or fallback to current logged-in user
+  const inspectorName = completedMachineSteps.length > 0 
+    ? completedMachineSteps[0].inspector_name 
+    : productionSteps.find((step: any) => step.step_type === 'machine_operation' && step.inspector_name)?.inspector_name 
+    || currentUserName; // Fallback to current logged-in user
+  
+  // Get all unique inspectors who worked on machine operations
+  const machineOperators = Array.from(new Set(
+    productionSteps
+      .filter((step: any) => step.step_type === 'machine_operation' && step.inspector_name)
+      .map((step: any) => step.inspector_name)
+  ));
+  
+  // If no operators found in steps, add current user
+  if (machineOperators.length === 0 && currentUserName !== 'Unknown User') {
+    machineOperators.push(currentUserName);
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
       <Header 
-        title={`Waste Generation: ${productionProduct.productName}`}
-        subtitle={`Track waste generated during production process${inspectorName ? ` • Inspector: ${inspectorName}` : ''}`}
+        title="Waste Generation"
+        subtitle="Track waste generated during production process"
       />
 
       {/* Status Alert */}
@@ -1293,6 +1370,46 @@ export default function WasteGeneration() {
           Back to Production Flow
         </Button>
       </div>
+
+      {/* Production Details Card */}
+      {productionProduct && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Production Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label className="text-sm text-gray-500">Product Name</Label>
+                <p className="font-medium">{productionProduct.productName}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Target Quantity</Label>
+                <p className="font-medium">{productionProduct.targetQuantity} pieces</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Machine Stage Completed By</Label>
+                <div>
+                  <p className="font-medium">{inspectorName}</p>
+                  {machineOperators.length > 1 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {machineOperators.length} operators involved
+                    </p>
+                  )}
+                  {currentUser && inspectorName === currentUserName && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      ✓ You completed this step
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Production Recipe Materials */}
       <Card>
