@@ -268,18 +268,18 @@ export default function DynamicProductionFlow() {
         } else {
           // Fallback: try to get production batch from list
           const { data: batches, error: batchListError } = await ProductionService.getProductionBatches({
-            // We can't filter by batch ID directly, so we'll need to get all and filter
-          });
-          
+          // We can't filter by batch ID directly, so we'll need to get all and filter
+        });
+        
           if (!batchListError && batches) {
-            const batch = batches.find((b: any) => b.id === batchId);
+          const batch = batches.find((b: any) => b.id === batchId);
             if (batch) {
               batchData = batch;
               if (batch.product_id) {
-                // Load product by ID
-                const { data: product } = await ProductService.getProductById(batch.product_id);
-                if (product) {
-                  productData = product;
+            // Load product by ID
+            const { data: product } = await ProductService.getProductById(batch.product_id);
+            if (product) {
+              productData = product;
                   console.log('✅ Found product data from batch list:', productData);
                 }
               }

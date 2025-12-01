@@ -247,15 +247,15 @@ class AnalyticsService {
           const date = new Date(orderDate);
           if (isNaN(date.getTime())) continue;
           
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
           const totalAmount = parseFloat(order.total_amount || order.totalAmount || 0);
 
-          monthMap.set(monthKey, {
+        monthMap.set(monthKey, {
             revenue: existing.revenue + totalAmount,
-            orders: existing.orders + 1,
-            production: existing.production
-          });
+          orders: existing.orders + 1,
+          production: existing.production
+        });
         } catch (e) {
           console.warn('Error processing order date:', orderDate, e);
           continue;
@@ -271,17 +271,17 @@ class AnalyticsService {
           const date = new Date(batchDate);
           if (isNaN(date.getTime())) continue;
           
-          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
 
           // Use batch_size, required_quantity, or actual_quantity for batches
           const quantity = parseFloat(batch.batch_size || batch.required_quantity || batch.actual_quantity || 0);
 
-          monthMap.set(monthKey, {
-            revenue: existing.revenue,
-            orders: existing.orders,
-            production: existing.production + quantity
-          });
+        monthMap.set(monthKey, {
+          revenue: existing.revenue,
+          orders: existing.orders,
+          production: existing.production + quantity
+        });
         } catch (e) {
           console.warn('Error processing batch date:', batchDate, e);
           continue;

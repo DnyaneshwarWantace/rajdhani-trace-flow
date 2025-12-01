@@ -33,6 +33,16 @@ export interface Product {
   actual_quantity?: number;
   actual_status?: 'in-stock' | 'low-stock' | 'out-of-stock' | 'expired' | 'in-production';
   individual_products?: any[];
+  individual_product_stats?: {
+    available: number;
+    sold: number;
+    damaged: number;
+    returned: number;
+    in_production: number;
+    quality_check: number;
+    reserved: number;
+    total: number;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -99,6 +109,7 @@ export function mapMongoDBProductToFrontend(mongoProduct: MongoDBProduct): Produ
     actual_quantity: mongoProduct.base_quantity,
     actual_status: mongoProduct.status as any,
     individual_products: [],
+    individual_product_stats: (mongoProduct as any).individual_product_stats || undefined,
     createdAt: mongoProduct.created_at,
     updatedAt: mongoProduct.updated_at,
   };

@@ -549,7 +549,7 @@ export default function WasteGeneration() {
           console.warn('⚠️ WARNING: Target quantity is defaulting to 1 even though batch data exists!');
           console.warn('⚠️ Batch data keys:', Object.keys(batchData));
         }
-        
+
         const productionProduct: ProductionProduct = {
           id: batchId || 'unknown',
           productId: (batchData?.product_id) || batchId || 'unknown',

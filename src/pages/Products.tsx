@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -121,6 +121,9 @@ export default function Products() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
   const [totalProductsCount, setTotalProductsCount] = useState(0);
+  
+  // Ref to track the page being loaded to prevent race conditions
+  const loadingPageRef = useRef<number>(1);
 
   // Stats state (from backend - total database values)
   const [stats, setStats] = useState({
@@ -276,7 +279,14 @@ export default function Products() {
   // Load products with filters from backend
   const loadProducts = async () => {
     try {
+      // Track the current page being loaded to prevent race conditions
+      loadingPageRef.current = currentPage;
+      
+      // Clear products immediately to prevent showing stale data
+      setProducts([]);
+      
       // Build filters object for backend
+      // Backend sorts by createdAt: -1 (most recent first) and handles pagination
       const filters: any = {
         limit: itemsPerPage,
         offset: (currentPage - 1) * itemsPerPage
@@ -307,11 +317,21 @@ export default function Products() {
         setTotalProductsCount(0);
       } else {
         const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
-        setProducts(mappedProducts);
-        setTotalProductsCount(result.count || mappedProducts.length);
-
-        // Load individual products for each product
-        await loadIndividualProductsForAllProducts(mappedProducts);
+        
+        // Calculate status for each product using backend stats
+        const productsWithStatus = mappedProducts.map(product => {
+          const calculatedStatus = calculateProductStatus(product);
+          return {
+            ...product,
+            actual_status: calculatedStatus as any,
+            status: calculatedStatus as any
+          };
+        });
+        
+        // Set products immediately with paginated results (all data from backend)
+        setProducts(productsWithStatus);
+        // Use backend count (total matching products after filters), not current page count
+        setTotalProductsCount(result.count ?? 0);
 
         // Skip recipe checking on initial load to avoid 404 errors
         // Recipes will be checked on-demand when user interacts with products (edit, duplicate, etc.)
@@ -395,24 +415,26 @@ export default function Products() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset to page 1 when filters change (but not pagination)
+  // Reset to page 1 and reload when filters change
   useEffect(() => {
+    // Reset to page 1 when filters change
     setCurrentPage(1);
+    // Note: loadProducts will be called by the next useEffect when currentPage changes
   }, [debouncedSearchTerm, categoryFilter, statusFilter]);
 
-  // Reload products when filters or pagination change
+  // Reload products when pagination or filters change
   useEffect(() => {
     loadProducts();
   }, [currentPage, debouncedSearchTerm, categoryFilter, statusFilter]);
 
-  // Calculate product status based on available stock
+  // Calculate product status based on available stock (uses backend stats)
   const calculateProductStatus = (product: any) => {
     if (product.individualStockTracking) {
-      // For individual tracking products, check available individual products
-      const availableCount = product.individual_products?.filter((ip: any) => ip.status === 'available').length || 0;
-      if (availableCount === 0) {
+      // Use individual_product_stats from backend (fast - no frontend API calls needed)
+      const stats = product.individual_product_stats;
+      if (!stats || stats.available === 0) {
         return 'out-of-stock';
-      } else if (availableCount <= product.minStockLevel) {
+      } else if (stats.available <= (product.minStockLevel || 5)) {
         return 'low-stock';
       } else {
         return 'in-stock';
@@ -421,7 +443,7 @@ export default function Products() {
       // For bulk products, check base quantity
       if (product.baseQuantity === 0) {
         return 'out-of-stock';
-      } else if (product.baseQuantity <= product.minStockLevel) {
+      } else if (product.baseQuantity <= (product.minStockLevel || 5)) {
         return 'low-stock';
       } else {
         return 'in-stock';
@@ -429,60 +451,6 @@ export default function Products() {
     }
   };
 
-  // Load individual products for all products
-  const loadIndividualProductsForAllProducts = async (products: any[]) => {
-    const updatedProducts = [...products];
-    
-    for (let i = 0; i < updatedProducts.length; i++) {
-      const product = updatedProducts[i];
-      if (product.individualStockTracking) {
-        try {
-          const { data: individualProducts, error } = await IndividualProductService.getIndividualProductsByProductId(product.id);
-          if (individualProducts && !error) {
-            const mappedIndividualProducts = individualProducts.map((ip: any) => ({
-              id: ip.id,
-              qrCode: ip.qr_code,
-              productId: ip.product_id,
-              productName: ip.product_name,
-              color: ip.color,
-              pattern: ip.pattern,
-              length: ip.length,
-              width: ip.width,
-              weight: ip.weight,
-              finalLength: ip.final_length,
-              finalWidth: ip.final_width,
-              finalWeight: ip.final_weight,
-              qualityGrade: ip.quality_grade,
-              status: ip.status,
-              location: ip.location,
-              productionDate: ip.production_date,
-              completionDate: ip.completion_date,
-              inspector: ip.inspector,
-              notes: ip.notes,
-              soldDate: ip.sold_date,
-              customerId: ip.customer_id,
-              orderId: ip.order_id,
-              createdAt: ip.created_at,
-              updatedAt: ip.updated_at
-            }));
-            updatedProducts[i] = { ...product, individual_products: mappedIndividualProducts };
-          }
-        } catch (error) {
-          // Skip if no individual products found
-        }
-      }
-      
-      // Calculate and update the product status based on available stock
-      const calculatedStatus = calculateProductStatus(updatedProducts[i]);
-      updatedProducts[i] = { 
-        ...updatedProducts[i], 
-        actual_status: calculatedStatus,
-        status: calculatedStatus
-      };
-    }
-    
-    setProducts(updatedProducts);
-  };
 
   // Check which products have recipes using MongoDB (only check when needed, suppress 404 errors)
   // This function is now optional - only checks recipes when explicitly needed
@@ -1675,9 +1643,16 @@ export default function Products() {
           console.error("Error reloading products:", result.error);
         } else {
           const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
-          setProducts(mappedProducts);
-          // Load individual products for immediate feedback (will be reloaded again after individual products are created)
-          await loadIndividualProductsForAllProducts(mappedProducts);
+          // Calculate status for each product using backend stats
+          const productsWithStatus = mappedProducts.map(product => {
+            const calculatedStatus = calculateProductStatus(product);
+            return {
+              ...product,
+              actual_status: calculatedStatus as any,
+              status: calculatedStatus as any
+            };
+          });
+          setProducts(productsWithStatus);
         }
       } catch (error) {
         console.error("Error saving product:", error);
@@ -1777,10 +1752,16 @@ export default function Products() {
           console.error("Error reloading products:", result.error);
         } else {
           const mappedProducts = (result.data || []).map(mapMongoDBProductToFrontend);
-          setProducts(mappedProducts);
-          
-          // Load individual products for all products (including the newly created one)
-          await loadIndividualProductsForAllProducts(mappedProducts);
+          // Calculate status for each product using backend stats
+          const productsWithStatus = mappedProducts.map(product => {
+            const calculatedStatus = calculateProductStatus(product);
+            return {
+              ...product,
+              actual_status: calculatedStatus as any,
+              status: calculatedStatus as any
+            };
+          });
+          setProducts(productsWithStatus);
           
           // Check which products have recipes
           // Skip recipe checking to avoid 404 errors - recipes checked on-demand
@@ -2451,10 +2432,10 @@ export default function Products() {
     setDuplicateProductMaterials(duplicateProductMaterials.filter((_, i) => i !== index));
   };
 
-  // Products are already filtered by backend, just sort them
+  // Products are already filtered and sorted by backend (most recent first)
+  // Backend sorts by createdAt: -1, so we just filter out any null/undefined
   const filteredProducts = (products || [])
-    .filter(product => product) // Remove null/undefined
-    .sort((a, b) => (a?.name || '').localeCompare(b?.name || ''));
+    .filter(product => product); // Remove null/undefined only
 
   const dynamicCategories = [...new Set((products || []).map(p => p?.category).filter(Boolean))];
   const dynamicSubcategories = [...new Set((products || []).map(p => p?.subcategory).filter(Boolean))];
