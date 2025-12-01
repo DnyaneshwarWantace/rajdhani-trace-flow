@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface Product {
   id: string;
@@ -84,9 +75,12 @@ export class ProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/products`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(productData),
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
 
       const result = await response.json();
 
@@ -127,12 +121,16 @@ export class ProductService {
 
       const response = await fetch(`${API_BASE_URL}/products?${params}`, {
         headers: {
-          ...getHeaders(),
+          ...getAuthHeaders(),
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
         }
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -150,8 +148,12 @@ export class ProductService {
   static async getProductById(id: string): Promise<{ data: Product | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/products/${id}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -170,9 +172,12 @@ export class ProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/products/${id}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
 
       const result = await response.json();
 
@@ -192,8 +197,11 @@ export class ProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/products/${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
 
       const result = await response.json();
 
@@ -212,8 +220,12 @@ export class ProductService {
   static async getProductStats(): Promise<{ data: ProductStats | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/products/stats`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -231,8 +243,12 @@ export class ProductService {
   static async getProductDropdownData(): Promise<{ data: any | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/products/dropdown-data`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -251,8 +267,11 @@ export class ProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/products/${id}/toggle-individual-tracking`, {
         method: 'PATCH',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+
+      // Handle authentication errors
+      await handleAuthError(response);
 
       const result = await response.json();
 

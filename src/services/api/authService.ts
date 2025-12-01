@@ -1,3 +1,5 @@
+import { handleAuthError } from '@/utils/apiClient';
+
 const API_URL = 'https://rajdhani.wantace.com/api/auth';
 
 export interface User {
@@ -158,6 +160,9 @@ class AuthService {
         },
       });
 
+      // Handle authentication errors (will logout and redirect if 401/403)
+      await handleAuthError(response);
+
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
@@ -201,6 +206,9 @@ class AuthService {
         body: JSON.stringify({ currentPassword, newPassword }),
       });
 
+      // Handle authentication errors (will logout and redirect if 401/403)
+      await handleAuthError(response);
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -231,6 +239,9 @@ class AuthService {
         },
         body: JSON.stringify(updates),
       });
+
+      // Handle authentication errors (will logout and redirect if 401/403)
+      await handleAuthError(response);
 
       const result = await response.json();
 

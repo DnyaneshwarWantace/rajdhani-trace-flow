@@ -94,12 +94,12 @@ export default function Dashboard() {
           materialStats.data.reduce((sum: number, m: any) => sum + (m.cost_per_unit || 0), 0) / materialStats.data.length : 0
       };
 
-      // Calculate individual product stats with error handling
+      // Individual product stats are already calculated by the backend
       const individualProductStats = {
-        totalIndividualProducts: individualProducts?.data?.length || 0,
-        availableProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'available').length || 0,
-        soldProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'sold').length || 0,
-        damagedProducts: individualProducts?.data?.filter((ip: any) => ip.status === 'damaged').length || 0
+        totalIndividualProducts: individualProducts?.data?.total_individual_products || 0,
+        availableProducts: individualProducts?.data?.available || 0,
+        soldProducts: individualProducts?.data?.sold || 0,
+        damagedProducts: individualProducts?.data?.damaged || 0
       };
 
       const dashboardStats = {

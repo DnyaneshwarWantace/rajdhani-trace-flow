@@ -1,18 +1,9 @@
 // Production Service for MongoDB Backend
 // Handles production, batches, machines, and waste management
 
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 // Production Interfaces
 export interface Production {
@@ -311,7 +302,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/productions`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(productionData),
       });
 
@@ -347,8 +338,9 @@ export class ProductionService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/production/productions?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -365,8 +357,9 @@ export class ProductionService {
   static async getProductionById(productionId: string): Promise<{ data: Production | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/productions/${productionId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -384,7 +377,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/productions/${productionId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -405,9 +398,10 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/productions/${productionId}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -426,7 +420,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/batches`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(batchData),
       });
 
@@ -462,8 +456,9 @@ export class ProductionService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/production/batches?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -480,8 +475,9 @@ export class ProductionService {
   static async getProductionBatchById(batchId: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/batches/${batchId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -499,7 +495,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/batches/${batchId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -521,7 +517,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/machines`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(machineData),
       });
 
@@ -555,8 +551,9 @@ export class ProductionService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/production/machines?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -573,8 +570,9 @@ export class ProductionService {
   static async getProductionMachineById(machineId: string): Promise<{ data: ProductionMachine | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/machines/${machineId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -592,7 +590,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/machines/${machineId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -614,7 +612,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(wasteData),
       });
 
@@ -650,8 +648,9 @@ export class ProductionService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/production/waste?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -668,8 +667,9 @@ export class ProductionService {
   static async getProductionWasteById(wasteId: string): Promise<{ data: ProductionWaste | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste/${wasteId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -687,7 +687,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste/${wasteId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -715,7 +715,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flows`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(flowData),
       });
 
@@ -735,8 +735,9 @@ export class ProductionService {
   static async getProductionFlowById(flowId: string): Promise<{ data: any | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flows/${flowId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -753,8 +754,9 @@ export class ProductionService {
   static async getProductionFlowByBatchId(batchId: string): Promise<{ data: any | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flows/batch/${batchId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -786,7 +788,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flow-steps`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(stepData),
       });
 
@@ -806,8 +808,9 @@ export class ProductionService {
   static async getProductionFlowSteps(flowId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flow-steps?flow_id=${flowId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -830,7 +833,7 @@ export class ProductionService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/flow-steps/${stepId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(update),
       });
       const result = await response.json();
@@ -848,8 +851,9 @@ export class ProductionService {
   static async getProductionStats(): Promise<{ data: any | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/stats`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

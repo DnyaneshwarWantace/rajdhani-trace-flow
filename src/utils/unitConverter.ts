@@ -5,7 +5,7 @@ export type AreaUnit = 'sqft' | 'sqm';
 export type VolumeUnit = never; // Not used anymore
 export type WeightUnit = 'kg';
 export type LengthUnit = never; // Not used anymore
-export type CountUnit = never; // Not used anymore
+export type CountUnit = 'unit'; // Per product unit
 export type TextileUnit = 'gsm';
 
 export type PricingUnit = AreaUnit | VolumeUnit | WeightUnit | LengthUnit | CountUnit | TextileUnit;
@@ -268,6 +268,11 @@ export function getUnitValue(productDimensions: ProductDimensions, unit: Pricing
  * Format unit label with proper pluralization
  */
 export function formatUnitLabel(unit: PricingUnit, quantity: number = 1): string {
+  // Handle 'unit' (per product) specially
+  if (unit === 'unit') {
+    return quantity === 1 ? 'product' : 'products';
+  }
+  
   const unitInfo = PRICING_UNITS.find(u => u.unit === unit);
   if (!unitInfo) return unit;
   

@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface CreateRecipeData {
   product_id: string;
@@ -64,7 +55,7 @@ export class MongoDBRecipeService {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(recipeData),
       });
 
@@ -86,8 +77,9 @@ export class MongoDBRecipeService {
     try {
       // Suppress 404 errors in console by using a custom fetch that doesn't log 404s
       const response = await fetch(`${API_BASE_URL}/recipes/product/${productId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
 
       // 404 is expected for products without recipes - return silently without logging
       if (response.status === 404) {
@@ -124,7 +116,7 @@ export class MongoDBRecipeService {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(recipeData),
       });
 
@@ -146,8 +138,9 @@ export class MongoDBRecipeService {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes/${recipeId}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
 
       if (!response.ok) {
         const result = await response.json();
@@ -165,9 +158,10 @@ export class MongoDBRecipeService {
   static async getAllRecipes(): Promise<{ data: RecipeWithMaterials[]; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -186,7 +180,7 @@ export class MongoDBRecipeService {
     try {
       const response = await fetch(`${API_BASE_URL}/recipes/calculate`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ product_id: productId, sqm }),
       });
 

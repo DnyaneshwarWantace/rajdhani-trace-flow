@@ -1,5 +1,6 @@
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
+
 const API_URL = 'https://rajdhani.wantace.com/api';
-import AuthService from './authService';
 
 export interface RoleOption {
   value: string;
@@ -36,20 +37,12 @@ export interface Permission {
 }
 
 class PermissionService {
-  // Get auth headers
-  private static getHeaders() {
-    const token = AuthService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  }
 
   // Get all permissions
   static async getAllPermissions(): Promise<{ data: Permission[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/permissions`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -69,7 +62,7 @@ class PermissionService {
   static async getPermissionsByRole(role: string): Promise<{ data: Permission | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/permissions/role/${role}`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -93,7 +86,7 @@ class PermissionService {
     try {
       const response = await fetch(`${API_URL}/permissions/role/${role}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates)
       });
 
@@ -115,7 +108,7 @@ class PermissionService {
     try {
       const response = await fetch(`${API_URL}/permissions/role/${role}/reset`, {
         method: 'POST',
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -135,7 +128,7 @@ class PermissionService {
   static async getAvailableRoles(): Promise<{ data: RoleOption[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/permissions/meta/roles`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -155,7 +148,7 @@ class PermissionService {
   static async getAvailablePages(): Promise<{ data: PageOption[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/permissions/meta/pages`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -175,7 +168,7 @@ class PermissionService {
   static async getAvailableActions(): Promise<{ data: ActionGroup | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/permissions/meta/actions`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();

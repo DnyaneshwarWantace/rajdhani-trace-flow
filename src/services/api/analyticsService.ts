@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface AnalyticsData {
   revenue: {
@@ -72,10 +63,10 @@ class AnalyticsService {
 
       // Fetch all stats in parallel
       const [orderStats, customerStats, productionStats, productStats] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders/stats?${params}`, { headers: getHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE_URL}/customers/stats`, { headers: getHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE_URL}/production/stats`, { headers: getHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE_URL}/products/stats`, { headers: getHeaders() }).then(r => r.json())
+        fetch(`${API_BASE_URL}/orders/stats?${params}`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
+        fetch(`${API_BASE_URL}/customers/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
+        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
+        fetch(`${API_BASE_URL}/products/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
       ]);
 
       // Calculate current period data
@@ -127,8 +118,9 @@ class AnalyticsService {
   static async getTopProducts(limit: number = 5): Promise<TopProduct[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/orders?limit=1000`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!result.success || !result.data) return [];
@@ -173,8 +165,9 @@ class AnalyticsService {
   static async getTopCustomers(limit: number = 5): Promise<TopCustomer[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/orders?limit=1000`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!result.success || !result.data) return [];
@@ -215,8 +208,8 @@ class AnalyticsService {
   static async getMonthlyTrends(): Promise<MonthlyTrend[]> {
     try {
       const [ordersRes, productionRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE_URL}/production/batches?limit=1000`, { headers: getHeaders() }).then(r => r.json())
+        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
+        fetch(`${API_BASE_URL}/production/batches?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
       ]);
 
       const orders = ordersRes.data || [];
@@ -282,8 +275,8 @@ class AnalyticsService {
   static async getProductionMetrics(): Promise<ProductionMetrics> {
     try {
       const [productionRes, ordersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/production/stats`, { headers: getHeaders() }).then(r => r.json()),
-        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getHeaders() }).then(r => r.json())
+        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
+        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
       ]);
 
       const productionStats = productionRes.data || {};

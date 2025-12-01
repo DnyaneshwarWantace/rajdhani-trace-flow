@@ -1,6 +1,7 @@
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 import AuthService from './authService';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
 export interface UploadImageResult {
   url: string;
@@ -47,6 +48,8 @@ export async function uploadImageToR2(
       },
       body: formData,
     });
+
+    await handleAuthError(response);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
@@ -103,6 +106,8 @@ export async function deleteImageFromR2(imageUrl: string): Promise<{ success: bo
       },
       body: JSON.stringify({ imageUrl }),
     });
+
+    await handleAuthError(response);
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Delete failed' }));

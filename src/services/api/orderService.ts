@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface CreateOrderData {
   customer_id?: string;
@@ -37,6 +28,15 @@ export interface CreateOrderItemData {
   product_type: 'product' | 'raw_material';
   quantity: number;
   unit_price: number;
+  total_price?: number;
+  pricing_unit?: string;
+  unit_value?: number;
+  product_dimensions?: {
+    length?: number;
+    width?: number;
+    weight?: number;
+    productType?: string;
+  };
   quality_grade?: string;
   specifications?: string;
   selected_individual_products?: string[];
@@ -178,6 +178,10 @@ export class MongoDBOrderService {
           product_type: item.product_type,
           quantity: item.quantity,
           unit_price: item.unit_price.toString(),
+          total_price: item.total_price, // CRITICAL: Include calculated total price
+          pricing_unit: item.pricing_unit, // Include pricing unit (sqm, piece, etc)
+          unit_value: item.unit_value, // Include unit value (e.g., SQM per piece)
+          product_dimensions: item.product_dimensions, // Include product dimensions
           quality_grade: item.quality_grade?.trim() || 'A',
           specifications: item.specifications?.trim() || null,
           selected_individual_products: item.selected_individual_products || []
@@ -186,10 +190,11 @@ export class MongoDBOrderService {
 
       const response = await fetch(`${API_BASE_URL}/orders`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(orderPayload),
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -225,8 +230,9 @@ export class MongoDBOrderService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/orders?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -244,8 +250,9 @@ export class MongoDBOrderService {
   static async getOrderById(orderId: string): Promise<{ data: Order | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -264,7 +271,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -286,7 +293,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
       });
 
@@ -308,7 +315,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status: 'delivered' }),
       });
 
@@ -330,7 +337,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status: 'cancelled' }),
       });
 
@@ -368,8 +375,9 @@ export class MongoDBOrderService {
       if (dateTo) params.append('date_to', dateTo);
 
       const response = await fetch(`${API_BASE_URL}/orders/stats?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -416,7 +424,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/items`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(itemData),
       });
 
@@ -438,7 +446,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/items/${itemId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -460,7 +468,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/items/${itemId}/individual-products`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ selected_individual_products: selectedIndividualProducts }),
       });
 
@@ -482,9 +490,10 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/items/${itemId}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -507,7 +516,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/payment`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(paymentData),
       });
 
@@ -532,7 +541,7 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}/gst`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(gstData),
       });
 
@@ -554,9 +563,10 @@ export class MongoDBOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

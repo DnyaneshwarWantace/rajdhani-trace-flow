@@ -1,16 +1,7 @@
 import { PurchaseOrder } from '@/lib/supabase';
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface CreatePurchaseOrderData {
   id: string;
@@ -34,7 +25,7 @@ export class PurchaseOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/purchase-orders`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(orderData),
       });
 
@@ -69,8 +60,9 @@ export class PurchaseOrderService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/purchase-orders?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -88,8 +80,10 @@ export class PurchaseOrderService {
   static async getPurchaseOrderById(orderId: string): Promise<{ data: PurchaseOrder | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      
+      await handleAuthError(response);
       
       // Handle 404 gracefully - order doesn't exist
       if (response.status === 404) {
@@ -114,7 +108,7 @@ export class PurchaseOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -136,9 +130,10 @@ export class PurchaseOrderService {
     try {
       const response = await fetch(`${API_BASE_URL}/purchase-orders/${orderId}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

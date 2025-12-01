@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface MaterialConsumption {
   id: string;
@@ -104,12 +95,13 @@ class MaterialConsumptionService {
     try {
       const response = await fetch(`${API_URL}/material-consumption${endpoint}`, {
         headers: {
-          ...getHeaders(),
+          ...getAuthHeaders(),
           ...options.headers,
         },
         ...options,
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

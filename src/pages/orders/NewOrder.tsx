@@ -255,7 +255,6 @@ export default function NewOrder() {
         if (customersData) {
           // MongoDB customers are already in the correct format
           setCustomers(customersData);
-          console.log('✅ Loaded', customersData.length, 'customers from MongoDB for NewOrder');
         }
       } catch (error) {
         console.error('Error loading customers:', error);
@@ -298,7 +297,6 @@ export default function NewOrder() {
         filters.color = productColorFilter;
       }
 
-      console.log("Loading products with filters:", filters);
       const { data: productsData, error: productsError, count } = await ProductService.getProducts(filters);
 
       if (productsError) {
@@ -307,8 +305,6 @@ export default function NewOrder() {
       }
 
       setProductTotalCount(count || 0);
-      console.log('✅ Product pagination - Page:', productPage, 'Total:', count, 'Items:', productsData?.length);
-      console.log('📊 Setting productTotalCount to:', count);
 
       // Transform products to match the expected format
       const transformedProducts = (productsData || []).map((product: any) => {
@@ -359,7 +355,6 @@ export default function NewOrder() {
       setRealProducts(updatedProducts);
       setIndividualProducts(individualProductsData || []);
 
-      console.log('✅ Loaded products with pagination:', updatedProducts.length, 'of', count);
     } catch (error) {
       console.error('Error loading products:', error);
     }
@@ -379,7 +374,6 @@ export default function NewOrder() {
         filters.search = productSearchTerm.trim();
       }
 
-      console.log("Loading raw materials with filters:", filters);
       const { data: rawMaterialsData, error: rawMaterialsError, count } = await RawMaterialService.getRawMaterials(filters);
 
       if (rawMaterialsError) {
@@ -388,7 +382,6 @@ export default function NewOrder() {
       }
 
       setMaterialTotalCount(count || 0);
-      console.log('✅ Material pagination - Page:', materialPage, 'Total:', count, 'Items:', rawMaterialsData?.length);
 
       // Transform raw materials to match the expected format
       const transformedRawMaterials = (rawMaterialsData || []).map((material: any) => {
@@ -410,7 +403,6 @@ export default function NewOrder() {
 
       setRawMaterials(transformedRawMaterials);
 
-      console.log('✅ Loaded raw materials with pagination:', transformedRawMaterials.length, 'of', count);
     } catch (error) {
       console.error('Error loading raw materials:', error);
     }
@@ -418,27 +410,17 @@ export default function NewOrder() {
 
   // Reload products when page changes
   useEffect(() => {
-    console.log('📦 Reloading products - page:', productPage);
     loadProductsWithFilters();
   }, [productPage]);
 
   // Reload materials when page changes
   useEffect(() => {
-    console.log('🧱 Reloading materials - page:', materialPage);
     loadRawMaterialsWithFilters();
   }, [materialPage]);
 
   // Auto-calculate recipe requirements when order items change
   useEffect(() => {
-    const productItems = orderItems.filter(item => item.product_type === 'product');
-    
-    if (productItems.length > 0) {
-      // Recipe calculation removed - use dedicated Recipe Calculator page instead
-      console.log('Recipe calculation available on dedicated Recipe Calculator page');
-    } else {
-      // Clear any existing recipe calculation when no products
-      console.log('No products in order - recipe calculation not needed');
-    }
+    // Recipe calculation removed - use dedicated Recipe Calculator page instead
   }, [orderItems]);
 
   const addOrderItem = () => {
@@ -593,13 +575,7 @@ export default function NewOrder() {
     const product = realProducts.find(p => p.id === productId);
     const hasIndividual = product && product.individualStockTracking !== false;
     
-    console.log(`🔍 hasIndividualStock check for ${productId}:`, {
-      productType,
-      product: product?.name,
-      individualStockTracking: product?.individualStockTracking,
-      hasIndividual
-    });
-    
+    // Check individual stock
     return hasIndividual;
   };
 
@@ -727,6 +703,19 @@ export default function NewOrder() {
       };
 
       // Save order to Supabase
+      console.log('========== ORDER ITEMS BEFORE SENDING TO BACKEND ==========');
+      orderItems.forEach(item => {
+        console.log(`Product: ${item.product_name}`);
+        console.log(`  quantity: ${item.quantity}`);
+        console.log(`  unit_price: ${item.unit_price}`);
+        console.log(`  total_price: ${item.total_price}`);
+        console.log(`  pricing_unit: ${item.pricing_unit}`);
+        console.log(`  unit_value: ${item.unit_value}`);
+        console.log(`  product_dimensions:`, item.product_dimensions);
+        console.log('---');
+      });
+      console.log('=========================================================');
+
       const orderData = {
         customer_id: selectedCustomer?.id,
         customer_name: newOrder.customerName,
@@ -739,6 +728,10 @@ export default function NewOrder() {
           product_type: item.product_type,
           quantity: item.quantity,
           unit_price: item.unit_price,
+          total_price: item.total_price, // CRITICAL: Send the calculated total price
+          pricing_unit: item.pricing_unit,
+          unit_value: item.unit_value,
+          product_dimensions: item.product_dimensions,
           quality_grade: item.quality_grade || 'A',
           specifications: item.specifications || '',
           selected_individual_products: (item as any).selectedIndividualProducts?.map((p: any) => p.id) || []
@@ -856,7 +849,6 @@ export default function NewOrder() {
     }
 
     // Recipe calculation removed - use dedicated Recipe Calculator page instead
-    console.log('Recipe calculation available on dedicated Recipe Calculator page');
 
     // Send notifications to materials section for raw materials needing restocking
     if (rawMaterialsNeedingRestock.length > 0) {
@@ -2030,7 +2022,6 @@ export default function NewOrder() {
             {(() => {
               const totalCount = currentOrderItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount;
               const perPage = currentOrderItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage;
-              console.log('🔍 Pagination check:', { totalCount, perPage, shouldShow: totalCount > perPage, productType: currentOrderItem?.product_type });
               return totalCount > perPage;
             })() && (
               <div className="border-t pt-4">

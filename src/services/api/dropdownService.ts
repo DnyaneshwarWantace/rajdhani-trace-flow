@@ -3,18 +3,9 @@
  * Handles all dropdown master data for products, materials, and production
  */
 
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface DropdownOption {
   id: string;
@@ -66,8 +57,9 @@ export class DropdownService {
       if (filters?.is_active !== undefined) params.append('is_active', filters.is_active.toString());
 
       const response = await fetch(`${API_BASE_URL}/dropdowns?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -87,8 +79,9 @@ export class DropdownService {
   static async getOptionsByCategory(category: string): Promise<DropdownOption[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/category/${category}?is_active=true`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -110,8 +103,9 @@ export class DropdownService {
     try {
       const categoriesParam = categories.join(',');
       const response = await fetch(`${API_BASE_URL}/dropdowns/multiple?categories=${categoriesParam}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -132,8 +126,9 @@ export class DropdownService {
   static async getProductDropdownData(): Promise<ProductDropdownData> {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/products`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -178,8 +173,9 @@ export class DropdownService {
   static async getMaterialDropdownData(): Promise<MaterialDropdownData> {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/materials`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -206,8 +202,9 @@ export class DropdownService {
   static async getProductionDropdownData(): Promise<ProductionDropdownData> {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/production`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -241,7 +238,7 @@ export class DropdownService {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           category,
           value,
@@ -272,7 +269,7 @@ export class DropdownService {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/${id}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
 
@@ -296,9 +293,10 @@ export class DropdownService {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/${id}/toggle`, {
         method: 'PATCH',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -319,9 +317,10 @@ export class DropdownService {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -348,8 +347,9 @@ export class DropdownService {
   static async getAllCategories(): Promise<string[]> {
     try {
       const response = await fetch(`${API_BASE_URL}/dropdowns/categories`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

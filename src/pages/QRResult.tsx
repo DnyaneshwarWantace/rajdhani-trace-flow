@@ -24,7 +24,7 @@ interface QRResultData {
 // Function to fetch product data - public access via backend API (no auth required)
 const fetchProductData = async (productId: string) => {
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
     const response = await fetch(`${API_URL}/public/products/${productId}`);
 
     if (!response.ok) {
@@ -45,7 +45,7 @@ const fetchProductData = async (productId: string) => {
 // Function to fetch individual product data - public access via backend API (no auth required)
 const fetchIndividualProductData = async (individualProductId: string) => {
   try {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
     const response = await fetch(`${API_URL}/public/individual-products/${individualProductId}`);
 
     if (!response.ok) {

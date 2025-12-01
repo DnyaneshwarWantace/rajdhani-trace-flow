@@ -167,44 +167,63 @@ export default function Orders() {
           setOrders([]);
         } else {
           // Transform MongoDB orders to match local interface
-          const transformedOrders: Order[] = (ordersData || []).map(order => ({
-            id: order.id,
-            orderNumber: order.order_number,
-            customerId: order.customer_id,
-            customerName: order.customer_name,
-            customerEmail: order.customer_email,
-            customerPhone: order.customer_phone,
-            orderDate: order.order_date,
-            expectedDelivery: order.expected_delivery,
-            items: (order.order_items || []).map((item: any) => ({
-              productId: item.product_id,
-              productName: item.product_name,
-              productType: item.product_type,
-              quantity: item.quantity,
-              unitPrice: parseFloat(item.unit_price),
-              totalPrice: parseFloat(item.total_price),
-              selectedIndividualProducts: item.selected_individual_products || [],
-              qualityGrade: item.quality_grade || 'A',
-              specifications: item.specifications || ''
-            })),
-            subtotal: parseFloat(order.subtotal),
-            gstRate: parseFloat(order.gst_rate),
-            gstAmount: parseFloat(order.gst_amount),
-            discountAmount: parseFloat(order.discount_amount),
-            totalAmount: parseFloat(order.total_amount),
-            paidAmount: parseFloat(order.paid_amount),
-            outstandingAmount: parseFloat(order.outstanding_amount),
-            paymentMethod: (order.payment_method || "credit") as "cash" | "card" | "bank-transfer" | "credit",
-            paymentTerms: order.payment_terms || "30 days",
-            dueDate: order.due_date,
-            status: order.status as "pending" | "accepted" | "dispatched" | "delivered" | "cancelled",
-            workflowStep: (order.workflow_step || "accept") as "accept" | "dispatch" | "delivered",
-            acceptedAt: order.accepted_at,
-            dispatchedAt: order.dispatched_at,
-            deliveredAt: order.delivered_at,
-            notes: order.special_instructions || "",
-            delivery_address: order.delivery_address ? JSON.parse(order.delivery_address) : undefined
-          }));
+          const transformedOrders: Order[] = (ordersData || []).map(order => {
+            console.log('========== TRANSFORMING ORDER FROM BACKEND ==========');
+            console.log('Order Number:', order.order_number);
+            console.log('Order Items from backend:', order.order_items);
+
+            const transformedItems = (order.order_items || []).map((item: any) => {
+              console.log(`  Item: ${item.product_name}`);
+              console.log(`    unit_price from backend: ${item.unit_price}`);
+              console.log(`    total_price from backend: ${item.total_price}`);
+              console.log(`    pricing_unit from backend: ${item.pricing_unit}`);
+              console.log(`    unit_value from backend: ${item.unit_value}`);
+
+              return {
+                productId: item.product_id,
+                productName: item.product_name,
+                productType: item.product_type,
+                quantity: item.quantity,
+                unitPrice: parseFloat(item.unit_price),
+                totalPrice: parseFloat(item.total_price),
+                selectedIndividualProducts: item.selected_individual_products || [],
+                qualityGrade: item.quality_grade || 'A',
+                specifications: item.specifications || ''
+              };
+            });
+
+            console.log('Transformed Items:', transformedItems);
+            console.log('====================================================');
+
+            return {
+              id: order.id,
+              orderNumber: order.order_number,
+              customerId: order.customer_id,
+              customerName: order.customer_name,
+              customerEmail: order.customer_email,
+              customerPhone: order.customer_phone,
+              orderDate: order.order_date,
+              expectedDelivery: order.expected_delivery,
+              items: transformedItems,
+              subtotal: parseFloat(order.subtotal),
+              gstRate: parseFloat(order.gst_rate),
+              gstAmount: parseFloat(order.gst_amount),
+              discountAmount: parseFloat(order.discount_amount),
+              totalAmount: parseFloat(order.total_amount),
+              paidAmount: parseFloat(order.paid_amount),
+              outstandingAmount: parseFloat(order.outstanding_amount),
+              paymentMethod: (order.payment_method || "credit") as "cash" | "card" | "bank-transfer" | "credit",
+              paymentTerms: order.payment_terms || "30 days",
+              dueDate: order.due_date,
+              status: order.status as "pending" | "accepted" | "dispatched" | "delivered" | "cancelled",
+              workflowStep: (order.workflow_step || "accept") as "accept" | "dispatch" | "delivered",
+              acceptedAt: order.accepted_at,
+              dispatchedAt: order.dispatched_at,
+              deliveredAt: order.delivered_at,
+              notes: order.special_instructions || "",
+              delivery_address: order.delivery_address ? JSON.parse(order.delivery_address) : undefined
+            };
+          });
           setOrders(transformedOrders);
         }
 
@@ -586,29 +605,72 @@ export default function Orders() {
                   {order.status === 'delivered' ? 'Items Delivered:' : 'Order Items:'}
                 </h4>
                 <div className={`${order.status === 'delivered' ? 'space-y-1' : 'space-y-2'}`}>
-                  {order.items.map((item, index) => (
-                    <div key={index} className={`flex items-center justify-between ${order.status === 'delivered' ? 'p-1' : 'p-2'} bg-white rounded border`}>
-                      <div className="flex-1">
-                        <div className={`font-medium ${order.status === 'delivered' ? 'text-xs' : 'text-sm'}`}>{item.productName}</div>
-                        <div className={`text-xs text-gray-600 ${order.status === 'delivered' ? 'mt-0' : ''}`}>
-                          {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • 
-                          Qty: {item.quantity} {item.unit || 'pieces'} • 
-                          ₹{item.unitPrice}/{item.unit || 'unit'}
-                        </div>
-                        {item.selectedIndividualProducts && item.selectedIndividualProducts.length > 0 && (
-                          <div className={`text-xs text-blue-600 ${order.status === 'delivered' ? 'mt-0' : 'mt-1'}`}>
-                            {order.status === 'delivered' ? 
-                              `Delivered: ${item.selectedIndividualProducts.length} pieces` :
-                              `Individual IDs: ${item.selectedIndividualProducts.map(p => p.qrCode || p.id).join(', ')}`
-                            }
+                  {order.items.map((item, index) => {
+                    // Get product details from the products list
+                    const product = products.find(p => p.id === item.productId);
+
+                    return (
+                      <div key={index} className={`${order.status === 'delivered' ? 'p-2' : 'p-3'} bg-white rounded border`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className={`font-medium ${order.status === 'delivered' ? 'text-xs' : 'text-sm'}`}>{item.productName}</div>
+                            <div className={`text-xs text-gray-600 ${order.status === 'delivered' ? 'mt-0' : 'mt-1'}`}>
+                              {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} •
+                              Qty: {item.quantity} {item.unit || 'pieces'}
+                            </div>
+
+                            {/* Product Details: Design/Colour, GSM, Width, Length */}
+                            {product && (
+                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                                {product.name && (
+                                  <div>
+                                    <span className="text-gray-500">Design:</span>
+                                    <span className="ml-1 font-medium text-gray-700">{product.name}</span>
+                                  </div>
+                                )}
+                                {product.color && (
+                                  <div>
+                                    <span className="text-gray-500">Colour:</span>
+                                    <span className="ml-1 font-medium text-gray-700">{product.color}</span>
+                                  </div>
+                                )}
+                                {product.weight && (
+                                  <div>
+                                    <span className="text-gray-500">GSM:</span>
+                                    <span className="ml-1 font-medium text-gray-700">{product.weight}</span>
+                                  </div>
+                                )}
+                                {product.width && (
+                                  <div>
+                                    <span className="text-gray-500">Width:</span>
+                                    <span className="ml-1 font-medium text-gray-700">{product.width}m</span>
+                                  </div>
+                                )}
+                                {product.length && (
+                                  <div>
+                                    <span className="text-gray-500">Length:</span>
+                                    <span className="ml-1 font-medium text-gray-700">{product.length}m</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {item.selectedIndividualProducts && item.selectedIndividualProducts.length > 0 && (
+                              <div className={`text-xs text-blue-600 ${order.status === 'delivered' ? 'mt-1' : 'mt-2'}`}>
+                                {order.status === 'delivered' ?
+                                  `Delivered: ${item.selectedIndividualProducts.length} pieces` :
+                                  `Individual IDs: ${item.selectedIndividualProducts.map(p => p.qrCode || p.id).join(', ')}`
+                                }
+                              </div>
+                            )}
                           </div>
-                        )}
+                          <div className={`${order.status === 'delivered' ? 'text-xs' : 'text-sm'} font-medium ml-3`}>
+                            ₹{(item.totalPrice || 0).toLocaleString()}
+                          </div>
+                        </div>
                       </div>
-                      <div className={`${order.status === 'delivered' ? 'text-xs' : 'text-sm'} font-medium`}>
-                        ₹{(item.totalPrice || 0).toLocaleString()}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

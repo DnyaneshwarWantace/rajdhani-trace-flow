@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface Machine {
   id: string;
@@ -34,8 +25,9 @@ export class MachineService {
   static async getMachines(): Promise<{ data: Machine[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/production/machines`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -54,7 +46,7 @@ export class MachineService {
     try {
       const response = await fetch(`${API_URL}/production/machines`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(machineData),
       });
 
@@ -76,7 +68,7 @@ export class MachineService {
     try {
       const response = await fetch(`${API_URL}/production/machines/${id}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(machineData),
       });
 
@@ -98,9 +90,10 @@ export class MachineService {
     try {
       const response = await fetch(`${API_URL}/production/machines/${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

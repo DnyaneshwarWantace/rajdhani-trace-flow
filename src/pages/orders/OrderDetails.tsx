@@ -395,7 +395,11 @@ export default function OrderDetails() {
         // Transform MongoDB order to match local interface
         const orderInfo = (orderData as any).order || orderData; // Handle both response formats
         const orderItems = (orderData as any).items || []; // Get items from response
-        
+
+        console.log('========== ORDER DETAILS - ORDER DATA FROM BACKEND ==========');
+        console.log('Order Number:', orderInfo.order_number);
+        console.log('Order Items from backend:', orderItems);
+
         const transformedOrder: Order = {
           id: orderInfo.id,
           orderNumber: orderInfo.order_number,
@@ -405,30 +409,38 @@ export default function OrderDetails() {
           customerPhone: orderInfo.customer_phone,
           orderDate: orderInfo.order_date,
           expectedDelivery: orderInfo.expected_delivery,
-          items: (orderItems || []).map((item: any) => ({
-            id: item.id,
-            productId: item.product_id,
-            productName: item.product_name,
-            productType: item.product_type || 'product',
-            quantity: item.quantity,
-            unitPrice: parseFloat(item.unit_price),
-            totalPrice: parseFloat(item.total_price),
-            availableStock: 0, // Will be populated from products
-            unit: item.product_type === 'raw_material' ? 'kg' : 'pieces', // Use correct unit based on product type // Add missing unit property
-            selectedIndividualProducts: (item.selected_individual_products || []).map((ip: any) => ({
-              id: ip.individual_product_id,
-              qrCode: ip.qr_code,
-              productId: ip.product_id || item.product_id,
-              productName: ip.product_name || item.product_name,
-              manufacturingDate: ip.completion_date || ip.production_date || ip.added_date,
-              dimensions: `${ip.final_length || ip.length || 'N/A'} x ${ip.final_width || ip.width || 'N/A'}`,
-              weight: ip.final_weight || ip.weight || 'N/A',
-              qualityGrade: ip.quality_grade || 'N/A',
-              inspector: ip.inspector || 'N/A',
-              status: ip.status || 'available',
-              location: ip.location || 'N/A'
-            }))
-          })),
+          items: (orderItems || []).map((item: any) => {
+            console.log(`  Item: ${item.product_name}`);
+            console.log(`    unit_price from backend: ${item.unit_price}`);
+            console.log(`    total_price from backend: ${item.total_price}`);
+            console.log(`    pricing_unit from backend: ${item.pricing_unit}`);
+            console.log(`    unit_value from backend: ${item.unit_value}`);
+
+            return {
+              id: item.id,
+              productId: item.product_id,
+              productName: item.product_name,
+              productType: item.product_type || 'product',
+              quantity: item.quantity,
+              unitPrice: parseFloat(item.unit_price),
+              totalPrice: parseFloat(item.total_price),
+              availableStock: 0, // Will be populated from products
+              unit: item.product_type === 'raw_material' ? 'kg' : 'pieces', // Use correct unit based on product type // Add missing unit property
+              selectedIndividualProducts: (item.selected_individual_products || []).map((ip: any) => ({
+                id: ip.individual_product_id,
+                qrCode: ip.qr_code,
+                productId: ip.product_id || item.product_id,
+                productName: ip.product_name || item.product_name,
+                manufacturingDate: ip.completion_date || ip.production_date || ip.added_date,
+                dimensions: `${ip.final_length || ip.length || 'N/A'} x ${ip.final_width || ip.width || 'N/A'}`,
+                weight: ip.final_weight || ip.weight || 'N/A',
+                qualityGrade: ip.quality_grade || 'N/A',
+                inspector: ip.inspector || 'N/A',
+                status: ip.status || 'available',
+                location: ip.location || 'N/A'
+              }))
+            };
+          }),
           subtotal: parseFloat(orderInfo.subtotal),
           gstRate: parseFloat(orderInfo.gst_rate),
           gstAmount: parseFloat(orderInfo.gst_amount),
@@ -1321,7 +1333,7 @@ export default function OrderDetails() {
                             {order.status === 'pending' && (
                               <div className="space-y-3">
                                 <div className="text-sm text-muted-foreground">
-                                  Quantity: {item.quantity} {item.unit} • Unit Price: ₹{item.unitPrice.toLocaleString()}
+                                  Qty: {item.quantity} {item.unit} • Total: ₹{item.totalPrice.toLocaleString()}
                                 </div>
                                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                                   <div className="flex items-center gap-2 text-yellow-800">
@@ -1339,7 +1351,7 @@ export default function OrderDetails() {
                             {order.status === 'accepted' && (
                               <div className="space-y-3">
                                 <div className="text-sm text-muted-foreground">
-                                  Quantity: {item.quantity} {item.unit} • Unit Price: ₹{item.unitPrice.toLocaleString()}
+                                  Qty: {item.quantity} {item.unit} • Total: ₹{item.totalPrice.toLocaleString()}
                                 </div>
 
                                 {/* Individual Products Display - Only for products, not raw materials */}
@@ -1508,7 +1520,7 @@ export default function OrderDetails() {
                             {order.status === 'dispatched' && (
                               <div className="space-y-3 mt-2">
                                 <div className="text-sm text-muted-foreground">
-                                  Quantity: {item.quantity} {item.unit} • Unit Price: ₹{item.unitPrice.toLocaleString()}
+                                  Qty: {item.quantity} {item.unit} • Total: ₹{item.totalPrice.toLocaleString()}
                                 </div>
                                 <div className="text-sm text-orange-600 font-medium">
                                   ✓ Stock Deducted • Ready for Delivery
@@ -1562,7 +1574,7 @@ export default function OrderDetails() {
                             {order.status === 'delivered' && isEditing && (
                               <div className="space-y-3 mt-2">
                                 <div className="text-sm text-muted-foreground">
-                                  {item.quantity} {item.unit} • Unit Price: ₹{item.unitPrice.toLocaleString()}
+                                  Qty: {item.quantity} {item.unit} • Total: ₹{item.totalPrice.toLocaleString()}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div>
@@ -1619,7 +1631,7 @@ export default function OrderDetails() {
                               <div className="space-y-2 mt-1">
                                 <div className="flex items-center justify-between">
                                   <div className="text-sm text-muted-foreground">
-                                    {item.quantity} {item.unit} • ₹{item.unitPrice.toLocaleString()}/unit
+                                    Qty: {item.quantity} {item.unit}
                                   </div>
                                   <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
                                     <CheckCircle className="w-4 h-4" />

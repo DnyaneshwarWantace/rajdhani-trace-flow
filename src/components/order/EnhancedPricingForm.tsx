@@ -64,14 +64,6 @@ export function EnhancedPricingForm({
   onProductSearch,
   onIndividualProductSelection
 }: EnhancedPricingFormProps) {
-  
-  // Debug: Log products data when component mounts or products change
-  useEffect(() => {
-    console.log('🔍 EnhancedPricingForm received products:', products.length);
-    products.slice(0, 3).forEach(product => {
-      console.log(`📦 Product "${product.name}": individualStockTracking = ${product.individualStockTracking}, stock = ${product.stock}`);
-    });
-  }, [products]);
 
   const { 
     calculateItemPrice, 
@@ -85,16 +77,6 @@ export function EnhancedPricingForm({
   const [previousPricingUnit, setPreviousPricingUnit] = useState<PricingUnit | undefined>(item.pricing_unit);
   const [pricePerProduct, setPricePerProduct] = useState<number | null>(null); // Store price per product for auto-conversion
 
-  // Debug: Log when product_id changes
-  useEffect(() => {
-    if (localItem.product_id) {
-      console.log('🎯 Product selected:', {
-        product_id: localItem.product_id,
-        product_name: localItem.product_name,
-        hasIndividualStock: hasIndividualStock()
-      });
-    }
-  }, [localItem.product_id]);
   const [calculation, setCalculation] = useState<PricingCalculation | null>(null);
   const [showCalculation, setShowCalculation] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -118,12 +100,13 @@ export function EnhancedPricingForm({
   });
   
   // Available pricing units based on product dimensions (ensure unique)
-  const availableUnits = [...new Set(getAvailablePricingUnits(item.product_dimensions))];
+  // Add "unit" (per product) as the first option, then other units
+  const availableUnits = ['unit', ...new Set(getAvailablePricingUnits(item.product_dimensions))];
   
   useEffect(() => {
     // Only calculate if pricing unit is selected and valid
-    if (!localItem.pricing_unit || !['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit)) {
-      // No pricing unit selected or invalid unit - use simple calculation
+    if (!localItem.pricing_unit || localItem.pricing_unit === 'unit' || !['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit)) {
+      // No pricing unit selected, "unit" selected, or invalid unit - use simple calculation (price per product)
       const simpleTotal = localItem.unit_price * localItem.quantity;
       const updatedItem = {
         ...localItem,
@@ -209,10 +192,9 @@ export function EnhancedPricingForm({
 
         updatedItem.product_dimensions = availableDimensions;
 
-        // Don't auto-set pricing unit - let user select it
-        // This allows user to enter price per product first, then select unit for conversion
+        // Set default pricing unit to "unit" (per product) if not set
         if (!updatedItem.pricing_unit) {
-          updatedItem.pricing_unit = undefined; // No default, user will select
+          updatedItem.pricing_unit = 'unit' as PricingUnit; // Default to per product
         }
 
         // Calculate total based on user input
@@ -229,122 +211,59 @@ export function EnhancedPricingForm({
   const handleUnitPriceChange = (value: string) => {
     const unitPrice = parseFloat(value) || 0;
     setLocalItem(prev => {
-      // If no pricing unit is selected, store this as price per product
-      if (!prev.pricing_unit || !['sqft', 'sqm', 'gsm', 'kg'].includes(prev.pricing_unit)) {
-        setPricePerProduct(unitPrice);
+      const newItem = { ...prev, unit_price: unitPrice };
+      
+      // Calculate total price based on pricing unit
+      if (!prev.pricing_unit || prev.pricing_unit === 'unit' || !['sqft', 'sqm', 'gsm', 'kg'].includes(prev.pricing_unit)) {
+        // Simple calculation: price per product * quantity
+        newItem.total_price = unitPrice * prev.quantity;
+      } else {
+        // Use pricing calculator for conversion units
+        const calc = calculateItemPrice({ ...newItem, quantity: prev.quantity });
+        newItem.total_price = calc.totalPrice > 0 ? calc.totalPrice : (unitPrice * prev.quantity);
       }
       
-      return {
-        ...prev, 
-        unit_price: unitPrice,
-        // Simple calculation: unit_price * quantity
-        total_price: unitPrice * prev.quantity
-      };
+      return newItem;
     });
   };
   
   const handleQuantityChange = (value: string) => {
     const quantity = parseInt(value) || 0;
-    setLocalItem(prev => ({ 
-      ...prev, 
-      quantity,
-      // Simple calculation: unit_price * quantity
-      total_price: prev.unit_price * quantity
-    }));
-  };
-  
-  const handlePricingUnitChange = (unit: PricingUnit) => {
     setLocalItem(prev => {
-      const newItem = { ...prev, pricing_unit: unit };
-      const dimensions = prev.product_dimensions;
+      const newItem = { ...prev, quantity };
       
-      // If user had entered a price, auto-convert it to the new unit
-      // This works when: 1) User enters price first, then selects unit, OR 2) User changes from one unit to another
-      if (prev.unit_price > 0 && ['sqft', 'sqm', 'gsm', 'kg'].includes(unit) && dimensions) {
-        let pricePerUnit = 0;
-        
-        // Determine base price (price per product):
-        // - If we have stored pricePerProduct, use it (user entered price per product first)
-        // - If no previous unit was selected, treat current price as price per product
-        // - If previous unit was a conversion unit, convert back to price per product first
-        let basePrice = prev.unit_price;
-        
-        if (pricePerProduct !== null) {
-          // User entered price per product first, use that
-          basePrice = pricePerProduct;
-        } else if (!previousPricingUnit || !['sqft', 'sqm', 'gsm', 'kg'].includes(previousPricingUnit)) {
-          // No previous unit or previous unit was not a conversion unit
-          // Treat current price as price per product
-          basePrice = prev.unit_price;
-          setPricePerProduct(prev.unit_price);
-        } else {
-          // Converting from one unit to another - convert back to price per product first
-          // Calculate what the price per product would be from the current unit_price
-          const prevAreaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
-          
-          if (previousPricingUnit === 'sqm' && prevAreaPerProduct > 0) {
-            basePrice = prev.unit_price * prevAreaPerProduct;
-          } else if (previousPricingUnit === 'sqft' && prevAreaPerProduct > 0) {
-            const prevAreaPerProductSqft = prevAreaPerProduct * 10.764;
-            basePrice = prev.unit_price * prevAreaPerProductSqft;
-          } else if (previousPricingUnit === 'gsm' && (dimensions.weight || dimensions.gsm) && prevAreaPerProduct > 0) {
-            const gsm = dimensions.weight || dimensions.gsm || 0;
-            basePrice = prev.unit_price * gsm * prevAreaPerProduct;
-          } else if (previousPricingUnit === 'kg' && dimensions.weight && dimensions.length && dimensions.width) {
-            // Calculate weight from GSM and area
-            const gsm = dimensions.weight || dimensions.gsm || 0;
-            const weightInKg = (gsm * prevAreaPerProduct) / 1000;
-            basePrice = prev.unit_price * weightInKg;
-          } else {
-            // Can't convert, use current price as base
-            basePrice = prev.unit_price;
-          }
-          
-          setPricePerProduct(basePrice);
-        }
-        
-        // Calculate price per unit based on the selected unit
-        if (unit === 'sqm') {
-          // Convert price per product to price per sqm
-          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
-          if (areaPerProduct > 0) {
-            pricePerUnit = basePrice / areaPerProduct;
-          }
-        } else if (unit === 'sqft') {
-          // Convert price per product to price per sqft
-          const areaPerProductSqm = (dimensions.length || 0) * (dimensions.width || 0);
-          const areaPerProductSqft = areaPerProductSqm * 10.764; // Convert sqm to sqft
-          if (areaPerProductSqft > 0) {
-            pricePerUnit = basePrice / areaPerProductSqft;
-          }
-        } else if (unit === 'gsm') {
-          // Convert price per product to price per GSM
-          // GSM is stored in the weight field
-          const gsm = dimensions.weight || dimensions.gsm || 0; // Use weight field as GSM
-          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
-          if (gsm > 0 && areaPerProduct > 0) {
-            // Price per GSM = Price per product / (GSM × Area in sqm)
-            pricePerUnit = basePrice / (gsm * areaPerProduct);
-          }
-        } else if (unit === 'kg') {
-          // Calculate weight in kg from length × width × GSM
-          // Weight (kg) = (GSM × Area in sqm) / 1000
-          const gsm = dimensions.weight || dimensions.gsm || 0; // GSM is in weight field
-          const areaPerProduct = (dimensions.length || 0) * (dimensions.width || 0);
-          if (gsm > 0 && areaPerProduct > 0) {
-            const weightInKg = (gsm * areaPerProduct) / 1000; // Convert grams to kg
-            if (weightInKg > 0) {
-              pricePerUnit = basePrice / weightInKg;
-            }
-          }
-        }
-        
-        if (pricePerUnit > 0) {
-          newItem.unit_price = pricePerUnit;
-        }
+      // Calculate total price based on pricing unit
+      if (!prev.pricing_unit || prev.pricing_unit === 'unit' || !['sqft', 'sqm', 'gsm', 'kg'].includes(prev.pricing_unit)) {
+        // Simple calculation: price per product * quantity
+        newItem.total_price = prev.unit_price * quantity;
+      } else {
+        // Use pricing calculator for conversion units
+        const calc = calculateItemPrice({ ...newItem, quantity });
+        newItem.total_price = calc.totalPrice > 0 ? calc.totalPrice : (prev.unit_price * quantity);
       }
       
-      setPreviousPricingUnit(unit);
+      return newItem;
+    });
+  };
+  
+  const handlePricingUnitChange = (unit: string) => {
+    setLocalItem(prev => {
+      const newItem = { ...prev, pricing_unit: unit as PricingUnit };
+      
+      // When pricing unit changes, reset the price field (don't auto-convert)
+      // User will enter the price according to the new unit
+      if (unit === 'unit') {
+        // If switching to "per product", keep the current price as is
+        // Calculate total: price per product * quantity
+        newItem.total_price = prev.unit_price * prev.quantity;
+      } else if (['sqft', 'sqm', 'gsm', 'kg'].includes(unit)) {
+        // If switching to a conversion unit, reset price to 0
+        // User needs to enter price according to the new unit
+        newItem.unit_price = 0;
+        newItem.total_price = 0;
+      }
+      
+      setPreviousPricingUnit(unit as PricingUnit);
       return newItem;
     });
   };
@@ -463,14 +382,6 @@ export function EnhancedPricingForm({
   const hasIndividualStock = () => {
     if (localItem.product_type === 'raw_material') return false;
     const product = products.find(p => p.id === localItem.product_id);
-    
-    console.log('🔍 hasIndividualStock check:', {
-      product_id: localItem.product_id,
-      product_name: product?.name,
-      individualStockTracking: product?.individualStockTracking,
-      hasIndividual: product && product.individualStockTracking !== false
-    });
-    
     return product && product.individualStockTracking !== false;
   };
 
@@ -751,7 +662,6 @@ export function EnhancedPricingForm({
           })() && (
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">Individual Product Selection</Label>
-              {(() => { console.log('🎯 Individual Product Selection section is rendering for:', localItem.product_name); return null; })()}
               <Button
                 variant="outline"
                 size="sm"
@@ -810,52 +720,11 @@ export function EnhancedPricingForm({
                 )}
               </div>
 
-              {/* Unit Price - User Input Required */}
-              <div className="space-y-2">
-                <Label htmlFor={`unitPrice-${item.id}`} className="text-sm font-medium text-gray-700">
-                  Price (₹) *
-                </Label>
-                <Input
-                  id={`unitPrice-${item.id}`}
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={localItem.unit_price || ''}
-                  onChange={(e) => handleUnitPriceChange(e.target.value)}
-                  placeholder="Enter your price"
-                  className={`w-full ${localItem.unit_price <= 0 ? 'border-gray-300 focus:border-gray-500' : ''}`}
-                  required
-                />
-                {localItem.unit_price <= 0 && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    💡 Enter the price you want to charge for this item
-                  </p>
-                )}
-              </div>
-
-              {/* Total Price (Editable) */}
-              <div className="space-y-2">
-                <Label htmlFor={`totalPrice-${item.id}`} className="text-sm font-medium text-gray-700">
-                  Total Price (₹)
-                </Label>
-                <Input
-                  id={`totalPrice-${item.id}`}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={localItem.total_price}
-                  onChange={(e) => handleTotalPriceChange(e.target.value)}
-                  placeholder="Total price"
-                  className="w-full bg-green-50 border-green-200"
-                />
-              </div>
-            </div>
-
-            {/* Pricing Unit Selection */}
+            {/* Pricing Unit Selection - After Quantity */}
             <div className="space-y-2">
               <Label className="text-sm font-medium text-gray-700">Pricing Unit</Label>
               <Select
-                value={localItem.pricing_unit}
+                value={localItem.pricing_unit || 'unit'}
                 onValueChange={handlePricingUnitChange}
               >
                 <SelectTrigger>
@@ -863,6 +732,16 @@ export function EnhancedPricingForm({
                 </SelectTrigger>
                 <SelectContent>
                   {availableUnits.map((unit, index) => {
+                    if (unit === 'unit') {
+                      return (
+                        <SelectItem key="unit" value="unit">
+                          <div className="flex flex-col">
+                            <span className="font-medium">Per Product</span>
+                            <span className="text-xs text-gray-500">Price per one product</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    }
                     const unitInfo = PRICING_UNITS.find(u => u.unit === unit);
                     return (
                       <SelectItem key={`${unit}-${index}`} value={unit}>
@@ -876,10 +755,71 @@ export function EnhancedPricingForm({
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                💡 <strong>Simple Pricing:</strong> Enter price per unit above. 
-                <br />
-                💡 <strong>Unit Conversion:</strong> Select different unit (like GSM, sqm) to calculate price based on dimensions.
+                💡 Select how you want to price this item. Default is "Per Product".
               </p>
+            </div>
+
+            {/* Unit Price - User Input Required - After Pricing Unit */}
+            <div className="space-y-2">
+              <Label htmlFor={`unitPrice-${item.id}`} className="text-sm font-medium text-gray-700">
+                {localItem.pricing_unit === 'unit' || !localItem.pricing_unit || !['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit)
+                  ? 'Price per Product (₹) *'
+                  : localItem.pricing_unit === 'sqft'
+                  ? 'Price per sqft (₹) *'
+                  : localItem.pricing_unit === 'sqm'
+                  ? 'Price per sqm (₹) *'
+                  : localItem.pricing_unit === 'kg'
+                  ? 'Price per kg (₹) *'
+                  : localItem.pricing_unit === 'gsm'
+                  ? 'Price per GSM (₹) *'
+                  : 'Price (₹) *'}
+              </Label>
+              <Input
+                id={`unitPrice-${item.id}`}
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={localItem.unit_price || ''}
+                onChange={(e) => handleUnitPriceChange(e.target.value)}
+                placeholder={
+                  localItem.pricing_unit === 'unit' || !localItem.pricing_unit || !['sqft', 'sqm', 'kg', 'gsm'].includes(localItem.pricing_unit)
+                    ? "Enter price per product"
+                    : localItem.pricing_unit === 'sqft'
+                    ? "Enter price per sqft"
+                    : localItem.pricing_unit === 'sqm'
+                    ? "Enter price per sqm"
+                    : localItem.pricing_unit === 'kg'
+                    ? "Enter price per kg"
+                    : localItem.pricing_unit === 'gsm'
+                    ? "Enter price per GSM"
+                    : "Enter price"
+                }
+                className={`w-full ${localItem.unit_price <= 0 ? 'border-gray-300 focus:border-gray-500' : ''}`}
+                required
+              />
+              {localItem.unit_price <= 0 && (
+                <p className="text-xs text-gray-600 mt-1">
+                  💡 Enter the price according to the selected pricing unit above
+                </p>
+              )}
+            </div>
+
+            {/* Total Price (Editable) */}
+            <div className="space-y-2">
+              <Label htmlFor={`totalPrice-${item.id}`} className="text-sm font-medium text-gray-700">
+                Total Price (₹)
+              </Label>
+              <Input
+                id={`totalPrice-${item.id}`}
+                type="number"
+                min="0"
+                step="0.01"
+                value={localItem.total_price}
+                onChange={(e) => handleTotalPriceChange(e.target.value)}
+                placeholder="Total price"
+                className="w-full bg-green-50 border-green-200"
+              />
+            </div>
             </div>
 
 
@@ -1510,13 +1450,6 @@ export function EnhancedPricingForm({
                 {/* Pagination - appears after products when scrolling */}
                 {(() => {
                   const pagination = localItem.product_type === 'raw_material' ? materialPagination : productPagination;
-                  console.log('🔍 EnhancedPricingForm Pagination check:', {
-                    productType: localItem.product_type,
-                    pagination,
-                    totalCount: pagination?.totalCount,
-                    itemsPerPage: pagination?.itemsPerPage,
-                    shouldShow: pagination && pagination.totalCount > pagination.itemsPerPage
-                  });
                   if (!pagination || pagination.totalCount <= pagination.itemsPerPage) return null;
 
                   const { currentPage, itemsPerPage, totalCount, onPageChange } = pagination;

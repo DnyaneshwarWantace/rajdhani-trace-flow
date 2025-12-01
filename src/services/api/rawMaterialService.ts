@@ -1,16 +1,7 @@
 import { RawMaterial } from '@/lib/supabase';
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface CreateRawMaterialData {
   id?: string;
@@ -45,7 +36,7 @@ export class RawMaterialService {
     try {
       const response = await fetch(`${API_BASE_URL}/raw-materials`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(materialData),
       });
 
@@ -82,8 +73,9 @@ export class RawMaterialService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/raw-materials?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -101,8 +93,9 @@ export class RawMaterialService {
   static async getRawMaterialById(materialId: string): Promise<{ data: RawMaterial | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/raw-materials/${materialId}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -121,7 +114,7 @@ export class RawMaterialService {
     try {
       const response = await fetch(`${API_BASE_URL}/raw-materials/${materialId}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -150,8 +143,9 @@ export class RawMaterialService {
   }> {
     try {
       const response = await fetch(`${API_BASE_URL}/raw-materials/stats`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -177,8 +171,9 @@ export class RawMaterialService {
   static async getMaterialsRequiringReorder(): Promise<{ data: RawMaterial[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/raw-materials/reorder`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

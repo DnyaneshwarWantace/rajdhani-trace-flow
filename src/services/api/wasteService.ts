@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 // Valid backend enum values for waste_type
 export type WasteType = 'cutting_waste' | 'defective_products' | 'excess_material' | 'contamination' | 'expired_material' | 'other';
@@ -70,7 +61,7 @@ export default class WasteService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           // Backend expects ProductionWaste fields
           material_id: payload.material_id,
@@ -107,8 +98,9 @@ export default class WasteService {
     try {
       const params = new URLSearchParams({ batch_id: batchId });
       const response = await fetch(`${API_BASE_URL}/production/waste?${params.toString()}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
       if (!response.ok) {
         return { data: null, error: result.error || 'Failed to fetch waste' };
@@ -123,8 +115,9 @@ export default class WasteService {
   static async getAllWaste(): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
       if (!response.ok) {
         return { data: null, error: result.error || 'Failed to fetch waste' };
@@ -140,8 +133,9 @@ export default class WasteService {
     try {
       const response = await fetch(`${API_BASE_URL}/production/waste/${wasteId}/return-to-inventory`, {
         method: 'POST',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
       if (!response.ok) {
         return { success: false, error: result.error || 'Failed to return waste to inventory' };

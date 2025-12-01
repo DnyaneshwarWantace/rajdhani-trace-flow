@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface IndividualProduct {
   id: string;
@@ -81,7 +72,7 @@ export class IndividualProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/individual-products/bulk`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           product_id: productId,
           quantity,
@@ -125,8 +116,9 @@ export class IndividualProductService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/individual-products/product/${productId}?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -144,8 +136,9 @@ export class IndividualProductService {
   static async getIndividualProductById(id: string): Promise<{ data: IndividualProduct | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/individual-products/${id}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -167,7 +160,7 @@ export class IndividualProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/individual-products/${id}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updateData),
       });
 
@@ -189,9 +182,10 @@ export class IndividualProductService {
     try {
       const response = await fetch(`${API_BASE_URL}/individual-products/${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -220,8 +214,9 @@ export class IndividualProductService {
       }
 
       const response = await fetch(`${API_BASE_URL}/individual-products?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -242,8 +237,9 @@ export class IndividualProductService {
       params.append('status', 'available');
 
       const response = await fetch(`${API_BASE_URL}/individual-products?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -264,8 +260,9 @@ export class IndividualProductService {
       if (productId) params.append('product_id', productId);
 
       const response = await fetch(`${API_BASE_URL}/individual-products/stats?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -293,8 +290,9 @@ export class IndividualProductService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_BASE_URL}/individual-products?${params}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

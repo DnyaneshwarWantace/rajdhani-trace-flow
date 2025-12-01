@@ -3,18 +3,9 @@
  * Handles all purchase order operations for the ManageStock page
  */
 
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface StockOrder {
   id: string;
@@ -252,8 +243,9 @@ export class ManageStockService {
   static async getOrderStats(): Promise<{ data: OrderStats | null; error: string | null }> {
     try {
       const response = await fetch(`${API_BASE_URL}/purchase-orders/stats`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

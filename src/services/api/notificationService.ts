@@ -1,15 +1,6 @@
-import AuthService from './authService';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
-
-// Helper function to get headers with auth token
-const getHeaders = () => {
-  const token = AuthService.getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
 
 export interface Notification {
   id: string;
@@ -44,7 +35,7 @@ export class MongoDBNotificationService {
     try {
       const response = await fetch(`${API_URL}/notifications`, {
         method: 'POST',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(notificationData),
       });
 
@@ -78,8 +69,9 @@ export class MongoDBNotificationService {
       if (filters?.offset) queryParams.append('offset', filters.offset.toString());
 
       const response = await fetch(`${API_URL}/notifications?${queryParams}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -102,8 +94,9 @@ export class MongoDBNotificationService {
   static async getNotificationById(id: string): Promise<{ data: Notification | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/notifications/${id}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -122,7 +115,7 @@ export class MongoDBNotificationService {
     try {
       const response = await fetch(`${API_URL}/notifications/${id}`, {
         method: 'PUT',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates),
       });
 
@@ -144,7 +137,7 @@ export class MongoDBNotificationService {
     try {
       const response = await fetch(`${API_URL}/notifications/${id}/status`, {
         method: 'PATCH',
-        headers: getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status }),
       });
 
@@ -166,9 +159,10 @@ export class MongoDBNotificationService {
     try {
       const response = await fetch(`${API_URL}/notifications/${id}`, {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
 
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -192,8 +186,9 @@ export class MongoDBNotificationService {
       });
 
       const response = await fetch(`${API_URL}/notifications/exists?${queryParams}`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {
@@ -211,8 +206,9 @@ export class MongoDBNotificationService {
   static async getNotificationCounts(): Promise<{ data: any[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/notifications/counts`, {
-        headers: getHeaders()
+        headers: getAuthHeaders()
       });
+      await handleAuthError(response);
       const result = await response.json();
 
       if (!response.ok) {

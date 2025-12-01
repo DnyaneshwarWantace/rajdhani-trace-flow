@@ -1,5 +1,7 @@
-const API_URL = 'https://rajdhani.wantace.com/api';
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 import AuthService, { User } from './authService';
+
+const API_URL = 'https://rajdhani.wantace.com/api';
 
 export interface CreateUserData {
   email: string;
@@ -19,20 +21,12 @@ export interface UpdateUserData {
 }
 
 class UserService {
-  // Get auth headers
-  private static getHeaders() {
-    const token = AuthService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  }
 
   // Get all users
   static async getUsers(): Promise<{ data: User[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/users`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -52,7 +46,7 @@ class UserService {
   static async getUserById(id: string): Promise<{ data: { user: User; permissions: any } | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/users/${id}`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -73,7 +67,7 @@ class UserService {
     try {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(userData)
       });
 
@@ -95,7 +89,7 @@ class UserService {
     try {
       const response = await fetch(`${API_URL}/users/${id}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates)
       });
 
@@ -117,7 +111,7 @@ class UserService {
     try {
       const response = await fetch(`${API_URL}/users/${id}`, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -138,7 +132,7 @@ class UserService {
     try {
       const response = await fetch(`${API_URL}/users/${id}/reset-password`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ newPassword })
       });
 
@@ -160,7 +154,7 @@ class UserService {
     try {
       const response = await fetch(`${API_URL}/users/${id}/status`, {
         method: 'PATCH',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify({ status })
       });
 

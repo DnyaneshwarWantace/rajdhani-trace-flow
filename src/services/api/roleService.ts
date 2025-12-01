@@ -1,5 +1,6 @@
+import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
+
 const API_URL = 'https://rajdhani.wantace.com/api';
-import AuthService from './authService';
 
 export interface Role {
   id: string;
@@ -31,20 +32,12 @@ export interface UpdateRoleData {
 }
 
 class RoleService {
-  // Get auth headers
-  private static getHeaders() {
-    const token = AuthService.getToken();
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-  }
 
   // Get all roles
   static async getAllRoles(): Promise<{ data: Role[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/roles`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -64,7 +57,7 @@ class RoleService {
   static async getActiveRoles(): Promise<{ data: RoleOption[] | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/roles/active`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -84,7 +77,7 @@ class RoleService {
   static async getRoleById(id: string): Promise<{ data: Role | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/roles/${id}`, {
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
@@ -105,7 +98,7 @@ class RoleService {
     try {
       const response = await fetch(`${API_URL}/roles`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(roleData)
       });
 
@@ -127,7 +120,7 @@ class RoleService {
     try {
       const response = await fetch(`${API_URL}/roles/${id}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers: getAuthHeaders(),
         body: JSON.stringify(updates)
       });
 
@@ -149,7 +142,7 @@ class RoleService {
     try {
       const response = await fetch(`${API_URL}/roles/${id}`, {
         method: 'DELETE',
-        headers: this.getHeaders()
+        headers: getAuthHeaders()
       });
 
       const result = await response.json();
