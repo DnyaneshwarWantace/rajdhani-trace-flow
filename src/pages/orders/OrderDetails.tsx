@@ -1328,7 +1328,66 @@ export default function OrderDetails() {
                         ) : (
                           <div>
                         <h3 className="font-semibold text-lg">{item.productName}</h3>
-                            
+
+                            {/* Product Details */}
+                            {(() => {
+                              const product = products.find(p => p.id === item.productId);
+                              if (!product) return null;
+
+                              return (
+                                <div className="mt-2 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                                  {product.color && (
+                                    <div>
+                                      <span className="font-medium">Colour:</span>
+                                      <span className="ml-1">{product.color}</span>
+                                    </div>
+                                  )}
+                                  {product.pattern && (
+                                    <div>
+                                      <span className="font-medium">Pattern:</span>
+                                      <span className="ml-1">{product.pattern}</span>
+                                    </div>
+                                  )}
+                                  {product.category && (
+                                    <div>
+                                      <span className="font-medium">Category:</span>
+                                      <span className="ml-1">{product.category}</span>
+                                    </div>
+                                  )}
+                                  {product.subcategory && (
+                                    <div>
+                                      <span className="font-medium">Subcategory:</span>
+                                      <span className="ml-1">{product.subcategory}</span>
+                                    </div>
+                                  )}
+                                  {product.weight && (
+                                    <div>
+                                      <span className="font-medium">GSM:</span>
+                                      <span className="ml-1">{product.weight}</span>
+                                    </div>
+                                  )}
+                                  {product.width && (
+                                    <div>
+                                      <span className="font-medium">Width:</span>
+                                      <span className="ml-1">{product.width}{product.width_unit || 'm'}</span>
+                                    </div>
+                                  )}
+                                  {product.length && (
+                                    <div>
+                                      <span className="font-medium">Length:</span>
+                                      <span className="ml-1">{product.length}{product.length_unit || 'm'}</span>
+                                    </div>
+                                  )}
+                                  {product.sqm_per_piece && (
+                                    <div>
+                                      <span className="font-medium">SQM/Piece:</span>
+                                      <span className="ml-1">{product.sqm_per_piece}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
                             {/* PENDING STATUS - Basic Info */}
                             {order.status === 'pending' && (
                               <div className="space-y-3">
