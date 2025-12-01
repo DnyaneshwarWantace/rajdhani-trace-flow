@@ -93,7 +93,10 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
     const totalRevenue = orders.totalRevenue || 0;
     const paidAmount = orders.paidAmount || 0;
     const outstandingAmount = orders.outstandingAmount || 0;
-    const paymentPercentage = totalRevenue > 0 ? Math.round((paidAmount / totalRevenue) * 100) : 0;
+    // Cap payment percentage at 100% to prevent overflow
+    const paymentPercentage = totalRevenue > 0 
+      ? Math.min(100, Math.round((paidAmount / totalRevenue) * 100)) 
+      : 0;
 
     return (
       <div className="space-y-4">
@@ -118,10 +121,10 @@ export function InteractiveCharts({ data, loading }: InteractiveChartsProps) {
             <span className="text-gray-700">Payment Progress</span>
             <span className="font-medium text-black">{paymentPercentage}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-3">
+          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div
               className="h-3 rounded-full bg-green-500 transition-all duration-1000 ease-out"
-              style={{ width: `${paymentPercentage}%` }}
+              style={{ width: `${paymentPercentage}%`, maxWidth: '100%' }}
             />
           </div>
         </div>

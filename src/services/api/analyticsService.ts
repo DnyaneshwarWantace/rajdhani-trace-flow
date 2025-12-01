@@ -63,17 +63,21 @@ class AnalyticsService {
 
       // Fetch all stats in parallel
       const [orderStats, customerStats, productionStats, productStats] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders/stats?${params}`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
-        fetch(`${API_BASE_URL}/customers/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
-        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
-        fetch(`${API_BASE_URL}/products/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
+        fetch(`${API_BASE_URL}/orders/stats?${params}`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: null })),
+        fetch(`${API_BASE_URL}/customers/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: null })),
+        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: null })),
+        fetch(`${API_BASE_URL}/products/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: null }))
       ]);
 
-      // Calculate current period data
-      const currentRevenue = orderStats.data?.total_order_value || 0;
-      const currentOrders = orderStats.data?.total_orders || 0;
-      const currentCustomers = customerStats.data?.total_customers || 0;
-      const currentProduction = productionStats.data?.total_batches || 0;
+      // Calculate current period data - handle both response formats
+      const orderData = orderStats?.data || orderStats || {};
+      const customerData = customerStats?.data || customerStats || {};
+      const productionData = productionStats?.data || productionStats || {};
+      
+      const currentRevenue = orderData?.total_order_value || orderData?.totalRevenue || 0;
+      const currentOrders = orderData?.total_orders || orderData?.totalOrders || 0;
+      const currentCustomers = customerData?.total_customers || customerData?.totalCustomers || 0;
+      const currentProduction = productionData?.total_batches || productionData?.totalBatches || 0;
 
       // For demo purposes, calculate growth as 10-20% (in real app, compare with previous period)
       const revenueGrowth = currentRevenue > 0 ? 15.5 : 0;
@@ -125,20 +129,26 @@ class AnalyticsService {
 
       if (!result.success || !result.data) return [];
 
+      // Extract orders array from response
+      const orders = Array.isArray(result.data) ? result.data : (result.data.orders || []);
+      if (!Array.isArray(orders) || orders.length === 0) return [];
+
       // Aggregate order items by product
       const productMap = new Map<string, { revenue: number; orders: number; quantity: number }>();
 
-      for (const order of result.data) {
-        if (!order.items || order.items.length === 0) continue;
+      for (const order of orders) {
+        if (!order.items || !Array.isArray(order.items) || order.items.length === 0) continue;
 
         for (const item of order.items) {
-          const key = item.product_name;
+          const key = item.product_name || item.productName || 'Unknown Product';
           const existing = productMap.get(key) || { revenue: 0, orders: 0, quantity: 0 };
+          const unitPrice = parseFloat(item.unit_price || item.unitPrice || 0);
+          const quantity = parseFloat(item.quantity || 0);
 
           productMap.set(key, {
-            revenue: existing.revenue + (item.unit_price * item.quantity),
+            revenue: existing.revenue + (unitPrice * quantity),
             orders: existing.orders + 1,
-            quantity: existing.quantity + item.quantity
+            quantity: existing.quantity + quantity
           });
         }
       }
@@ -170,18 +180,24 @@ class AnalyticsService {
       await handleAuthError(response);
       const result = await response.json();
 
-      if (!result.success || !result.data) return [];
+      // Handle different response formats
+      const orders = result?.data || result?.orders || [];
+      if (!Array.isArray(orders)) {
+        console.warn('Orders data is not an array in getTopCustomers:', orders);
+        return [];
+      }
 
       // Aggregate by customer
       const customerMap = new Map<string, { type: string; revenue: number; orders: number }>();
 
-      for (const order of result.data) {
-        const key = order.customer_name;
+      for (const order of orders) {
+        const key = order.customer_name || order.customerName || 'Unknown Customer';
         const existing = customerMap.get(key) || { type: 'Individual', revenue: 0, orders: 0 };
+        const totalAmount = parseFloat(order.total_amount || order.totalAmount || 0);
 
         customerMap.set(key, {
-          type: order.customer_type || 'Individual',
-          revenue: existing.revenue + (order.total_amount || 0),
+          type: order.customer_type || order.customerType || 'Individual',
+          revenue: existing.revenue + totalAmount,
           orders: existing.orders + 1
         });
       }
@@ -208,45 +224,68 @@ class AnalyticsService {
   static async getMonthlyTrends(): Promise<MonthlyTrend[]> {
     try {
       const [ordersRes, productionRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
-        fetch(`${API_BASE_URL}/production/batches?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
+        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: [] })),
+        fetch(`${API_BASE_URL}/production/batches?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: [] }))
       ]);
 
-      const orders = ordersRes.data || [];
-      const production = productionRes.data || [];
+      // Handle different response formats
+      const orders = ordersRes?.data || ordersRes?.orders || [];
+      const production = productionRes?.data || productionRes?.batches || [];
+      
+      if (!Array.isArray(orders)) return [];
+      if (!Array.isArray(production)) return [];
 
       // Group by month
       const monthMap = new Map<string, { revenue: number; orders: number; production: number }>();
 
       // Process orders
       for (const order of orders) {
-        if (!order.order_date) continue;
-        const date = new Date(order.order_date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
+        const orderDate = order.order_date || order.orderDate || order.created_at || order.createdAt;
+        if (!orderDate) continue;
+        
+        try {
+          const date = new Date(orderDate);
+          if (isNaN(date.getTime())) continue;
+          
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
+          const totalAmount = parseFloat(order.total_amount || order.totalAmount || 0);
 
-        monthMap.set(monthKey, {
-          revenue: existing.revenue + (order.total_amount || 0),
-          orders: existing.orders + 1,
-          production: existing.production
-        });
+          monthMap.set(monthKey, {
+            revenue: existing.revenue + totalAmount,
+            orders: existing.orders + 1,
+            production: existing.production
+          });
+        } catch (e) {
+          console.warn('Error processing order date:', orderDate, e);
+          continue;
+        }
       }
 
       // Process production batches
       for (const batch of production) {
-        if (!batch.created_at) continue;
-        const date = new Date(batch.created_at);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
+        const batchDate = batch.created_at || batch.createdAt || batch.start_date || batch.startDate;
+        if (!batchDate) continue;
+        
+        try {
+          const date = new Date(batchDate);
+          if (isNaN(date.getTime())) continue;
+          
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+          const existing = monthMap.get(monthKey) || { revenue: 0, orders: 0, production: 0 };
 
-        // Use required_quantity for batches (planned production)
-        const quantity = batch.required_quantity || batch.actual_quantity || 0;
+          // Use batch_size, required_quantity, or actual_quantity for batches
+          const quantity = parseFloat(batch.batch_size || batch.required_quantity || batch.actual_quantity || 0);
 
-        monthMap.set(monthKey, {
-          revenue: existing.revenue,
-          orders: existing.orders,
-          production: existing.production + quantity
-        });
+          monthMap.set(monthKey, {
+            revenue: existing.revenue,
+            orders: existing.orders,
+            production: existing.production + quantity
+          });
+        } catch (e) {
+          console.warn('Error processing batch date:', batchDate, e);
+          continue;
+        }
       }
 
       // Convert to array and sort by month
@@ -275,12 +314,23 @@ class AnalyticsService {
   static async getProductionMetrics(): Promise<ProductionMetrics> {
     try {
       const [productionRes, ordersRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }),
-        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); })
+        fetch(`${API_BASE_URL}/production/stats`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: {} })),
+        fetch(`${API_BASE_URL}/orders?limit=1000`, { headers: getAuthHeaders() }).then(async r => { await handleAuthError(r); return r.json(); }).catch(() => ({ success: false, data: [] }))
       ]);
 
-      const productionStats = productionRes.data || {};
-      const orders = ordersRes.data || [];
+      // Handle different response formats
+      const productionStats = productionRes?.data || productionRes || {};
+      const orders = ordersRes?.data || ordersRes?.orders || [];
+      
+      if (!Array.isArray(orders)) {
+        console.warn('Orders data is not an array:', orders);
+        return {
+          efficiency: 0,
+          wasteReduction: 0,
+          qualityScore: 0,
+          onTimeDelivery: 0
+        };
+      }
 
       // Calculate production efficiency (completed vs total batches)
       const efficiency = productionStats.total_batches > 0
