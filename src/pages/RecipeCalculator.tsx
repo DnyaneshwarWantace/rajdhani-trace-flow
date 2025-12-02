@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import ProductService, { Product } from "@/services/api/productService";
 import { MongoDBRecipeService } from "@/services/api/recipeService";
 import RawMaterialService from "@/services/api/rawMaterialService";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -561,10 +560,6 @@ export default function RecipeCalculator() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Recipe Calculator" 
-        subtitle="Calculate raw materials using SQM-based recipes (1 sqm base) with automatic dimension calculations"
-      />
 
       <Tabs defaultValue="calculator" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">

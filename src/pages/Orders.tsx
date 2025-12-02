@@ -5,7 +5,6 @@ import { cleanupOrderNotifications } from "@/lib/storageUtils";
 import { MongoDBOrderService } from "@/services/api/orderService";
 import { CustomerService } from "@/services/customerService";
 import ProductService, { Product } from "@/services/api/productService";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -876,10 +875,6 @@ export default function Orders() {
 
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      <Header
-        title="Order Management"
-        subtitle="Manage orders & track production"
-      />
 
       {/* Enhanced Controls - Mobile Responsive */}
       <Card className="p-4 sm:p-6">

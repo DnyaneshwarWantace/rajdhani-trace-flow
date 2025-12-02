@@ -1,6 +1,6 @@
 import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 
-const API_URL = 'https://rajdhani.wantace.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
 export interface Role {
   id: string;

@@ -4,7 +4,6 @@ import { MongoDBProductService, IndividualProductService } from "@/services";
 import { MongoDBRecipeService } from "@/services/api/recipeService";
 import { RawMaterialService } from "@/services/api/rawMaterialService";
 import { mapMongoDBProductToFrontend, mapMongoDBIndividualProductToFrontend, type Product as FrontendProduct, type IndividualProduct as FrontendIndividualProduct } from "@/utils/typeMapping";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -270,8 +269,6 @@ export default function ProductDetail() {
 
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      <Header title="Product Details" />
-      
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">

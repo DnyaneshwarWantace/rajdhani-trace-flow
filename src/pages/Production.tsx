@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -701,10 +700,6 @@ export default function Production() {
         </div>
       )}
 
-      <Header
-        title="Production Management"
-        subtitle="Track manufacturing processes"
-      />
 
       {/* Action Bar - Mobile Responsive */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center sm:justify-between">

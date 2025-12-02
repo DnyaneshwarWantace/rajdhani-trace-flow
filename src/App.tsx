@@ -4,11 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Sidebar } from "@/components/layout/Sidebar";
+import FixedHeader from "@/components/layout/FixedHeader";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SidebarProvider, useSidebarContext } from "@/contexts/SidebarContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { cn } from "@/lib/utils";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import Orders from "./pages/Orders";
 import NewOrder from "./pages/orders/NewOrder";
@@ -37,6 +39,7 @@ import DropdownMaster from "./pages/DropdownMaster";
 import RecipeCalculator from "./pages/RecipeCalculator";
 import BackendTest from "./pages/BackendTest";
 import AccessDenied from "./pages/AccessDenied";
+import ActivityLogs from "./pages/ActivityLogs";
 
 // import RajdhaniERP from "@/lib/storageUtilsUtils"; // Removed - using Supabase now
 import { useEffect } from "react";
@@ -54,13 +57,15 @@ const AuthenticatedLayout: React.FC = () => {
   }
 
   return (
-          <div className="flex min-h-screen bg-background">
-            <Sidebar className="hidden md:flex" />
-            <main className={cn(
-              "flex-1 min-w-0 w-full transition-all duration-300",
-              isCollapsed ? "md:ml-16" : "md:ml-64"
-            )}>
-              <Routes>
+    <div className="min-h-screen bg-gray-50">
+      <FixedHeader />
+      <div className="flex">
+        <Sidebar className="hidden lg:flex" />
+        <main className={cn(
+          "flex-1 transition-all duration-300 pt-0",
+          isCollapsed ? "lg:ml-16" : "lg:ml-56"
+        )}>
+          <Routes>
           {/* Dashboard - accessible to all authenticated users */}
           <Route path="/" element={
             <ProtectedRoute>
@@ -68,132 +73,132 @@ const AuthenticatedLayout: React.FC = () => {
             </ProtectedRoute>
           } />
 
-          {/* Orders routes - restricted to users with orders permission */}
+          {/* Orders routes - accessible to all authenticated users */}
           <Route path="/orders" element={
-            <ProtectedRoute requiredPermission="orders">
+            <ProtectedRoute>
               <Orders />
             </ProtectedRoute>
           } />
           <Route path="/orders/new" element={
-            <ProtectedRoute requiredPermission="orders">
+            <ProtectedRoute>
               <NewOrder />
             </ProtectedRoute>
           } />
           <Route path="/orders/add-item" element={
-            <ProtectedRoute requiredPermission="orders">
+            <ProtectedRoute>
               <AddItem />
             </ProtectedRoute>
           } />
           <Route path="/orders/:orderId" element={
-            <ProtectedRoute requiredPermission="orders">
+            <ProtectedRoute>
               <OrderDetails />
             </ProtectedRoute>
           } />
 
 
-          {/* Production routes - restricted to users with production permission */}
+          {/* Production routes - accessible to all authenticated users */}
           <Route path="/production" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <Production />
             </ProtectedRoute>
           } />
           <Route path="/production/new-batch" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <NewBatch />
             </ProtectedRoute>
           } />
           <Route path="/production-detail/:productId" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <ProductionDetail />
             </ProtectedRoute>
           } />
           <Route path="/production/:batchId/dynamic-flow" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <DynamicProductionFlow />
             </ProtectedRoute>
           } />
           <Route path="/production/:batchId/waste-generation" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <WasteGeneration />
             </ProtectedRoute>
           } />
           <Route path="/production/complete/:batchId" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <Complete />
             </ProtectedRoute>
           } />
           <Route path="/production/summary/:productId" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <ProductionSummary />
             </ProtectedRoute>
           } />
 
-          {/* Raw materials routes - restricted to users with materials permission */}
+          {/* Raw materials routes - accessible to all authenticated users */}
           <Route path="/materials" element={
-            <ProtectedRoute requiredPermission="materials">
+            <ProtectedRoute>
               <Materials />
             </ProtectedRoute>
           } />
           <Route path="/manage-stock" element={
-            <ProtectedRoute requiredPermission="products">
+            <ProtectedRoute>
               <ManageStock />
             </ProtectedRoute>
           } />
 
-          {/* Customer routes - restricted to users with customers OR suppliers permission */}
+          {/* Customer routes - accessible to all authenticated users */}
           <Route path="/customers" element={
             <ProtectedRoute>
               <Customers />
             </ProtectedRoute>
           } />
 
-          {/* Analytics - restricted to users with reports permission */}
+          {/* Analytics - accessible to all authenticated users */}
           <Route path="/analytics" element={
-            <ProtectedRoute requiredPermission="reports">
+            <ProtectedRoute>
               <Analytics />
             </ProtectedRoute>
           } />
 
-          {/* Product routes - restricted to users with products permission */}
+          {/* Product routes - accessible to all authenticated users */}
           <Route path="/products" element={
-            <ProtectedRoute requiredPermission="products">
+            <ProtectedRoute>
               <Products />
             </ProtectedRoute>
           } />
           <Route path="/product/:productId" element={
-            <ProtectedRoute requiredPermission="products">
+            <ProtectedRoute>
               <ProductDetail />
             </ProtectedRoute>
           } />
           <Route path="/product-stock/:productId" element={
-            <ProtectedRoute requiredPermission="products">
+            <ProtectedRoute>
               <ProductStock />
             </ProtectedRoute>
           } />
           <Route path="/product-wastage" element={
-            <ProtectedRoute requiredPermission="products">
+            <ProtectedRoute>
               <ProductWastage />
             </ProtectedRoute>
           } />
 
 
-          {/* Recipe Calculator - restricted to users with production permission */}
+          {/* Recipe Calculator - accessible to all authenticated users */}
           <Route path="/recipe-calculator" element={
-            <ProtectedRoute requiredPermission="production">
+            <ProtectedRoute>
               <RecipeCalculator />
             </ProtectedRoute>
           } />
 
-          {/* Settings - requires settings permission */}
+          {/* Settings - admin only */}
           <Route path="/settings" element={
-            <ProtectedRoute requiredPermission="settings">
+            <ProtectedRoute requiredRole="admin">
               <Settings />
             </ProtectedRoute>
           } />
 
-          {/* Dropdown Master - requires settings permission */}
+          {/* Dropdown Master - admin only */}
           <Route path="/dropdown-master" element={
-            <ProtectedRoute requiredPermission="settings">
+            <ProtectedRoute requiredRole="admin">
               <DropdownMaster />
             </ProtectedRoute>
           } />
@@ -205,10 +210,17 @@ const AuthenticatedLayout: React.FC = () => {
             </ProtectedRoute>
           } />
 
+          <Route path="/activity-logs" element={
+            <ProtectedRoute requiredRole="admin">
+              <ActivityLogs />
+            </ProtectedRoute>
+          } />
+
           {/* 404 page */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </main>
+          </main>
+      </div>
     </div>
   );
 };
@@ -228,9 +240,10 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <Routes>
-              {/* Public login route */}
+              {/* Public routes */}
               <Route path="/login" element={<Login />} />
-              
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+
               {/* Public QR result route - accessible without authentication */}
               <Route path="/qr-result" element={<QRResult />} />
 

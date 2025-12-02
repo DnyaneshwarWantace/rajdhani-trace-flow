@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1312,10 +1311,6 @@ export default function WasteGeneration() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Waste Generation"
-        subtitle="Track waste generated during production process"
-      />
 
       {/* Status Alert */}
       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">

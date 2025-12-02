@@ -49,14 +49,25 @@ export default function PermissionManagement() {
       ]);
 
       if (rolesResult.data) {
-        setRoles(rolesResult.data);
+        // Filter to only admin and user roles
+        const filteredRoles = rolesResult.data.filter(role => role.value === 'admin' || role.value === 'user');
+        setRoles(filteredRoles.length > 0 ? filteredRoles : [
+          { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+          { value: 'user', label: 'User', description: 'Standard user' }
+        ]);
       } else if (rolesResult.error) {
         console.error('Error loading roles:', rolesResult.error);
-        toast({
-          title: 'Warning',
-          description: 'Failed to load roles. Please refresh the page.',
-          variant: 'destructive'
-        });
+        // Set default roles if API fails
+        setRoles([
+          { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+          { value: 'user', label: 'User', description: 'Standard user' }
+        ]);
+      } else {
+        // Fallback if no data
+        setRoles([
+          { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+          { value: 'user', label: 'User', description: 'Standard user' }
+        ]);
       }
 
       if (pagesResult.data) {

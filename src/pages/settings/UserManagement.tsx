@@ -52,9 +52,9 @@ export default function UserManagement() {
   // Form states
   const [createForm, setCreateForm] = useState<CreateUserData>({
     email: '',
-    password: '',
+    password: '', // Will be ignored - backend generates temp password
     full_name: '',
-    role: 'operator',
+    role: 'user',
     phone: '',
     department: ''
   });
@@ -98,23 +98,39 @@ export default function UserManagement() {
         description: error,
         variant: 'destructive'
       });
+      // Set default roles if API fails
+      setRoles([
+        { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+        { value: 'user', label: 'User', description: 'Standard user' }
+      ]);
     } else if (data) {
-      setRoles(data);
+      // Filter to only admin and user roles
+      const filteredRoles = data.filter(role => role.value === 'admin' || role.value === 'user');
+      setRoles(filteredRoles.length > 0 ? filteredRoles : [
+        { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+        { value: 'user', label: 'User', description: 'Standard user' }
+      ]);
+    } else {
+      // Fallback if no data
+      setRoles([
+        { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+        { value: 'user', label: 'User', description: 'Standard user' }
+      ]);
     }
   };
 
   const handleCreateUser = async () => {
-    if (!createForm.email || !createForm.password || !createForm.full_name) {
+    if (!createForm.email || !createForm.full_name) {
       toast({
         title: 'Validation Error',
-        description: 'Email, password, and full name are required',
+        description: 'Email and full name are required',
         variant: 'destructive'
       });
       return;
     }
 
     const { data, error } = await UserService.createUser(createForm);
-    
+
     if (error) {
       toast({
         title: 'Error',
@@ -124,14 +140,15 @@ export default function UserManagement() {
     } else {
       toast({
         title: 'Success',
-        description: 'User created successfully'
+        description: 'User created successfully. Welcome email sent with temporary password.',
+        duration: 5000
       });
       setShowCreateDialog(false);
       setCreateForm({
         email: '',
         password: '',
         full_name: '',
-        role: 'operator',
+        role: 'user',
         phone: '',
         department: ''
       });
@@ -287,93 +304,115 @@ export default function UserManagement() {
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Created By</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={7} className="text-center text-gray-500 py-8">
                       No users found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge className={getRoleColor(user.role)}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{user.department || '-'}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(user.status)}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setEditForm({
-                                full_name: user.full_name,
-                                role: user.role,
-                                phone: user.phone || '',
-                                department: user.department || '',
-                                status: user.status as any
-                              });
-                              setShowEditDialog(true);
-                            }}
-                            disabled={currentUser?.id === user.id}
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleStatus(user)}
-                            disabled={currentUser?.id === user.id}
-                          >
-                            {user.status === 'active' ? (
-                              <UserX className="w-3 h-3" />
-                            ) : (
-                              <UserCheck className="w-3 h-3" />
-                            )}
-                          </Button>
+                  filteredUsers.map((user) => {
+                    // Check if current user created this user
+                    const canManage = user.created_by === currentUser?.id;
+                    const isOwnAccount = currentUser?.id === user.id;
+                    
+                    return (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge className={getRoleColor(user.role)}>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{user.department || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(user.status)}>
+                            {user.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.created_by_user ? (
+                            <div className="text-sm">
+                              <div className="font-medium">{user.created_by_user.full_name}</div>
+                              <div className="text-xs text-gray-500">{user.created_by_user.email}</div>
+                            </div>
+                          ) : user.created_by === 'system' ? (
+                            <span className="text-sm text-gray-500">System</span>
+                          ) : (
+                            <span className="text-sm text-gray-400">Unknown</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setEditForm({
+                                  full_name: user.full_name,
+                                  role: user.role,
+                                  phone: user.phone || '',
+                                  department: user.department || '',
+                                  status: user.status as any
+                                });
+                                setShowEditDialog(true);
+                              }}
+                              disabled={isOwnAccount || !canManage}
+                              title={!canManage ? 'You can only edit users you created' : isOwnAccount ? 'Cannot edit your own account' : ''}
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleStatus(user)}
+                              disabled={isOwnAccount || !canManage}
+                              title={!canManage ? 'You can only change status of users you created' : isOwnAccount ? 'Cannot change your own status' : ''}
+                            >
+                              {user.status === 'active' ? (
+                                <UserX className="w-3 h-3" />
+                              ) : (
+                                <UserCheck className="w-3 h-3" />
+                              )}
+                            </Button>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowResetPasswordDialog(true);
-                            }}
-                          >
-                            <Key className="w-3 h-3" />
-                          </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowResetPasswordDialog(true);
+                              }}
+                            >
+                              <Key className="w-3 h-3" />
+                            </Button>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowDeleteDialog(true);
-                            }}
-                            disabled={currentUser?.id === user.id}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowDeleteDialog(true);
+                              }}
+                              disabled={isOwnAccount || !canManage}
+                              className="text-red-600 hover:text-red-700"
+                              title={!canManage ? 'You can only delete users you created' : isOwnAccount ? 'Cannot delete your own account' : ''}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -387,7 +426,7 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
             <DialogDescription>
-              Add a new user to the system
+              Add a new user to the system. A welcome email will be sent with a temporary password.
             </DialogDescription>
           </DialogHeader>
 
@@ -400,17 +439,6 @@ export default function UserManagement() {
                 value={createForm.email}
                 onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                 placeholder="user@rajdhani.com"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="password">Password *</Label>
-              <Input
-                id="password"
-                type="password"
-                value={createForm.password}
-                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                placeholder="••••••••"
               />
             </div>
 
@@ -592,17 +620,39 @@ export default function UserManagement() {
           </DialogHeader>
 
           {selectedUser && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="font-medium">{selectedUser.full_name}</p>
-              <p className="text-sm text-gray-600">{selectedUser.email}</p>
-            </div>
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="font-medium">{selectedUser.full_name}</p>
+                <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                <p className="text-sm mt-2">
+                  <Badge className={getRoleColor(selectedUser.role)}>
+                    {selectedUser.role}
+                  </Badge>
+                </p>
+              </div>
+              
+              {selectedUser.role === 'admin' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm font-medium text-yellow-800">
+                    ⚠️ Cannot delete admin users
+                  </p>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    Please change this user's role to "user" first, then delete them.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteUser}
+              disabled={selectedUser?.role === 'admin'}
+            >
               Delete User
             </Button>
           </DialogFooter>

@@ -13,6 +13,12 @@ export interface User {
   avatar?: string;
   last_login?: string;
   created_at: string;
+  created_by?: string;
+  created_by_user?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
 }
 
 export interface Permission {
@@ -268,36 +274,17 @@ class AuthService {
   }
 
   // Check if user has permission for a page
+  // Simplified: All authenticated users have access to everything except settings and activity-logs
   static hasPageAccess(page: string): boolean {
-    const permissions = this.getPermissions();
-    if (!permissions) return false;
-    
-    // Admin always has access
     const user = this.getUser();
-    if (user?.role === 'admin') return true;
     
-    // Check direct page access
-    if (permissions.page_permissions[page as keyof typeof permissions.page_permissions]) {
-      return true;
+    // Settings and activity-logs are admin only (handled by ProtectedRoute)
+    if (page === 'settings' || page === 'activity-logs') {
+      return user?.role === 'admin';
     }
     
-    // SPECIAL CASE: If user has orders page access, allow access to related pages
-    if (permissions.page_permissions.orders) {
-      // Allow products, customers, materials, suppliers pages (needed for order management)
-      if (page === 'products' || page === 'customers' || page === 'materials' || page === 'suppliers') {
-        return true;
-      }
-    }
-    
-    // SPECIAL CASE: If user has production page access, allow access to related pages
-    if (permissions.page_permissions.production) {
-      // Allow products and materials pages (needed for production management)
-      if (page === 'products' || page === 'materials') {
-        return true;
-      }
-    }
-    
-    return false;
+    // All other pages are accessible to all authenticated users
+    return true;
   }
 
   // Check if user has permission for an action

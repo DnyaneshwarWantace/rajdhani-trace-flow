@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -189,10 +188,6 @@ export default function AddItem() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Add New Product" 
-        subtitle="Create a new product with customizable fields"
-      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Product Form */}

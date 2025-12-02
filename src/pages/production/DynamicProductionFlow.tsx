@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -899,10 +898,6 @@ export default function DynamicProductionFlow() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header
-        title="Production Flow - Machine Operations"
-        subtitle={productionProduct?.productName || "Loading..."}
-      />
 
       <div className="flex items-center gap-4 mb-6">
         <Button variant="outline" onClick={() => navigate('/production')}>

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -342,11 +341,11 @@ export default function ProductionDetail() {
     
     // Load recipe IMMEDIATELY and in parallel with other data
     // This ensures recipe loads fast if available
-    if (productId) {
-      const actualProductId = productId;
+        if (productId) {
+          const actualProductId = productId;
       console.log('🚀 Loading recipe immediately for product:', actualProductId);
-      loadProductRecipe(actualProductId);
-    }
+          loadProductRecipe(actualProductId);
+        }
     
     // Load raw materials and products in parallel (but don't wait for them before loading recipe)
     Promise.all([
@@ -2268,10 +2267,6 @@ export default function ProductionDetail() {
 
     return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title={`Production: ${productionProduct.productName}`}
-        subtitle={`Track material consumption and waste generation`}
-      />
 
       {/* Production Progress Bar */}
       <ProductionProgressBar
@@ -2602,7 +2597,7 @@ export default function ProductionDetail() {
                        <Button
                          variant="outline"
                          size="sm"
-                         onClick={() => setIsMaterialSelectionOpen(true)}
+              onClick={() => setIsMaterialSelectionOpen(true)}
                          disabled={isLoadingRecipe}
                        >
                          {isLoadingRecipe ? (
@@ -2612,8 +2607,8 @@ export default function ProductionDetail() {
                            </>
                          ) : (
                            <>
-                             <Plus className="w-4 h-4 mr-2" />
-                             Select Materials & Products
+              <Plus className="w-4 h-4 mr-2" />
+              Select Materials & Products
                            </>
                          )}
                        </Button>

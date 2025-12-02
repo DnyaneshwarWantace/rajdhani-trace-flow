@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -720,10 +719,6 @@ export default function Complete() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Complete Production"
-        subtitle={`Final product creation for ${productionProduct.productName}${inspectorName ? ` • Inspector: ${inspectorName}` : ''}`}
-      />
 
       {/* Production Progress Bar */}
       <ProductionProgressBar

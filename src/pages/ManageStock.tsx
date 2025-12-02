@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -781,10 +780,6 @@ export default function ManageStock() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Manage Stock" 
-        subtitle="Track raw material orders, quantities, and delivery status"
-      />
 
 
 

@@ -25,7 +25,6 @@ import type { DropdownOption } from "@/services/api/dropdownService";
 import { uploadImageToR2, deleteImageFromR2 } from "@/services/api/r2Service";
 // Supabase removed - now using MongoDB via backend API
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +54,12 @@ import {
   Edit, Eye, Filter, SortAsc, SortDesc, Hash, Play, RefreshCw,
   Bell, Factory, Clock, ArrowRight, Copy, Trash2, ChevronDown
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Pagination,
   PaginationContent,
@@ -327,7 +332,7 @@ export default function Products() {
             status: calculatedStatus as any
           };
         });
-        
+
         // Set products immediately with paginated results (all data from backend)
         setProducts(productsWithStatus);
         // Use backend count (total matching products after filters), not current page count
@@ -2450,10 +2455,19 @@ export default function Products() {
     
     if (!product) return 0;
     
-    // For products with individual stock tracking, count only available individual products
-    if (product.individualStockTracking && product.individual_products) {
+    // For products with individual stock tracking, use backend stats (fast - no API calls needed)
+    if (product.individualStockTracking) {
+      // First try to use individual_product_stats from backend
+      if (product.individual_product_stats && typeof product.individual_product_stats.available === 'number') {
+        return product.individual_product_stats.available;
+      }
+      // Fallback to individual_products array if stats not available
+      if (product.individual_products && Array.isArray(product.individual_products)) {
       const availableCount = product.individual_products.filter((ip: any) => ip.status === 'available').length;
       return availableCount;
+      }
+      // If neither available, return 0
+      return 0;
     }
     
     // For bulk products, use baseQuantity, quantity, or actual_quantity as fallback
@@ -2471,8 +2485,21 @@ export default function Products() {
   // Get individual product breakdown for display
   const getIndividualProductBreakdown = (productId: string) => {
     const product = products.find(p => p.id === productId);
-    if (!product || !product.individual_products) return null;
+    if (!product) return null;
     
+    // First try to use individual_product_stats from backend (fast - no API calls needed)
+    if (product.individual_product_stats) {
+      const stats = product.individual_product_stats;
+      return {
+        available: stats.available || 0,
+        sold: stats.sold || 0,
+        damaged: stats.damaged || 0,
+        total: stats.total || 0
+      };
+    }
+    
+    // Fallback to individual_products array if stats not available
+    if (product.individual_products && Array.isArray(product.individual_products)) {
     const individualProducts = product.individual_products;
     const available = individualProducts.filter((ip: any) => ip.status === 'available').length;
     const sold = individualProducts.filter((ip: any) => ip.status === 'sold').length;
@@ -2480,6 +2507,9 @@ export default function Products() {
     const total = individualProducts.length;
     
     return { available, sold, damaged, total };
+    }
+    
+    return null;
   };
 
   // Handle adding product to production
@@ -2646,10 +2676,6 @@ export default function Products() {
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      <Header 
-        title="Product Inventory"
-        subtitle="Track products & manage inventory"
-      />
 
       <Tabs defaultValue="inventory" className="space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-4">
@@ -4369,43 +4395,63 @@ export default function Products() {
                           </td>
                           <td className="p-4">
                             <div className="space-y-1">
+                              {product.individualStockTracking ? (
+                                <>
                               <div className="font-medium text-foreground">
-                                {getAvailablePieces(product.id || '')} Products
+                                    Available: {getAvailablePieces(product.id || '')} Products
                               </div>
                               {(() => {
-                                // Calculate total SQM for all products
-                                const quantity = getAvailablePieces(product.id || '');
+                                    const breakdown = getIndividualProductBreakdown(product.id || '');
+                                    if (breakdown) {
+                                      return (
+                                        <>
+                                          <div className="text-xs text-muted-foreground">
+                                            Total: {breakdown.total} • Available: {breakdown.available} • Sold: {breakdown.sold} • Damaged: {breakdown.damaged}
+                                          </div>
+                                          {(() => {
+                                            // Calculate total SQM for all available products
                                 const perProductSQM = calculateSQM(
                                   product.length || '0',
                                   product.width || '0',
                                   product.lengthUnit || 'feet',
                                   product.widthUnit || 'feet'
                                 );
-                                const totalSQM = quantity * perProductSQM;
-
+                                            const totalSQM = breakdown.available * perProductSQM;
                                 return (
                                   <div className="text-xs text-muted-foreground">
-                                    Total: {totalSQM.toFixed(4)} SQM
+                                                Total SQM: {totalSQM.toFixed(4)} SQM
                                   </div>
                                 );
                               })()}
-                              {(() => {
-                                const breakdown = getIndividualProductBreakdown(product.id || '');
-                                if (breakdown) {
-                                  return (
-                                    <div className="text-xs text-muted-foreground">
-                                      Total: {breakdown.total} • Available: {breakdown.available} • Sold: {breakdown.sold} • Damaged: {breakdown.damaged}
+                                        </>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-medium text-foreground">
+                                    {getAvailablePieces(product.id || '')} {product.unit || 'Units'}
                                     </div>
-                                  );
-                                } else if (getAvailablePieces(product.id || '') !== (product.quantity || 0)) {
+                                  {(() => {
+                                    // Calculate total SQM for bulk products
+                                    const quantity = getAvailablePieces(product.id || '');
+                                    const perProductSQM = calculateSQM(
+                                      product.length || '0',
+                                      product.width || '0',
+                                      product.lengthUnit || 'feet',
+                                      product.widthUnit || 'feet'
+                                    );
+                                    const totalSQM = quantity * perProductSQM;
                                   return (
                                 <div className="text-xs text-muted-foreground">
-                                  Total Products: {product.quantity || 0}
+                                        Total: {totalSQM.toFixed(4)} SQM
                                 </div>
                                   );
-                                }
-                                return null;
                               })()}
+                                </>
+                              )}
                             </div>
                           </td>
                           <td className="p-4">
@@ -4414,60 +4460,96 @@ export default function Products() {
                             </Badge>
                           </td>
                           <td className="p-4">
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => navigate(`/product/${product.id}`)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              {hasIndividualStock(product.id) && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => navigate(`/product-stock/${product.id}`)}
-                              >
-                                <Hash className="w-4 h-4" />
-                              </Button>
-                              )}
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => handleEditProduct(product)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={async () => await handleDuplicateProduct(product)}
-                                className="border-green-500 text-green-600 hover:bg-green-50"
-                                title="Duplicate Product"
-                                disabled={isDuplicatingProduct === product.id}
-                              >
-                                {isDuplicatingProduct === product.id ? (
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Copy className="w-4 h-4" />
+                            <TooltipProvider>
+                              <div className="flex gap-2">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => navigate(`/product/${product.id}`)}
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>View Details</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                {hasIndividualStock(product.id) && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => navigate(`/product-stock/${product.id}`)}
+                                    >
+                                      <Hash className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>View Stock</p>
+                                  </TooltipContent>
+                                </Tooltip>
                                 )}
-                              </Button>
-                              {hasIndividualStock(product.id) && (
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={async () => await handleAddToProduction(product)}
-                                className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                                disabled={isAddingToProduction === product.id}
-                              >
-                                {isAddingToProduction === product.id ? (
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Play className="w-4 h-4" />
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => handleEditProduct(product)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Edit Product</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={async () => await handleDuplicateProduct(product)}
+                                      className="border-green-500 text-green-600 hover:bg-green-50"
+                                      disabled={isDuplicatingProduct === product.id}
+                                    >
+                                      {isDuplicatingProduct === product.id ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Copy className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Duplicate Product</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                                {hasIndividualStock(product.id) && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={async () => await handleAddToProduction(product)}
+                                      className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                                      disabled={isAddingToProduction === product.id}
+                                    >
+                                      {isAddingToProduction === product.id ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Play className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Add to Production</p>
+                                  </TooltipContent>
+                                </Tooltip>
                                 )}
-                                </Button>
-                              )}
-                            </div>
+                              </div>
+                            </TooltipProvider>
                           </td>
                         </tr>
                     ))}

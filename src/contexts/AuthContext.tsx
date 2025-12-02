@@ -100,7 +100,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const hasPageAccess = (page: string): boolean => {
-    return AuthService.hasPageAccess(page);
+    // Simplified: All authenticated users have access to everything except settings and activity-logs
+    // Settings and activity-logs are handled by ProtectedRoute with requiredRole="admin"
+    if (page === 'settings' || page === 'activity-logs') {
+      return user?.role === 'admin';
+    }
+    // All other pages are accessible to all authenticated users
+    return true;
   };
 
   const value: AuthContextType = {

@@ -4,7 +4,6 @@ import { CustomerService, CreateCustomerData } from "@/services/customerService"
 import { SupplierService, CreateSupplierData } from "@/services/supplierService";
 import { MongoDBOrderService } from "@/services/api/orderService";
 import { useToast } from "@/hooks/use-toast";
-import { Header } from "@/components/layout/Header";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, Phone, Mail, MapPin, ShoppingBag, Save, X, Calendar, DollarSign, Package, User, Building, RefreshCw, CheckCircle, AlertTriangle, Truck } from "lucide-react";
+import { Plus, Search, Filter, Eye, Edit, MoreHorizontal, Phone, Mail, MapPin, ShoppingBag, Save, X, Calendar, DollarSign, Package, User, Building, CheckCircle, AlertTriangle, Truck } from "lucide-react";
 import { GSTApiService } from "@/services/gstApiService";
 import {
   DropdownMenu,
@@ -810,25 +809,6 @@ export default function Customers() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <Header 
-        title="Customer & Supplier Management" 
-        subtitle="Manage customer and supplier information and relationships"
-      />
-        <Button 
-          onClick={() => {
-            loadCustomers();
-            loadSuppliers();
-            loadOrders();
-          }}
-          variant="outline" 
-          size="sm"
-          className="gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Refresh Data
-        </Button>
-      </div>
 
       <Tabs value={activeTab} onValueChange={(value) => {
         // Prevent switching to tab if user doesn't have permission

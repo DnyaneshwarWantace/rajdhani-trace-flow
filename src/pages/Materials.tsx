@@ -3,7 +3,6 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { DropdownService } from "@/services/api/dropdownService";
 import { PurchaseOrderService } from "@/services/api/purchaseOrderService";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1861,7 +1860,6 @@ export default function Materials() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background p-6">
-        <Header title="Raw Materials" />
         <div className="max-w-7xl mx-auto mt-8">
           <div className="flex items-center justify-center h-64">
             <div className="text-lg">Loading materials...</div>
@@ -1873,8 +1871,6 @@ export default function Materials() {
 
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      <Header title="Raw Materials" />
-      
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-8">
           <div>

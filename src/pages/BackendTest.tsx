@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -475,10 +474,6 @@ export default function BackendTest() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header
-        title="Backend Testing Suite"
-        subtitle="Test all Supabase backend services and functionality"
-      />
 
       {/* Control Panel */}
       <Card>

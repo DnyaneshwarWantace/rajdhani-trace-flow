@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -142,10 +141,6 @@ export default function Analytics() {
   if (loading) {
     return (
       <div className="flex-1 space-y-6 p-6">
-        <Header
-          title="Business Analytics"
-          subtitle="Comprehensive insights into your carpet manufacturing business"
-        />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map(i => (
             <Card key={i} className="animate-pulse">
@@ -161,10 +156,6 @@ export default function Analytics() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header
-        title="Business Analytics"
-        subtitle="Real-time insights powered by MongoDB"
-      />
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

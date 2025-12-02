@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Header } from "@/components/layout/Header";
 import { ModernStatsGrid } from "@/components/dashboard/ModernStatsGrid";
 import { InteractiveCharts } from "@/components/dashboard/InteractiveCharts";
 import { RealtimeMetrics } from "@/components/dashboard/RealtimeMetrics";
@@ -188,13 +187,6 @@ export default function Dashboard() {
         initial="hidden"
         animate="visible"
       >
-        {/* Header */}
-        <motion.div variants={itemVariants}>
-          <Header
-            title="Business Dashboard"
-            subtitle="Real-time insights for carpets and raw materials business"
-          />
-        </motion.div>
 
         {loading && !dashboardData ? (
           <motion.div

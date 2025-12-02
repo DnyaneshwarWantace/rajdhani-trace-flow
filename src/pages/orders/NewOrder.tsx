@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -930,10 +929,6 @@ export default function NewOrder() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title="Create New Order" 
-        subtitle="Add customer details and order items"
-      />
 
       {/* Customer Selection */}
       <Card>

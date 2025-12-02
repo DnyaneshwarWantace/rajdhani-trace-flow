@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Header } from '@/components/layout/Header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings as SettingsIcon, Users, Shield, User as UserIcon, Key, Edit, Save, X, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Users, User as UserIcon, Key, Edit, Save, X, Eye, EyeOff } from 'lucide-react';
 import UserManagement from './settings/UserManagement';
-import PermissionManagement from './settings/PermissionManagement';
-import RoleManagement from './settings/RoleManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -155,13 +152,9 @@ export default function Settings() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header
-        title="Settings"
-        subtitle="Manage your account and system settings"
-      />
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <UserIcon className="w-4 h-4" />
             Profile
@@ -171,20 +164,10 @@ export default function Settings() {
             Security
           </TabsTrigger>
           {user?.role === 'admin' && (
-            <>
-              <TabsTrigger value="roles" className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                Roles
-              </TabsTrigger>
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 Users
               </TabsTrigger>
-              <TabsTrigger value="permissions" className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
-                Permissions
-              </TabsTrigger>
-            </>
           )}
         </TabsList>
 
@@ -463,24 +446,10 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
-        {/* Role Management Tab (Admin Only) */}
-        {user?.role === 'admin' && (
-          <TabsContent value="roles">
-            <RoleManagement />
-          </TabsContent>
-        )}
-
         {/* Users Tab (Admin Only) */}
         {user?.role === 'admin' && (
           <TabsContent value="users">
             <UserManagement />
-          </TabsContent>
-        )}
-
-        {/* Permissions Tab (Admin Only) */}
-        {user?.role === 'admin' && (
-          <TabsContent value="permissions">
-            <PermissionManagement />
           </TabsContent>
         )}
       </Tabs>

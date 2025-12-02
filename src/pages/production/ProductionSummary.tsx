@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProductionService } from "@/services/api/productionService";
@@ -120,10 +119,6 @@ export default function ProductionSummary() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header
-        title="Production Summary"
-        subtitle={`${productionFlow.flow_name?.replace(' Production Flow - Batch PRO-', ' - Batch ').replace('PRO-', '') || 'Production Details'}`}
-      />
 
       {/* Production Dates Card */}
       {batch && (

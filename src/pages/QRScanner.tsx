@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,10 +39,6 @@ export default function QRScanner() {
 
   return (
     <div className="flex-1 space-y-4 sm:space-y-6 p-3 sm:p-4 lg:p-6">
-      <Header
-        title="QR Code Scanner"
-        subtitle="Scan product QR codes to view details"
-      />
 
       <div className="flex items-center gap-4 mb-6">
         <Button

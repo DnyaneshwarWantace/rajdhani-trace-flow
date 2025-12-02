@@ -1,7 +1,7 @@
 import { getAuthHeaders, handleAuthError } from '@/utils/apiClient';
 import AuthService, { User } from './authService';
 
-const API_URL = 'https://rajdhani.wantace.com/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
 export interface CreateUserData {
   email: string;
@@ -22,10 +22,10 @@ export interface UpdateUserData {
 
 class UserService {
 
-  // Get all users
+  // Get all users (Admin only)
   static async getUsers(): Promise<{ data: User[] | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users`, {
+      const response = await fetch(`${API_URL}/auth/admin/users`, {
         headers: getAuthHeaders()
       });
 
@@ -45,7 +45,7 @@ class UserService {
   // Get user by ID
   static async getUserById(id: string): Promise<{ data: { user: User; permissions: any } | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users/${id}`, {
+      const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
         headers: getAuthHeaders()
       });
 
@@ -62,13 +62,16 @@ class UserService {
     }
   }
 
-  // Create user
+  // Create user (Admin only - sends welcome email with temp password)
   static async createUser(userData: CreateUserData): Promise<{ data: User | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
+      // Remove password from userData - backend will generate temp password
+      const { password, ...userDataWithoutPassword } = userData;
+
+      const response = await fetch(`${API_URL}/auth/admin/users`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify(userData)
+        body: JSON.stringify(userDataWithoutPassword)
       });
 
       const result = await response.json();
@@ -87,7 +90,7 @@ class UserService {
   // Update user
   static async updateUser(id: string, updates: UpdateUserData): Promise<{ data: User | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users/${id}`, {
+      const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(updates)
@@ -106,10 +109,10 @@ class UserService {
     }
   }
 
-  // Delete user
+  // Delete user (Admin only)
   static async deleteUser(id: string): Promise<{ error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users/${id}`, {
+      const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -130,7 +133,7 @@ class UserService {
   // Reset user password
   static async resetPassword(id: string, newPassword: string): Promise<{ error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users/${id}/reset-password`, {
+      const response = await fetch(`${API_URL}/auth/admin/users/${id}/reset-password`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ newPassword })
@@ -149,10 +152,10 @@ class UserService {
     }
   }
 
-  // Update user status
+  // Update user status (Admin only)
   static async updateUserStatus(id: string, status: 'active' | 'inactive' | 'suspended'): Promise<{ data: User | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/users/${id}/status`, {
+      const response = await fetch(`${API_URL}/auth/admin/users/${id}/status`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ status })

@@ -2,7 +2,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Home, ArrowLeft, Shield } from "lucide-react";
-import { Header } from "@/components/layout/Header";
 
 export default function AccessDenied() {
   const navigate = useNavigate();
@@ -15,7 +14,6 @@ export default function AccessDenied() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header title="Access Denied" />
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-2xl mx-auto">
           <Card className="border-destructive">

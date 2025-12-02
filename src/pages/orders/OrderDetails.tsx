@@ -7,7 +7,6 @@ import IndividualProductService from "@/services/api/individualProductService";
 import RawMaterialService from "@/services/api/rawMaterialService";
 import AuthService from "@/services/api/authService";
 import { supabase } from "@/lib/supabase";
-import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1010,7 +1009,6 @@ export default function OrderDetails() {
   if (loading) {
     return (
       <div className="flex-1 space-y-6 p-6">
-        <Header title="Order Details" subtitle="Loading..." />
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
@@ -1024,7 +1022,6 @@ export default function OrderDetails() {
   if (!order) {
     return (
       <div className="flex-1 space-y-6 p-6">
-        <Header title="Order Details" subtitle="Order not found" />
         <Card className="p-12 text-center">
           <Package className="w-20 h-20 mx-auto mb-6 text-muted-foreground" />
           <h3 className="text-xl font-semibold mb-3">Order Not Found</h3>
@@ -1083,10 +1080,6 @@ export default function OrderDetails() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <Header 
-        title={`Order ${order.orderNumber}`} 
-        subtitle="View complete order details and manage status"
-      />
 
       {/* Order Header */}
       <div className="flex items-center justify-between">

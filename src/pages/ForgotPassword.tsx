@@ -5,64 +5,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield, ArrowLeft } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield, ArrowLeft, KeyRound } from 'lucide-react';
 
-export default function Login() {
+export default function ForgotPassword() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Email, 2: OTP, 3: New Password
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loginMethod, setLoginMethod] = useState<'password' | 'otp'>('password'); // Default to password
-  const [showOTPStep, setShowOTPStep] = useState(false);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
-  // Handle password-based login (default method)
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || 'Invalid email or password');
-        setIsLoading(false);
-        return;
-      }
-
-      // Store auth data (matching AuthService keys)
-      localStorage.setItem('auth_token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-      localStorage.setItem('permissions', JSON.stringify(data.data.permissions));
-
-      // Navigate to dashboard
-      navigate('/');
-      window.location.reload(); // Reload to update auth context
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
-      setIsLoading(false);
-    }
-  };
-
-  // Handle OTP-based login (optional method)
+  // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -70,7 +31,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login-otp/request`, {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password/request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,9 +47,8 @@ export default function Login() {
         return;
       }
 
-      // Show OTP step
       setSuccess(data.message || 'OTP sent to your email');
-      setShowOTPStep(true);
+      setStep(2);
       setIsLoading(false);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
@@ -96,6 +56,7 @@ export default function Login() {
     }
   };
 
+  // Step 2: Verify OTP
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -103,12 +64,13 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login-otp/verify`, {
+      // Just verify OTP, don't reset yet
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password/reset`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify({ email, otp, newPassword: 'temp123' }), // Temporary password for verification
       });
 
       const data = await response.json();
@@ -122,32 +84,69 @@ export default function Login() {
         return;
       }
 
-      // Store auth data (matching AuthService keys)
-      localStorage.setItem('auth_token', data.data.token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-      localStorage.setItem('permissions', JSON.stringify(data.data.permissions));
-
-      // Navigate to dashboard
-      navigate('/');
-      window.location.reload(); // Reload to update auth context
+      // OTP verified, move to password reset
+      setSuccess('OTP verified! Set your new password');
+      setStep(3);
+      setIsLoading(false);
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setIsLoading(false);
     }
   };
 
-  const handleBackToLogin = () => {
-    setShowOTPStep(false);
+  // Step 3: Reset Password
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to reset password');
+        setIsLoading(false);
+        return;
+      }
+
+      setSuccess('Password reset successful! Redirecting to login...');
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setStep(1);
     setOtp('');
     setError('');
     setSuccess('');
     setAttemptsLeft(3);
-  };
-
-  const toggleLoginMethod = () => {
-    setLoginMethod(loginMethod === 'password' ? 'otp' : 'password');
-    setError('');
-    setSuccess('');
   };
 
   return (
@@ -156,26 +155,22 @@ export default function Login() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full flex items-center justify-center">
-              {showOTPStep ? (
-                <Shield className="w-8 h-8 text-white" />
-              ) : (
-                <Lock className="w-8 h-8 text-white" />
-              )}
+              {step === 1 && <KeyRound className="w-8 h-8 text-white" />}
+              {step === 2 && <Shield className="w-8 h-8 text-white" />}
+              {step === 3 && <Lock className="w-8 h-8 text-white" />}
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">Rajdhani Carpets</CardTitle>
+          <CardTitle className="text-3xl font-bold">Reset Password</CardTitle>
           <CardDescription className="text-base">
-            {showOTPStep
-              ? 'Enter verification code'
-              : loginMethod === 'password'
-                ? 'Sign in to your account'
-                : 'Login with OTP'}
+            {step === 1 && 'Enter your email to receive a verification code'}
+            {step === 2 && 'Enter the verification code sent to your email'}
+            {step === 3 && 'Create your new password'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!showOTPStep ? (
-            // Step 1: Email & Password OR Email only (for OTP)
-            <form onSubmit={loginMethod === 'password' ? handlePasswordLogin : handleRequestOTP} className="space-y-4">
+          {step === 1 && (
+            // Step 1: Request OTP
+            <form onSubmit={handleRequestOTP} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -190,7 +185,7 @@ export default function Login() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@rajdhani.com"
+                    placeholder="your@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
@@ -200,42 +195,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {loginMethod === 'password' && (
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="password">Password</Label>
-                    <Link to="/forgot-password" className="text-xs text-blue-600 hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="pl-10 pr-10"
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      disabled={isLoading}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
@@ -244,27 +203,23 @@ export default function Login() {
                 {isLoading ? (
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {loginMethod === 'password' ? 'Signing in...' : 'Sending OTP...'}
+                    Sending OTP...
                   </div>
                 ) : (
-                  loginMethod === 'password' ? 'Sign In' : 'Send OTP'
+                  'Send Verification Code'
                 )}
               </Button>
 
-              <div className="text-center space-y-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={toggleLoginMethod}
-                  disabled={isLoading}
-                  className="text-sm text-blue-600 hover:text-blue-700"
-                >
-                  {loginMethod === 'password' ? 'Login with OTP instead' : 'Login with password instead'}
-                </Button>
+              <div className="text-center">
+                <Link to="/login" className="text-sm text-blue-600 hover:underline">
+                  Back to Login
+                </Link>
               </div>
             </form>
-          ) : (
-            // Step 2: OTP Verification
+          )}
+
+          {step === 2 && (
+            // Step 2: Verify OTP
             <form onSubmit={handleVerifyOTP} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
@@ -316,7 +271,7 @@ export default function Login() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={handleBackToLogin}
+                  onClick={handleBackToEmail}
                   disabled={isLoading}
                   className="flex-1"
                 >
@@ -334,7 +289,7 @@ export default function Login() {
                       Verifying...
                     </div>
                   ) : (
-                    'Verify & Sign In'
+                    'Verify Code'
                   )}
                 </Button>
               </div>
@@ -351,24 +306,91 @@ export default function Login() {
             </form>
           )}
 
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-center text-gray-600">
-              {showOTPStep ? (
-                'Check your email for the verification code'
-              ) : loginMethod === 'password' ? (
-                'Default credentials for testing:'
-              ) : (
-                'OTP will be sent to your registered email'
+          {step === 3 && (
+            // Step 3: New Password
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
-            </p>
-            {!showOTPStep && loginMethod === 'password' && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-center space-y-1">
-                <p className="font-medium">Email: admin@rajdhani.com</p>
-                <p className="font-medium">Password: admin123</p>
-                <p className="text-blue-600 mt-2">✓ Development Mode</p>
+
+              {success && (
+                <Alert className="border-green-200 bg-green-50">
+                  <Shield className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800">{success}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="newPassword">New Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="newPassword"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="pl-10 pr-10"
+                    required
+                    disabled={isLoading}
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pl-10 pr-10"
+                    required
+                    disabled={isLoading}
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={isLoading}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Resetting password...
+                  </div>
+                ) : (
+                  'Reset Password'
+                )}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
