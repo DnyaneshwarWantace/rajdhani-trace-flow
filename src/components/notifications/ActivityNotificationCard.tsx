@@ -20,7 +20,6 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import type { Notification } from '@/services/notificationService';
-import { NotificationService } from '@/services/notificationService';
 import { ManageStockService } from '@/services/manageStockService';
 import type { StockOrder } from '@/types/manageStock';
 

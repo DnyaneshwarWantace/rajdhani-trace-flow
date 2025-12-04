@@ -22,10 +22,7 @@ import {
   XCircle,
   Factory,
   Package,
-  ShoppingCart,
-  Users,
-  Building2,
-  ChefHat
+  ShoppingCart
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { categorizeNotifications } from '@/utils/notificationCategories';
@@ -89,45 +86,6 @@ export default function Notifications() {
     }
   };
 
-  const handleMarkAsRead = async (id: string) => {
-    try {
-      await NotificationService.updateNotificationStatus(id, 'read');
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
-      );
-      toast({
-        title: 'Success',
-        description: 'Notification marked as read',
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to mark notification as read',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleMarkAsUnread = async (id: string) => {
-    try {
-      await NotificationService.updateNotificationStatus(id, 'unread');
-      setNotifications(prev =>
-        prev.map(n => n.id === id ? { ...n, status: 'unread' as const } : n)
-      );
-      toast({
-        title: 'Success',
-        description: 'Notification marked as unread',
-      });
-    } catch (error) {
-      console.error('Error marking notification as unread:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to mark notification as unread',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -180,33 +138,6 @@ export default function Notifications() {
     return <Info className="w-5 h-5 text-gray-600" />;
   };
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return <Badge className="bg-red-100 text-red-700 border-red-200">Urgent</Badge>;
-      case 'high':
-        return <Badge className="bg-orange-100 text-orange-700 border-orange-200">High</Badge>;
-      case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">Medium</Badge>;
-      case 'low':
-        return <Badge className="bg-green-100 text-green-700 border-green-200">Low</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'unread':
-        return <Badge className="bg-blue-100 text-blue-700 border-blue-200">Unread</Badge>;
-      case 'read':
-        return <Badge className="bg-gray-100 text-gray-700 border-gray-200">Read</Badge>;
-      case 'dismissed':
-        return <Badge className="bg-gray-200 text-gray-600 border-gray-300">Dismissed</Badge>;
-      default:
-        return null;
-    }
-  };
 
   const handleNotificationClick = (notification: Notification) => {
     // Navigate based on module
@@ -377,84 +308,7 @@ export default function Notifications() {
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
   const allUnreadCount = allNotifications.filter(n => n.status === 'unread').length;
   const activityUnreadCount = activityLogNotifications.filter(n => n.status === 'unread').length;
-  const readCount = notifications.filter(n => n.status === 'read').length;
-  const dismissedCount = notifications.filter(n => n.status === 'dismissed').length;
 
-  // Get counts for each section
-  const getSectionCounts = () => {
-    const materialNotifications = notifications.filter(n => 
-      n.module === 'materials' || 
-      n.related_data?.action_category === 'MATERIAL' ||
-      n.related_data?.action_category === 'PURCHASE_ORDER' ||
-      n.related_data?.action?.includes('MATERIAL_') ||
-      n.related_data?.action?.includes('PURCHASE_ORDER_')
-    );
-    
-    const productNotifications = notifications.filter(n => 
-      n.module === 'products' || 
-      n.related_data?.action_category === 'PRODUCT' ||
-      n.related_data?.action?.includes('PRODUCT_')
-    );
-    
-    const orderNotifications = notifications.filter(n => 
-      (n.module === 'orders' && !n.related_data?.action?.includes('PURCHASE_ORDER')) ||
-      (n.related_data?.action_category === 'ORDER' && !n.related_data?.action?.includes('PURCHASE_ORDER')) ||
-      (n.related_data?.action?.includes('ORDER_') && !n.related_data?.action?.includes('PURCHASE_ORDER'))
-    );
-    
-    const customerNotifications = notifications.filter(n => 
-      n.related_data?.action_category === 'CLIENT' ||
-      n.related_data?.action?.includes('CLIENT_') ||
-      n.related_data?.action?.includes('CUSTOMER_')
-    );
-    
-    const supplierNotifications = notifications.filter(n => 
-      n.related_data?.action?.includes('SUPPLIER_')
-    );
-    
-    const productionNotifications = notifications.filter(n => 
-      n.module === 'production' ||
-      n.related_data?.action_category === 'RECIPE' ||
-      n.related_data?.action_category === 'PRODUCTION' ||
-      n.related_data?.action?.includes('RECIPE_') ||
-      n.related_data?.action?.includes('PRODUCTION_')
-    );
-
-    return {
-      material: {
-        notifications: materialNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: materialNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: materialNotifications.filter(n => n.status === 'unread').length,
-      },
-      product: {
-        notifications: productNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: productNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: productNotifications.filter(n => n.status === 'unread').length,
-      },
-      order: {
-        notifications: orderNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: orderNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: orderNotifications.filter(n => n.status === 'unread').length,
-      },
-      customer: {
-        notifications: customerNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: customerNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: customerNotifications.filter(n => n.status === 'unread').length,
-      },
-      supplier: {
-        notifications: supplierNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: supplierNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: supplierNotifications.filter(n => n.status === 'unread').length,
-      },
-      production: {
-        notifications: productionNotifications.filter(n => !n.related_data?.activity_log_id).length,
-        logs: productionNotifications.filter(n => n.related_data?.activity_log_id).length,
-        unread: productionNotifications.filter(n => n.status === 'unread').length,
-      },
-    };
-  };
-
-  const sectionCounts = getSectionCounts();
 
   return (
     <Layout>
