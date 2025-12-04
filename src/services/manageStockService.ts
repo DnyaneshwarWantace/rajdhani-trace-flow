@@ -3,7 +3,7 @@
  * Handles all purchase order operations for the ManageStock page
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://rajdhani.wantace.com/api';
 
 export interface StockOrder {
   id: string;
