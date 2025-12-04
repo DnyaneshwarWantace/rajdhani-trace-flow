@@ -1,0 +1,140 @@
+import ProductTable from '@/components/products/ProductTable';
+import ProductCard from '@/components/products/ProductCard';
+import InventoryFilters from './InventoryFilters';
+import ProductPagination from './ProductPagination';
+import type { Product, ProductFilters } from '@/types/product';
+
+interface InventoryTabProps {
+  products: Product[];
+  loading: boolean;
+  error: string | null;
+  filters: ProductFilters;
+  viewMode: 'grid' | 'table';
+  totalProducts: number;
+  onSearchChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onStatusChange: (value: string) => void;
+  onViewModeChange: (mode: 'grid' | 'table') => void;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+  onView: (product: Product) => void;
+  onEdit: (product: Product) => void;
+  onDuplicate: (product: Product) => void;
+  onStock: (product: Product) => void;
+  onProduction: (product: Product) => void;
+  onQRCode?: (product: Product) => void;
+}
+
+export default function InventoryTab({
+  products,
+  loading,
+  error,
+  filters,
+  viewMode,
+  totalProducts,
+  onSearchChange,
+  onCategoryChange,
+  onStatusChange,
+  onViewModeChange,
+  onPageChange,
+  onLimitChange,
+  onView,
+  onEdit,
+  onDuplicate,
+  onStock,
+  onProduction,
+  onQRCode,
+}: InventoryTabProps) {
+  return (
+    <>
+      <InventoryFilters
+        filters={filters}
+        viewMode={viewMode}
+        onSearchChange={onSearchChange}
+        onCategoryChange={onCategoryChange}
+        onStatusChange={onStatusChange}
+        onViewModeChange={onViewModeChange}
+      />
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Products List */}
+      {!loading && !error && (
+        <>
+          {/* Desktop View */}
+          <div className="hidden lg:block">
+            {viewMode === 'table' ? (
+              <ProductTable
+                products={products}
+                onView={onView}
+                onEdit={onEdit}
+                onDuplicate={onDuplicate}
+                onStock={onStock}
+                onProduction={onProduction}
+                onQRCode={onQRCode}
+              />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product._id}
+                    product={product}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onDuplicate={onDuplicate}
+                    onStock={onStock}
+                    onProduction={onProduction}
+                    onQRCode={onQRCode}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Mobile View - Always Grid */}
+          <div className="lg:hidden">
+            <div className="grid grid-cols-1 gap-4">
+              {products.map((product) => (
+                <ProductCard
+                  key={product._id}
+                  product={product}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDuplicate={onDuplicate}
+                  onStock={onStock}
+                  onProduction={onProduction}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Pagination */}
+          <ProductPagination
+            totalProducts={totalProducts}
+            filters={filters}
+            onPageChange={onPageChange}
+            onLimitChange={onLimitChange}
+          />
+        </>
+      )}
+    </>
+  );
+}
+

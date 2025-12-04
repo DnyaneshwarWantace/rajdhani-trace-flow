@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Force Select dropdown to have solid white background */
+[data-radix-select-content] {
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-radix-select-viewport] {
+  background-color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* Ensure primary buttons (blue) have white text */
+button.bg-primary-600,
+button.bg-primary-700,
+button[class*="bg-primary-600"],
+button[class*="bg-primary-700"],
+.bg-primary-600 button,
+.bg-primary-700 button {
+  color: white !important;
+}
+
+/* Also apply to any element with primary background */
+.bg-primary-600,
+.bg-primary-700 {
+  color: white !important;
+}
+
+/* Hide scrollbars globally but keep scrolling functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
+  background: transparent;
+}
