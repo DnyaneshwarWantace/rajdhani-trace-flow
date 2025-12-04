@@ -57,7 +57,7 @@ export default function ProductionNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <ChefHat className="w-4 h-4 text-teal-600" />;
   };
 

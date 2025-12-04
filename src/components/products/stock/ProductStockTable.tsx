@@ -100,8 +100,8 @@ export default function ProductStockTable({
                   : 'N/A'}
               </td>
               <td className="p-3">
-                <Badge variant={getQualityVariant(item.quality_grade)}>
-                  {item.quality_grade}
+                <Badge variant={getQualityVariant(item.quality_grade || 'N/A')}>
+                  {item.quality_grade || 'N/A'}
                 </Badge>
               </td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.inspector || 'N/A'}</td>

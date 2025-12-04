@@ -28,7 +28,7 @@ export default function ProductCard({
   onProduction,
   onQRCode,
   showActions = true,
-  variant = 'default',
+  variant: _variant = 'default',
   isSelected = false,
   onClick,
 }: ProductCardProps) {

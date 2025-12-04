@@ -13,9 +13,9 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
     ? (material.current_stock / material.max_capacity) * 100 
     : 0;
 
-  const reorderPercentage = material.max_capacity > 0
-    ? (material.reorder_point / material.max_capacity) * 100
-    : 0;
+  // const reorderPercentage = material.max_capacity > 0
+  //   ? (material.reorder_point / material.max_capacity) * 100
+  //   : 0;
 
   const getStockStatus = () => {
     if (material.current_stock === 0) {

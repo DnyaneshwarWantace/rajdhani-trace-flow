@@ -25,9 +25,9 @@ export default function ProductViewModal({
   onClose,
   product,
   onEdit,
-  onDuplicate,
+  onDuplicate: _onDuplicate,
   onStockAdjust,
-  onProduction,
+  onProduction: _onProduction,
 }: ProductViewModalProps) {
   if (!isOpen || !product) return null;
 
@@ -36,7 +36,7 @@ export default function ProductViewModal({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
         <div className="overflow-y-auto max-h-[90vh]">
           {/* Header with Image */}
-          <ProductDetailHeader product={product} onClose={onClose} />
+          <ProductDetailHeader product={product} />
 
           {/* Stats Cards */}
           <ProductDetailStats product={product} />
@@ -64,10 +64,7 @@ export default function ProductViewModal({
           {/* Actions Footer */}
           <ProductDetailActions
             onEdit={onEdit ? () => onEdit(product) : undefined}
-            onDuplicate={onDuplicate ? () => onDuplicate(product) : undefined}
-            onStockAdjust={onStockAdjust ? () => onStockAdjust(product) : undefined}
-            onProduction={onProduction ? () => onProduction(product) : undefined}
-            onClose={onClose}
+            onStock={onStockAdjust ? () => onStockAdjust(product) : undefined}
           />
         </div>
       </DialogContent>

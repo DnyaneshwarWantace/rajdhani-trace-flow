@@ -12,7 +12,7 @@ interface IndividualProductHeaderProps {
 
 export default function IndividualProductHeader({
   individualProduct,
-  product,
+  product: _product,
   onBack,
   onEdit,
 }: IndividualProductHeaderProps) {

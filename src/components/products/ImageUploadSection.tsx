@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { X, Upload, Image } from 'lucide-react';
 
 interface ImageUploadSectionProps {

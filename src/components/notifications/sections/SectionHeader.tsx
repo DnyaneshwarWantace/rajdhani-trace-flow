@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface SectionHeaderProps {
   title: string;

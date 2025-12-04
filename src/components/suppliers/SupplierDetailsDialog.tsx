@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building, Mail, Phone, MapPin, Calendar, DollarSign, Package, ShoppingBag, Edit, X, Star, Truck } from 'lucide-react';
+import { Building, Mail, Phone, MapPin, Calendar, DollarSign, Package, ShoppingBag, Edit, X, Star } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Supplier } from '@/services/supplierService';
 import type { StockOrder } from '@/services/manageStockService';

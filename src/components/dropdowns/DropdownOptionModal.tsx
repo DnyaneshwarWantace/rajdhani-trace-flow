@@ -27,7 +27,7 @@ export default function DropdownOptionModal({
   open,
   onOpenChange,
   option,
-  category,
+  category: _category,
   categoryLabel,
   formData,
   onFormDataChange,

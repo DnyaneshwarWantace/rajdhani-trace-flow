@@ -55,7 +55,7 @@ export default function OrderNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <ShoppingCart className="w-4 h-4 text-purple-600" />;
   };
 

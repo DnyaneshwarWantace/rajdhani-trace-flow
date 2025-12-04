@@ -135,7 +135,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
     );
   }
 
-  const availableWaste = wasteData.filter((w) => w.status === 'available_for_reuse');
+  // const availableWaste = wasteData.filter((w) => w.status === 'available_for_reuse');
 
   return (
     <div className="space-y-6">

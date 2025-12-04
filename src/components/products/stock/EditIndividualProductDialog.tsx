@@ -55,7 +55,7 @@ export default function EditIndividualProductDialog({
         inspector: individualProduct.inspector || '',
         location: individualProduct.location || '',
         notes: individualProduct.notes || '',
-        status: individualProduct.status || 'available',
+        status: (individualProduct.status || 'available') as 'available' | 'sold' | 'damaged' | 'returned',
       });
     }
   }, [individualProduct, open]);

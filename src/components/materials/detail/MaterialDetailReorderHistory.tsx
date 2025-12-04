@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, Package, Calendar, Building2, DollarSign, Loader2 } from 'lucide-react';
+import { ShoppingBag, Package, Calendar, Building2, Loader2 } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
-import { ManageStockService, type StockOrder } from '@/services/manageStockService';
+import type { StockOrder } from '@/services/manageStockService';
 import type { RawMaterial } from '@/types/material';
 
 interface MaterialDetailReorderHistoryProps {

@@ -515,7 +515,7 @@ export default function MaterialSelectorDialog({
                   </div>
                   
                   {/* SQM Calculation Display for Products */}
-                  {chosenType === 'product' && selectedMaterial && (
+                  {chosenType === 'product' && selectedMaterial && 'length' in selectedMaterial && (
                     <div className="mt-3 space-y-2">
                       {selectedMaterial.length && selectedMaterial.width && (
                         <div className="p-2 bg-white rounded border border-primary-200">

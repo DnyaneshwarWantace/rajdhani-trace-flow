@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Clock, CheckCircle, Calendar, Package } from 'lucide-react';
+import { Clock, CheckCircle, Package } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
 interface IndividualProductHistoryProps {

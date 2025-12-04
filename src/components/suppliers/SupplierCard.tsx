@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, MapPin, Edit, Trash2, Eye, Star, Calendar } from 'lucide-react';
+import { Mail, Phone, MapPin, Edit, Trash2, Eye, Star } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Supplier } from '@/services/supplierService';
 import type { StockOrder } from '@/services/manageStockService';

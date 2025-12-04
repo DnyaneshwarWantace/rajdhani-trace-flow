@@ -102,7 +102,8 @@ function checkIfMaterialDetailsString(notes: string): string | null {
 
     // If it contains 3 or more material detail patterns, it's likely just material details
     // Also check if it doesn't contain other meaningful text
-    const hasOtherText = !/^(Material|Quantity|Unit|Cost|Min|Max|Quality|Is Restock|Batch)/i.test(notes.split(',')[0]?.trim() || '');
+    // Check if notes contain other meaningful text beyond material details
+    // const hasOtherText = !/^(Material|Quantity|Unit|Cost|Min|Max|Quality|Is Restock|Batch)/i.test(notes.split(',')[0]?.trim() || '');
     
     if (patternCount >= 3) {
       // This is likely just formatted material details

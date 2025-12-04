@@ -51,7 +51,7 @@ export function calculateProductRatio(sourceProduct: any, targetProduct: any): n
   }
   
   const sourceSQM = calculateSQM(sourceProduct.length, sourceProduct.width, sourceLengthUnit, sourceWidthUnit);
-  const targetSQM = calculateSQM(targetProduct.length, targetProduct.width, targetLengthUnit, targetWidthUnit);
+  // const targetSQM = calculateSQM(targetProduct.length, targetProduct.width, targetLengthUnit, targetWidthUnit);
   
   // Calculate how many units of source product are needed for 1 SQM of target product
   // Formula: 1 / sourceSQM (units of source per 1 SQM of target)

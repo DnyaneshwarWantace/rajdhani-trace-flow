@@ -60,8 +60,10 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   const loadDropdowns = async () => {
     try {
       // Load suppliers
-      const suppliersData = await SupplierService.getSuppliers();
-      setSuppliers(suppliersData.map((s) => ({ id: s.id, name: s.name })));
+      const suppliersResult = await SupplierService.getSuppliers();
+      if (suppliersResult.data) {
+        setSuppliers(suppliersResult.data.map((s) => ({ id: s.id, name: s.name })));
+      }
 
       // Load all dropdowns from backend
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';

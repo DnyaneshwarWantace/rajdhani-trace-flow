@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import { Calendar, User, MapPin, FileText } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';

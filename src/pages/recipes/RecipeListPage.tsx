@@ -5,7 +5,7 @@ import { RecipeService } from '@/services/recipeService';
 import RecipeList from '@/components/recipes/RecipeList';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, FileText, Loader2 } from 'lucide-react';
+import { Plus, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Recipe } from '@/types/recipe';
 

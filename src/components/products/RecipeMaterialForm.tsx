@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Search, X, Calculator } from 'lucide-react';
 import MaterialSelectorDialog from './MaterialSelectorDialog';
 import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
-import { calculateProductRatio } from '@/utils/productRatioCalculator';
 
 interface RecipeMaterial {
   materialId: string;
@@ -34,7 +33,7 @@ export default function RecipeMaterialForm({
   targetProduct,
 }: RecipeMaterialFormProps) {
   const [showMaterialSelector, setShowMaterialSelector] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  // const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   // Calculate SQM for target product
   const targetSQM = targetProduct 

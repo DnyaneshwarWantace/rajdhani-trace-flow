@@ -34,8 +34,15 @@ export const getNotificationCategory = (notification: Notification): Notificatio
   // Check for stock-related
   if (
     notification.type === 'low_stock' ||
-    notification.type === 'restock_request' ||
-    notification.type === 'out_of_stock'
+    notification.type === 'restock_request'
+  ) {
+    return 'stock';
+  }
+  
+  // Check for out_of_stock in message or title
+  if (
+    notification.message?.toLowerCase().includes('out of stock') ||
+    notification.title?.toLowerCase().includes('out of stock')
   ) {
     return 'stock';
   }

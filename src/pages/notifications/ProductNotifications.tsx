@@ -55,7 +55,7 @@ export default function ProductNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <Package className="w-4 h-4 text-blue-600" />;
   };
 

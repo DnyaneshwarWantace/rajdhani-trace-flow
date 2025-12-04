@@ -112,7 +112,7 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
                   <p className="text-sm text-gray-600">Created On</p>
                   <p className="font-medium text-gray-900 flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    {formatIndianDateTime(order.createdAt || order.created_at)}
+                    {formatIndianDateTime((order.createdAt || order.created_at) as string)}
                   </p>
                 </div>
               )}

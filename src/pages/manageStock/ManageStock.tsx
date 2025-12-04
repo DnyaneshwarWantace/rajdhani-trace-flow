@@ -38,7 +38,7 @@ export default function ManageStock() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const { data, count } = await ManageStockService.getOrders({
+      const { data } = await ManageStockService.getOrders({
         search: filters.search,
         status: filters.status,
         limit: filters.limit,

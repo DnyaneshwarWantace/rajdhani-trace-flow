@@ -53,7 +53,7 @@ export default function SupplierNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <Building2 className="w-4 h-4 text-orange-600" />;
   };
 

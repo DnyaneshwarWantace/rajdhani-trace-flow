@@ -55,7 +55,7 @@ export default function CustomerNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <Users className="w-4 h-4 text-green-600" />;
   };
 

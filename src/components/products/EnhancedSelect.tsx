@@ -26,7 +26,7 @@ export default function EnhancedSelect({
   onAddNew,
   placeholder = 'Select...',
   required = false,
-  searchable = false,
+  searchable: _searchable = false,
 }: EnhancedSelectProps) {
   const [showAddNew, setShowAddNew] = useState(false);
   const [newValue, setNewValue] = useState('');

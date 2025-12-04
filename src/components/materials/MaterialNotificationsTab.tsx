@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, RefreshCw, Clock, Warehouse, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
+import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 

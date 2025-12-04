@@ -13,7 +13,7 @@ interface ActivityLogSectionProps {
 export default function ActivityLogSectionComponent({
   section,
   onNotificationClick,
-  getNotificationIcon,
+  getNotificationIcon: _getNotificationIcon,
 }: ActivityLogSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 

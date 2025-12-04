@@ -57,7 +57,7 @@ export default function MaterialNotifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
+  const getNotificationIcon = (_type: string, _module: string) => {
     return <Factory className="w-4 h-4 text-indigo-600" />;
   };
 

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Package, Factory, DollarSign, AlertCircle } from 'lucide-react';
+import { FileText, Package, Factory } from 'lucide-react';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
 import type { Recipe } from '@/types/recipe';

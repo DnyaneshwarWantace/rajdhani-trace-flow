@@ -4,7 +4,7 @@ import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { MaterialService } from '@/services/materialService';
 import { RecipeService } from '@/services/recipeService';
-import type { Recipe, RecipeMaterial } from '@/types/recipe';
+import type { RecipeMaterial as BackendRecipeMaterial } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { X, Calculator } from 'lucide-react';
 import { calculateSQM } from '@/utils/sqmCalculator';
@@ -143,7 +143,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       const recipe = await RecipeService.getRecipeByProductId(productId);
       if (recipe && recipe.materials) {
         // Convert recipe materials to form format
-        const materials: RecipeMaterial[] = recipe.materials.map((mat: RecipeMaterial) => ({
+        const materials: RecipeMaterial[] = recipe.materials.map((mat: BackendRecipeMaterial) => ({
           materialId: mat.material_id,
           materialName: mat.material_name,
           quantity: mat.quantity_per_sqm.toString(),

@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX, Shield } from 'lucide-react';
+import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX } from 'lucide-react';
 import { UserService } from '@/services/userService';
 import type { CreateUserData, UpdateUserData } from '@/services/userService';
 import type { User } from '@/types/auth';
