@@ -66,7 +66,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       }
 
       // Load all dropdowns from backend
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const API_URL = import.meta.env.VITE_API_URL || '/api';
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/dropdowns`, {

@@ -11,7 +11,7 @@ import { User, Key, Users, Edit, Save, X, Eye, EyeOff, LogOut } from 'lucide-rea
 import UserManagement from './UserManagement';
 import Layout from '@/components/layout/Layout';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function Settings() {
   const { user, logout } = useAuth();
