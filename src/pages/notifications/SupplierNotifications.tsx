@@ -71,7 +71,12 @@ export default function SupplierNotifications() {
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
       return true;
     })
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort((a, b) => {
+      // For activity logs, use the activity log's created_at from related_data if available
+      const dateA = a.related_data?.created_at || a.created_at;
+      const dateB = b.related_data?.created_at || b.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
 
   const filteredLogs = activityLogs
     .filter(n => {
@@ -80,7 +85,12 @@ export default function SupplierNotifications() {
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
       return true;
     })
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    .sort((a, b) => {
+      // For activity logs, use the activity log's created_at from related_data if available
+      const dateA = a.related_data?.created_at || a.created_at;
+      const dateB = b.related_data?.created_at || b.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 

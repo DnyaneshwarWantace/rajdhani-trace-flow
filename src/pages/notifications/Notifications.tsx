@@ -208,9 +208,12 @@ export default function Notifications() {
     }
     
     // Sort by date (latest first)
-    return logs.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    // For activity logs, use the activity log's created_at from related_data if available
+    return logs.sort((a, b) => {
+      const dateA = a.related_data?.created_at || a.created_at;
+      const dateB = b.related_data?.created_at || b.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
   };
 
   // Filter notifications by selected category
@@ -305,7 +308,10 @@ export default function Notifications() {
       if (a.status === 'unread' && b.status !== 'unread') return -1;
       if (a.status !== 'unread' && b.status === 'unread') return 1;
       // Then sort by date (newest first)
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      // For activity logs, use the activity log's created_at from related_data if available
+      const dateA = a.related_data?.created_at || a.created_at;
+      const dateB = b.related_data?.created_at || b.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
