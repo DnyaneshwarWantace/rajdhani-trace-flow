@@ -6,6 +6,7 @@ import { SupplierService } from '@/services/supplierService';
 import type { RawMaterialFormData } from '@/types/material';
 import type { DropdownOption } from '@/types/dropdown';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import MaterialBasicInfo from './form/MaterialBasicInfo';
 import MaterialSupplierSection from './form/MaterialSupplierSection';
 import MaterialCategorySection from './form/MaterialCategorySection';
@@ -28,6 +29,8 @@ interface Supplier {
 
 export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: AddToInventoryDialogProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -253,16 +256,49 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
 
     try {
       // Validate required fields
-      if (
-        !formData.name ||
-        !formData.supplier ||
-        !formData.category ||
-        !formData.unit ||
-        !formData.costPerUnit
-      ) {
+      const missingFields: string[] = [];
+      
+      if (!formData.name || formData.name.trim() === '') {
+        missingFields.push('Material Name');
+      }
+      if (!formData.supplier || formData.supplier.trim() === '') {
+        missingFields.push('Supplier');
+      }
+      if (!formData.category || formData.category.trim() === '') {
+        missingFields.push('Category');
+      }
+      if (!formData.unit || formData.unit.trim() === '') {
+        missingFields.push('Unit');
+      }
+      if (!formData.costPerUnit || formData.costPerUnit.trim() === '' || formData.costPerUnit === '0') {
+        missingFields.push('Cost per Unit');
+      }
+      if (isAdmin && (!formData.currentStock || formData.currentStock.trim() === '' || formData.currentStock === '0')) {
+        missingFields.push('Current Stock');
+      }
+      
+      // Validate cost per unit must be greater than 0
+      const costPerUnit = parseFloat(formData.costPerUnit);
+      if (isNaN(costPerUnit) || costPerUnit <= 0) {
+        if (!missingFields.includes('Cost per Unit')) {
+          missingFields.push('Cost per Unit (must be > 0)');
+        }
+      }
+      
+      // Validate current stock if admin
+      if (isAdmin) {
+        const currentStock = parseFloat(formData.currentStock);
+        if (isNaN(currentStock) || currentStock < 0) {
+          if (!missingFields.includes('Current Stock')) {
+            missingFields.push('Current Stock (must be >= 0)');
+          }
+        }
+      }
+
+      if (missingFields.length > 0) {
         toast({
           title: 'Validation Error',
-          description: 'Please fill in all required fields',
+          description: `Please fill in: ${missingFields.join(', ')}`,
           variant: 'destructive',
         });
         setLoading(false);
@@ -410,6 +446,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
             maxCapacity={formData.maxCapacity}
             reorderPoint={formData.reorderPoint}
             showCurrentStock={true}
+            isCurrentStockEditable={isAdmin}
             onCurrentStockChange={(value) => setFormData({ ...formData, currentStock: value })}
             onMinThresholdChange={(value) => setFormData({ ...formData, minThreshold: value })}
             onMaxCapacityChange={(value) => setFormData({ ...formData, maxCapacity: value })}
@@ -427,7 +464,28 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={loading} className="bg-primary-600 text-white hover:bg-primary-700">
+          <Button 
+            type="submit" 
+            onClick={handleSubmit} 
+            disabled={
+              loading ||
+              !formData.name ||
+              !formData.supplier ||
+              !formData.category ||
+              !formData.unit ||
+              !formData.costPerUnit ||
+              formData.costPerUnit === '0' ||
+              parseFloat(formData.costPerUnit || '0') <= 0 ||
+              isNaN(parseFloat(formData.costPerUnit || '0')) ||
+              (isAdmin && (
+                !formData.currentStock ||
+                formData.currentStock === '0' ||
+                parseFloat(formData.currentStock || '0') < 0 ||
+                isNaN(parseFloat(formData.currentStock || '0'))
+              ))
+            } 
+            className="bg-primary-600 text-white hover:bg-primary-700"
+          >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
