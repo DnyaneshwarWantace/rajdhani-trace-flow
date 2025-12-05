@@ -11,15 +11,24 @@ export function formatActivityMessage(log: ActivityLog): string {
   const changes = log.changes || {};
   const userName = log.user_name || 'User';
 
-  // Material-related actions
-  if (category === 'MATERIAL' || action.includes('MATERIAL_')) {
+  // Material-related actions - MUST check this FIRST before purchase order
+  // Check by category, action, or endpoint to catch all material actions
+  const isMaterial = category === 'MATERIAL' || 
+                    action.includes('MATERIAL_') ||
+                    action === 'MATERIAL_CREATE' ||
+                    action === 'MATERIAL_UPDATE' ||
+                    action === 'MATERIAL_DELETE' ||
+                    (log.endpoint && log.endpoint.includes('/raw-materials')) ||
+                    (log.endpoint && log.endpoint.includes('/materials'));
+
+  if (isMaterial) {
     const materialName = metadata.material_name || log.target_resource || 'Material';
 
-    if (action === 'MATERIAL_CREATE') {
+    if (action === 'MATERIAL_CREATE' || (action.includes('CREATE') && isMaterial)) {
       return `${userName} added new material "${materialName}" to inventory`;
     }
 
-    if (action === 'MATERIAL_UPDATE') {
+    if (action === 'MATERIAL_UPDATE' || (action.includes('UPDATE') && isMaterial)) {
       const changedFields = Object.keys(changes);
       if (changedFields.length > 0) {
         // Show key changes
@@ -44,16 +53,19 @@ export function formatActivityMessage(log: ActivityLog): string {
       return `${userName} updated material "${materialName}"`;
     }
 
-    if (action === 'MATERIAL_DELETE') {
+    if (action === 'MATERIAL_DELETE' || (action.includes('DELETE') && isMaterial)) {
       return `${userName} removed material "${materialName}" from inventory`;
     }
   }
 
-  // Purchase Order actions - check category, action, or description
-  const isPurchaseOrder = category === 'PURCHASE_ORDER' || 
-                         action.includes('PURCHASE_ORDER') || 
-                         action === 'PurchaseOrder' ||
-                         (log.description && log.description.toLowerCase().includes('purchase order'));
+  // Purchase Order actions - ONLY check if NOT a material action
+  // Be more strict - don't match just based on description containing "purchase order"
+  const isPurchaseOrder = !isMaterial && (
+    category === 'PURCHASE_ORDER' || 
+    action.includes('PURCHASE_ORDER') || 
+    action === 'PurchaseOrder' ||
+    (log.endpoint && log.endpoint.includes('/purchase-orders'))
+  );
   
   if (isPurchaseOrder) {
     // Extract order number from various sources
