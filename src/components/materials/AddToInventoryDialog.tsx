@@ -148,14 +148,33 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   };
 
   // Map frontend unit values to backend enum values
+  // IMPORTANT: Keep "L" as "L" if that's what's in the dropdown - don't normalize to "liters"
   const normalizeUnit = (unit: string): string => {
     if (!unit) return 'pieces'; // Default fallback
     
     const normalized = unit.trim();
+    
+    // First, check if the unit is already in the dropdown list - if so, use it as-is
+    // This prevents normalizing valid units like "L" to "liters" when "L" is a valid option
+    if (units.length > 0) {
+      // Check exact match
+      if (units.includes(normalized)) {
+        return normalized; // Use as-is if it's in the dropdown
+      }
+      // Check case-insensitive match
+      const unitLower = normalized.toLowerCase();
+      const matchingUnit = units.find(u => u.toLowerCase() === unitLower);
+      if (matchingUnit) {
+        return matchingUnit; // Return the exact case from the dropdown
+      }
+    }
+    
+    // If not in dropdown, use normalization mapping
     const unitMap: Record<string, string> = {
-      // Liters variations
-      'L': 'liters',
-      'l': 'liters',
+      // Keep "L" as "L" - don't normalize to "liters" if it's uppercase L
+      // Only normalize lowercase "l" and other variations
+      'L': 'L', // Keep uppercase L as-is
+      'l': 'L', // lowercase l -> uppercase L (to match dropdown)
       'Liters': 'liters',
       'liter': 'liters',
       'Liter': 'liters',
@@ -226,8 +245,11 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     }
     
     // If no match found, try to infer from common patterns
-    if (lower.includes('liter') || lower.includes('litre') || lower === 'l') {
-      return 'liters';
+    if (lower === 'l') {
+      return 'L'; // lowercase l -> uppercase L (to match dropdown)
+    }
+    if (lower.includes('liter') || lower.includes('litre')) {
+      return 'liters'; // Only normalize full words like "liter" or "litre" to "liters"
     }
     if (lower.includes('kilo') || lower === 'kg') {
       return 'kg';
