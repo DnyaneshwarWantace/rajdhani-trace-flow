@@ -343,6 +343,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       setInvalidFields(new Set());
 
       // Validate required fields and collect invalid ones
+      // Check in order of appearance in the form
       const missingFields: string[] = [];
       const fieldRefs: { [key: string]: React.RefObject<any> } = {
         name: nameRef,
@@ -353,19 +354,45 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         expectedDelivery: expectedDeliveryRef,
       };
 
-      if (!formData.name) missingFields.push('name');
-      if (!formData.supplier) missingFields.push('supplier');
-      if (!formData.category) missingFields.push('category');
-      if (!formData.unit) missingFields.push('unit');
-      if (!formData.costPerUnit) missingFields.push('costPerUnit');
-      if (mode === 'create' && !formData.expectedDelivery) missingFields.push('expectedDelivery');
+      // Check each field - use trim() for strings and check for empty strings
+      if (!formData.name || formData.name.trim() === '') {
+        missingFields.push('name');
+      }
+      if (!formData.supplier || formData.supplier.trim() === '') {
+        missingFields.push('supplier');
+      }
+      if (!formData.category || formData.category.trim() === '') {
+        missingFields.push('category');
+      }
+      if (!formData.unit || formData.unit.trim() === '') {
+        missingFields.push('unit');
+      }
+      if (!formData.costPerUnit || formData.costPerUnit.trim() === '') {
+        missingFields.push('costPerUnit');
+      }
+      if (mode === 'create' && (!formData.expectedDelivery || formData.expectedDelivery.trim() === '')) {
+        missingFields.push('expectedDelivery');
+      }
 
       if (missingFields.length > 0) {
         setInvalidFields(new Set(missingFields));
         
-        // Focus on first missing field
+        // Focus on first missing field (in order of form appearance)
         const firstMissingField = missingFields[0];
         const fieldRef = fieldRefs[firstMissingField];
+        
+        // Create a more specific error message
+        const fieldNames: { [key: string]: string } = {
+          name: 'Material Name',
+          supplier: 'Supplier',
+          category: 'Category',
+          unit: 'Unit',
+          costPerUnit: 'Cost per Unit',
+          expectedDelivery: 'Expected Delivery Date',
+        };
+        
+        const missingFieldNames = missingFields.map(f => fieldNames[f] || f).join(', ');
+        
         if (fieldRef?.current) {
           // Scroll to field
           fieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -377,9 +404,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
         toast({
           title: 'Validation Error',
-          description: mode === 'edit' 
-            ? 'Please fill in all required fields' 
-            : 'Please fill in all required fields including expected delivery date',
+          description: `Please fill in: ${missingFieldNames}`,
           variant: 'destructive',
         });
         setLoading(false);
@@ -387,12 +412,33 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       }
 
       // Validate expected delivery date is in the future (only for create mode)
-      if (mode === 'create') {
+      // Only validate if the date is actually filled (already checked above, but double-check)
+      if (mode === 'create' && formData.expectedDelivery && formData.expectedDelivery.trim() !== '') {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const expectedDate = new Date(formData.expectedDelivery);
+        
+        // Check if date is valid
+        if (isNaN(expectedDate.getTime())) {
+          setInvalidFields(new Set(['expectedDelivery']));
+          if (expectedDeliveryRef.current) {
+            expectedDeliveryRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              expectedDeliveryRef.current?.focus();
+            }, 100);
+          }
+          toast({
+            title: 'Validation Error',
+            description: 'Please enter a valid expected delivery date',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        
         expectedDate.setHours(0, 0, 0, 0);
         
+        // Only show error if date is today or in the past
         if (expectedDate <= today) {
           setInvalidFields(new Set(['expectedDelivery']));
           if (expectedDeliveryRef.current) {
