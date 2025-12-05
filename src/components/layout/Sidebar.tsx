@@ -148,10 +148,10 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           bg-white border-r border-gray-200
           transition-all duration-300 ease-in-out
           ${isOpen ? 'w-56' : 'w-0 lg:w-16'}
-          overflow-hidden
+          ${isOpen ? 'overflow-hidden' : 'overflow-visible'}
         `}
       >
-        <div className="flex flex-col h-full p-3">
+        <div className={`flex flex-col h-full p-3 ${!isOpen ? 'overflow-visible' : ''}`}>
           {/* Desktop Toggle Button */}
           <div className="hidden lg:flex justify-end mb-2">
             <button
@@ -185,7 +185,10 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
                 to={item.path}
                 onClick={() => {
                   setHoveredItem(null); // Clear hover state immediately
-                  onClose(); // Close sidebar on mobile when clicking a link
+                  // Only close sidebar on mobile (not on desktop when already collapsed)
+                  if (window.innerWidth < 1024) {
+                    onClose();
+                  }
                 }}
                 onMouseEnter={() => !isOpen && setHoveredItem(item.name)} // Only hover when collapsed
                 onMouseLeave={() => setHoveredItem(null)}
@@ -211,8 +214,7 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
                 {/* Tooltip - Show when sidebar is collapsed on desktop */}
                 {!isOpen && hoveredItem === item.name && (
-                  <div className="hidden lg:block fixed left-24 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-[9999] shadow-xl pointer-events-none"
-                    style={{ top: `${(menuItems.findIndex(i => i.name === item.name) * 64) + 140}px` }}>
+                  <div className="hidden lg:block absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-[9999] shadow-xl pointer-events-none">
                     {item.name}
                     <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
                   </div>

@@ -65,20 +65,24 @@ export default function OrderNotifications() {
     }
   };
 
-  // Apply filters
-  const filteredNotifications = notifications.filter(n => {
-    if (filterType !== 'all' && n.type !== filterType) return false;
-    if (filterStatus !== 'all' && n.status !== filterStatus) return false;
-    if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
-    return true;
-  });
+  // Apply filters and sort by date (latest first)
+  const filteredNotifications = notifications
+    .filter(n => {
+      if (filterType !== 'all' && n.type !== filterType) return false;
+      if (filterStatus !== 'all' && n.status !== filterStatus) return false;
+      if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
+      return true;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  const filteredLogs = activityLogs.filter(n => {
-    if (filterType !== 'all' && n.type !== filterType) return false;
-    if (filterStatus !== 'all' && n.status !== filterStatus) return false;
-    if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
-    return true;
-  });
+  const filteredLogs = activityLogs
+    .filter(n => {
+      if (filterType !== 'all' && n.type !== filterType) return false;
+      if (filterStatus !== 'all' && n.status !== filterStatus) return false;
+      if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
+      return true;
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
 

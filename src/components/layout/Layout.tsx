@@ -23,11 +23,9 @@ export default function Layout({ children }: LayoutProps) {
   useEffect(() => {
     const handleResize = () => {
       const isDesktop = window.innerWidth >= 1024;
-      // On desktop (>= 1024px), open sidebar if closed
       // On mobile (< 1024px), close sidebar if open
-      if (isDesktop && !isSidebarOpen) {
-        setIsSidebarOpen(true);
-      } else if (!isDesktop && isSidebarOpen) {
+      // On desktop, don't auto-open - let user control it
+      if (!isDesktop && isSidebarOpen) {
         setIsSidebarOpen(false);
       }
     };
