@@ -17,7 +17,28 @@ export const convertActivityLogToNotification = async (
       method: activityLog.method
     });
     
-    // Skip certain actions that shouldn't create notifications
+    // IMPORTANT: Check if this is a material or purchase order action FIRST
+    // These should ALWAYS create notifications, regardless of endpoint or other checks
+    const isMaterialAction = activityLog.action_category === 'MATERIAL' || 
+                            activityLog.action?.includes('MATERIAL') ||
+                            activityLog.action === 'MATERIAL_CREATE' ||
+                            activityLog.action === 'MATERIAL_UPDATE' ||
+                            activityLog.action === 'MATERIAL_DELETE' ||
+                            (activityLog.endpoint && activityLog.endpoint.includes('/materials'));
+
+    const isPurchaseOrderAction = activityLog.action_category === 'PURCHASE_ORDER' || 
+                                 activityLog.action?.includes('PURCHASE_ORDER') ||
+                                 activityLog.action === 'PurchaseOrder' ||
+                                 (activityLog.endpoint && activityLog.endpoint.includes('/purchase-orders'));
+
+    console.log('🔍 Early action detection:', {
+      action: activityLog.action,
+      category: activityLog.action_category,
+      isMaterialAction,
+      isPurchaseOrderAction
+    });
+    
+    // Skip certain actions that shouldn't create notifications (but NOT material/purchase order actions)
     const skipActions = [
       'PRODUCT_VIEW',
       'ORDER_VIEW',
@@ -31,30 +52,26 @@ export const convertActivityLogToNotification = async (
       'API_CALL', // Skip generic API calls
     ];
 
-    if (skipActions.includes(activityLog.action)) {
-      console.log('⏭️ Skipping action:', activityLog.action);
+    if (!isMaterialAction && !isPurchaseOrderAction && skipActions.includes(activityLog.action)) {
+      console.log('⏭️ Skipping action (in skipActions list):', activityLog.action);
       return null;
     }
 
-    // Skip if it's a generic API_CALL with no meaningful data
-    if (activityLog.action === 'API_CALL' || 
-        (activityLog.endpoint === '/' || activityLog.endpoint === '/api')) {
+    // Skip if it's a generic API_CALL with no meaningful data (but NOT for material/purchase order actions)
+    if (!isMaterialAction && !isPurchaseOrderAction && 
+        (activityLog.action === 'API_CALL' || 
+         (activityLog.endpoint === '/' || activityLog.endpoint === '/api'))) {
+      console.log('⏭️ Skipping generic API_CALL:', activityLog.endpoint);
       return null;
     }
 
-    // Check if this is a purchase order action (before endpoint checks)
-    const isPurchaseOrderAction = activityLog.action_category === 'PURCHASE_ORDER' || 
-                                 activityLog.action?.includes('PURCHASE_ORDER') ||
-                                 activityLog.action === 'PurchaseOrder' ||
-                                 (activityLog.endpoint && activityLog.endpoint.includes('/purchase-orders'));
-
-    // Check if this is a material action (should always create notifications)
-    const isMaterialAction = activityLog.action_category === 'MATERIAL' || 
-                            activityLog.action?.includes('MATERIAL') ||
-                            activityLog.action === 'MATERIAL_CREATE' ||
-                            activityLog.action === 'MATERIAL_UPDATE' ||
-                            activityLog.action === 'MATERIAL_DELETE' ||
-                            (activityLog.endpoint && activityLog.endpoint.includes('/materials'));
+    console.log('🔍 Action detection (after checks):', {
+      action: activityLog.action,
+      category: activityLog.action_category,
+      endpoint: activityLog.endpoint,
+      isPurchaseOrderAction,
+      isMaterialAction
+    });
 
     // Skip if endpoint is too generic or login/logout (but NOT for purchase orders or material actions)
     if (!isPurchaseOrderAction && !isMaterialAction && (
@@ -65,6 +82,7 @@ export const convertActivityLogToNotification = async (
       activityLog.endpoint.includes('/auth/login') ||
       activityLog.endpoint.includes('/auth/logout')
     )) {
+      console.log('⏭️ Skipping due to generic endpoint:', activityLog.endpoint);
       return null; // Always skip these (except purchase orders and material actions)
     }
 
@@ -76,6 +94,7 @@ export const convertActivityLogToNotification = async (
        activityLog.description === `${activityLog.method} ${activityLog.endpoint}`))
     {
       // Always skip generic descriptions (except for purchase orders and material actions)
+      console.log('⏭️ Skipping due to generic description:', activityLog.description);
       return null;
     }
 
