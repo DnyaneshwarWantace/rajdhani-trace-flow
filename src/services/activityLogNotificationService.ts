@@ -40,28 +40,38 @@ export const convertActivityLogToNotification = async (
       return null;
     }
 
-    // Skip if endpoint is too generic or login/logout
-    if (
+    // Check if this is a purchase order action (before endpoint checks)
+    const isPurchaseOrderAction = activityLog.action_category === 'PURCHASE_ORDER' || 
+                                 activityLog.action?.includes('PURCHASE_ORDER') ||
+                                 activityLog.action === 'PurchaseOrder' ||
+                                 (activityLog.endpoint && activityLog.endpoint.includes('/purchase-orders'));
+
+    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders)
+    if (!isPurchaseOrderAction && (
       activityLog.endpoint === '/' ||
       activityLog.endpoint === '/api' ||
       activityLog.endpoint.includes('/api/auth/login') ||
       activityLog.endpoint.includes('/api/auth/logout') ||
       activityLog.endpoint.includes('/auth/login') ||
       activityLog.endpoint.includes('/auth/logout')
-    ) {
-      return null; // Always skip these
+    )) {
+      return null; // Always skip these (except purchase orders)
     }
 
-    // Skip if description is too generic or meaningless
-    if (
-      activityLog.description &&
+    // Skip if description is too generic or meaningless (but NOT for purchase orders)
+    if (!isPurchaseOrderAction && activityLog.description &&
       (activityLog.description === 'Action' ||
        activityLog.description.includes('POST /') ||
        activityLog.description.includes('GET /') ||
        activityLog.description === `${activityLog.method} ${activityLog.endpoint}`))
     {
-      // Always skip generic descriptions
+      // Always skip generic descriptions (except for purchase orders)
       return null;
+    }
+
+    // IMPORTANT: Purchase orders should ALWAYS create notifications
+    if (isPurchaseOrderAction) {
+      console.log('✅ Purchase order action detected - will create notification:', activityLog.action);
     }
 
     // Determine notification type based on action
@@ -98,37 +108,60 @@ export const convertActivityLogToNotification = async (
       category: activityLog.action_category,
       module,
       type: notificationType,
-      priority
+      priority,
+      title,
+      message
     });
 
     // Create notification
-    const notification = await NotificationService.createNotification({
-      type: notificationType,
-      title,
-      message,
-      priority,
-      module,
-      status: 'unread',
-      related_id: activityLog.target_resource,
-      related_data: {
-        activity_log_id: activityLog._id,
-        action: activityLog.action,
-        action_category: activityLog.action_category,
-        description: activityLog.description,
-        user_name: activityLog.user_name,
-        user_email: activityLog.user_email,
-        user_role: activityLog.user_role,
-        method: activityLog.method,
-        endpoint: activityLog.endpoint,
-        target_resource: activityLog.target_resource,
-        target_resource_type: activityLog.target_resource_type,
-        metadata: activityLog.metadata,
-        changes: activityLog.changes,
-        created_at: activityLog.created_at,
-      },
-    });
+    try {
+      const notification = await NotificationService.createNotification({
+        type: notificationType,
+        title,
+        message,
+        priority,
+        module,
+        status: 'unread',
+        related_id: activityLog.target_resource,
+        related_data: {
+          activity_log_id: activityLog._id,
+          action: activityLog.action,
+          action_category: activityLog.action_category,
+          description: activityLog.description,
+          user_name: activityLog.user_name,
+          user_email: activityLog.user_email,
+          user_role: activityLog.user_role,
+          method: activityLog.method,
+          endpoint: activityLog.endpoint,
+          target_resource: activityLog.target_resource,
+          target_resource_type: activityLog.target_resource_type,
+          metadata: activityLog.metadata,
+          changes: activityLog.changes,
+          created_at: activityLog.created_at,
+        },
+      });
 
-    return notification;
+      if (!notification) {
+        console.error('❌ NotificationService.createNotification returned null/undefined for:', activityLog.action);
+        return null;
+      }
+
+      console.log('✅ Successfully created notification:', (notification as any).id || (notification as any)._id || 'created');
+      return notification;
+    } catch (error) {
+      console.error('❌ Error creating notification:', error);
+      // For purchase orders, log more details
+      if (isPurchaseOrderAction) {
+        console.error('❌ Failed to create notification for purchase order:', {
+          action: activityLog.action,
+          title,
+          message,
+          module,
+          error: error instanceof Error ? error.message : error
+        });
+      }
+      return null;
+    }
   } catch (error) {
     console.error('Error converting activity log to notification:', error);
     return null;
