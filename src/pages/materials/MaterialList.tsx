@@ -411,7 +411,12 @@ export default function MaterialList() {
     }));
   };
 
-  const handleRestockSubmit = async () => {
+  const handleRestockSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+
+    // STRICT VALIDATION - Check all required fields first
     if (!selectedRestockMaterial || !restockForm.supplier || !restockForm.quantity || !restockForm.costPerUnit) {
       toast({
         title: 'Missing Required Fields',
@@ -421,26 +426,27 @@ export default function MaterialList() {
       return;
     }
 
-    // Validate quantity and cost per unit must be greater than 0
+    // Parse and validate quantity - MUST BE > 0
     const quantity = parseFloat(restockForm.quantity);
-    const costPerUnit = parseFloat(restockForm.costPerUnit);
-
-    // Check for NaN or invalid numbers
-    if (isNaN(quantity) || quantity <= 0) {
+    if (isNaN(quantity) || quantity <= 0 || quantity === 0) {
       toast({
         title: 'Invalid Quantity',
-        description: 'Quantity must be greater than 0.',
+        description: 'Quantity must be greater than 0. Minimum value is 0.01.',
         variant: 'destructive',
       });
+      setRestockForm({ ...restockForm, quantity: '' });
       return;
     }
 
-    if (isNaN(costPerUnit) || costPerUnit <= 0) {
+    // Parse and validate cost per unit - MUST BE > 0
+    const costPerUnit = parseFloat(restockForm.costPerUnit);
+    if (isNaN(costPerUnit) || costPerUnit <= 0 || costPerUnit === 0) {
       toast({
         title: 'Invalid Price',
-        description: 'Cost per unit must be greater than 0.',
+        description: 'Cost per unit must be greater than 0. Minimum value is 0.01.',
         variant: 'destructive',
       });
+      setRestockForm({ ...restockForm, costPerUnit: '' });
       return;
     }
 
@@ -865,11 +871,22 @@ export default function MaterialList() {
                     value={restockForm.quantity}
                     onChange={(e) => {
                       const value = e.target.value;
+                      // Allow empty string for typing, but validate on blur/submit
                       if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setRestockForm({ ...restockForm, quantity: value });
+                        // Prevent setting to exactly "0" - require at least 0.01
+                        if (value !== '0') {
+                          setRestockForm({ ...restockForm, quantity: value });
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (isNaN(value) || value <= 0) {
+                        setRestockForm({ ...restockForm, quantity: '' });
                       }
                     }}
                     placeholder="Enter quantity (min: 0.01)"
+                    required
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Unit: {selectedRestockMaterial.unit}
@@ -891,11 +908,22 @@ export default function MaterialList() {
                     value={restockForm.costPerUnit}
                     onChange={(e) => {
                       const value = e.target.value;
+                      // Allow empty string for typing, but validate on blur/submit
                       if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setRestockForm({ ...restockForm, costPerUnit: value });
+                        // Prevent setting to exactly "0" - require at least 0.01
+                        if (value !== '0') {
+                          setRestockForm({ ...restockForm, costPerUnit: value });
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value);
+                      if (isNaN(value) || value <= 0) {
+                        setRestockForm({ ...restockForm, costPerUnit: '' });
                       }
                     }}
                     placeholder="Enter cost per unit (min: 0.01)"
+                    required
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Editable
@@ -953,15 +981,20 @@ export default function MaterialList() {
                 Cancel
               </Button>
               <Button 
-                onClick={handleRestockSubmit} 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleRestockSubmit(e);
+                }} 
                 disabled={
                   submitting || 
                   !restockForm.quantity || 
                   !restockForm.costPerUnit || 
-                  parseFloat(restockForm.quantity) <= 0 || 
-                  parseFloat(restockForm.costPerUnit) <= 0 ||
-                  isNaN(parseFloat(restockForm.quantity)) ||
-                  isNaN(parseFloat(restockForm.costPerUnit))
+                  restockForm.quantity === '0' ||
+                  restockForm.costPerUnit === '0' ||
+                  parseFloat(restockForm.quantity || '0') <= 0 || 
+                  parseFloat(restockForm.costPerUnit || '0') <= 0 ||
+                  isNaN(parseFloat(restockForm.quantity || '0')) ||
+                  isNaN(parseFloat(restockForm.costPerUnit || '0'))
                 }
               >
                 {submitting ? (
