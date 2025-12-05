@@ -41,7 +41,7 @@ export default function ProductStockTable({
         <thead>
           <tr className="border-b">
             <th className="text-left p-3 font-medium text-gray-600">ID</th>
-            <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">QR Code</th>
+            <th className="text-left p-3 font-medium text-gray-600">QR Code</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden md:table-cell">
               Production Date
             </th>
@@ -62,17 +62,23 @@ export default function ProductStockTable({
                   <span className="font-mono text-sm">{item.id}</span>
                 </div>
               </td>
-              <td className="p-3 hidden lg:table-cell">
+              <td className="p-3">
                 <div className="flex items-center gap-2">
                   {item.qr_code ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onQRCodeClick(item)}
-                      title={`QR Code: ${item.qr_code}`}
-                    >
-                      <QrCode className="w-4 h-4" />
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onQRCodeClick(item)}
+                        title={`View QR Code: ${item.qr_code}`}
+                        className="h-8 w-8 p-0"
+                      >
+                        <QrCode className="w-4 h-4" />
+                      </Button>
+                      <span className="font-mono text-xs text-gray-600 max-w-[100px] truncate" title={item.qr_code}>
+                        {item.qr_code}
+                      </span>
+                    </>
                   ) : (
                     <span className="text-gray-400 text-sm">No QR Code</span>
                   )}

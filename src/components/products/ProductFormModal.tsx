@@ -49,7 +49,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     pattern: '',
     base_quantity: 0, // Will be converted to empty string for display
     unit: '',
-    individual_stock_tracking: false,
+    individual_stock_tracking: true, // DEFAULT: YES - track individual pieces with QR codes
     length: '',
     width: '',
     length_unit: 'feet',
@@ -169,7 +169,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       pattern: '',
       base_quantity: 0,
       unit: '',
-      individual_stock_tracking: false,
+      individual_stock_tracking: true, // DEFAULT: YES
       length: '',
       width: '',
       length_unit: 'feet',
@@ -265,22 +265,26 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       // Check length - must have both value AND unit
       const lengthValue = formData.length ? String(formData.length).trim() : '';
       const lengthUnitValue = formData.length_unit ? String(formData.length_unit).trim() : '';
+      console.log('VALIDATION - Length:', { lengthValue, lengthUnitValue, raw: { length: formData.length, length_unit: formData.length_unit } });
       if (!lengthValue || !lengthUnitValue) {
         missingFields.push('Length');
       }
-      
+
       // Check width - must have both value AND unit
       const widthValue = formData.width ? String(formData.width).trim() : '';
       const widthUnitValue = formData.width_unit ? String(formData.width_unit).trim() : '';
+      console.log('VALIDATION - Width:', { widthValue, widthUnitValue, raw: { width: formData.width, width_unit: formData.width_unit } });
       if (!widthValue || !widthUnitValue) {
         missingFields.push('Width');
       }
-      
+
       // Check weight - must have both value AND unit
+      // Weight is OPTIONAL - only validate if one is provided but not the other
       const weightValue = formData.weight ? String(formData.weight).trim() : '';
       const weightUnitValue = formData.weight_unit ? String(formData.weight_unit).trim() : '';
-      if (!weightValue || !weightUnitValue) {
-        missingFields.push('Weight');
+      console.log('VALIDATION - Weight:', { weightValue, weightUnitValue, raw: { weight: formData.weight, weight_unit: formData.weight_unit } });
+      if ((weightValue && !weightUnitValue) || (!weightValue && weightUnitValue)) {
+        missingFields.push('Weight (both value and unit required if provided)');
       }
       
       // base_quantity can be 0, so we only check if it's a valid number (not negative)

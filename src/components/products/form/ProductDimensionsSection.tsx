@@ -40,6 +40,7 @@ export default function ProductDimensionsSection({
           description="Required for SQM calculation"
           onValueChange={(value) => onFormDataChange({ length: value })}
           onUnitChange={(unit) => onFormDataChange({ length_unit: unit })}
+          onCombinedChange={(value, unit) => onFormDataChange({ length: value, length_unit: unit })}
           onReload={onReload}
         />
 
@@ -55,6 +56,7 @@ export default function ProductDimensionsSection({
           description="Required for SQM calculation"
           onValueChange={(value) => onFormDataChange({ width: value })}
           onUnitChange={(unit) => onFormDataChange({ width_unit: unit })}
+          onCombinedChange={(value, unit) => onFormDataChange({ width: value, width_unit: unit })}
           onReload={onReload}
         />
       </div>
@@ -68,10 +70,11 @@ export default function ProductDimensionsSection({
         unitOptions={weightUnits}
         category="weight"
         placeholder="e.g., 3"
-        required
-        description="Required for product specification"
+        required={false}
+        description="Optional"
         onValueChange={(value) => onFormDataChange({ weight: value })}
         onUnitChange={(unit) => onFormDataChange({ weight_unit: unit })}
+        onCombinedChange={(value, unit) => onFormDataChange({ weight: value, weight_unit: unit })}
         onReload={onReload}
       />
     </>

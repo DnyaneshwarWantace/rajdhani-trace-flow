@@ -25,6 +25,7 @@ interface ValueUnitDropdownFieldProps {
   description?: string;
   onValueChange: (value: string) => void;
   onUnitChange: (unit: string) => void;
+  onCombinedChange?: (value: string, unit: string) => void;
   onReload: () => Promise<void>;
 }
 
@@ -57,6 +58,7 @@ export default function ValueUnitDropdownField({
   description,
   onValueChange,
   onUnitChange,
+  onCombinedChange,
   onReload,
 }: ValueUnitDropdownFieldProps) {
   const { toast } = useToast();
@@ -82,14 +84,23 @@ export default function ValueUnitDropdownField({
       setNewValueInput('');
       setNewUnitInput('');
     } else if (selectedValue === 'N/A') {
-      onValueChange('');
-      onUnitChange('');
+      if (onCombinedChange) {
+        onCombinedChange('', '');
+      } else {
+        onValueChange('');
+        onUnitChange('');
+      }
       setSearchTerm('');
     } else {
       const parsed = parseValueWithUnit(selectedValue);
-      // Set both value and unit immediately - React will batch these updates
-      onValueChange(parsed.value || '');
-      onUnitChange(parsed.unit || '');
+      console.log('🔍 ValueUnitDropdownField - Parsed:', { selectedValue, parsed });
+      // Use combined change callback if available (better for React state updates)
+      if (onCombinedChange) {
+        onCombinedChange(parsed.value || '', parsed.unit || '');
+      } else {
+        onValueChange(parsed.value || '');
+        onUnitChange(parsed.unit || '');
+      }
       setSearchTerm('');
     }
   };
