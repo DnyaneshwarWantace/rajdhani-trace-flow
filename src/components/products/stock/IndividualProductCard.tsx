@@ -12,7 +12,7 @@ export default function IndividualProductCard({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available':
-        return 'bg-white text-gray-700 border-gray-300';
+        return 'bg-blue-600 text-white border-blue-600';
       case 'sold':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'damaged':

@@ -183,8 +183,11 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => onClose()} // Close sidebar on mobile when clicking a link
-                onMouseEnter={() => setHoveredItem(item.name)}
+                onClick={() => {
+                  setHoveredItem(null); // Clear hover state immediately
+                  onClose(); // Close sidebar on mobile when clicking a link
+                }}
+                onMouseEnter={() => !isOpen && setHoveredItem(item.name)} // Only hover when collapsed
                 onMouseLeave={() => setHoveredItem(null)}
                 className={`
                   relative flex items-center gap-3 px-3 py-3 rounded-xl
@@ -208,7 +211,8 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
                 {/* Tooltip - Show when sidebar is collapsed on desktop */}
                 {!isOpen && hoveredItem === item.name && (
-                  <div className="hidden lg:block absolute left-full ml-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-50 shadow-lg">
+                  <div className="hidden lg:block fixed left-24 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-[9999] shadow-xl pointer-events-none"
+                    style={{ top: `${(menuItems.findIndex(i => i.name === item.name) * 64) + 140}px` }}>
                     {item.name}
                     <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
                   </div>

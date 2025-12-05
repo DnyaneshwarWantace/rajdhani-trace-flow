@@ -47,7 +47,7 @@ export default function IndividualProductHeader({
                 </p>
                 <Badge 
                   variant={getStatusVariant(individualProduct.status)}
-                  className={individualProduct.status === 'available' ? 'bg-white text-gray-700 border-gray-300' : ''}
+                  className={individualProduct.status === 'available' ? 'bg-blue-600 text-white border-blue-600' : ''}
                 >
                   {individualProduct.status}
                 </Badge>
