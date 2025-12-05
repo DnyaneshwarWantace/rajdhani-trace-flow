@@ -421,13 +421,33 @@ export default function MaterialList() {
       return;
     }
 
+    // Validate quantity and cost per unit must be greater than 0
+    const quantity = parseFloat(restockForm.quantity);
+    const costPerUnit = parseFloat(restockForm.costPerUnit);
+
+    if (quantity <= 0) {
+      toast({
+        title: 'Invalid Quantity',
+        description: 'Quantity must be greater than 0.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (costPerUnit <= 0) {
+      toast({
+        title: 'Invalid Price',
+        description: 'Cost per unit must be greater than 0.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setSubmitting(true);
 
       // Create order (restock or new order based on material status)
       const orderIsOutOfStock = selectedRestockMaterial.status === 'out-of-stock';
-      const quantity = parseFloat(restockForm.quantity);
-      const costPerUnit = parseFloat(restockForm.costPerUnit);
       const totalCost = quantity * costPerUnit;
 
       // Get supplier ID if exists
