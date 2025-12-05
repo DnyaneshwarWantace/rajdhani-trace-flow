@@ -12,7 +12,9 @@ export const convertActivityLogToNotification = async (
     console.log('🔄 Converting activity log to notification:', {
       action: activityLog.action,
       category: activityLog.action_category,
-      description: activityLog.description
+      description: activityLog.description,
+      endpoint: activityLog.endpoint,
+      method: activityLog.method
     });
     
     // Skip certain actions that shouldn't create notifications
@@ -105,7 +107,36 @@ export const convertActivityLogToNotification = async (
     }
 
     // Build title and message
-    const { title, message } = buildNotificationContent(activityLog);
+    let title: string;
+    let message: string;
+    try {
+      const content = buildNotificationContent(activityLog);
+      title = content.title;
+      message = content.message;
+      
+      // Validate title and message are not empty
+      if (!title || title.trim() === '' || !message || message.trim() === '') {
+        console.warn('⚠️ Empty title or message, using fallback:', {
+          action: activityLog.action,
+          title,
+          message,
+          description: activityLog.description
+        });
+        // Use description as fallback if available
+        if (activityLog.description && activityLog.description.trim() !== '') {
+          title = activityLog.description;
+          message = activityLog.description;
+        } else {
+          title = `${activityLog.user_name || 'User'} ${activityLog.action?.replace(/_/g, ' ').toLowerCase() || 'performed action'}`;
+          message = activityLog.description || title;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error building notification content:', error);
+      // Use fallback content
+      title = `${activityLog.user_name || 'User'} ${activityLog.action?.replace(/_/g, ' ').toLowerCase() || 'performed action'}`;
+      message = activityLog.description || title;
+    }
 
     // Ensure module is valid (must be one of: orders, products, materials, production)
     // The getModule function should already return a valid value, but double-check
@@ -161,14 +192,18 @@ export const convertActivityLogToNotification = async (
       return notification;
     } catch (error) {
       console.error('❌ Error creating notification:', error);
-      // For purchase orders, log more details
-      if (isPurchaseOrderAction) {
-        console.error('❌ Failed to create notification for purchase order:', {
+      // For purchase orders and material actions, log more details
+      if (isPurchaseOrderAction || isMaterialAction) {
+        console.error(`❌ Failed to create notification for ${isPurchaseOrderAction ? 'purchase order' : 'material action'}:`, {
           action: activityLog.action,
+          category: activityLog.action_category,
           title,
           message,
           module,
-          error: error instanceof Error ? error.message : error
+          priority,
+          type: notificationType,
+          error: error instanceof Error ? error.message : error,
+          stack: error instanceof Error ? error.stack : undefined
         });
       }
       return null;
