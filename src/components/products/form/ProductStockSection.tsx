@@ -45,11 +45,13 @@ export default function ProductStockSection({
             <Input
               id="quantity"
               type="number"
-              value={formData.base_quantity}
-              onChange={(e) => onFormDataChange({ base_quantity: Number(e.target.value) })}
-              placeholder="Enter quantity (e.g., 10)"
+              value={formData.base_quantity === 0 ? '' : formData.base_quantity}
+              onChange={(e) => {
+                const value = e.target.value;
+                onFormDataChange({ base_quantity: value === '' ? 0 : Number(value) });
+              }}
+              placeholder="Enter quantity"
               min="0"
-              required
             />
           )}
           <p className="text-xs text-gray-500 mt-1">
