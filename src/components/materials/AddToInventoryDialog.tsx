@@ -273,10 +273,6 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       if (!formData.costPerUnit || formData.costPerUnit.trim() === '' || formData.costPerUnit === '0') {
         missingFields.push('Cost per Unit');
       }
-      if (isAdmin && (!formData.currentStock || formData.currentStock.trim() === '' || formData.currentStock === '0')) {
-        missingFields.push('Current Stock');
-      }
-      
       // Validate cost per unit must be greater than 0
       const costPerUnit = parseFloat(formData.costPerUnit);
       if (isNaN(costPerUnit) || costPerUnit <= 0) {
@@ -285,12 +281,16 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
         }
       }
       
-      // Validate current stock if admin
+      // Validate current stock if admin (can be 0, but must be a valid number)
       if (isAdmin) {
-        const currentStock = parseFloat(formData.currentStock);
-        if (isNaN(currentStock) || currentStock < 0) {
-          if (!missingFields.includes('Current Stock')) {
-            missingFields.push('Current Stock (must be >= 0)');
+        if (formData.currentStock === '' || formData.currentStock.trim() === '') {
+          missingFields.push('Current Stock');
+        } else {
+          const currentStock = parseFloat(formData.currentStock);
+          if (isNaN(currentStock) || currentStock < 0) {
+            if (!missingFields.includes('Current Stock')) {
+              missingFields.push('Current Stock (must be >= 0)');
+            }
           }
         }
       }
@@ -478,8 +478,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
               parseFloat(formData.costPerUnit || '0') <= 0 ||
               isNaN(parseFloat(formData.costPerUnit || '0')) ||
               (isAdmin && (
-                !formData.currentStock ||
-                formData.currentStock === '0' ||
+                formData.currentStock === '' ||
                 parseFloat(formData.currentStock || '0') < 0 ||
                 isNaN(parseFloat(formData.currentStock || '0'))
               ))
