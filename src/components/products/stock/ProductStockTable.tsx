@@ -112,7 +112,13 @@ export default function ProductStockTable({
               </td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.inspector || 'N/A'}</td>
               <td className="p-3">
-                <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
+                {item.status === 'available' ? (
+                  <Badge variant="outline" className="bg-white text-gray-700 border-gray-300">
+                    {item.status}
+                  </Badge>
+                ) : (
+                  <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
+                )}
               </td>
               <td className="p-3">
                 <div className="flex gap-2">
