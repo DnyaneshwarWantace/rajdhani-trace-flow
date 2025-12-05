@@ -1,8 +1,30 @@
 import { io, Socket } from 'socket.io-client';
 
-// Socket.IO connects to the same domain as the frontend
-// Since we're using relative paths, we need to use the current origin
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
+// Socket.IO URL configuration
+// In development: connect directly to backend (localhost:8000)
+// In production: use same origin as frontend (will be proxied by Nginx)
+const getSocketURL = () => {
+  // If explicitly set via env variable, use that
+  if (import.meta.env.VITE_SOCKET_URL) {
+    return import.meta.env.VITE_SOCKET_URL;
+  }
+  
+  // In development (Vite dev server on port 3000), connect to backend on port 8000
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    // Check if we're in development (localhost:3000 or localhost:5173)
+    if (origin.includes('localhost:3000') || origin.includes('localhost:5173') || origin.includes('127.0.0.1:3000')) {
+      return 'http://localhost:8000';
+    }
+    // In production, use same origin (Nginx will proxy /socket.io/ to backend)
+    return origin;
+  }
+  
+  // Fallback
+  return 'http://localhost:8000';
+};
+
+const SOCKET_URL = getSocketURL();
 
 export interface ActivityLog {
   _id: string;
