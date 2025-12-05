@@ -844,7 +844,34 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={loading} className="bg-primary-600 text-white hover:bg-primary-700">
+          <Button 
+            type="submit" 
+            onClick={handleSubmit} 
+            disabled={
+              loading ||
+              !formData.name ||
+              !formData.supplier ||
+              !formData.category ||
+              !formData.unit ||
+              !formData.costPerUnit ||
+              (mode === 'create' && (
+                !formData.quantity ||
+                !formData.expectedDelivery ||
+                formData.quantity === '0' ||
+                formData.costPerUnit === '0' ||
+                parseFloat(formData.quantity || '0') <= 0 ||
+                parseFloat(formData.costPerUnit || '0') <= 0 ||
+                isNaN(parseFloat(formData.quantity || '0')) ||
+                isNaN(parseFloat(formData.costPerUnit || '0'))
+              )) ||
+              (mode === 'edit' && (
+                formData.costPerUnit === '0' ||
+                parseFloat(formData.costPerUnit || '0') <= 0 ||
+                isNaN(parseFloat(formData.costPerUnit || '0'))
+              ))
+            } 
+            className="bg-primary-600 text-white hover:bg-primary-700"
+          >
             {loading ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
