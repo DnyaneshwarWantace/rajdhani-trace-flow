@@ -246,6 +246,48 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     setError(null);
 
     try {
+      // Validate required fields
+      if (!formData.name || formData.name.trim() === '') {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a product name',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.category || formData.category.trim() === '') {
+        toast({
+          title: 'Validation Error',
+          description: 'Please select a category',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.unit || formData.unit.trim() === '') {
+        toast({
+          title: 'Validation Error',
+          description: 'Please select a unit',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Validate base_quantity must be greater than 0 for new products
+      if (mode === 'create' && (formData.base_quantity <= 0 || isNaN(formData.base_quantity))) {
+        toast({
+          title: 'Validation Error',
+          description: 'Base quantity must be greater than 0',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
       const finalFormData = { ...formData };
 
       let createdProduct;
@@ -555,7 +597,17 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-primary-600 hover:bg-primary-700">
+            <Button 
+              type="submit" 
+              disabled={
+                loading ||
+                !formData.name ||
+                !formData.category ||
+                !formData.unit ||
+                (mode === 'create' && (formData.base_quantity <= 0 || isNaN(formData.base_quantity)))
+              } 
+              className="bg-primary-600 hover:bg-primary-700"
+            >
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
