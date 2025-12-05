@@ -45,10 +45,18 @@ export default function ProductStockSection({
             <Input
               id="quantity"
               type="number"
-              value={formData.base_quantity === 0 ? '' : formData.base_quantity}
+              value={formData.base_quantity === 0 && formData.base_quantity !== undefined ? '' : (formData.base_quantity ?? '')}
               onChange={(e) => {
                 const value = e.target.value;
-                onFormDataChange({ base_quantity: value === '' ? 0 : Number(value) });
+                // Allow empty string, 0, or any positive number
+                if (value === '') {
+                  onFormDataChange({ base_quantity: 0 });
+                } else {
+                  const numValue = Number(value);
+                  if (!isNaN(numValue) && numValue >= 0) {
+                    onFormDataChange({ base_quantity: numValue });
+                  }
+                }
               }}
               placeholder="Enter quantity"
               min="0"

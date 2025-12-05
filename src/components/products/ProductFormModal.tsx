@@ -261,13 +261,16 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('Unit');
       }
-      if (!formData.length || formData.length.trim() === '') {
+      // Check length - must have both value and unit
+      if (!formData.length || formData.length.trim() === '' || !formData.length_unit || formData.length_unit.trim() === '') {
         missingFields.push('Length');
       }
-      if (!formData.width || formData.width.trim() === '') {
+      // Check width - must have both value and unit
+      if (!formData.width || formData.width.trim() === '' || !formData.width_unit || formData.width_unit.trim() === '') {
         missingFields.push('Width');
       }
-      if (!formData.weight || formData.weight.trim() === '') {
+      // Check weight - must have both value and unit
+      if (!formData.weight || formData.weight.trim() === '' || !formData.weight_unit || formData.weight_unit.trim() === '') {
         missingFields.push('Weight');
       }
       
