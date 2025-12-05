@@ -58,9 +58,53 @@ export function formatActivityMessage(log: ActivityLog): string {
     }
   }
 
-  // Purchase Order actions - ONLY check if NOT a material action
+  // Product-related actions - check BEFORE purchase order
+  const isProduct = category === 'PRODUCT' || 
+                   action.includes('PRODUCT_') ||
+                   action === 'PRODUCT_CREATE' ||
+                   action === 'PRODUCT_UPDATE' ||
+                   action === 'PRODUCT_DELETE' ||
+                   (log.endpoint && log.endpoint.includes('/products'));
+
+  if (isProduct) {
+    const productName = metadata.product_name || log.target_resource || 'Product';
+
+    if (action === 'PRODUCT_CREATE' || (action.includes('CREATE') && isProduct)) {
+      // Build detailed message from metadata
+      const details: string[] = [];
+      if (metadata.category) details.push(metadata.category);
+      if (metadata.subcategory) details.push(metadata.subcategory);
+      if (metadata.length && metadata.length_unit) {
+        details.push(`${metadata.length} ${metadata.length_unit} × ${metadata.width || 'N/A'} ${metadata.width_unit || ''}`);
+      }
+      if (metadata.base_quantity !== undefined) {
+        details.push(`Qty: ${metadata.base_quantity}`);
+      }
+      if (metadata.unit) {
+        details.push(`Unit: ${metadata.unit}`);
+      }
+      if (metadata.has_recipe) {
+        details.push(`Recipe: ${metadata.recipe_count || 0} material(s)`);
+      } else {
+        details.push('No recipe');
+      }
+
+      const detailsText = details.length > 0 ? ` (${details.join(', ')})` : '';
+      return `${userName} created product "${productName}"${detailsText}`;
+    }
+
+    if (action === 'PRODUCT_UPDATE' || (action.includes('UPDATE') && isProduct)) {
+      return `${userName} updated product "${productName}"`;
+    }
+
+    if (action === 'PRODUCT_DELETE' || (action.includes('DELETE') && isProduct)) {
+      return `${userName} deleted product "${productName}"`;
+    }
+  }
+
+  // Purchase Order actions - ONLY check if NOT a material or product action
   // Be more strict - don't match just based on description containing "purchase order"
-  const isPurchaseOrder = !isMaterial && (
+  const isPurchaseOrder = !isMaterial && !isProduct && (
     category === 'PURCHASE_ORDER' || 
     action.includes('PURCHASE_ORDER') || 
     action === 'PurchaseOrder' ||
