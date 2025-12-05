@@ -451,11 +451,11 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       const supplierId = supplierData?.id;
 
       // Get quantity from form and validate
-      const orderQuantity = parseFloat(formData.quantity) || 0;
-      const costPerUnit = parseFloat(formData.costPerUnit) || 0;
+      const orderQuantity = parseFloat(formData.quantity);
+      const costPerUnit = parseFloat(formData.costPerUnit);
 
       // Validate quantity and cost per unit must be greater than 0 for orders
-      if (orderQuantity <= 0) {
+      if (isNaN(orderQuantity) || orderQuantity <= 0) {
         toast({
           title: 'Invalid Quantity',
           description: 'Order quantity must be greater than 0.',
@@ -465,7 +465,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         return;
       }
 
-      if (costPerUnit <= 0) {
+      if (isNaN(costPerUnit) || costPerUnit <= 0) {
         toast({
           title: 'Invalid Price',
           description: 'Cost per unit must be greater than 0.',

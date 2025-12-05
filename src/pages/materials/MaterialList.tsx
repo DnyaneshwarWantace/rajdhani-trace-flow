@@ -425,7 +425,8 @@ export default function MaterialList() {
     const quantity = parseFloat(restockForm.quantity);
     const costPerUnit = parseFloat(restockForm.costPerUnit);
 
-    if (quantity <= 0) {
+    // Check for NaN or invalid numbers
+    if (isNaN(quantity) || quantity <= 0) {
       toast({
         title: 'Invalid Quantity',
         description: 'Quantity must be greater than 0.',
@@ -434,7 +435,7 @@ export default function MaterialList() {
       return;
     }
 
-    if (costPerUnit <= 0) {
+    if (isNaN(costPerUnit) || costPerUnit <= 0) {
       toast({
         title: 'Invalid Price',
         description: 'Cost per unit must be greater than 0.',
@@ -858,7 +859,9 @@ export default function MaterialList() {
                   </Label>
                   <Input
                     id="restockQuantity"
-                    type="text"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
                     value={restockForm.quantity}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -866,7 +869,7 @@ export default function MaterialList() {
                         setRestockForm({ ...restockForm, quantity: value });
                       }
                     }}
-                    placeholder="Enter quantity"
+                    placeholder="Enter quantity (min: 0.01)"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Unit: {selectedRestockMaterial.unit}
@@ -882,7 +885,9 @@ export default function MaterialList() {
                   </Label>
                   <Input
                     id="restockCostPerUnit"
-                    type="text"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
                     value={restockForm.costPerUnit}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -890,7 +895,7 @@ export default function MaterialList() {
                         setRestockForm({ ...restockForm, costPerUnit: value });
                       }
                     }}
-                    placeholder="Auto-filled from supplier"
+                    placeholder="Enter cost per unit (min: 0.01)"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Editable
@@ -947,7 +952,18 @@ export default function MaterialList() {
               >
                 Cancel
               </Button>
-              <Button onClick={handleRestockSubmit} disabled={submitting}>
+              <Button 
+                onClick={handleRestockSubmit} 
+                disabled={
+                  submitting || 
+                  !restockForm.quantity || 
+                  !restockForm.costPerUnit || 
+                  parseFloat(restockForm.quantity) <= 0 || 
+                  parseFloat(restockForm.costPerUnit) <= 0 ||
+                  isNaN(parseFloat(restockForm.quantity)) ||
+                  isNaN(parseFloat(restockForm.costPerUnit))
+                }
+              >
                 {submitting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
