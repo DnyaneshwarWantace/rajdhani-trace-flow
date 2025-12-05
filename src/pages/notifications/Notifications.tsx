@@ -207,7 +207,10 @@ export default function Notifications() {
       }
     }
     
-    return logs;
+    // Sort by date (latest first)
+    return logs.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   };
 
   // Filter notifications by selected category
