@@ -87,8 +87,9 @@ export default function ValueUnitDropdownField({
       setSearchTerm('');
     } else {
       const parsed = parseValueWithUnit(selectedValue);
-      onValueChange(parsed.value);
-      onUnitChange(parsed.unit);
+      // Set both value and unit immediately - React will batch these updates
+      onValueChange(parsed.value || '');
+      onUnitChange(parsed.unit || '');
       setSearchTerm('');
     }
   };

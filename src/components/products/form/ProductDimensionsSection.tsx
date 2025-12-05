@@ -30,8 +30,8 @@ export default function ProductDimensionsSection({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ValueUnitDropdownField
           label="Length"
-          value={formData.length}
-          unit={formData.length_unit}
+          value={formData.length || ''}
+          unit={formData.length_unit || ''}
           combinedValues={lengths}
           unitOptions={lengthUnits}
           category="length"
@@ -45,8 +45,8 @@ export default function ProductDimensionsSection({
 
         <ValueUnitDropdownField
           label="Width"
-          value={formData.width}
-          unit={formData.width_unit}
+          value={formData.width || ''}
+          unit={formData.width_unit || ''}
           combinedValues={widths}
           unitOptions={widthUnits}
           category="width"

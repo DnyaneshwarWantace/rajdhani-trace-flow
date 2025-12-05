@@ -261,16 +261,25 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('Unit');
       }
-      // Check length - must have both value and unit
-      if (!formData.length || formData.length.trim() === '' || !formData.length_unit || formData.length_unit.trim() === '') {
+      
+      // Check length - must have both value AND unit
+      const lengthValue = formData.length ? String(formData.length).trim() : '';
+      const lengthUnitValue = formData.length_unit ? String(formData.length_unit).trim() : '';
+      if (!lengthValue || !lengthUnitValue) {
         missingFields.push('Length');
       }
-      // Check width - must have both value and unit
-      if (!formData.width || formData.width.trim() === '' || !formData.width_unit || formData.width_unit.trim() === '') {
+      
+      // Check width - must have both value AND unit
+      const widthValue = formData.width ? String(formData.width).trim() : '';
+      const widthUnitValue = formData.width_unit ? String(formData.width_unit).trim() : '';
+      if (!widthValue || !widthUnitValue) {
         missingFields.push('Width');
       }
-      // Check weight - must have both value and unit
-      if (!formData.weight || formData.weight.trim() === '' || !formData.weight_unit || formData.weight_unit.trim() === '') {
+      
+      // Check weight - must have both value AND unit
+      const weightValue = formData.weight ? String(formData.weight).trim() : '';
+      const weightUnitValue = formData.weight_unit ? String(formData.weight_unit).trim() : '';
+      if (!weightValue || !weightUnitValue) {
         missingFields.push('Weight');
       }
       
