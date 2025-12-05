@@ -46,8 +46,16 @@ export const convertActivityLogToNotification = async (
                                  activityLog.action === 'PurchaseOrder' ||
                                  (activityLog.endpoint && activityLog.endpoint.includes('/purchase-orders'));
 
-    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders)
-    if (!isPurchaseOrderAction && (
+    // Check if this is a material action (should always create notifications)
+    const isMaterialAction = activityLog.action_category === 'MATERIAL' || 
+                            activityLog.action?.includes('MATERIAL') ||
+                            activityLog.action === 'MATERIAL_CREATE' ||
+                            activityLog.action === 'MATERIAL_UPDATE' ||
+                            activityLog.action === 'MATERIAL_DELETE' ||
+                            (activityLog.endpoint && activityLog.endpoint.includes('/materials'));
+
+    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders or material actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && (
       activityLog.endpoint === '/' ||
       activityLog.endpoint === '/api' ||
       activityLog.endpoint.includes('/api/auth/login') ||
@@ -55,23 +63,26 @@ export const convertActivityLogToNotification = async (
       activityLog.endpoint.includes('/auth/login') ||
       activityLog.endpoint.includes('/auth/logout')
     )) {
-      return null; // Always skip these (except purchase orders)
+      return null; // Always skip these (except purchase orders and material actions)
     }
 
-    // Skip if description is too generic or meaningless (but NOT for purchase orders)
-    if (!isPurchaseOrderAction && activityLog.description &&
+    // Skip if description is too generic or meaningless (but NOT for purchase orders or material actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && activityLog.description &&
       (activityLog.description === 'Action' ||
        activityLog.description.includes('POST /') ||
        activityLog.description.includes('GET /') ||
        activityLog.description === `${activityLog.method} ${activityLog.endpoint}`))
     {
-      // Always skip generic descriptions (except for purchase orders)
+      // Always skip generic descriptions (except for purchase orders and material actions)
       return null;
     }
 
-    // IMPORTANT: Purchase orders should ALWAYS create notifications
+    // IMPORTANT: Purchase orders and material actions should ALWAYS create notifications
     if (isPurchaseOrderAction) {
       console.log('✅ Purchase order action detected - will create notification:', activityLog.action);
+    }
+    if (isMaterialAction) {
+      console.log('✅ Material action detected - will create notification:', activityLog.action);
     }
 
     // Determine notification type based on action
