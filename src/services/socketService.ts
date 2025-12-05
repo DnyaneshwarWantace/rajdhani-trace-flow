@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 
 // Socket.IO connects to the same domain as the frontend
 // Since we're using relative paths, we need to use the current origin
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'https://rajdhani.wantace.com');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8000');
 
 export interface ActivityLog {
   _id: string;
