@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,14 +18,11 @@ interface MaterialCategorySectionProps {
   categories: string[];
   onCategoryChange: (value: string) => void;
   onCategoriesReload: () => void;
+  hasError?: boolean;
 }
 
-export default function MaterialCategorySection({
-  category,
-  categories,
-  onCategoryChange,
-  onCategoriesReload,
-}: MaterialCategorySectionProps) {
+const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySectionProps>(
+  ({ category, categories, onCategoryChange, onCategoriesReload, hasError = false }, ref) => {
   const { toast } = useToast();
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -132,7 +129,11 @@ export default function MaterialCategorySection({
             }
           }}
         >
-          <SelectTrigger id="category">
+          <SelectTrigger 
+            ref={ref}
+            id="category"
+            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+          >
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
@@ -198,5 +199,9 @@ export default function MaterialCategorySection({
       </div>
     </div>
   );
-}
+});
+
+MaterialCategorySection.displayName = 'MaterialCategorySection';
+
+export default MaterialCategorySection;
 

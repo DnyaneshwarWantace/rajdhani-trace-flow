@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -18,14 +18,11 @@ interface MaterialUnitSectionProps {
   units: string[];
   onUnitChange: (value: string) => void;
   onUnitsReload: () => void;
+  hasError?: boolean;
 }
 
-export default function MaterialUnitSection({
-  unit,
-  units,
-  onUnitChange,
-  onUnitsReload,
-}: MaterialUnitSectionProps) {
+const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionProps>(
+  ({ unit, units, onUnitChange, onUnitsReload, hasError = false }, ref) => {
   const { toast } = useToast();
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -132,7 +129,11 @@ export default function MaterialUnitSection({
             }
           }}
         >
-          <SelectTrigger id="unit">
+          <SelectTrigger 
+            ref={ref}
+            id="unit"
+            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+          >
             <SelectValue placeholder="Select unit" />
           </SelectTrigger>
           <SelectContent>
@@ -198,5 +199,9 @@ export default function MaterialUnitSection({
       </div>
     </div>
   );
-}
+});
+
+MaterialUnitSection.displayName = 'MaterialUnitSection';
+
+export default MaterialUnitSection;
 

@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,20 +17,22 @@ interface MaterialSupplierSectionProps {
   supplier: string;
   suppliers: Supplier[];
   onSupplierChange: (value: string) => void;
+  hasError?: boolean;
 }
 
-export default function MaterialSupplierSection({
-  supplier,
-  suppliers,
-  onSupplierChange,
-}: MaterialSupplierSectionProps) {
-  return (
-    <div>
-      <Label htmlFor="supplier">Supplier Name *</Label>
-      <Select value={supplier || undefined} onValueChange={onSupplierChange}>
-        <SelectTrigger id="supplier">
-          <SelectValue placeholder="Select supplier" />
-        </SelectTrigger>
+const MaterialSupplierSection = forwardRef<HTMLButtonElement, MaterialSupplierSectionProps>(
+  ({ supplier, suppliers, onSupplierChange, hasError = false }, ref) => {
+    return (
+      <div>
+        <Label htmlFor="supplier">Supplier Name *</Label>
+        <Select value={supplier || undefined} onValueChange={onSupplierChange}>
+          <SelectTrigger 
+            ref={ref}
+            id="supplier"
+            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+          >
+            <SelectValue placeholder="Select supplier" />
+          </SelectTrigger>
         <SelectContent>
           {suppliers.length > 0 ? (
             suppliers.map((supplierOption) => (
@@ -46,5 +49,9 @@ export default function MaterialSupplierSection({
       </Select>
     </div>
   );
-}
+});
+
+MaterialSupplierSection.displayName = 'MaterialSupplierSection';
+
+export default MaterialSupplierSection;
 

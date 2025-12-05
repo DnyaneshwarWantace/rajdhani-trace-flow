@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
@@ -42,6 +42,15 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const [colors, setColors] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
+
+  // Refs for form fields to focus on validation errors
+  const nameRef = useRef<HTMLInputElement>(null);
+  const supplierRef = useRef<HTMLButtonElement>(null);
+  const categoryRef = useRef<HTMLButtonElement>(null);
+  const unitRef = useRef<HTMLButtonElement>(null);
+  const costPerUnitRef = useRef<HTMLInputElement>(null);
+  const expectedDeliveryRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -330,15 +339,42 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     setLoading(true);
 
     try {
-      // Validate required fields
-      if (
-        !formData.name ||
-        !formData.supplier ||
-        !formData.category ||
-        !formData.unit ||
-        !formData.costPerUnit ||
-        (mode === 'create' && !formData.expectedDelivery)
-      ) {
+      // Clear previous invalid fields
+      setInvalidFields(new Set());
+
+      // Validate required fields and collect invalid ones
+      const missingFields: string[] = [];
+      const fieldRefs: { [key: string]: React.RefObject<any> } = {
+        name: nameRef,
+        supplier: supplierRef,
+        category: categoryRef,
+        unit: unitRef,
+        costPerUnit: costPerUnitRef,
+        expectedDelivery: expectedDeliveryRef,
+      };
+
+      if (!formData.name) missingFields.push('name');
+      if (!formData.supplier) missingFields.push('supplier');
+      if (!formData.category) missingFields.push('category');
+      if (!formData.unit) missingFields.push('unit');
+      if (!formData.costPerUnit) missingFields.push('costPerUnit');
+      if (mode === 'create' && !formData.expectedDelivery) missingFields.push('expectedDelivery');
+
+      if (missingFields.length > 0) {
+        setInvalidFields(new Set(missingFields));
+        
+        // Focus on first missing field
+        const firstMissingField = missingFields[0];
+        const fieldRef = fieldRefs[firstMissingField];
+        if (fieldRef?.current) {
+          // Scroll to field
+          fieldRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Focus on field
+          setTimeout(() => {
+            fieldRef.current?.focus();
+          }, 100);
+        }
+
         toast({
           title: 'Validation Error',
           description: mode === 'edit' 
@@ -358,6 +394,13 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         expectedDate.setHours(0, 0, 0, 0);
         
         if (expectedDate <= today) {
+          setInvalidFields(new Set(['expectedDelivery']));
+          if (expectedDeliveryRef.current) {
+            expectedDeliveryRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+              expectedDeliveryRef.current?.focus();
+            }, 100);
+          }
           toast({
             title: 'Validation Error',
             description: 'Expected delivery date must be a future date',
@@ -594,21 +637,48 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           />
 
           <MaterialBasicInfo
+            ref={nameRef}
             name={formData.name}
-            onNameChange={(value) => setFormData({ ...formData, name: value })}
+            onNameChange={(value) => {
+              setFormData({ ...formData, name: value });
+              setInvalidFields(prev => {
+                const next = new Set(prev);
+                next.delete('name');
+                return next;
+              });
+            }}
+            hasError={invalidFields.has('name')}
           />
 
           <div className="grid grid-cols-2 gap-4">
             <MaterialSupplierSection
+              ref={supplierRef}
               supplier={formData.supplier}
               suppliers={suppliers}
-              onSupplierChange={(value) => setFormData({ ...formData, supplier: value })}
+              onSupplierChange={(value) => {
+                setFormData({ ...formData, supplier: value });
+                setInvalidFields(prev => {
+                  const next = new Set(prev);
+                  next.delete('supplier');
+                  return next;
+                });
+              }}
+              hasError={invalidFields.has('supplier')}
             />
             <MaterialCategorySection
+              ref={categoryRef}
               category={formData.category}
               categories={categories}
-              onCategoryChange={(value: string) => setFormData({ ...formData, category: value })}
+              onCategoryChange={(value: string) => {
+                setFormData({ ...formData, category: value });
+                setInvalidFields(prev => {
+                  const next = new Set(prev);
+                  next.delete('category');
+                  return next;
+                });
+              }}
               onCategoriesReload={loadDropdowns}
+              hasError={invalidFields.has('category')}
             />
           </div>
 
@@ -628,10 +698,19 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           />
 
           <MaterialUnitSection
+            ref={unitRef}
             unit={formData.unit}
             units={units}
-            onUnitChange={(value) => setFormData({ ...formData, unit: value })}
+            onUnitChange={(value) => {
+              setFormData({ ...formData, unit: value });
+              setInvalidFields(prev => {
+                const next = new Set(prev);
+                next.delete('unit');
+                return next;
+              });
+            }}
             onUnitsReload={loadDropdowns}
+            hasError={invalidFields.has('unit')}
           />
 
           {/* Quantity and Expected Delivery (only for create mode) */}
@@ -658,11 +737,23 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
                   Expected Delivery Date *
                 </label>
                 <input
+                  ref={expectedDeliveryRef}
                   type="date"
                   value={formData.expectedDelivery}
-                  onChange={(e) => setFormData({ ...formData, expectedDelivery: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, expectedDelivery: e.target.value });
+                    setInvalidFields(prev => {
+                      const next = new Set(prev);
+                      next.delete('expectedDelivery');
+                      return next;
+                    });
+                  }}
                   min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-primary-500 outline-none ${
+                    invalidFields.has('expectedDelivery')
+                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                      : 'border-gray-300 focus:ring-primary-500'
+                  }`}
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">Expected delivery date (must be a future date)</p>
@@ -688,8 +779,17 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           />
 
           <MaterialCostSection
+            ref={costPerUnitRef}
             costPerUnit={formData.costPerUnit}
-            onCostPerUnitChange={(value) => setFormData({ ...formData, costPerUnit: value })}
+            onCostPerUnitChange={(value) => {
+              setFormData({ ...formData, costPerUnit: value });
+              setInvalidFields(prev => {
+                const next = new Set(prev);
+                next.delete('costPerUnit');
+                return next;
+              });
+            }}
+            hasError={invalidFields.has('costPerUnit')}
           />
         </form>
 
