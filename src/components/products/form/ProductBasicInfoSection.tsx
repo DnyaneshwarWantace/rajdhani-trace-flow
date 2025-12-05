@@ -61,9 +61,9 @@ export default function ProductBasicInfoSection({
         <ProductDropdownField
           label="Subcategory"
           value={formData.subcategory || ''}
-          placeholder="Select subcategory (optional)"
+          placeholder="Select subcategory"
           options={subcategories}
-          allowNA
+          required
           category="subcategory"
           onValueChange={(value) => onFormDataChange({ subcategory: value })}
           onDelete={onDeleteSubcategory}

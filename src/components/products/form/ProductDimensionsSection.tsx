@@ -68,7 +68,8 @@ export default function ProductDimensionsSection({
         unitOptions={weightUnits}
         category="weight"
         placeholder="e.g., 3"
-        description="Select from dropdown or add new value with unit"
+        required
+        description="Required for product specification"
         onValueChange={(value) => onFormDataChange({ weight: value })}
         onUnitChange={(unit) => onFormDataChange({ weight_unit: unit })}
         onReload={onReload}

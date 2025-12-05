@@ -46,25 +46,9 @@ export default function ProductStockSection({
               id="quantity"
               type="number"
               value={formData.base_quantity}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Prevent entering 0 directly
-                if (value === '' || (parseFloat(value) > 0 && /^\d*\.?\d*$/.test(value))) {
-                  onFormDataChange({ base_quantity: Number(value) || 0 });
-                } else if (value === '0') {
-                  onFormDataChange({ base_quantity: 0 }); // Allow 0 temporarily but will be validated
-                }
-              }}
-              onBlur={(e) => {
-                const value = parseFloat(e.target.value);
-                // Clear if invalid (NaN or <= 0)
-                if (isNaN(value) || value <= 0) {
-                  onFormDataChange({ base_quantity: 0 });
-                }
-              }}
-              placeholder="Enter quantity (min: 1)"
-              min="1"
-              step="1"
+              onChange={(e) => onFormDataChange({ base_quantity: Number(e.target.value) })}
+              placeholder="Enter quantity (e.g., 10)"
+              min="0"
               required
             />
           )}
