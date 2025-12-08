@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building, Star } from 'lucide-react';
+import { Building } from 'lucide-react';
 import type { Supplier } from '@/services/supplierService';
 
 interface SupplierDetailHeaderProps {
@@ -28,12 +28,6 @@ export default function SupplierDetailHeader({ supplier }: SupplierDetailHeaderP
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">{supplier.name}</h1>
               {getStatusBadge(supplier.status)}
-              {supplier.performance_rating && (
-                <Badge variant="outline" className="gap-1">
-                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                  {supplier.performance_rating.toFixed(1)}/10
-                </Badge>
-              )}
             </div>
             {supplier.contact_person && (
               <p className="text-lg text-gray-600 mb-2">Contact: {supplier.contact_person}</p>

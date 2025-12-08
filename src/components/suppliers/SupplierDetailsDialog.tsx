@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Building, Mail, Phone, MapPin, Calendar, DollarSign, Package, ShoppingBag, Edit, X, Star } from 'lucide-react';
+import { Building, Mail, Phone, MapPin, Calendar, DollarSign, Package, ShoppingBag, Edit, X } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Supplier } from '@/services/supplierService';
 import type { StockOrder } from '@/services/manageStockService';
@@ -145,12 +145,6 @@ export default function SupplierDetailsDialog({
                     <div className="flex items-center gap-2">
                       <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-xs">GST: {supplier.gst_number}</span>
-                    </div>
-                  )}
-                  {supplier.performance_rating && (
-                    <div className="flex items-center gap-2">
-                      <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                      <span>Performance Rating: {supplier.performance_rating.toFixed(1)}/10</span>
                     </div>
                   )}
                   {supplier.created_at && (

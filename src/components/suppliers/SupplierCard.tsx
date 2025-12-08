@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, MapPin, Edit, Trash2, Eye, Star } from 'lucide-react';
+import { Mail, Phone, MapPin, Edit, Trash2, Eye } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Supplier } from '@/services/supplierService';
 import type { StockOrder } from '@/services/manageStockService';
@@ -71,12 +71,6 @@ export default function SupplierCard({ supplier, orders, onEdit, onDelete, canDe
             {supplier.contact_person && <p className="text-xs text-gray-600 mb-2">Contact: {supplier.contact_person}</p>}
             <div className="flex items-center gap-2 flex-wrap">
               {getStatusBadge(supplier.status)}
-              {supplier.performance_rating && (
-                <Badge variant="outline" className="text-xs">
-                  <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
-                  {supplier.performance_rating.toFixed(1)}
-                </Badge>
-              )}
             </div>
           </div>
         </div>
