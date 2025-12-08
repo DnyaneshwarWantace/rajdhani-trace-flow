@@ -17,7 +17,7 @@ export const convertActivityLogToNotification = async (
       method: activityLog.method
     });
     
-    // IMPORTANT: Check if this is a material or purchase order action FIRST
+    // IMPORTANT: Check if this is a material, purchase order, or supplier action FIRST
     // These should ALWAYS create notifications, regardless of endpoint or other checks
     const isMaterialAction = activityLog.action_category === 'MATERIAL' || 
                             activityLog.action?.includes('MATERIAL') ||
@@ -31,11 +31,19 @@ export const convertActivityLogToNotification = async (
                                  activityLog.action === 'PurchaseOrder' ||
                                  (activityLog.endpoint && activityLog.endpoint.includes('/purchase-orders'));
 
+    const isSupplierAction = activityLog.action_category === 'SUPPLIER' || 
+                            activityLog.action?.includes('SUPPLIER') ||
+                            activityLog.action === 'SUPPLIER_CREATE' ||
+                            activityLog.action === 'SUPPLIER_UPDATE' ||
+                            activityLog.action === 'SUPPLIER_DELETE' ||
+                            (activityLog.endpoint && activityLog.endpoint.includes('/suppliers'));
+
     console.log('🔍 Early action detection:', {
       action: activityLog.action,
       category: activityLog.action_category,
       isMaterialAction,
-      isPurchaseOrderAction
+      isPurchaseOrderAction,
+      isSupplierAction
     });
     
     // Skip certain actions that shouldn't create notifications (but NOT material/purchase order actions)
@@ -52,13 +60,13 @@ export const convertActivityLogToNotification = async (
       'API_CALL', // Skip generic API calls
     ];
 
-    if (!isMaterialAction && !isPurchaseOrderAction && skipActions.includes(activityLog.action)) {
+    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && skipActions.includes(activityLog.action)) {
       console.log('⏭️ Skipping action (in skipActions list):', activityLog.action);
       return null;
     }
 
-    // Skip if it's a generic API_CALL with no meaningful data (but NOT for material/purchase order actions)
-    if (!isMaterialAction && !isPurchaseOrderAction && 
+    // Skip if it's a generic API_CALL with no meaningful data (but NOT for material/purchase order/supplier actions)
+    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && 
         (activityLog.action === 'API_CALL' || 
          (activityLog.endpoint === '/' || activityLog.endpoint === '/api'))) {
       console.log('⏭️ Skipping generic API_CALL:', activityLog.endpoint);
@@ -73,8 +81,8 @@ export const convertActivityLogToNotification = async (
       isMaterialAction
     });
 
-    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders or material actions)
-    if (!isPurchaseOrderAction && !isMaterialAction && (
+    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders, material, or supplier actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && (
       activityLog.endpoint === '/' ||
       activityLog.endpoint === '/api' ||
       activityLog.endpoint.includes('/api/auth/login') ||
@@ -86,8 +94,8 @@ export const convertActivityLogToNotification = async (
       return null; // Always skip these (except purchase orders and material actions)
     }
 
-    // Skip if description is too generic or meaningless (but NOT for purchase orders or material actions)
-    if (!isPurchaseOrderAction && !isMaterialAction && activityLog.description &&
+    // Skip if description is too generic or meaningless (but NOT for purchase orders, material, or supplier actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && activityLog.description &&
       (activityLog.description === 'Action' ||
        activityLog.description.includes('POST /') ||
        activityLog.description.includes('GET /') ||
@@ -98,12 +106,15 @@ export const convertActivityLogToNotification = async (
       return null;
     }
 
-    // IMPORTANT: Purchase orders and material actions should ALWAYS create notifications
+    // IMPORTANT: Purchase orders, material, and supplier actions should ALWAYS create notifications
     if (isPurchaseOrderAction) {
       console.log('✅ Purchase order action detected - will create notification:', activityLog.action);
     }
     if (isMaterialAction) {
       console.log('✅ Material action detected - will create notification:', activityLog.action);
+    }
+    if (isSupplierAction) {
+      console.log('✅ Supplier action detected - will create notification:', activityLog.action);
     }
 
     // Determine notification type based on action
@@ -311,6 +322,8 @@ const getModule = (log: ActivityLog): Notification['module'] => {
       return 'materials';
     case 'ORDER':
       return 'orders';
+    case 'SUPPLIER':
+      return 'materials'; // Suppliers are part of materials module
     case 'RECIPE':
     case 'PRODUCTION':
       return 'production';
@@ -407,6 +420,40 @@ const buildNotificationContent = (
     return {
       title: formattedMessage,
       message: formattedMessage,
+    };
+  }
+
+  // Handle supplier creation
+  if (log.action === 'SUPPLIER_CREATE') {
+    const supplierName = log.metadata?.supplier_name || log.target_resource || 'Supplier';
+    const supplierId = log.target_resource || log.metadata?.supplier_id || 'N/A';
+    return {
+      title: `${userName} created a supplier`,
+      message: `Created supplier "${supplierName}" (ID: ${supplierId})`,
+    };
+  }
+
+  // Handle supplier update
+  if (log.action === 'SUPPLIER_UPDATE') {
+    const supplierName = log.metadata?.supplier_name || log.target_resource || 'Supplier';
+    const supplierId = log.target_resource || log.metadata?.supplier_id || 'N/A';
+    const changedFields = log.metadata?.fields_changed || [];
+    const changesText = changedFields.length > 0 
+      ? `Changed: ${changedFields.join(', ')}`
+      : 'Updated supplier details';
+    return {
+      title: `${userName} updated a supplier`,
+      message: `Updated supplier "${supplierName}" (ID: ${supplierId}) - ${changesText}`,
+    };
+  }
+
+  // Handle supplier delete
+  if (log.action === 'SUPPLIER_DELETE') {
+    const supplierName = log.metadata?.supplier_name || log.target_resource || 'Supplier';
+    const supplierId = log.target_resource || log.metadata?.supplier_id || 'N/A';
+    return {
+      title: `${userName} deleted a supplier`,
+      message: `Deleted supplier "${supplierName}" (ID: ${supplierId})`,
     };
   }
 
