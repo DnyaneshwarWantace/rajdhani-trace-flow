@@ -12,8 +12,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001,
+    port: 3000,
     host: true, // Allow access from network (0.0.0.0)
-    strictPort: false, // If 3001 is taken, try next available port
+    strictPort: false, // If 3000 is taken, try next available port
   },
 })
