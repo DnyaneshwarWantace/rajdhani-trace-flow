@@ -13,7 +13,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    host: true, // Allow access from network (0.0.0.0)
+    host: '0.0.0.0', // Explicitly bind to all network interfaces
     strictPort: false, // If 3000 is taken, try next available port
   },
 })
