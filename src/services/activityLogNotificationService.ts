@@ -38,12 +38,20 @@ export const convertActivityLogToNotification = async (
                             activityLog.action === 'SUPPLIER_DELETE' ||
                             (activityLog.endpoint && activityLog.endpoint.includes('/suppliers'));
 
+    const isCustomerAction = activityLog.action_category === 'CUSTOMER' || 
+                            activityLog.action?.includes('CUSTOMER') ||
+                            activityLog.action === 'CUSTOMER_CREATE' ||
+                            activityLog.action === 'CUSTOMER_UPDATE' ||
+                            activityLog.action === 'CUSTOMER_DELETE' ||
+                            (activityLog.endpoint && activityLog.endpoint.includes('/customers'));
+
     console.log('🔍 Early action detection:', {
       action: activityLog.action,
       category: activityLog.action_category,
       isMaterialAction,
       isPurchaseOrderAction,
-      isSupplierAction
+      isSupplierAction,
+      isCustomerAction
     });
     
     // Skip certain actions that shouldn't create notifications (but NOT material/purchase order actions)
@@ -60,13 +68,13 @@ export const convertActivityLogToNotification = async (
       'API_CALL', // Skip generic API calls
     ];
 
-    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && skipActions.includes(activityLog.action)) {
+    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && !isCustomerAction && skipActions.includes(activityLog.action)) {
       console.log('⏭️ Skipping action (in skipActions list):', activityLog.action);
       return null;
     }
 
-    // Skip if it's a generic API_CALL with no meaningful data (but NOT for material/purchase order/supplier actions)
-    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && 
+    // Skip if it's a generic API_CALL with no meaningful data (but NOT for material/purchase order/supplier/customer actions)
+    if (!isMaterialAction && !isPurchaseOrderAction && !isSupplierAction && !isCustomerAction && 
         (activityLog.action === 'API_CALL' || 
          (activityLog.endpoint === '/' || activityLog.endpoint === '/api'))) {
       console.log('⏭️ Skipping generic API_CALL:', activityLog.endpoint);
@@ -81,8 +89,8 @@ export const convertActivityLogToNotification = async (
       isMaterialAction
     });
 
-    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders, material, or supplier actions)
-    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && (
+    // Skip if endpoint is too generic or login/logout (but NOT for purchase orders, material, supplier, or customer actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && !isCustomerAction && (
       activityLog.endpoint === '/' ||
       activityLog.endpoint === '/api' ||
       activityLog.endpoint.includes('/api/auth/login') ||
@@ -94,8 +102,8 @@ export const convertActivityLogToNotification = async (
       return null; // Always skip these (except purchase orders and material actions)
     }
 
-    // Skip if description is too generic or meaningless (but NOT for purchase orders, material, or supplier actions)
-    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && activityLog.description &&
+    // Skip if description is too generic or meaningless (but NOT for purchase orders, material, supplier, or customer actions)
+    if (!isPurchaseOrderAction && !isMaterialAction && !isSupplierAction && !isCustomerAction && activityLog.description &&
       (activityLog.description === 'Action' ||
        activityLog.description.includes('POST /') ||
        activityLog.description.includes('GET /') ||
@@ -106,7 +114,7 @@ export const convertActivityLogToNotification = async (
       return null;
     }
 
-    // IMPORTANT: Purchase orders, material, and supplier actions should ALWAYS create notifications
+    // IMPORTANT: Purchase orders, material, supplier, and customer actions should ALWAYS create notifications
     if (isPurchaseOrderAction) {
       console.log('✅ Purchase order action detected - will create notification:', activityLog.action);
     }
@@ -115,6 +123,9 @@ export const convertActivityLogToNotification = async (
     }
     if (isSupplierAction) {
       console.log('✅ Supplier action detected - will create notification:', activityLog.action);
+    }
+    if (isCustomerAction) {
+      console.log('✅ Customer action detected - will create notification:', activityLog.action);
     }
 
     // Determine notification type based on action
@@ -324,6 +335,8 @@ const getModule = (log: ActivityLog): Notification['module'] => {
       return 'orders';
     case 'SUPPLIER':
       return 'materials'; // Suppliers are part of materials module
+    case 'CUSTOMER':
+      return 'orders'; // Customers are part of orders module
     case 'RECIPE':
     case 'PRODUCTION':
       return 'production';
@@ -454,6 +467,42 @@ const buildNotificationContent = (
     return {
       title: `${userName} deleted a supplier`,
       message: `Deleted supplier "${supplierName}" (ID: ${supplierId})`,
+    };
+  }
+
+  // Handle customer creation
+  if (log.action === 'CUSTOMER_CREATE') {
+    const customerName = log.metadata?.customer_name || log.target_resource || 'Customer';
+    const customerId = log.target_resource || log.metadata?.customer_id || 'N/A';
+    const customerType = log.metadata?.customer_type || '';
+    const typeText = customerType ? ` (${customerType})` : '';
+    return {
+      title: `${userName} created a customer`,
+      message: `Created customer "${customerName}"${typeText} (ID: ${customerId})`,
+    };
+  }
+
+  // Handle customer update
+  if (log.action === 'CUSTOMER_UPDATE') {
+    const customerName = log.metadata?.customer_name || log.target_resource || 'Customer';
+    const customerId = log.target_resource || log.metadata?.customer_id || 'N/A';
+    const changedFields = log.metadata?.fields_changed || [];
+    const changesText = changedFields.length > 0 
+      ? `Changed: ${changedFields.join(', ')}`
+      : 'Updated customer details';
+    return {
+      title: `${userName} updated a customer`,
+      message: `Updated customer "${customerName}" (ID: ${customerId}) - ${changesText}`,
+    };
+  }
+
+  // Handle customer delete
+  if (log.action === 'CUSTOMER_DELETE') {
+    const customerName = log.metadata?.customer_name || log.target_resource || 'Customer';
+    const customerId = log.target_resource || log.metadata?.customer_id || 'N/A';
+    return {
+      title: `${userName} deleted a customer`,
+      message: `Deleted customer "${customerName}" (ID: ${customerId})`,
     };
   }
 
