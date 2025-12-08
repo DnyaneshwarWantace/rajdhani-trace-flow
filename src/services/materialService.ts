@@ -1,6 +1,8 @@
 import type { RawMaterial, RawMaterialFormData, MaterialStats, MaterialFilters } from '@/types/material';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
 
 export class MaterialService {
   private static getHeaders(): HeadersInit {

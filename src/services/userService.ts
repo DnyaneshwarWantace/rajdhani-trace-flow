@@ -1,6 +1,8 @@
 import type { User } from '@/types/auth';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
 
 export interface CreateUserData {
   email: string;

@@ -1,6 +1,8 @@
 import type { Recipe, RecipeFilters } from '@/types/recipe';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
 
 export class RecipeService {
   private static getHeaders(): HeadersInit {

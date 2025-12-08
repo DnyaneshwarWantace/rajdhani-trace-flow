@@ -359,7 +359,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           }
           
           // Create new recipe via API (or recreate if editing)
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/recipes`, {
+          const { getApiUrl } = await import('@/utils/apiConfig');
+          const response = await fetch(`${getApiUrl()}/recipes`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

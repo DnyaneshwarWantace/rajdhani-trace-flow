@@ -15,7 +15,8 @@ export function useDropdowns(toast: UseToast['toast']) {
     try {
       setLoading(true);
       // Use DropdownService which has proper headers and error handling
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const { getApiUrl } = await import('@/utils/apiConfig');
+      const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/dropdowns`, {

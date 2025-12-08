@@ -22,7 +22,8 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
     try {
       setLoading(true);
       // Fetch raw orders directly to check all items in each order
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+      const { getApiUrl } = await import('@/utils/apiConfig');
+      const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_URL}/purchase-orders?limit=1000`, {

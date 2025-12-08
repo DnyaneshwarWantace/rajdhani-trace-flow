@@ -1,6 +1,8 @@
 import type { IndividualProduct, IndividualProductFormData } from '@/types/product';
 
-const API_URL = import.meta.env.VITE_API_URL;
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
 
 export class IndividualProductService {
   private static getHeaders(): HeadersInit {

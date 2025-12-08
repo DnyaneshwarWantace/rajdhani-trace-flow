@@ -1,6 +1,7 @@
 import type { DropdownOption, DropdownFormData, GroupedDropdowns } from '@/types/dropdown';
+import { getApiUrl } from '@/utils/apiConfig';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = getApiUrl();
 
 export class DropdownService {
   private static getHeaders(): HeadersInit {

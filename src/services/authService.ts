@@ -1,6 +1,7 @@
 import type { LoginCredentials, AuthResponse, User } from '@/types/auth';
+import { getApiUrl } from '@/utils/apiConfig';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = getApiUrl();
 
 export class AuthService {
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
