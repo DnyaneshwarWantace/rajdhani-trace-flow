@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
+import { uploadImageToR2 } from '@/services/imageService';
 import { SupplierService } from '@/services/supplierService';
 import type { RawMaterialFormData } from '@/types/material';
 import type { DropdownOption } from '@/types/dropdown';
@@ -331,8 +332,28 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       // Upload image if provided
       let imageUrl = '';
       if (imageFile) {
-        // TODO: Implement image upload to backend
-        imageUrl = imagePreview;
+        try {
+          const uploadResult = await uploadImageToR2(imageFile, 'materials');
+          if (uploadResult.error) {
+            toast({
+              title: 'Image Upload Failed',
+              description: uploadResult.error,
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+          imageUrl = uploadResult.url;
+        } catch (error: any) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: 'Image Upload Failed',
+            description: error?.message || 'Failed to upload image',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
       }
 
       // Normalize unit to match backend enum

@@ -24,9 +24,9 @@ export async function uploadImageToR2(
       return { url: '', key: '', error: 'File must be an image' };
     }
 
-    // Validate file size (max 20MB - backend limit)
-    if (file.size > 20 * 1024 * 1024) {
-      return { url: '', key: '', error: 'Image size must be less than 20MB' };
+    // Validate file size (max 50MB - backend limit)
+    if (file.size > 50 * 1024 * 1024) {
+      return { url: '', key: '', error: 'Image size must be less than 50MB' };
     }
 
     // Get auth token
