@@ -35,7 +35,6 @@ import { MaterialService } from '@/services/materialService';
 import ProductCard from './ProductCard';
 import MaterialCard from '@/components/materials/MaterialCard';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
-import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
 
 interface MaterialSelectorDialogProps {
   isOpen: boolean;
@@ -46,6 +45,7 @@ interface MaterialSelectorDialogProps {
     quantity: string;
     unit: string;
     cost?: string;
+    materialType?: 'product' | 'raw_material';
   }) => void;
   targetProduct?: {
     length: string;
@@ -73,8 +73,14 @@ export default function MaterialSelectorDialog({
   const [selectedLength, setSelectedLength] = useState('all');
   const [selectedWidth, setSelectedWidth] = useState('all');
   const [selectedWeight, setSelectedWeight] = useState('all');
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
-  const [calculatedQuantity, setCalculatedQuantity] = useState<string>('');
+  const [selectedItems, setSelectedItems] = useState<Array<{
+    materialId: string;
+    materialName: string;
+    unit: string;
+    quantity: string;
+    cost: string;
+    materialType: 'product' | 'raw_material';
+  }>>([]);
 
   // Data loading state
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
@@ -133,6 +139,27 @@ export default function MaterialSelectorDialog({
     }
   };
 
+  // Load initial counts when dialog opens
+  useEffect(() => {
+    if (isOpen && chosenType === null) {
+      // Load total counts for both products and materials
+      const loadInitialCounts = async () => {
+        try {
+          // Load products count
+          const productsResult = await ProductService.getProducts({ limit: 1 });
+          setProductsTotal(productsResult.total || 0);
+          
+          // Load materials count
+          const materialsResult = await MaterialService.getMaterials({ limit: 1 });
+          setMaterialsTotal(materialsResult.total || 0);
+        } catch (err) {
+          console.error('Failed to load initial counts:', err);
+        }
+      };
+      loadInitialCounts();
+    }
+  }, [isOpen]);
+
   // Load data when filters change
   useEffect(() => {
     if (isOpen && chosenType === 'material') {
@@ -186,54 +213,51 @@ export default function MaterialSelectorDialog({
   };
 
   const handleMaterialSelection = (material: Product | RawMaterial, type: 'product' | 'material') => {
-    let autoCalculatedQuantity = '';
-
-    // Only auto-calculate for PRODUCTS (not raw materials)
-    if (type === 'product' && targetProduct) {
-      const product = material as Product;
-      // Check if both source product (material) and target product have required fields
-      if (!product.length || !product.width || !product.length_unit || !product.width_unit) {
-        alert(`The selected product "${product.name}" is missing length, width, or their units. Please update the product details first.`);
-        return;
-      }
-
-      if (!targetProduct.length || !targetProduct.width || !targetProduct.length_unit || !targetProduct.width_unit) {
-        alert(`Please fill in Length, Width, and their units for the target product first, then select the product as recipe ingredient.`);
-        return;
-      }
-
-      // Both products have required fields - calculate the ratio
-      const ratio = calculateProductRatio(product, targetProduct);
-      if (ratio > 0 && !isNaN(ratio) && isFinite(ratio)) {
-        autoCalculatedQuantity = ratio.toFixed(4);
-        setCalculatedQuantity(autoCalculatedQuantity);
-      } else {
-        alert(`Could not calculate the ratio. Please check that both products have valid length and width values.`);
-        return;
-      }
-    } else {
-      setCalculatedQuantity('');
-    }
-
-    const materialId = (material as Product)._id || (material as RawMaterial)._id || (material as Product).id || (material as RawMaterial).id;
+    // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
+    const materialId = material.id || (material as any)._id || '';
     const materialName = material.name;
     const unit = type === 'product' ? (material as Product).unit : (material as RawMaterial).unit;
     const cost = type === 'material' ? (material as RawMaterial).cost_per_unit?.toString() || '' : '';
-
-    setSelectedMaterialId(materialId);
     
-    // For raw materials, call onSelect immediately (no calculation needed)
-    // For products, wait for user to confirm after seeing the calculation
-    if (type === 'material') {
-      const selected = {
-        materialId,
-        materialName,
-        quantity: '',
-        unit: unit || '',
-        cost,
-      };
-      onSelect(selected);
+    // Check if already selected
+    if (selectedItems.some(item => item.materialId === materialId)) {
+      return; // Already selected, do nothing
     }
+
+    let quantity = '';
+    
+    // If it's a product and we have target product dimensions, try to auto-calculate
+    if (type === 'product' && targetProduct) {
+      const product = material as Product;
+      
+      if (product.length && product.width && product.length_unit && product.width_unit &&
+          targetProduct.length && targetProduct.width && targetProduct.length_unit && targetProduct.width_unit) {
+        // Both products have required fields - calculate the ratio
+        const ratio = calculateProductRatio(product, targetProduct);
+        if (ratio > 0 && !isNaN(ratio) && isFinite(ratio)) {
+          quantity = ratio.toFixed(4);
+        }
+      }
+    }
+
+    const selected = {
+      materialId,
+      materialName,
+      quantity,
+      unit: unit || '',
+      cost,
+      materialType: type === 'product' ? 'product' as const : 'raw_material' as const,
+    };
+
+    // Add to selected items
+    setSelectedItems([...selectedItems, selected]);
+    
+    // Immediately call onSelect to add to recipe (validation happens in main form)
+    onSelect(selected);
+  };
+
+  const handleRemoveSelected = (materialId: string) => {
+    setSelectedItems(selectedItems.filter(item => item.materialId !== materialId));
   };
 
   const handleClose = () => {
@@ -247,18 +271,19 @@ export default function MaterialSelectorDialog({
     setSelectedLength('all');
     setSelectedWidth('all');
     setSelectedWeight('all');
-    setSelectedMaterialId('');
-    setCalculatedQuantity('');
+    setSelectedItems([]);
     setMaterialsPage(1);
     setProductsPage(1);
     setRawMaterials([]);
     setProducts([]);
+    // Don't reset totals - they will be reloaded when dialog opens again
     onClose();
   };
 
-  const selectedMaterial = chosenType === 'product'
-    ? products.find(p => (p._id || p.id) === selectedMaterialId)
-    : rawMaterials.find(m => (m._id || m.id) === selectedMaterialId);
+  // Check if an item is already selected
+  const isItemSelected = (itemId: string) => {
+    return selectedItems.some(item => item.materialId === itemId);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
@@ -297,7 +322,7 @@ export default function MaterialSelectorDialog({
                       Select from existing products in your inventory
                     </p>
                     <div className="text-xs text-gray-500 font-medium">
-                      Available: {products.length} products
+                      Available: {productsTotal} product{productsTotal !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
@@ -319,7 +344,7 @@ export default function MaterialSelectorDialog({
                       Select from raw materials in your inventory
                     </p>
                     <div className="text-xs text-gray-500 font-medium">
-                      Available: {rawMaterials.length} materials
+                      Available: {materialsTotal} material{materialsTotal !== 1 ? 's' : ''}
                     </div>
                   </div>
                 </div>
@@ -333,6 +358,7 @@ export default function MaterialSelectorDialog({
               {/* Back Button */}
               <div className="flex items-center gap-2">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => {
@@ -489,99 +515,57 @@ export default function MaterialSelectorDialog({
                 </div>
               )}
 
-              {/* Selected Material Display */}
-              {selectedMaterial && (
-                <div className="p-4 bg-primary-50 border-2 border-primary-300 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className="w-5 h-5 text-primary-600" />
-                        <span className="font-semibold text-primary-900">
-                          Selected: {selectedMaterial.name}
-                        </span>
-                      </div>
-                      <div className="text-sm text-primary-700">
-                        {chosenType === 'material' ? 'Raw Material' : 'Product'}
-                      </div>
+              {/* Selected Items Display */}
+              {/* Selected Items Display */}
+              {selectedItems.length > 0 && (
+                <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                      <span className="font-semibold text-green-900">
+                        Selected Items ({selectedItems.length})
+                      </span>
                     </div>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedMaterialId('')}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSelectedItems([]);
+                      }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <X className="w-4 h-4" />
+                      Clear All
                     </Button>
                   </div>
-                  
-                  {/* SQM Calculation Display for Products */}
-                  {chosenType === 'product' && selectedMaterial && 'length' in selectedMaterial && (
-                    <div className="mt-3 space-y-2">
-                      {selectedMaterial.length && selectedMaterial.width && (
-                        <div className="p-2 bg-white rounded border border-primary-200">
-                          <p className="text-xs font-medium text-primary-800 mb-1">Selected Product Area:</p>
-                          <p className="text-sm font-semibold text-primary-900">
-                            {formatSQMWithSquareFeet(
-                              calculateSQM(
-                                selectedMaterial.length,
-                                selectedMaterial.width,
-                                selectedMaterial.length_unit || 'feet',
-                                selectedMaterial.width_unit || 'feet'
-                              )
-                            )}
-                          </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedItems.map((item) => (
+                      <div key={item.materialId} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">{item.materialName}</div>
+                          <div className="text-xs text-gray-600">
+                            {item.materialType === 'product' ? 'Product' : 'Raw Material'} • {item.unit}
+                            {item.quantity && ` • Qty: ${item.quantity}`}
+                          </div>
                         </div>
-                      )}
-                      {targetProduct && targetProduct.length && targetProduct.width && (
-                        <div className="p-2 bg-white rounded border border-primary-200">
-                          <p className="text-xs font-medium text-primary-800 mb-1">Target Product Area:</p>
-                          <p className="text-sm font-semibold text-primary-900">
-                            {formatSQMWithSquareFeet(
-                              calculateSQM(
-                                targetProduct.length,
-                                targetProduct.width,
-                                targetProduct.length_unit,
-                                targetProduct.width_unit
-                              )
-                            )}
-                          </p>
-                        </div>
-                      )}
-                      {calculatedQuantity && (
-                        <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                          <p className="text-xs font-medium text-blue-800 mb-1">
-                            Auto-calculated Quantity (for 1 SQM of target product):
-                          </p>
-                          <p className="text-sm font-bold text-blue-900">
-                            {calculatedQuantity} {selectedMaterial.unit || 'units'}
-                          </p>
-                          <p className="text-xs text-blue-700 mt-1">
-                            This is the quantity needed per 1 SQM of the target product
-                          </p>
-                        </div>
-                      )}
-                      <Button
-                        onClick={() => {
-                          const materialId = selectedMaterial._id || selectedMaterial.id;
-                          const materialName = selectedMaterial.name;
-                          const unit = (selectedMaterial as Product).unit || '';
-                          const cost = '';
-                          onSelect({
-                            materialId,
-                            materialName,
-                            quantity: calculatedQuantity || '',
-                            unit,
-                            cost,
-                          });
-                          handleClose();
-                        }}
-                        className="w-full mt-2"
-                        disabled={!calculatedQuantity}
-                      >
-                        Confirm Selection
-                      </Button>
-                    </div>
-                  )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveSelected(item.materialId);
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -597,10 +581,12 @@ export default function MaterialSelectorDialog({
                     {chosenType === 'product' && products.length > 0 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {products.map((product) => {
-                          const isSelected = selectedMaterialId === (product._id || product.id);
+                          // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
+                          const productId = product.id || product._id;
+                          const isSelected = isItemSelected(productId);
                           return (
                             <ProductCard
-                              key={product._id || product.id}
+                              key={productId}
                               product={product}
                               showActions={false}
                               variant="compact"
@@ -615,10 +601,12 @@ export default function MaterialSelectorDialog({
                     {chosenType === 'material' && rawMaterials.length > 0 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {rawMaterials.map((material) => {
-                          const isSelected = selectedMaterialId === (material._id || material.id);
+                          // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
+                          const materialId = material.id || material._id;
+                          const isSelected = isItemSelected(materialId);
                           return (
                             <MaterialCard
-                              key={material._id || material.id}
+                              key={materialId}
                               material={material}
                               isSelected={isSelected}
                               onClick={() => handleMaterialSelection(material, 'material')}
@@ -696,8 +684,17 @@ export default function MaterialSelectorDialog({
         </div>
 
         <DialogFooter className="border-t border-gray-200 pt-4 mt-4">
-          <Button variant="outline" onClick={handleClose} className="border-gray-300">
-            {selectedMaterialId ? 'Done' : 'Cancel'}
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleClose();
+            }} 
+            className="border-gray-300"
+          >
+            {selectedItems.length > 0 ? `Done (${selectedItems.length} selected)` : 'Cancel'}
           </Button>
         </DialogFooter>
       </DialogContent>

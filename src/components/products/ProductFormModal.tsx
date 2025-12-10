@@ -33,6 +33,7 @@ interface RecipeMaterial {
   quantity: string;
   unit: string;
   cost?: string;
+  materialType?: 'product' | 'raw_material'; // Track the actual type selected
 }
 
 export default function ProductFormModal({ isOpen, onClose, onSuccess, product, mode }: ProductFormModalProps) {
@@ -225,7 +226,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   };
 
   const addProductMaterial = () => {
-    if (!newMaterial.materialId || !newMaterial.quantity || !newMaterial.unit) return;
+    // Allow adding materials even if quantity is empty (for raw materials, user can fill later)
+    // Only materialId and unit are required - validation happens on form submit
+    if (!newMaterial.materialId || !newMaterial.unit) return;
     setRecipeMaterials([...recipeMaterials, newMaterial]);
     setNewMaterial({
       materialId: '',
@@ -236,12 +239,20 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     });
   };
 
+  const addMaterialDirectly = (material: RecipeMaterial) => {
+    // Direct add function that bypasses newMaterial state
+    // This is used when materials are selected from the dialog
+    if (!material.materialId || !material.unit) return;
+    setRecipeMaterials([...recipeMaterials, material]);
+  };
+
   const removeProductMaterial = (index: number) => {
     setRecipeMaterials(recipeMaterials.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setLoading(true);
     setError(null);
 
@@ -328,9 +339,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             }
           }
 
-          // Determine material type based on unit or material name
+          // Determine material type - use stored type if available, otherwise guess from unit
           const getMaterialType = (mat: RecipeMaterial): 'raw_material' | 'product' => {
-            // Check if unit suggests it's a product
+            // If materialType was stored when selected, use it
+            if (mat.materialType) {
+              return mat.materialType;
+            }
+            // Fallback: Check if unit suggests it's a product
             if (mat.unit === 'roll' || mat.unit === 'rolls' || mat.unit === 'sqm' || mat.unit === 'SQM') {
               return 'product';
             }
@@ -340,18 +355,30 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
 
           const recipeData = {
             product_id: createdProduct.id,
-            materials: recipeMaterials.map(mat => ({
-              material_id: mat.materialId,
-              material_name: mat.materialName,
-              material_type: getMaterialType(mat),
-              quantity_per_sqm: parseFloat(mat.quantity) || 0,
-              unit: mat.unit,
-              cost_per_unit: parseFloat(mat.cost || '0') || 0,
-            })),
+            materials: recipeMaterials.map(mat => {
+              const materialType = getMaterialType(mat);
+              console.log('📦 Creating recipe material:', {
+                materialId: mat.materialId,
+                materialName: mat.materialName,
+                materialType,
+                quantity: mat.quantity,
+                unit: mat.unit,
+              });
+              return {
+                material_id: mat.materialId,
+                material_name: mat.materialName,
+                material_type: materialType,
+                quantity_per_sqm: parseFloat(mat.quantity) || 0,
+                unit: mat.unit,
+                cost_per_unit: parseFloat(mat.cost || '0') || 0,
+              };
+            }),
             description: `Recipe for ${createdProduct.name}`,
             version: '1.0',
             created_by: createdBy,
           };
+
+          console.log('📋 Recipe data to send:', recipeData);
 
           // Delete existing recipe if editing (not duplicating)
           if (existingRecipe && mode === 'edit') {
@@ -594,6 +621,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                   newMaterial={newMaterial}
                   onMaterialChange={setNewMaterial}
                   onAdd={addProductMaterial}
+                  onAddMaterial={addMaterialDirectly}
                   targetProduct={{
                     length: formData.length,
                     width: formData.width,
@@ -609,10 +637,26 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
 
           {/* Fixed Footer */}
           <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+              }}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-primary-600 hover:bg-primary-700">
+            <Button 
+              type="submit" 
+              disabled={loading} 
+              className="bg-primary-600 hover:bg-primary-700"
+              onClick={(e) => {
+                // Ensure this is the only way to submit
+                e.stopPropagation();
+              }}
+            >
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

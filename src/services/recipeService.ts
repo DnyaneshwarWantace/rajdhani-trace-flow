@@ -79,6 +79,22 @@ export class RecipeService {
     }
   }
 
+  static async updateRecipe(recipeId: string, recipeData: { materials: any[] }): Promise<Recipe> {
+    const response = await fetch(`${API_URL}/recipes/${recipeId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(recipeData),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update recipe');
+    }
+
+    const data = await response.json();
+    return data.data;
+  }
+
   static async deleteRecipe(recipeId: string): Promise<void> {
     const response = await fetch(`${API_URL}/recipes/${recipeId}`, {
       method: 'DELETE',

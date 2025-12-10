@@ -5,7 +5,7 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/v2/' : '/', // Only use /v2/ in production
+  base: '/v2/', // Always use /v2/ for both development and production
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

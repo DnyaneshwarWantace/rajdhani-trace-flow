@@ -69,6 +69,15 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    name: 'Recipe Calculator',
+    path: '/recipes/calculator',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+      </svg>
+    ),
+  },
+  {
     name: 'Manage Stock',
     path: '/manage-stock',
     icon: (
@@ -145,13 +154,13 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
       <aside
         className={`
           fixed top-16 left-0 z-50 h-[calc(100vh-4rem)]
-          bg-white border-r border-gray-200
+          bg-white border-r border-gray-200 shadow-lg
           transition-all duration-300 ease-in-out
-          ${isOpen ? 'w-56' : 'w-0 lg:w-16'}
-          ${isOpen ? 'overflow-hidden' : 'overflow-visible'}
+          ${isOpen ? 'w-56 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16'}
+          ${isOpen ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden lg:overflow-visible'}
         `}
       >
-        <div className={`flex flex-col h-full p-3 ${!isOpen ? 'overflow-visible' : ''}`}>
+        <div className={`flex flex-col h-full p-3 ${isOpen ? 'min-w-[14rem]' : 'lg:min-w-[4rem]'}`}>
           {/* Desktop Toggle Button */}
           <div className="hidden lg:flex justify-end mb-2">
             <button
@@ -178,7 +187,7 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </div>
 
           {/* Navigation Menu */}
-          <nav className="flex-1 space-y-1">
+          <nav className="flex-1 space-y-1 overflow-y-auto">
             {menuItems.map((item) => (
               <Link
                 key={item.path}
@@ -201,9 +210,12 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
                       : 'text-gray-600 hover:bg-gray-100'
                   }
                   ${isOpen ? 'justify-start' : 'justify-center lg:justify-center'}
+                  ${!isOpen ? 'lg:min-w-[3rem]' : 'w-full'}
                 `}
               >
-                <span className="flex-shrink-0">{item.icon}</span>
+                <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-current">
+                  {item.icon}
+                </span>
 
                 {/* Text - Show when sidebar is open */}
                 {isOpen && (

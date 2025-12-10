@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Search, X, Calculator } from 'lucide-react';
 import MaterialSelectorDialog from './MaterialSelectorDialog';
 import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
+import { calculateProductRatio } from '@/utils/productRatioCalculator';
 
 interface RecipeMaterial {
   materialId: string;
@@ -12,12 +13,14 @@ interface RecipeMaterial {
   quantity: string;
   unit: string;
   cost?: string;
+  materialType?: 'product' | 'raw_material';
 }
 
 interface RecipeMaterialFormProps {
   newMaterial: RecipeMaterial;
   onMaterialChange: (material: RecipeMaterial) => void;
   onAdd: () => void;
+  onAddMaterial?: (material: RecipeMaterial) => void; // Direct add function
   targetProduct?: {
     length: string;
     width: string;
@@ -33,7 +36,7 @@ export default function RecipeMaterialForm({
   targetProduct,
 }: RecipeMaterialFormProps) {
   const [showMaterialSelector, setShowMaterialSelector] = useState(false);
-  // const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProductData, setSelectedProductData] = useState<any>(null);
 
   // Calculate SQM for target product
   const targetSQM = targetProduct 
@@ -45,10 +48,37 @@ export default function RecipeMaterialForm({
       )
     : 0;
 
-  const handleMaterialSelect = (selected: RecipeMaterial) => {
-    // If it's a product, we need to auto-calculate the ratio
-    // For now, just set the material - ratio calculation will be handled by MaterialSelectorDialog
-    onMaterialChange(selected);
+  const handleMaterialSelect = async (selected: RecipeMaterial) => {
+    // Populate the form with selected material
+    let materialToSet = { ...selected };
+    
+    // If it's a product and we have target product dimensions, calculate quantity
+    if (selected.materialType === 'product' && targetProduct && selected.materialId) {
+      try {
+        // Fetch the product details to get dimensions
+        const { ProductService } = await import('@/services/productService');
+        const product = await ProductService.getProductById(selected.materialId);
+        
+        if (product && product.length && product.width && product.length_unit && product.width_unit &&
+            targetProduct.length && targetProduct.width && targetProduct.length_unit && targetProduct.width_unit) {
+          // Calculate the ratio
+          const ratio = calculateProductRatio(product, targetProduct);
+          if (ratio > 0 && !isNaN(ratio) && isFinite(ratio)) {
+            materialToSet.quantity = ratio.toFixed(4);
+            setSelectedProductData(product);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch product details:', error);
+        setSelectedProductData(null);
+      }
+    } else {
+      setSelectedProductData(null);
+    }
+    
+    // Set the material in the form
+    onMaterialChange(materialToSet);
+    // Close the dialog so user can see the form and fill in details
     setShowMaterialSelector(false);
   };
 
@@ -98,17 +128,20 @@ export default function RecipeMaterialForm({
                   </div>
                 </div>
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() =>
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     onMaterialChange({
                       materialId: '',
                       materialName: '',
                       quantity: '',
                       unit: '',
                       cost: '',
-                    })
-                  }
+                    });
+                  }}
                   className="text-red-600 hover:text-red-700"
                 >
                   <X className="w-4 h-4" />
@@ -116,6 +149,7 @@ export default function RecipeMaterialForm({
               </div>
             ) : (
               <Button
+                type="button"
                 variant="outline"
                 onClick={() => setShowMaterialSelector(true)}
                 className="w-full h-12 border-dashed border-2 border-gray-300 hover:border-primary-400 hover:bg-primary-50"
@@ -141,6 +175,13 @@ export default function RecipeMaterialForm({
                   onMaterialChange({ ...newMaterial, quantity: value });
                 }
               }}
+              onKeyDown={(e) => {
+                // Prevent form submission on Enter key
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               placeholder={isProduct ? 'Auto-calculated for products' : 'e.g., 0.5, 2.5, 0.2'}
             />
             <p className="text-xs text-gray-500 mt-1">
@@ -148,10 +189,21 @@ export default function RecipeMaterialForm({
                 ? 'Quantity per 1 SQM (auto-calculated based on product dimensions, or edit manually)'
                 : 'Quantity needed for 1 SQM of this product (supports decimals like 0.5kg, 0.2 pieces)'}
             </p>
-            {isProduct && newMaterial.quantity && (
-              <p className="text-xs text-blue-600 mt-1">
-                For 1 SQM of target product, you need {newMaterial.quantity} {newMaterial.unit} of this product
-              </p>
+            {isProduct && newMaterial.quantity && selectedProductData && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-xs font-medium text-blue-900 mb-1">Auto-calculated Quantity for 1 SQM:</p>
+                <p className="text-sm font-bold text-blue-900">
+                  {newMaterial.quantity} {newMaterial.unit}
+                </p>
+                {selectedProductData.length && selectedProductData.width && (
+                  <p className="text-xs text-blue-700 mt-1">
+                    Based on: {selectedProductData.length} {selectedProductData.length_unit} × {selectedProductData.width} {selectedProductData.width_unit}
+                  </p>
+                )}
+                <p className="text-xs text-blue-600 mt-1">
+                  For 1 SQM of target product, you need {newMaterial.quantity} {newMaterial.unit} of this product
+                </p>
+              </div>
             )}
           </div>
           <div>
@@ -160,6 +212,13 @@ export default function RecipeMaterialForm({
               id="materialUnit"
               value={newMaterial.unit}
               onChange={(e) => onMaterialChange({ ...newMaterial, unit: e.target.value })}
+              onKeyDown={(e) => {
+                // Prevent form submission on Enter key
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               placeholder="e.g., kg, meters, pieces"
             />
           </div>
@@ -167,6 +226,7 @@ export default function RecipeMaterialForm({
       </div>
 
       <Button
+        type="button"
         onClick={onAdd}
         className="w-full mt-4"
         disabled={!newMaterial.materialId || !newMaterial.quantity || !newMaterial.unit}

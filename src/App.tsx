@@ -11,6 +11,7 @@ import DropdownMaster from '@/pages/dropdowns/DropdownMaster';
 import MaterialList from '@/pages/materials/MaterialList';
 import MaterialDetail from '@/pages/materials/MaterialDetail';
 import RecipeListPage from '@/pages/recipes/RecipeListPage';
+import RecipeCalculator from '@/pages/recipes/RecipeCalculator';
 import ManageStock from '@/pages/manageStock/ManageStock';
 import Settings from '@/pages/settings/Settings';
 import Notifications from '@/pages/notifications/Notifications';
@@ -104,6 +105,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <RecipeListPage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/recipes/calculator"
+        element={
+          <PrivateRoute>
+            <RecipeCalculator />
           </PrivateRoute>
         }
       />

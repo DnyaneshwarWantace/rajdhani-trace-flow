@@ -41,9 +41,14 @@ export default function RecipeMaterialsList({ materials, onRemove }: RecipeMater
             </div>
           </div>
           <Button
+            type="button"
             variant="outline"
             size="sm"
-            onClick={() => onRemove(index)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemove(index);
+            }}
             className="text-red-600 hover:bg-red-50"
           >
             <X className="w-4 h-4" />
