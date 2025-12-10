@@ -822,12 +822,37 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
                   min="1"
                   step="1"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  onChange={(e) => {
+                    // Only allow numeric input (integers only, no decimals)
+                    let value = e.target.value;
+                    // Remove any non-numeric characters except empty string
+                    value = value.replace(/[^0-9]/g, '');
+                    // Ensure it's not empty, default to '1' if empty
+                    if (value === '') {
+                      value = '1';
+                    }
+                    // Ensure minimum value is 1
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue) && numValue < 1) {
+                      value = '1';
+                    }
+                    setFormData({ ...formData, quantity: value });
+                  }}
+                  onKeyDown={(e) => {
+                    // Prevent non-numeric keys (except backspace, delete, arrow keys, etc.)
+                    if (
+                      !/[0-9]/.test(e.key) &&
+                      !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key) &&
+                      !(e.ctrlKey || e.metaKey) // Allow Ctrl/Cmd + A, C, V, etc.
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   placeholder="1"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Quantity to order</p>
+                <p className="text-xs text-gray-500 mt-1">Quantity to order (numbers only)</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
