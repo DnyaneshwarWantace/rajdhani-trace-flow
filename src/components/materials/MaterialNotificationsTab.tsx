@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,7 +11,6 @@ export default function MaterialNotificationsTab() {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
