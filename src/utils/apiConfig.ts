@@ -13,7 +13,7 @@ export const getApiUrl = (): string => {
     
     // If accessing via localhost or 127.0.0.1, use localhost:8000
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8000/api';
+      return 'https://rajdhani.wantace.com/api';
     }
     
     // If accessing via network IP (192.168.x.x, 10.x.x.x, etc.), use the same IP with port 8000
@@ -31,7 +31,7 @@ export const getApiUrl = (): string => {
   }
 
   // Fallback for SSR or other cases
-  return 'http://localhost:8000/api';
+  return 'https://rajdhani.wantace.com/api';
 };
 
 /**
@@ -48,7 +48,7 @@ export const getSocketUrl = (): string => {
     
     // If accessing via localhost or 127.0.0.1, use localhost:8000
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8000';
+      return 'https://rajdhani.wantace.com';
     }
     
     // If accessing via network IP, use the same IP with port 8000
@@ -65,6 +65,6 @@ export const getSocketUrl = (): string => {
   }
 
   // Fallback
-  return 'http://localhost:8000';
+  return 'https://rajdhani.wantace.com';
 };
 

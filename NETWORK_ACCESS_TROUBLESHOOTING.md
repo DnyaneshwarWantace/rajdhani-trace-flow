@@ -76,7 +76,7 @@ npm start
 
 The backend should be running on port 8000. The frontend will automatically connect to:
 - `http://YOUR_IP:8000/api` when accessed via network IP
-- `http://localhost:8000/api` when accessed via localhost
+- `https://rajdhani.wantace.com/api` when accessed via localhost
 
 ## 6. Common Issues
 
