@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
+import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,6 +11,7 @@ export default function MaterialNotificationsTab() {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -158,117 +159,155 @@ export default function MaterialNotificationsTab() {
 
           {/* Notifications List */}
           <div className="space-y-3">
-            {notifications.map((notification) => (
-              <Card key={notification.id} className="border-0 shadow-sm hover:shadow-md transition-shadow bg-white">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(notification.type)}
-                    </div>
+            {notifications.map((notification) => {
+              const isExpanded = expandedNotificationId === notification.id;
+              const hasDetails = notification.related_data && (
+                (notification.related_data.materialName && notification.related_data.materialName.trim()) ||
+                notification.related_data.currentStock !== undefined ||
+                (notification.related_data.minThreshold && notification.related_data.minThreshold > 0) ||
+                (notification.related_data.category && notification.related_data.category.trim())
+              );
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-0.5">{notification.title}</h4>
-                          {notification.message && notification.message !== notification.title && (
-                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
-                          )}
-                        </div>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs font-medium ${getPriorityColor(notification.priority)}`}
-                        >
-                          {notification.priority}
-                        </Badge>
+              return (
+                <Card
+                  key={notification.id}
+                  className={`border-0 shadow-sm hover:shadow-md transition-shadow bg-white ${hasDetails ? 'cursor-pointer' : ''}`}
+                  onClick={() => hasDetails && setExpandedNotificationId(isExpanded ? null : notification.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        {getNotificationIcon(notification.type)}
                       </div>
 
-                      {/* Related Data */}
-                      {notification.related_data && (
-                        <div className="bg-gray-50 rounded-lg p-3 mb-2 space-y-1.5">
-                          {notification.related_data.materialName && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Material:</span>
-                              <span className="text-gray-900">{notification.related_data.materialName}</span>
-                            </div>
-                          )}
-                          {notification.related_data.currentStock !== undefined && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Current Stock:</span>
-                              <span className="text-gray-900">{notification.related_data.currentStock} {notification.related_data.unit || ''}</span>
-                            </div>
-                          )}
-                          {notification.related_data.minThreshold && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Min Threshold:</span>
-                              <span className="text-gray-900">{notification.related_data.minThreshold} {notification.related_data.unit || ''}</span>
-                            </div>
-                          )}
-                          {notification.related_data.category && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Category:</span>
-                              <span className="text-gray-900">{notification.related_data.category}</span>
-                            </div>
-                          )}
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900 mb-1">{notification.title}</h4>
+                            {notification.message && notification.message.trim() && notification.message !== notification.title && (
+                              <p className="text-sm text-gray-600">{notification.message}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs font-medium ${getPriorityColor(notification.priority)}`}
+                            >
+                              {notification.priority}
+                            </Badge>
+                            {hasDetails && (
+                              <button
+                                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedNotificationId(isExpanded ? null : notification.id);
+                                }}
+                                aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-gray-500" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                                )}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      )}
 
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-2 mt-2">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>
-                            {notification.created_at 
-                              ? (() => {
-                                  try {
-                                    const date = new Date(notification.created_at);
-                                    if (isNaN(date.getTime())) {
+                        {/* Related Data - Collapsible */}
+                        {isExpanded && hasDetails && (
+                          <div className="bg-gray-50 rounded-lg p-3 my-2 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                            {notification.related_data.materialName && notification.related_data.materialName.trim() && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Material:</span>
+                                <span className="text-gray-900">{notification.related_data.materialName}</span>
+                              </div>
+                            )}
+                            {notification.related_data.currentStock !== undefined && notification.related_data.currentStock !== null && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Current Stock:</span>
+                                <span className="text-gray-900">{notification.related_data.currentStock} {notification.related_data.unit || ''}</span>
+                              </div>
+                            )}
+                            {notification.related_data.minThreshold && notification.related_data.minThreshold > 0 && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Min Threshold:</span>
+                                <span className="text-gray-900">{notification.related_data.minThreshold} {notification.related_data.unit || ''}</span>
+                              </div>
+                            )}
+                            {notification.related_data.category && notification.related_data.category.trim() && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Category:</span>
+                                <span className="text-gray-900">{notification.related_data.category}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between mt-2">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>
+                              {notification.created_at
+                                ? (() => {
+                                    try {
+                                      const date = new Date(notification.created_at);
+                                      if (isNaN(date.getTime())) {
+                                        return 'Just now';
+                                      }
+                                      // Use relative time for recent notifications, full date for older ones
+                                      const now = new Date();
+                                      const diffMs = now.getTime() - date.getTime();
+                                      const diffMins = Math.floor(diffMs / 60000);
+                                      const diffHours = Math.floor(diffMs / 3600000);
+                                      const diffDays = Math.floor(diffMs / 86400000);
+
+                                      if (diffMins < 1) return 'Just now';
+                                      if (diffMins < 60) return `${diffMins} min ago`;
+                                      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                                      if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                                      return formatIndianDateTime(notification.created_at);
+                                    } catch {
                                       return 'Just now';
                                     }
-                                    // Use relative time for recent notifications, full date for older ones
-                                    const now = new Date();
-                                    const diffMs = now.getTime() - date.getTime();
-                                    const diffMins = Math.floor(diffMs / 60000);
-                                    const diffHours = Math.floor(diffMs / 3600000);
-                                    const diffDays = Math.floor(diffMs / 86400000);
-                                    
-                                    if (diffMins < 1) return 'Just now';
-                                    if (diffMins < 60) return `${diffMins} min ago`;
-                                    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-                                    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-                                    return formatIndianDateTime(notification.created_at);
-                                  } catch {
-                                    return 'Just now';
-                                  }
-                                })()
-                              : 'Just now'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-gray-600 hover:text-gray-900"
-                            onClick={() => handleMarkAsRead(notification.id)}
-                          >
-                            Mark Read
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-gray-600 hover:text-red-600"
-                            onClick={() => handleResolveNotification(notification.id)}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                                  })()
+                                : 'Just now'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs text-gray-600 hover:text-gray-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                            >
+                              Mark Read
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 text-xs text-gray-600 hover:text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResolveNotification(notification.id);
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       ) : (

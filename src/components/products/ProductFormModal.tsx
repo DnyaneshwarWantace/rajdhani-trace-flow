@@ -271,17 +271,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         const trimmedName = formData.name.trim();
         const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
         
-        // Check if it's only alphabetic (letters and spaces)
-        if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
-          missingFields.push('Product Name (letters only)');
-          toast({
-            title: 'Validation Error',
-            description: 'Product name can only contain letters (a-z, A-Z) and spaces',
-            variant: 'destructive',
-          });
-        }
+        // Allow ALL characters - only check word count and character limits
         // Check word count (max 50 words)
-        else if (words.length > 50) {
+        if (words.length > 50) {
           missingFields.push('Product Name (max 50 words)');
           toast({
             title: 'Validation Error',

@@ -57,6 +57,15 @@ export async function uploadImageToR2(
         return { url: '', key: '', error: 'Authentication expired' };
       }
 
+      // Handle 413 Payload Too Large - nginx limit issue
+      if (response.status === 413) {
+        return {
+          url: '',
+          key: '',
+          error: 'File too large. Server configuration needs to be updated to allow uploads up to 50MB. Please contact administrator.',
+        };
+      }
+
       const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
       return {
         url: '',
