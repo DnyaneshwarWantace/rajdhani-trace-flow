@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Package } from 'lucide-react';
 import type { Product } from '@/types/product';
 import type { RawMaterial } from '@/types/material';

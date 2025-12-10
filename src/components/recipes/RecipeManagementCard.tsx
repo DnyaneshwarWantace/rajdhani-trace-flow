@@ -53,7 +53,7 @@ export default function RecipeManagementCard({
   const handleRemoveMaterial = async (recipeId: string, materialId: string) => {
     try {
       const recipe = recipes.find((r) => r.id === recipeId);
-      if (!recipe || recipe.materials.length <= 1) {
+      if (!recipe || !recipe.materials || recipe.materials.length <= 1) {
         toast({
           title: 'Cannot Remove',
           description: 'Recipe must have at least one material',
@@ -94,7 +94,7 @@ export default function RecipeManagementCard({
       if (!editingMaterial) return;
 
       const recipe = recipes.find((r) => r.id === editingMaterial.recipe_id);
-      if (!recipe) return;
+      if (!recipe || !recipe.materials) return;
 
       let updatedMaterials = [...recipe.materials];
 
@@ -229,7 +229,7 @@ export default function RecipeManagementCard({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleRemoveMaterial(recipe.id, material.id)}
-                                disabled={recipe.materials.length <= 1}
+                                disabled={!recipe.materials || recipe.materials.length <= 1}
                                 className="flex-1 md:flex-none text-red-600 hover:bg-red-50"
                               >
                                 <Trash2 className="w-4 h-4" />

@@ -1,7 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Factory, TrendingUp, ChevronDown, ChevronUp, Package, CheckCircle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Factory } from 'lucide-react';
 import type { Product } from '@/types/product';
 import type { RawMaterial } from '@/types/material';
 import ProductionStepsSection from './ProductionStepsSection';
@@ -72,7 +70,6 @@ export default function CalculationResultsCard({
   expandedSteps,
   onToggleStep,
 }: CalculationResultsCardProps) {
-  const totalShortage = finalBreakdown.reduce((sum, material) => sum + material.shortage, 0);
   const availableMaterials = finalBreakdown.filter((m) => m.is_available).length;
   const totalMaterials = finalBreakdown.length;
 
