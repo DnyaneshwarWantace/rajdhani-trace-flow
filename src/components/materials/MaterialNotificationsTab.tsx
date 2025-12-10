@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
+import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -11,6 +11,7 @@ export default function MaterialNotificationsTab() {
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
@@ -159,7 +160,7 @@ export default function MaterialNotificationsTab() {
           {/* Notifications List */}
           <div className="space-y-3">
             {notifications.map((notification) => (
-              <Card key={notification.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
+              <Card key={notification.id} className="border-0 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Icon */}
@@ -171,8 +172,10 @@ export default function MaterialNotificationsTab() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-1">{notification.title}</h4>
-                          <p className="text-sm text-gray-600 mb-3">{notification.message}</p>
+                          <h4 className="font-semibold text-gray-900 mb-0.5">{notification.title}</h4>
+                          {notification.message && notification.message !== notification.title && (
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                          )}
                         </div>
                         <Badge 
                           variant="outline" 
@@ -184,7 +187,7 @@ export default function MaterialNotificationsTab() {
 
                       {/* Related Data */}
                       {notification.related_data && (
-                        <div className="bg-gray-50 rounded-lg p-3 mb-3 space-y-1.5">
+                        <div className="bg-gray-50 rounded-lg p-3 mb-2 space-y-1.5">
                           {notification.related_data.materialName && (
                             <div className="flex items-center gap-2 text-xs">
                               <span className="text-gray-500 font-medium">Material:</span>
@@ -213,10 +216,35 @@ export default function MaterialNotificationsTab() {
                       )}
 
                       {/* Footer */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between pt-2 mt-2">
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{formatIndianDateTime(notification.created_at)}</span>
+                          <span>
+                            {notification.created_at 
+                              ? (() => {
+                                  try {
+                                    const date = new Date(notification.created_at);
+                                    if (isNaN(date.getTime())) {
+                                      return 'Just now';
+                                    }
+                                    // Use relative time for recent notifications, full date for older ones
+                                    const now = new Date();
+                                    const diffMs = now.getTime() - date.getTime();
+                                    const diffMins = Math.floor(diffMs / 60000);
+                                    const diffHours = Math.floor(diffMs / 3600000);
+                                    const diffDays = Math.floor(diffMs / 86400000);
+                                    
+                                    if (diffMins < 1) return 'Just now';
+                                    if (diffMins < 60) return `${diffMins} min ago`;
+                                    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                                    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                                    return formatIndianDateTime(notification.created_at);
+                                  } catch {
+                                    return 'Just now';
+                                  }
+                                })()
+                              : 'Just now'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button

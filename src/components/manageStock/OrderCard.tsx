@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { formatNotes } from '@/utils/formatNotes';
 import type { StockOrder } from '@/types/manageStock';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface OrderCardProps {
   order: StockOrder;
@@ -25,14 +26,16 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
   const StatusIcon = status.icon;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-4">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 space-y-4 overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="space-y-2 flex-1">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Package className="w-5 h-5 text-gray-400" />
-            <h3 className="font-semibold text-lg text-gray-900">{order.materialName}</h3>
-            <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${status.color}`}>
+        <div className="space-y-2 flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-3 flex-wrap min-w-0">
+            <Package className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            <h3 className="font-semibold text-lg text-gray-900 min-w-0 flex-1 overflow-hidden">
+              <TruncatedText text={order.materialName} maxLength={35} as="span" />
+            </h3>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 flex-shrink-0 ${status.color}`}>
               <StatusIcon className="w-3 h-3" />
               {status.label}
             </span>
@@ -86,8 +89,9 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
       {(() => {
         const formattedNotes = formatNotes(order.notes);
         return formattedNotes ? (
-          <div className="text-sm text-gray-600">
-            <strong>Notes:</strong> {formattedNotes}
+          <div className="text-sm text-gray-600 break-words">
+            <strong>Notes:</strong>{' '}
+            <TruncatedText text={formattedNotes} maxLength={100} as="span" />
           </div>
         ) : null;
       })()}

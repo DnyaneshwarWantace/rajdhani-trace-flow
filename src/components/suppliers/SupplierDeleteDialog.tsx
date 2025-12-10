@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Trash2 } from 'lucide-react';
 import type { Supplier } from '@/services/supplierService';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface SupplierDeleteDialogProps {
   isOpen: boolean;
@@ -30,8 +31,14 @@ export default function SupplierDeleteDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Supplier</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{supplier?.name}"? This cannot be undone.
+          <DialogDescription className="break-words">
+            Are you sure you want to delete "
+            {supplier?.name ? (
+              <TruncatedText text={supplier.name} maxLength={50} as="span" className="font-semibold" />
+            ) : (
+              'this supplier'
+            )}
+            "? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

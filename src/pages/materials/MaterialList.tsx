@@ -37,6 +37,7 @@ import { ManageStockService } from '@/services/manageStockService';
 import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 type TabValue = 'inventory' | 'waste-recovery' | 'analytics' | 'notifications';
 
@@ -208,7 +209,13 @@ export default function MaterialList() {
 
     setIsDeleting(true);
     try {
-      await MaterialService.deleteMaterial(materialToDelete._id || materialToDelete.id);
+      // Prioritize custom id field (e.g., "MAT-251210-001") over MongoDB _id
+      // Backend can handle both, but custom id is preferred
+      const materialId = materialToDelete.id || materialToDelete._id;
+      if (!materialId) {
+        throw new Error('Material ID not found');
+      }
+      await MaterialService.deleteMaterial(materialId);
       toast({
         title: 'Success',
         description: `Material "${materialToDelete.name}" has been deleted successfully`,
@@ -686,8 +693,14 @@ export default function MaterialList() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Material</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{materialToDelete?.name}"? This action cannot be undone.
+            <DialogDescription className="break-words">
+              Are you sure you want to delete "
+              {materialToDelete?.name ? (
+                <TruncatedText text={materialToDelete.name} maxLength={50} as="span" className="font-semibold" />
+              ) : (
+                'this material'
+              )}
+              "? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -721,7 +734,8 @@ export default function MaterialList() {
                         <div>
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  {selectedRestockMaterial.status === 'out-of-stock' ? 'Order' : 'Restock'} {selectedRestockMaterial.name}
+                  {selectedRestockMaterial.status === 'out-of-stock' ? 'Order' : 'Restock'}{' '}
+                  <TruncatedText text={selectedRestockMaterial.name} maxLength={40} as="span" />
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
                   {selectedRestockMaterial.status === 'out-of-stock'
@@ -751,7 +765,9 @@ export default function MaterialList() {
                     />
                   )}
                     <div className="flex-1">
-                    <div className="font-semibold text-gray-900">{selectedRestockMaterial.name}</div>
+                    <div className="font-semibold text-gray-900">
+                      <TruncatedText text={selectedRestockMaterial.name} maxLength={50} as="span" />
+                    </div>
                     <div className="text-sm text-gray-600 mt-1">
                       Current stock: <span className="font-medium">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>
                     </div>

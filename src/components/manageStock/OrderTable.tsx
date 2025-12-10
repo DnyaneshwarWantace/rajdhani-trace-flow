@@ -2,6 +2,7 @@ import { Package, Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle 
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/types/manageStock';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface OrderTableProps {
   orders: StockOrder[];
@@ -56,11 +57,13 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
 
               return (
                 <tr key={order.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium text-gray-900">{order.materialName}</div>
+                      <Package className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-gray-900">
+                          <TruncatedText text={order.materialName} maxLength={40} as="span" />
+                        </div>
                         <div className="text-sm text-gray-500">{order.order_number}</div>
                       </div>
                     </div>

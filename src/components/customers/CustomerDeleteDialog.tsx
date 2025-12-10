@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Trash2 } from 'lucide-react';
 import type { Customer } from '@/services/customerService';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface CustomerDeleteDialogProps {
   isOpen: boolean;
@@ -30,8 +31,14 @@ export default function CustomerDeleteDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete Customer</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to delete "{customer?.name}"? This cannot be undone.
+          <DialogDescription className="break-words">
+            Are you sure you want to delete "
+            {customer?.name ? (
+              <TruncatedText text={customer.name} maxLength={50} as="span" className="font-semibold" />
+            ) : (
+              'this customer'
+            )}
+            "? This cannot be undone.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

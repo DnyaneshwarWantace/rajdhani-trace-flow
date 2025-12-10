@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { Recycle, Package, Loader2, RefreshCw } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { useToast } from '@/hooks/use-toast';
@@ -200,10 +201,12 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                         </Badge>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium text-gray-900">{waste.material_name}</div>
-                        <div className="text-sm text-gray-500">
-                          {waste.quantity} {waste.unit}
-                        </div>
+                    <div className="font-medium text-gray-900 min-w-0">
+                      <TruncatedText text={waste.material_name} maxLength={50} className="block" />
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {waste.quantity} {waste.unit}
+                    </div>
                       </td>
                       <td className="p-4">
                         <div className="font-medium text-gray-900">{waste.quantity}</div>
@@ -215,12 +218,16 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="text-sm font-medium text-gray-900">{waste.material_name}</div>
+                    <div className="text-sm font-medium text-gray-900 min-w-0">
+                      <TruncatedText text={waste.material_name} maxLength={60} className="block" />
+                    </div>
                         <div className="text-xs text-gray-500 mt-1">
                           {waste.material_type === 'product' ? '📦 Product' : '🔧 Raw Material'}
                         </div>
                         {waste.production_batch_id && (
-                          <div className="text-xs text-gray-500">Batch: {waste.production_batch_id}</div>
+                      <div className="text-xs text-gray-500 min-w-0">
+                        <TruncatedText text={`Batch: ${waste.production_batch_id}`} maxLength={50} className="block" />
+                      </div>
                         )}
                         <div className="text-xs text-primary-600 mt-1">
                           Type: {WasteService.mapWasteTypeToDisplay(waste.waste_type)}

@@ -3,6 +3,7 @@ import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHe
 import { ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface MaterialCardProps {
   material: RawMaterial;
@@ -94,7 +95,9 @@ export default function MaterialCard({
       <div className="p-6">
         {/* Header Section */}
         <div className="mb-4">
-          <h3 className="font-semibold text-lg mb-1 text-gray-900">{material.name}</h3>
+          <h3 className="font-semibold text-lg mb-1 text-gray-900">
+            <TruncatedText text={material.name} maxLength={60} as="span" />
+          </h3>
           <p className="text-sm text-gray-500 mb-2">{material.type || material.category}</p>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${getStatusColor(material.status)}`} />
@@ -119,7 +122,9 @@ export default function MaterialCard({
           {material.supplier_name && (
             <div className="flex justify-between">
               <span className="text-gray-600">Supplier:</span>
-              <span className="text-gray-900 truncate max-w-[60%]">{material.supplier_name}</span>
+              <span className="text-gray-900 max-w-[60%]">
+                <TruncatedText text={material.supplier_name} maxLength={25} />
+              </span>
             </div>
           )}
           <div className="flex justify-between">

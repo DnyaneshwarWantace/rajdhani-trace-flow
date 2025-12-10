@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import { formatNotes } from '@/utils/formatNotes';
 import type { StockOrder } from '@/types/manageStock';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface OrderDetailsDialogProps {
   order: StockOrder | null;
@@ -47,7 +48,9 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Material Name</p>
-                <p className="font-medium text-gray-900">{order.materialName}</p>
+                <p className="font-medium text-gray-900 break-words">
+                  <TruncatedText text={order.materialName} maxLength={60} as="span" />
+                </p>
               </div>
               {order.materialCategory && (
                 <div>

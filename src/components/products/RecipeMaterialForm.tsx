@@ -6,6 +6,7 @@ import { Plus, Search, X, Calculator } from 'lucide-react';
 import MaterialSelectorDialog from './MaterialSelectorDialog';
 import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface RecipeMaterial {
   materialId: string;
@@ -121,8 +122,10 @@ export default function RecipeMaterialForm({
             {/* Current Selection Display */}
             {newMaterial.materialId ? (
               <div className="flex items-center justify-between p-3 bg-primary-50 border border-primary-200 rounded-lg">
-                <div className="flex-1">
-                  <div className="font-medium text-primary-900">{newMaterial.materialName}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-primary-900">
+                    <TruncatedText text={newMaterial.materialName} maxLength={50} as="span" />
+                  </div>
                   <div className="text-sm text-primary-700">
                     {isProduct ? 'Product' : 'Raw Material'}
                   </div>

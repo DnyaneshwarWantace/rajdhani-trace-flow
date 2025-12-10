@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { X, Package } from 'lucide-react';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface RecipeMaterial {
   materialId: string;
@@ -34,8 +35,10 @@ export default function RecipeMaterialsList({ materials, onRemove }: RecipeMater
       <label className="text-sm font-medium">Recipe Materials:</label>
       {materials.map((material, index) => (
         <div key={index} className="flex items-center justify-between bg-primary-50 p-3 rounded-lg">
-          <div className="flex-1">
-            <div className="font-medium">{material.materialName}</div>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">
+              <TruncatedText text={material.materialName} maxLength={50} as="span" />
+            </div>
             <div className="text-sm text-gray-600">
               {material.quantity} {material.unit}
             </div>

@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { SupplierService } from '@/services/supplierService';
 import { ManageStockService } from '@/services/manageStockService';
+import { uploadImageToR2 } from '@/services/imageService';
 import type { RawMaterial, RawMaterialFormData } from '@/types/material';
 import type { DropdownOption } from '@/types/dropdown';
 import { useToast } from '@/hooks/use-toast';
@@ -358,6 +359,40 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       // Check each field - use trim() for strings and check for empty strings
       if (!formData.name || formData.name.trim() === '') {
         missingFields.push('name');
+      } else {
+        const trimmedName = formData.name.trim();
+        const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
+        
+        // Check if it's only alphabetic (letters and spaces)
+        if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+          missingFields.push('name');
+          toast({
+            title: 'Validation Error',
+            description: 'Material name can only contain letters (a-z, A-Z) and spaces',
+            variant: 'destructive',
+          });
+        }
+        // Check word count (max 50 words)
+        else if (words.length > 50) {
+          missingFields.push('name');
+          toast({
+            title: 'Validation Error',
+            description: 'Material name can have maximum 50 words',
+            variant: 'destructive',
+          });
+        }
+        // Check each word length (max 20 characters per word)
+        else {
+          const longWords = words.filter(word => word.length > 20);
+          if (longWords.length > 0) {
+            missingFields.push('name');
+            toast({
+              title: 'Validation Error',
+              description: `Each word can be maximum 20 characters. Words exceeding limit: ${longWords.join(', ')}`,
+              variant: 'destructive',
+            });
+          }
+        }
       }
       if (!formData.supplier || formData.supplier.trim() === '') {
         missingFields.push('supplier');
@@ -458,11 +493,34 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         }
       }
 
-      // Upload image if provided
+      // Upload image to Cloudflare R2 if provided
       let imageUrl = '';
       if (imageFile) {
-        // TODO: Implement image upload to backend
-        imageUrl = imagePreview;
+        try {
+          const uploadResult = await uploadImageToR2(imageFile, 'materials');
+          if (uploadResult.error) {
+            toast({
+              title: 'Image Upload Failed',
+              description: uploadResult.error,
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+          imageUrl = uploadResult.url;
+        } catch (error: any) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: 'Image Upload Failed',
+            description: error.message || 'Failed to upload image',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      } else if (mode === 'edit' && material?.image_url) {
+        // Keep existing image URL if no new image is uploaded
+        imageUrl = material.image_url;
       }
 
       // Use unit exactly as selected from dropdown - don't normalize if it's in valid units

@@ -5,6 +5,7 @@ import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { QrCode, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface ProductTableProps {
   products: Product[];
@@ -80,8 +81,13 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                         </svg>
                       </div>
                     )}
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <TruncatedText
+                        text={product.name}
+                        maxLength={40}
+                        className="font-medium text-gray-900"
+                        as="p"
+                      />
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-sm text-gray-500 truncate">{product.id}</p>
                         {product.has_recipe && (

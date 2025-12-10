@@ -4,6 +4,7 @@ import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { MaterialService } from '@/services/materialService';
 import { RecipeService } from '@/services/recipeService';
+import { uploadImageToR2 } from '@/services/imageService';
 import type { RecipeMaterial as BackendRecipeMaterial } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { X, Calculator } from 'lucide-react';
@@ -67,6 +68,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
 
   // Image state
   const [imagePreview, setImagePreview] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   // Recipe state
   const [recipeMaterials, setRecipeMaterials] = useState<RecipeMaterial[]>([]);
@@ -185,6 +187,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       status: 'active',
     });
     setImagePreview('');
+    setImageFile(null);
     setRecipeMaterials([]);
     setNewMaterial({
       materialId: '',
@@ -212,6 +215,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   };
 
   const handleImageUpload = (file: File) => {
+    setImageFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
@@ -222,6 +226,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
 
   const removeImage = () => {
     setImagePreview('');
+    setImageFile(null);
     setFormData({ ...formData, image_url: '' });
   };
 
@@ -262,6 +267,40 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       
       if (!formData.name || formData.name.trim() === '') {
         missingFields.push('Product Name');
+      } else {
+        const trimmedName = formData.name.trim();
+        const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
+        
+        // Check if it's only alphabetic (letters and spaces)
+        if (!/^[a-zA-Z\s]+$/.test(trimmedName)) {
+          missingFields.push('Product Name (letters only)');
+          toast({
+            title: 'Validation Error',
+            description: 'Product name can only contain letters (a-z, A-Z) and spaces',
+            variant: 'destructive',
+          });
+        }
+        // Check word count (max 50 words)
+        else if (words.length > 50) {
+          missingFields.push('Product Name (max 50 words)');
+          toast({
+            title: 'Validation Error',
+            description: 'Product name can have maximum 50 words',
+            variant: 'destructive',
+          });
+        }
+        // Check each word length (max 20 characters per word)
+        else {
+          const longWords = words.filter(word => word.length > 20);
+          if (longWords.length > 0) {
+            missingFields.push('Product Name (max 20 chars per word)');
+            toast({
+              title: 'Validation Error',
+              description: `Each word can be maximum 20 characters. Words exceeding limit: ${longWords.join(', ')}`,
+              variant: 'destructive',
+            });
+          }
+        }
       }
       if (!formData.category || formData.category.trim() === '') {
         missingFields.push('Category');
@@ -313,7 +352,37 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         return;
       }
 
-      const finalFormData = { ...formData };
+      // Upload image to Cloudflare R2 if provided
+      let imageUrl = formData.image_url || '';
+      if (imageFile) {
+        try {
+          const uploadResult = await uploadImageToR2(imageFile, 'products');
+          if (uploadResult.error) {
+            toast({
+              title: 'Image Upload Failed',
+              description: uploadResult.error,
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+          imageUrl = uploadResult.url;
+        } catch (error: any) {
+          console.error('Error uploading image:', error);
+          toast({
+            title: 'Image Upload Failed',
+            description: error.message || 'Failed to upload image',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      } else if (mode === 'edit' && product?.image_url) {
+        // Keep existing image URL if no new image is uploaded
+        imageUrl = product.image_url;
+      }
+
+      const finalFormData = { ...formData, image_url: imageUrl };
 
       let createdProduct;
       if (mode === 'edit' && product) {

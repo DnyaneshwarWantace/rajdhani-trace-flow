@@ -2,6 +2,7 @@ import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Eye, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface MaterialTableProps {
   materials: RawMaterial[];
@@ -73,8 +74,13 @@ export default function MaterialTable({
                         </svg>
                       </div>
                     )}
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{material.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <TruncatedText
+                        text={material.name}
+                        maxLength={40}
+                        className="font-medium text-gray-900"
+                        as="p"
+                      />
                       <p className="text-sm text-gray-500 truncate">{material.id}</p>
                     </div>
                   </div>

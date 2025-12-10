@@ -4,6 +4,7 @@ import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface ProductCardProps {
   product: Product;
@@ -93,8 +94,8 @@ export default function ProductCard({
       {/* Content Section - Clean and Compact */}
       <div className="p-4">
         {/* Title */}
-        <h3 className="font-semibold text-gray-900 text-sm mb-2 line-clamp-2 min-h-[2.5rem] leading-tight">
-          {product.name}
+        <h3 className="font-semibold text-gray-900 text-sm mb-2 min-h-[2.5rem] leading-tight">
+          <TruncatedText text={product.name} maxLength={60} as="span" />
         </h3>
 
         {/* Essential Info - Single Row */}

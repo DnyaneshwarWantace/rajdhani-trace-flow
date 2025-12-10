@@ -94,7 +94,8 @@ export class MaterialService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to delete material');
+      const error = await response.json().catch(() => ({ error: 'Failed to delete material' }));
+      throw new Error(error.error || 'Failed to delete material');
     }
   }
 

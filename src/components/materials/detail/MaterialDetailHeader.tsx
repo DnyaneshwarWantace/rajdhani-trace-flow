@@ -1,6 +1,7 @@
 import { ArrowLeft, Edit, Factory } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { RawMaterial } from '@/types/material';
 
 interface MaterialDetailHeaderProps {
@@ -47,9 +48,9 @@ export default function MaterialDetailHeader({
           <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 bg-primary-100 rounded-lg flex items-center justify-center">
             <Factory className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
           </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
-              {material.name}
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 break-words">
+              <TruncatedText text={material.name} maxLength={60} as="span" className="inline-block max-w-full" />
             </h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge className={getStatusColor(material.status)}>

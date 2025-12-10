@@ -35,6 +35,7 @@ import { MaterialService } from '@/services/materialService';
 import ProductCard from './ProductCard';
 import MaterialCard from '@/components/materials/MaterialCard';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface MaterialSelectorDialogProps {
   isOpen: boolean;
@@ -543,8 +544,10 @@ export default function MaterialSelectorDialog({
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {selectedItems.map((item) => (
                       <div key={item.materialId} className="flex items-center justify-between p-2 bg-white rounded border border-green-200">
-                        <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">{item.materialName}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-gray-900">
+                            <TruncatedText text={item.materialName} maxLength={40} as="span" />
+                          </div>
                           <div className="text-xs text-gray-600">
                             {item.materialType === 'product' ? 'Product' : 'Raw Material'} • {item.unit}
                             {item.quantity && ` • Qty: ${item.quantity}`}

@@ -62,58 +62,46 @@ export default function MaterialAnalyticsTab() {
   return (
     <div className="space-y-6">
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Value</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-xs sm:text-sm text-gray-600">Total Value</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
                   {formatCurrency(stats.totalValue)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Total inventory value</p>
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
+              <DollarSign className="w-8 h-8 text-green-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">Average Value</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-3xl font-bold text-gray-900">
+                <p className="text-xs sm:text-sm text-gray-600">Average Value</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
                   {formatCurrency(stats.averageValue)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">Per material</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
-              </div>
+              <TrendingUp className="w-8 h-8 text-blue-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-gray-600">Overstock Items</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-3xl font-bold text-gray-900">{stats.overstock}</p>
+                <p className="text-xs sm:text-sm text-gray-600">Overstock Items</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.overstock}</p>
                 <p className="text-xs text-gray-500 mt-1">Materials exceeding capacity</p>
               </div>
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Package className="w-6 h-6 text-purple-600" />
-              </div>
+              <Package className="w-8 h-8 text-purple-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
