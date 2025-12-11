@@ -1,5 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, Activity } from 'lucide-react';
+import { Bell, Activity, Loader2 } from 'lucide-react';
 import type { Notification } from '@/services/notificationService';
 import ActivityNotificationCard from '@/components/notifications/ActivityNotificationCard';
 import NotificationSectionComponent from '@/components/notifications/NotificationSection';
@@ -24,8 +24,8 @@ export default function SectionContent({
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
         </CardContent>
       </Card>
     );

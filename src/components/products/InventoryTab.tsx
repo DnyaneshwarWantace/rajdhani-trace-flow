@@ -1,3 +1,4 @@
+import { Loader2 } from 'lucide-react';
 import ProductTable from '@/components/products/ProductTable';
 import ProductCard from '@/components/products/ProductCard';
 import InventoryFilters from './InventoryFilters';
@@ -59,7 +60,10 @@ export default function InventoryTab({
       {/* Loading State */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading products...</p>
+          </div>
         </div>
       )}
 

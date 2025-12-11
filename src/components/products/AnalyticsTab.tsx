@@ -5,7 +5,7 @@ import StatCard from './analytics/StatCard';
 import StatusDistributionChart from './analytics/StatusDistributionChart';
 import CategoryDistributionChart from './analytics/CategoryDistributionChart';
 import StockLevelChart from './analytics/StockLevelChart';
-import { Package, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Package, TrendingUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 
 interface AnalyticsTabProps {
   products: Product[];
@@ -80,7 +80,10 @@ export default function AnalyticsTab({ products }: AnalyticsTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading analytics...</p>
+        </div>
       </div>
     );
   }

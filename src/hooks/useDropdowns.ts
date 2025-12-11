@@ -193,7 +193,9 @@ export function useDropdowns(toast: UseToast['toast']) {
 
   const toggleActive = async (option: DropdownOption) => {
     try {
-      await DropdownService.toggleActive(option._id);
+      // Prefer custom id field, fallback to _id
+      const idToToggle = option.id || option._id;
+      await DropdownService.toggleActive(idToToggle);
       toast({
         title: 'Success',
         description: `Option ${option.is_active ? 'deactivated' : 'activated'} successfully`,

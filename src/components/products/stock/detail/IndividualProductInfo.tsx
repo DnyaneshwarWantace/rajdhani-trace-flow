@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import { Calendar, User, MapPin, FileText } from 'lucide-react';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { IndividualProduct } from '@/types/product';
 
 interface IndividualProductInfoProps {
@@ -69,12 +70,17 @@ export default function IndividualProductInfo({ individualProduct }: IndividualP
         {individualProduct.notes && (
           <div className="sm:col-span-2">
             <div className="flex items-start gap-3">
-              <FileText className="w-4 h-4 text-gray-400 mt-0.5" />
-              <div className="flex-1">
+              <FileText className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
                 <p className="text-gray-600 mb-2">Notes</p>
-                <p className="font-medium text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200 whitespace-pre-wrap">
-                  {individualProduct.notes}
-                </p>
+                <div className="font-medium text-gray-900 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <TruncatedText
+                    text={individualProduct.notes}
+                    maxLength={200}
+                    className="whitespace-pre-wrap break-words"
+                    as="p"
+                  />
+                </div>
               </div>
             </div>
           </div>

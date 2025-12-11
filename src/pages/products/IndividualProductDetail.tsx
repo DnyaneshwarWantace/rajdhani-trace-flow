@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, AlertTriangle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { Product, IndividualProduct, IndividualProductFormData } from '@/types/product';
 
 export default function IndividualProductDetail() {
@@ -29,6 +30,7 @@ export default function IndividualProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('details');
 
   useEffect(() => {
     loadData();
@@ -77,6 +79,10 @@ export default function IndividualProductDetail() {
 
   const handleEdit = () => {
     setIsEditDialogOpen(true);
+  };
+
+  const handleViewQRCode = () => {
+    setActiveTab('qrcode');
   };
 
   const handleSaveEdit = async (id: string, data: Partial<IndividualProductFormData>) => {
@@ -132,6 +138,7 @@ export default function IndividualProductDetail() {
           product={product}
           onBack={handleBack}
           onEdit={handleEdit}
+          onViewQRCode={handleViewQRCode}
         />
 
         {/* Stats Cards */}
@@ -147,27 +154,37 @@ export default function IndividualProductDetail() {
                   <img
                     src={product.image_url}
                     alt={product.name}
-                    className="w-20 h-20 rounded-lg object-cover border border-gray-200"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-20 h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
-                    <Package className="w-10 h-10 text-gray-400" />
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                    <Package className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
                   </div>
                 )}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {product.category}
-                    {product.color && ` • ${product.color}`}
-                    {product.pattern && ` • ${product.pattern}`}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                    <TruncatedText
+                      text={product.name}
+                      maxLength={40}
+                      className="break-words"
+                      as="span"
+                    />
+                  </h3>
+                  <div className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
+                    <TruncatedText
+                      text={`${product.category}${product.color ? ` • ${product.color}` : ''}${product.pattern ? ` • ${product.pattern}` : ''}`}
+                      maxLength={50}
+                      className="break-words"
+                      as="p"
+                    />
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Tabs */}
-          <Tabs defaultValue="details" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="bg-white border border-gray-200">
               <TabsTrigger value="details">Details</TabsTrigger>
               <TabsTrigger value="qrcode">QR Code</TabsTrigger>
@@ -183,7 +200,10 @@ export default function IndividualProductDetail() {
             </TabsContent>
 
             <TabsContent value="qrcode">
-              <IndividualProductQRCode individualProduct={individualProduct} />
+              <IndividualProductQRCode 
+                individualProduct={individualProduct} 
+                productId={productId}
+              />
             </TabsContent>
 
             <TabsContent value="history">

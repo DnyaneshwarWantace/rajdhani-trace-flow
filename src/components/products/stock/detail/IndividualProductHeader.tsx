@@ -8,6 +8,7 @@ interface IndividualProductHeaderProps {
   product: Product;
   onBack: () => void;
   onEdit: () => void;
+  onViewQRCode?: () => void;
 }
 
 export default function IndividualProductHeader({
@@ -15,6 +16,7 @@ export default function IndividualProductHeader({
   product: _product,
   onBack,
   onEdit,
+  onViewQRCode,
 }: IndividualProductHeaderProps) {
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -60,8 +62,8 @@ export default function IndividualProductHeader({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {individualProduct.qr_code && (
-              <Button variant="outline" size="sm" className="gap-2">
+            {individualProduct.qr_code && onViewQRCode && (
+              <Button variant="outline" size="sm" className="gap-2" onClick={onViewQRCode}>
                 <QrCode className="w-4 h-4" />
                 View QR Code
               </Button>

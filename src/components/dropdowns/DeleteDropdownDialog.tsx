@@ -25,7 +25,9 @@ export default function DeleteDropdownDialog({
 }: DeleteDropdownDialogProps) {
   const handleDelete = async () => {
     if (!option) return;
-    await onDelete(option._id);
+    // Prefer custom id field, fallback to _id
+    const idToDelete = option.id || option._id;
+    await onDelete(idToDelete);
     onOpenChange(false);
   };
 

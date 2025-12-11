@@ -262,8 +262,10 @@ export default function ValueUnitDropdownField({
       
       const option = allDropdowns.find((opt: any) => opt.category === category && opt.value === combinedValue);
       
-      if (option && option._id) {
-        await DropdownService.deleteDropdown(option._id);
+      if (option) {
+        // Prefer custom id field, fallback to _id
+        const idToDelete = option.id || option._id;
+        await DropdownService.deleteDropdown(idToDelete);
         await onReload();
         
         // If deleted value was selected, clear the form
