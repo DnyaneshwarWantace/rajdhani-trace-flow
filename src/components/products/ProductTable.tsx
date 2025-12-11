@@ -118,10 +118,10 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{product.category}</p>
+                  <div className="min-w-0 max-w-[150px]">
+                    <p className="text-sm font-medium text-gray-900 line-clamp-1 break-words">{product.category}</p>
                     {product.subcategory && (
-                      <p className="text-xs text-gray-500">{product.subcategory}</p>
+                      <p className="text-xs text-gray-500 line-clamp-1 break-words">{product.subcategory}</p>
                     )}
                   </div>
                 </td>
