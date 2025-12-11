@@ -35,19 +35,19 @@ export default function IndividualProductHeader({
 
   return (
     <div className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={onBack} className="p-2">
-              <ArrowLeft className="w-5 h-5" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+            <Button variant="ghost" size="sm" onClick={onBack} className="p-2 flex-shrink-0">
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Individual Product</h1>
-              <div className="flex items-center gap-3 mt-1">
-                <p className="text-sm text-gray-600 font-mono">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Individual Product</h1>
+              <div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap">
+                <p className="text-xs sm:text-sm text-gray-600 font-mono truncate">
                   {individualProduct.qr_code || individualProduct.id}
                 </p>
-                <Badge 
+                <Badge
                   variant={getStatusVariant(individualProduct.status)}
                   className={individualProduct.status === 'available' ? 'bg-blue-600 text-white border-blue-600' : ''}
                 >
@@ -61,15 +61,15 @@ export default function IndividualProductHeader({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             {individualProduct.qr_code && onViewQRCode && (
-              <Button variant="outline" size="sm" className="gap-2" onClick={onViewQRCode}>
-                <QrCode className="w-4 h-4" />
-                View QR Code
+              <Button variant="outline" size="sm" className="gap-2 flex-1 sm:flex-initial" onClick={onViewQRCode}>
+                <QrCode className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">QR Code</span>
               </Button>
             )}
-            <Button onClick={onEdit} size="sm">
-              Edit Details
+            <Button onClick={onEdit} size="sm" className="flex-1 sm:flex-initial">
+              <span className="text-xs sm:text-sm">Edit</span>
             </Button>
           </div>
         </div>

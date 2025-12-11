@@ -47,37 +47,6 @@ export default function ProductDetailHeader({ product }: ProductDetailHeaderProp
         </div>
       </div>
 
-      {/* Title Section */}
-      <div className="bg-white px-6 py-6 border-b border-gray-200">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">{product.name}</h1>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-gray-500 font-mono bg-gray-50 px-3 py-1 rounded-md">
-              {product.id}
-            </span>
-            {product.category && (
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {product.category}
-              </Badge>
-            )}
-            {product.subcategory && (
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {product.subcategory}
-              </Badge>
-            )}
-            {product.color && (
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {product.color}
-              </Badge>
-            )}
-            {product.pattern && (
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                {product.pattern}
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

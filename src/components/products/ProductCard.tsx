@@ -4,7 +4,6 @@ import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface ProductCardProps {
   product: Product;
@@ -94,8 +93,8 @@ export default function ProductCard({
       {/* Content Section - Clean and Compact */}
       <div className="p-4">
         {/* Title */}
-        <h3 className="font-semibold text-gray-900 text-sm mb-2 min-h-[2.5rem] leading-tight">
-          <TruncatedText text={product.name} maxLength={40} as="span" />
+        <h3 className="font-semibold text-gray-900 text-sm mb-2 leading-tight line-clamp-2">
+          {product.name}
         </h3>
 
         {/* Essential Info - Single Row */}
@@ -119,7 +118,7 @@ export default function ProductCard({
           {/* Category */}
           <div className="flex items-center justify-between text-xs gap-2">
             <span className="text-gray-500 flex-shrink-0">Category</span>
-            <span className="font-medium text-gray-900 text-right line-clamp-2 min-w-0">{product.category}</span>
+            <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.category}</span>
           </div>
 
           {/* Stock */}
@@ -132,14 +131,14 @@ export default function ProductCard({
           <div className="space-y-0.5">
             <div className="flex items-center justify-between text-xs gap-2">
               <span className="text-gray-500 flex-shrink-0">Dimensions</span>
-              <span className="font-medium text-gray-900 text-right line-clamp-1 min-w-0">
+              <span className="font-medium text-gray-900 text-right truncate min-w-0">
                 {product.dimensions_display || `${product.length}${product.length_unit} × ${product.width}${product.width_unit}`}
               </span>
             </div>
             {product.sqm && (
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-500">SQM</span>
-                <span className="font-medium text-gray-900">{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
+                <span className="font-medium text-gray-900 truncate">{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
               </div>
             )}
           </div>

@@ -53,20 +53,20 @@ export default function ProductDetailStats({ product }: ProductDetailStatsProps)
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-200">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 px-4 sm:px-6 py-4 bg-gray-50 border-b border-gray-200">
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
           <div
             key={index}
-            className={`${stat.bgColor} rounded-lg p-4 border border-gray-200`}
+            className={`${stat.bgColor} rounded-lg p-3 sm:p-4 border border-gray-200`}
           >
-            <div className="flex items-center gap-3">
-              <div className={`${stat.color} p-2 rounded-lg bg-white`}>
-                <Icon className="w-5 h-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className={`${stat.color} p-1.5 sm:p-2 rounded-lg bg-white flex-shrink-0`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-600 mb-1">{stat.label}</p>
+                <p className="text-xs text-gray-600 mb-1 truncate">{stat.label}</p>
                 <p className={`text-sm font-bold ${stat.color} truncate`}>
                   {stat.value}
                 </p>

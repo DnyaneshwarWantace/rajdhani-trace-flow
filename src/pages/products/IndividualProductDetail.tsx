@@ -14,7 +14,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, AlertTriangle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { Product, IndividualProduct, IndividualProductFormData } from '@/types/product';
 
 export default function IndividualProductDetail() {
@@ -162,22 +161,12 @@ export default function IndividualProductDetail() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                    <TruncatedText
-                      text={product.name}
-                      maxLength={40}
-                      className="break-words"
-                      as="span"
-                    />
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 break-words">
+                    {product.name}
                   </h3>
-                  <div className="text-xs sm:text-sm text-gray-600 mt-1 break-words">
-                    <TruncatedText
-                      text={`${product.category}${product.color ? ` • ${product.color}` : ''}${product.pattern ? ` • ${product.pattern}` : ''}`}
-                      maxLength={50}
-                      className="break-words"
-                      as="p"
-                    />
-                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 mt-1 break-words line-clamp-1">
+                    {`${product.category}${product.color ? ` • ${product.color}` : ''}${product.pattern ? ` • ${product.pattern}` : ''}`}
+                  </p>
                 </div>
               </div>
             </CardContent>

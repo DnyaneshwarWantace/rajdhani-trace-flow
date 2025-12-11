@@ -19,22 +19,16 @@ export default function ProductDetailInfo({ product }: ProductDetailInfoProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Basic Information</CardTitle>
+        <CardTitle className="text-base sm:text-lg">Basic Information</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {infoItems.map((item, index) => (
-            <div key={index} className="space-y-1">
-              <p className="text-sm text-gray-600">{item.label}</p>
-              {item.type === 'badge' ? (
-                <Badge variant="outline" className="text-sm">
-                  {item.value || 'N/A'}
-                </Badge>
-              ) : (
-                <p className="text-sm font-medium text-gray-900 font-mono">
-                  {item.value || 'N/A'}
-                </p>
-              )}
+            <div key={index} className="space-y-1 min-w-0">
+              <p className="text-xs sm:text-sm text-gray-600">{item.label}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-900 font-mono break-words">
+                {item.value || 'N/A'}
+              </p>
             </div>
           ))}
         </div>

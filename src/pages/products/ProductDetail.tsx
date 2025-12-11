@@ -5,6 +5,7 @@ import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import type { Product } from '@/types/product';
 import ProductDetailHeader from '@/components/products/detail/ProductDetailHeader';
+import ProductDetailTitle from '@/components/products/detail/ProductDetailTitle';
 import ProductDetailStats from '@/components/products/detail/ProductDetailStats';
 import ProductDetailInfo from '@/components/products/detail/ProductDetailInfo';
 import ProductDetailDimensions from '@/components/products/detail/ProductDetailDimensions';
@@ -135,6 +136,9 @@ export default function ProductDetail() {
         <div className="bg-white border-b border-gray-200">
           <ProductDetailHeader product={product} />
         </div>
+
+        {/* Title Section */}
+        <ProductDetailTitle product={product} />
 
         {/* Stats Cards */}
         <div className="bg-white border-b border-gray-200">

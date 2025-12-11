@@ -202,7 +202,7 @@ export default function ProductStock() {
       <div className="min-h-screen bg-gray-50">
         <ProductStockHeader product={product} productId={productId} />
 
-        <div className="p-6 space-y-6">
+        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
           <StockStatsCards stats={stats} />
 
           <ProductStockFilters
