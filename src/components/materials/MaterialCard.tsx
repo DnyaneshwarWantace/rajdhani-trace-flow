@@ -93,15 +93,15 @@ export default function MaterialCard({
         </div>
       )}
 
-      <div className="p-6">
+      <div className="p-4">
         {/* Header Section */}
-        <div className="mb-4">
-          <h3 className="font-semibold text-lg mb-1 text-gray-900">
-            <TruncatedText text={material.name} maxLength={40} as="span" />
+        <div className="mb-3">
+          <h3 className="font-semibold text-sm mb-1 text-gray-900 line-clamp-2 leading-tight">
+            <TruncatedText text={material.name} maxLength={50} as="span" />
           </h3>
-          <p className="text-sm text-gray-500 mb-2 line-clamp-1">{material.type || material.category}</p>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${getStatusColor(material.status)}`} />
+          <p className="text-xs text-gray-500 mb-1 line-clamp-1">{material.type || material.category}</p>
+          <div className="flex items-center gap-1.5">
+            <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor(material.status)}`} />
             <span className="text-xs text-gray-600 capitalize">
               {material.status.replace('-', ' ')}
             </span>
@@ -109,39 +109,39 @@ export default function MaterialCard({
         </div>
 
         {/* Info Section */}
-        <div className="space-y-2 text-sm mb-4">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Stock:</span>
-            <span className="font-medium text-gray-900">
+        <div className="space-y-1.5 text-xs mb-3">
+          <div className="flex justify-between gap-2">
+            <span className="text-gray-600 flex-shrink-0">Stock:</span>
+            <span className="font-medium text-gray-900 truncate">
               {formatIndianNumberWithDecimals(Number(material.current_stock || 0), 2)} {material.unit}
             </span>
           </div>
           <div className="flex justify-between items-start gap-2 min-w-0">
             <span className="text-gray-600 flex-shrink-0">Category:</span>
-            <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-2">{material.category}</span>
+            <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.category}</span>
           </div>
           {material.supplier_name && (
             <div className="flex justify-between items-start gap-2 min-w-0">
               <span className="text-gray-600 flex-shrink-0">Supplier:</span>
-              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-2">{material.supplier_name}</span>
+              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.supplier_name}</span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span className="text-gray-600">Cost/Unit:</span>
-            <span className="text-gray-900">
+          <div className="flex justify-between gap-2">
+            <span className="text-gray-600 flex-shrink-0">Cost/Unit:</span>
+            <span className="text-gray-900 truncate">
               {formatCurrency(material.cost_per_unit || 0)}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Reorder Point:</span>
-            <span className="text-gray-900">
+          <div className="flex justify-between gap-2">
+            <span className="text-gray-600 flex-shrink-0">Reorder:</span>
+            <span className="text-gray-900 truncate">
               {formatIndianNumberWithDecimals(Number(material.reorder_point || 0), 2)} {material.unit}
             </span>
           </div>
           {material.min_threshold && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Min Threshold:</span>
-              <span className="text-gray-900">
+            <div className="flex justify-between gap-2">
+              <span className="text-gray-600 flex-shrink-0">Min:</span>
+              <span className="text-gray-900 truncate">
                 {formatIndianNumberWithDecimals(Number(material.min_threshold || 0), 2)} {material.unit}
               </span>
             </div>
