@@ -129,6 +129,19 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     }
   }, [isOpen, mode, material, units]);
 
+  // Lock body scroll when dialog is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   const loadDropdowns = async () => {
     try {
       // Load suppliers

@@ -205,9 +205,6 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
                 key={section.category}
                 section={section}
                 onNotificationClick={handleNotificationClick}
-                getNotificationIcon={getNotificationIcon}
-                getNotificationBgColor={getNotificationBgColor}
-                formatDate={formatDate}
                 compact={true}
               />
             ))}

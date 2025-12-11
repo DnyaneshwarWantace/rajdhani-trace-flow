@@ -415,6 +415,20 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     }
   };
 
+  // Lock body scroll when dialog is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      loadDropdowns();
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (

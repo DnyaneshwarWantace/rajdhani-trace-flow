@@ -55,14 +55,6 @@ export default function SectionContent({
               <NotificationSectionComponent
                 section={section}
                 onNotificationClick={onNotificationClick}
-                getNotificationIcon={getNotificationIcon}
-                getNotificationBgColor={(type, priority) => {
-                  if (priority === 'urgent' || type === 'error') return 'bg-red-50 border-red-200';
-                  if (priority === 'high' || type === 'low_stock') return 'bg-orange-50 border-orange-200';
-                  if (priority === 'medium') return 'bg-yellow-50 border-yellow-200';
-                  return 'bg-white border-gray-200';
-                }}
-                formatDate={formatDate}
                 compact={false}
               />
             </CardContent>

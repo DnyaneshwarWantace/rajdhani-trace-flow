@@ -7,9 +7,6 @@ import ActivityNotificationCard from './ActivityNotificationCard';
 interface NotificationSectionProps {
   section: NotificationSection;
   onNotificationClick: (notification: Notification) => void;
-  getNotificationIcon: (type: string, module: string) => React.ReactNode;
-  getNotificationBgColor: (type: string, priority: string) => string;
-  formatDate: (date: string) => string;
   compact?: boolean; // For dropdown view
   expandedId?: string | null;
   onExpand?: (id: string | null) => void;
@@ -19,9 +16,6 @@ interface NotificationSectionProps {
 export default function NotificationSectionComponent({
   section,
   onNotificationClick,
-  getNotificationIcon,
-  getNotificationBgColor,
-  formatDate,
   compact = false,
   expandedId,
   onExpand,
