@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, X, Check, AlertCircle, Package, ShoppingCart, Factory, AlertTriangle } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
-import { formatDate } from '@/utils/formatHelpers';
 import { categorizeNotifications } from '@/utils/notificationCategories';
 import NotificationSectionComponent from '@/components/notifications/NotificationSection';
 
@@ -112,43 +111,6 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
     onClose();
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
-    if (type === 'low_stock' || type === 'restock_request') {
-      return <AlertTriangle className="w-5 h-5 text-orange-600" />;
-    }
-    if (type === 'error' || type === 'urgent') {
-      return <AlertCircle className="w-5 h-5 text-red-600" />;
-    }
-    if (type === 'success' || type === 'production_complete') {
-      return <Check className="w-5 h-5 text-green-600" />;
-    }
-    
-    // Module-based icons
-    if (module === 'products') {
-      return <Package className="w-5 h-5 text-blue-600" />;
-    }
-    if (module === 'orders') {
-      return <ShoppingCart className="w-5 h-5 text-purple-600" />;
-    }
-    if (module === 'materials') {
-      return <Factory className="w-5 h-5 text-indigo-600" />;
-    }
-    
-    return <Bell className="w-5 h-5 text-gray-600" />;
-  };
-
-  const getNotificationBgColor = (type: string, priority: string) => {
-    if (priority === 'urgent' || type === 'error') {
-      return 'bg-red-50 border-red-200';
-    }
-    if (priority === 'high' || type === 'low_stock') {
-      return 'bg-orange-50 border-orange-200';
-    }
-    if (priority === 'medium') {
-      return 'bg-yellow-50 border-yellow-200';
-    }
-    return 'bg-white border-gray-200';
-  };
 
   if (!isOpen) return null;
 

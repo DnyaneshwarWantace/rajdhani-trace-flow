@@ -70,7 +70,19 @@ export default function ValueUnitDropdownField({
   const [searchTerm, setSearchTerm] = useState('');
 
   // Get current combined value for display
-  const currentCombinedValue = value && unit ? `${value} ${unit}`.trim() : '';
+  // Ensure value is properly formatted (convert number to string if needed)
+  const displayValue = value !== null && value !== undefined && value !== '' ? String(value) : '';
+  const currentCombinedValue = displayValue && unit ? `${displayValue} ${unit}`.trim() : '';
+
+  // Debug logging
+  console.log(`🔍 ${label} Field State:`, {
+    receivedValue: value,
+    receivedUnit: unit,
+    displayValue,
+    currentCombinedValue,
+    combinedValuesCount: combinedValues.length,
+    combinedValuesPreview: combinedValues.slice(0, 3)
+  });
 
   // Filter combined values based on search
   const filteredValues = combinedValues.filter((val) =>
@@ -79,6 +91,12 @@ export default function ValueUnitDropdownField({
 
   // Handle selecting from dropdown
   const handleSelectChange = (selectedValue: string) => {
+    // Don't process empty string selections - this happens when value is not in dropdown
+    if (!selectedValue || selectedValue === '') {
+      console.log('🔍 Ignoring empty selection');
+      return;
+    }
+
     if (selectedValue === 'add_new') {
       setShowAddNew(true);
       setNewValueInput('');
@@ -390,18 +408,50 @@ export default function ValueUnitDropdownField({
     );
   }
 
+  // Check if current value exists in dropdown options (case-insensitive and trim spaces)
+  const normalizedCurrent = currentCombinedValue.trim().toLowerCase();
+  const valueExistsInDropdown = currentCombinedValue && combinedValues.some(
+    val => val.trim().toLowerCase() === normalizedCurrent
+  );
+
+  // Find the exact match from dropdown (with original casing)
+  const exactMatch = combinedValues.find(
+    val => val.trim().toLowerCase() === normalizedCurrent
+  );
+
+  // Always use empty string instead of undefined to keep it controlled
+  const selectValue = valueExistsInDropdown && exactMatch ? exactMatch : '';
+
+  console.log(`🔍 ${label} Dropdown Match:`, {
+    currentCombinedValue,
+    valueExistsInDropdown,
+    exactMatch,
+    selectValue
+  });
+
   return (
     <div>
       <Label>
         {label} {required && '*'}
       </Label>
       {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
+
+      {/* Show current value if it's not in dropdown */}
+      {currentCombinedValue && !valueExistsInDropdown && (
+        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+          <span className="text-blue-700">Current: {currentCombinedValue}</span>
+          <span className="text-blue-500 ml-2">(Not in dropdown)</span>
+        </div>
+      )}
+
       <Select
-        value={currentCombinedValue || undefined}
+        value={selectValue}
         onValueChange={handleSelectChange}
       >
         <SelectTrigger>
-          <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+          <SelectValue
+            placeholder={currentCombinedValue || `Select ${label.toLowerCase()}`}
+          />
         </SelectTrigger>
         <SelectContent>
           {/* Search Input */}

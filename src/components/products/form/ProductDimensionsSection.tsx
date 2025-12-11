@@ -70,8 +70,8 @@ export default function ProductDimensionsSection({
         unitOptions={weightUnits}
         category="weight"
         placeholder="e.g., 3"
-        required={false}
-        description="Optional"
+        required={true}
+        description="Required"
         onValueChange={(value) => onFormDataChange({ weight: value })}
         onUnitChange={(unit) => onFormDataChange({ weight_unit: unit })}
         onCombinedChange={(value, unit) => onFormDataChange({ weight: value, weight_unit: unit })}

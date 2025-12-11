@@ -11,8 +11,6 @@ interface SectionContentProps {
   activityLogs: Notification[];
   loading: boolean;
   onNotificationClick: (notification: Notification) => void;
-  getNotificationIcon: (type: string, module: string) => React.ReactNode;
-  formatDate: (date: string) => string;
 }
 
 export default function SectionContent({
@@ -21,8 +19,6 @@ export default function SectionContent({
   activityLogs,
   loading,
   onNotificationClick,
-  getNotificationIcon,
-  formatDate,
 }: SectionContentProps) {
   if (loading) {
     return (

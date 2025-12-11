@@ -101,13 +101,27 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     deleteUnit,
   } = useProductFormDropdowns();
 
+  // Load dropdowns when dialog opens
   useEffect(() => {
     if (isOpen) {
       reloadDropdowns();
       loadMaterials();
       loadProducts();
+    }
+  }, [isOpen]);
 
-      if (product && (mode === 'edit' || mode === 'duplicate')) {
+  // Populate form when product data changes
+  useEffect(() => {
+    if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
+      console.log('🔍 Populating form with product:', product);
+      console.log('🔍 Product dimensions:', {
+        length: product.length,
+        width: product.width,
+        weight: product.weight,
+        length_unit: product.length_unit,
+        width_unit: product.width_unit,
+        weight_unit: product.weight_unit
+      });
         setFormData({
           name: mode === 'duplicate' ? `${product.name} (Copy)` : product.name,
           category: product.category,
@@ -117,11 +131,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           base_quantity: mode === 'duplicate' ? 0 : (product.base_quantity || 0),
           unit: product.unit,
           individual_stock_tracking: product.individual_stock_tracking,
-          length: product.length,
-          width: product.width,
-          length_unit: product.length_unit,
-          width_unit: product.width_unit,
-          weight: product.weight || '',
+          length: product.length !== null && product.length !== undefined && product.length !== '' ? String(product.length) : '',
+          width: product.width !== null && product.width !== undefined && product.width !== '' ? String(product.width) : '',
+          length_unit: product.length_unit || '',
+          width_unit: product.width_unit || '',
+          weight: product.weight !== null && product.weight !== undefined && product.weight !== '' ? String(product.weight) : '',
           weight_unit: product.weight_unit || '',
           min_stock_level: product.min_stock_level,
           max_stock_level: product.max_stock_level || 100,
@@ -130,14 +144,16 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           image_url: product.image_url || '',
           status: product.status,
         });
-        if (product.image_url) {
-          setImagePreview(product.image_url);
-        }
-        // Load recipe for this product
-        loadRecipe(product.id);
+      if (product.image_url) {
+        setImagePreview(product.image_url);
       } else {
-        resetForm();
+        setImagePreview('');
       }
+      setImageFile(null);
+      // Load recipe for this product
+      loadRecipe(product.id);
+    } else if (isOpen && !product && mode === 'create') {
+      resetForm();
     }
   }, [isOpen, product, mode]);
 
@@ -320,13 +336,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         missingFields.push('Width');
       }
 
-      // Check weight - must have both value AND unit
-      // Weight is OPTIONAL - only validate if one is provided but not the other
+      // Check weight - must have both value AND unit (NOW MANDATORY)
       const weightValue = formData.weight ? String(formData.weight).trim() : '';
       const weightUnitValue = formData.weight_unit ? String(formData.weight_unit).trim() : '';
       console.log('VALIDATION - Weight:', { weightValue, weightUnitValue, raw: { weight: formData.weight, weight_unit: formData.weight_unit } });
-      if ((weightValue && !weightUnitValue) || (!weightValue && weightUnitValue)) {
-        missingFields.push('Weight (both value and unit required if provided)');
+      if (!weightValue || !weightUnitValue) {
+        missingFields.push('Weight');
       }
       
       // base_quantity can be 0, so we only check if it's a valid number (not negative)
@@ -369,8 +384,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           setLoading(false);
           return;
         }
-      } else if (mode === 'edit' && product?.image_url) {
-        // Keep existing image URL if no new image is uploaded
+      } else if (mode === 'edit' && product?.image_url && !imagePreview) {
+        // If user removed the image (no preview), clear the URL
+        imageUrl = '';
+      } else if (mode === 'edit' && product?.image_url && imagePreview === product.image_url) {
+        // Keep existing image URL if user didn't change it
         imageUrl = product.image_url;
       }
 

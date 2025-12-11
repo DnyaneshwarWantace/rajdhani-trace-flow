@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { NotificationService, type Notification } from '@/services/notificationService';
-import { formatDate } from '@/utils/formatHelpers';
 import { 
   Select, 
   SelectContent, 
@@ -110,33 +109,6 @@ export default function Notifications() {
     }
   };
 
-  const getNotificationIcon = (type: string, module: string) => {
-    if (type === 'low_stock' || type === 'restock_request') {
-      return <AlertTriangle className="w-5 h-5 text-orange-600" />;
-    }
-    if (type === 'error' || type === 'out_of_stock') {
-      return <XCircle className="w-5 h-5 text-red-600" />;
-    }
-    if (type === 'success' || type === 'production_complete' || type === 'order_completed') {
-      return <CheckCircle className="w-5 h-5 text-green-600" />;
-    }
-    if (type === 'warning' || type === 'production_request') {
-      return <AlertCircle className="w-5 h-5 text-yellow-600" />;
-    }
-    
-    // Module-based icons
-    if (module === 'products') {
-      return <Package className="w-5 h-5 text-blue-600" />;
-    }
-    if (module === 'orders') {
-      return <ShoppingCart className="w-5 h-5 text-purple-600" />;
-    }
-    if (module === 'materials') {
-      return <Factory className="w-5 h-5 text-indigo-600" />;
-    }
-    
-    return <Info className="w-5 h-5 text-gray-600" />;
-  };
 
 
   const handleNotificationClick = (notification: Notification) => {
