@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, X, Check, AlertCircle, Package, ShoppingCart, Factory, AlertTriangle } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { categorizeNotifications } from '@/utils/notificationCategories';
 import NotificationSectionComponent from '@/components/notifications/NotificationSection';

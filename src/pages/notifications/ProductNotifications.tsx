@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { NotificationService, type Notification } from '@/services/notificationService';
-import { formatDate } from '@/utils/formatHelpers';
 import { Package } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import SectionHeader from '@/components/notifications/sections/SectionHeader';
@@ -53,10 +52,6 @@ export default function ProductNotifications() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getNotificationIcon = (_type: string, _module: string) => {
-    return <Package className="w-4 h-4 text-blue-600" />;
   };
 
   const handleNotificationClick = (notification: Notification) => {
@@ -128,8 +123,6 @@ export default function ProductNotifications() {
           activityLogs={filteredLogs}
           loading={loading}
           onNotificationClick={handleNotificationClick}
-          getNotificationIcon={getNotificationIcon}
-          formatDate={formatDate}
         />
       </div>
     </Layout>

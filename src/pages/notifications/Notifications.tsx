@@ -14,14 +14,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   Bell, 
-  AlertCircle, 
-  AlertTriangle, 
   CheckCircle, 
-  Info,
-  XCircle,
-  Factory,
-  Package,
-  ShoppingCart
+  Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { categorizeNotifications } from '@/utils/notificationCategories';
