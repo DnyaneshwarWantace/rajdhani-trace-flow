@@ -466,7 +466,7 @@ export default function ValueUnitDropdownField({
           </div>
 
           {/* Add New Option */}
-          <SelectItem value="add_new" className="text-primary-600 font-medium">
+          <SelectItem value="add_new" className="text-primary-600 font-medium pr-10 pl-7 text-left">
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Add New {label}
@@ -474,31 +474,31 @@ export default function ValueUnitDropdownField({
           </SelectItem>
 
           {/* N/A Option */}
-          <SelectItem value="N/A" className="text-gray-500 italic">
+          <SelectItem value="N/A" className="text-gray-500 italic pr-10 pl-7 text-left">
             N/A (No {label})
           </SelectItem>
 
           {/* Combined Values with Delete */}
           {filteredValues.length > 0 ? (
             filteredValues.map((combinedValue) => (
-              <SelectItem key={combinedValue} value={combinedValue}>
-                <div className="flex items-center justify-between w-full">
-                  <span className="flex-1">{combinedValue}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      handleDelete(combinedValue);
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </SelectItem>
+              <div key={combinedValue} className="relative flex items-center">
+                <SelectItem value={combinedValue} className="flex-1 pr-8">
+                  <span className="truncate block max-w-[200px] text-sm">{combinedValue}</span>
+                </SelectItem>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    handleDelete(combinedValue);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             ))
           ) : (
             <div className="p-2 text-sm text-gray-500 text-center">

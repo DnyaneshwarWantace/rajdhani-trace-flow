@@ -116,7 +116,7 @@ export default function EnhancedSelect({
         </SelectTrigger>
         <SelectContent>
           {enhancedOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
+            <SelectItem key={option.value} value={option.value} className="pr-10 text-left">
               {option.label}
             </SelectItem>
           ))}

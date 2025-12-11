@@ -202,20 +202,18 @@ export default function ProductDropdownField({
           {filteredOptions
             .filter((opt) => opt && opt.trim() !== '' && opt !== 'NA' && opt !== 'N/A')
             .map((option) => (
-              <div
-                key={option}
-                className="flex items-center justify-between px-2 py-1.5 hover:bg-accent rounded-sm"
-              >
-                <SelectItem value={option} className="flex-1 p-0 h-auto">
-                  {option}
+              <div key={option} className="relative flex items-center">
+                <SelectItem value={option} className="flex-1 pr-8">
+                  <span className="truncate block max-w-[200px] text-sm">{option}</span>
                 </SelectItem>
                 {option && onDelete && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 z-10"
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       handleDelete(option);
                     }}
                   >

@@ -59,7 +59,7 @@ export default function ProductValueUnitField({
                 unitOptions
                   .filter((opt) => opt && opt.trim() !== '')
                   .map((unitOption) => (
-                    <SelectItem key={unitOption} value={unitOption}>
+                    <SelectItem key={unitOption} value={unitOption} className="pr-10 text-left">
                       {unitOption}
                     </SelectItem>
                   ))
