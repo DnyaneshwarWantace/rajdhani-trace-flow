@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { X } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { SupplierService } from '@/services/supplierService';
@@ -779,36 +781,40 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             />
           </div>
 
-          <MaterialTypeSection
-            type={formData.type}
-            color={formData.color}
-            types={types}
-            colors={colors}
-            onTypeChange={(value: string) =>
-              setFormData({
-                ...formData,
-                type: value,
-                color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
-              })
-            }
-            onColorChange={(value) => setFormData({ ...formData, color: value })}
-          />
+          {/* Material Type and Unit on same line */}
+          <div className="grid grid-cols-2 gap-4">
+            <MaterialTypeSection
+              type={formData.type}
+              color={formData.color}
+              types={types}
+              colors={colors}
+              onTypeChange={(value: string) =>
+                setFormData({
+                  ...formData,
+                  type: value,
+                  color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
+                })
+              }
+              onColorChange={(value) => setFormData({ ...formData, color: value })}
+              onTypesReload={loadDropdowns}
+            />
 
-          <MaterialUnitSection
-            ref={unitRef}
-            unit={formData.unit}
-            units={units}
-            onUnitChange={(value) => {
-              setFormData({ ...formData, unit: value });
-              setInvalidFields(prev => {
-                const next = new Set(prev);
-                next.delete('unit');
-                return next;
-              });
-            }}
-            onUnitsReload={loadDropdowns}
-            hasError={invalidFields.has('unit')}
-          />
+            <MaterialUnitSection
+              ref={unitRef}
+              unit={formData.unit}
+              units={units}
+              onUnitChange={(value) => {
+                setFormData({ ...formData, unit: value });
+                setInvalidFields(prev => {
+                  const next = new Set(prev);
+                  next.delete('unit');
+                  return next;
+                });
+              }}
+              onUnitsReload={loadDropdowns}
+              hasError={invalidFields.has('unit')}
+            />
+          </div>
 
           {/* Quantity and Expected Delivery (only for create mode) */}
           {mode === 'create' && (
@@ -887,32 +893,51 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             currentStock={formData.currentStock}
             minThreshold={formData.minThreshold}
             maxCapacity={formData.maxCapacity}
-            reorderPoint={formData.reorderPoint}
             showCurrentStock={mode === 'edit'}
             isCurrentStockEditable={isAdmin}
-            onCurrentStockChange={(value) => {
+            onCurrentStockChange={(value: string) => {
               if (isAdmin) {
                 setFormData({ ...formData, currentStock: value });
               }
             }}
-            onMinThresholdChange={(value) => setFormData({ ...formData, minThreshold: value })}
-            onMaxCapacityChange={(value) => setFormData({ ...formData, maxCapacity: value })}
-            onReorderPointChange={(value) => setFormData({ ...formData, reorderPoint: value })}
+            onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
+            onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
           />
 
-          <MaterialCostSection
-            ref={costPerUnitRef}
-            costPerUnit={formData.costPerUnit}
-            onCostPerUnitChange={(value) => {
-              setFormData({ ...formData, costPerUnit: value });
-              setInvalidFields(prev => {
-                const next = new Set(prev);
-                next.delete('costPerUnit');
-                return next;
-              });
-            }}
-            hasError={invalidFields.has('costPerUnit')}
-          />
+          {/* Reorder Point and Cost/Unit on same line */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="reorderPoint">Reorder Point *</Label>
+              <Input
+                id="reorderPoint"
+                type="text"
+                value={formData.reorderPoint}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setFormData({ ...formData, reorderPoint: value });
+                  }
+                }}
+                placeholder="50"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed</p>
+            </div>
+
+            <MaterialCostSection
+              ref={costPerUnitRef}
+              costPerUnit={formData.costPerUnit}
+              onCostPerUnitChange={(value: string) => {
+                setFormData({ ...formData, costPerUnit: value });
+                setInvalidFields(prev => {
+                  const next = new Set(prev);
+                  next.delete('costPerUnit');
+                  return next;
+                });
+              }}
+              hasError={invalidFields.has('costPerUnit')}
+            />
+          </div>
         </form>
 
         {/* Fixed Footer */}

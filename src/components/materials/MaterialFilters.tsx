@@ -91,8 +91,8 @@ export default function MaterialFilters({
           </Select>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-2 w-full lg:w-auto">
+        {/* View Mode Toggle - Only show on desktop */}
+        <div className="hidden lg:flex items-center gap-2">
           <span className="text-sm text-gray-600 whitespace-nowrap">View:</span>
           <button
             onClick={() => onViewModeChange('table')}

@@ -77,7 +77,7 @@ export default function MaterialTable({
                     <div className="min-w-0 flex-1">
                       <TruncatedText
                         text={material.name}
-                        maxLength={40}
+                        maxLength={25}
                         className="font-medium text-gray-900"
                         as="p"
                       />
@@ -86,10 +86,10 @@ export default function MaterialTable({
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{material.category}</p>
+                  <div className="min-w-0 max-w-xs">
+                    <p className="text-sm font-medium text-gray-900 line-clamp-2 break-words">{material.category}</p>
                     {material.type && (
-                      <p className="text-xs text-gray-500">{material.type}</p>
+                      <p className="text-xs text-gray-500 line-clamp-1">{material.type}</p>
                     )}
                   </div>
                 </td>
@@ -107,7 +107,13 @@ export default function MaterialTable({
                   </p>
                 </td>
                 <td className="px-4 py-4">
-                  <p className="text-sm text-gray-900">{material.supplier_name || 'N/A'}</p>
+                  <p className="text-sm text-gray-900 break-words min-w-0">
+                    {material.supplier_name ? (
+                      <TruncatedText text={material.supplier_name} maxLength={20} as="span" />
+                    ) : (
+                      'N/A'
+                    )}
+                  </p>
                 </td>
                 <td className="px-4 py-4">
                   <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(material.status)}`}>

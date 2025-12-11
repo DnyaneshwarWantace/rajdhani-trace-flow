@@ -27,6 +27,51 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
 
+  // Handler for unit name (max 2 words, max 10 chars per word)
+  const handleUnitNameChange = (value: string) => {
+    let inputValue = value;
+
+    // Split by spaces to get words
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to 2 words
+    if (words.length > 2) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 2) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to 10 characters
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > 10 ? part.slice(0, 10) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setNewUnitName(inputValue);
+  };
+
+  // Count words for display
+  const wordCount = newUnitName.trim().split(/\s+/).filter(w => w.length > 0).length;
+
   const handleAddUnit = async () => {
     if (!newUnitName.trim() || units.includes(newUnitName.trim())) {
       return;
@@ -142,23 +187,23 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
               units
                 .filter((u) => u && u.trim() !== '')
                 .map((u) => (
-                  <SelectItem key={u} value={u}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{u}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleDeleteUnit(u);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </SelectItem>
+                  <div key={u} className="relative flex items-center">
+                    <SelectItem value={u} className="flex-1">
+                      {u}
+                    </SelectItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleDeleteUnit(u);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 ))
             ) : (
               <SelectItem value="no_units" disabled>
@@ -174,27 +219,33 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
           </SelectContent>
         </Select>
         {showAddUnit && (
-          <div className="flex gap-2">
-            <Input
-              value={newUnitName}
-              onChange={(e) => setNewUnitName(e.target.value)}
-              placeholder="Enter new unit"
-              className="flex-1"
-            />
-            <Button type="button" size="sm" onClick={handleAddUnit}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setShowAddUnit(false);
-                setNewUnitName('');
-              }}
-            >
-              Cancel
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={newUnitName}
+                  onChange={(e) => handleUnitNameChange(e.target.value)}
+                  placeholder="Enter new unit"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {wordCount}/2 words • Max 10 characters per word
+                </p>
+              </div>
+              <Button type="button" size="sm" onClick={handleAddUnit}>
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowAddUnit(false);
+                  setNewUnitName('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
       </div>

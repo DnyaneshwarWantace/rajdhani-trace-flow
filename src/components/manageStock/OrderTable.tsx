@@ -62,16 +62,18 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                       <Package className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="font-medium text-gray-900">
-                          <TruncatedText text={order.materialName} maxLength={40} as="span" />
+                          <TruncatedText text={order.materialName} maxLength={25} as="span" />
                         </div>
                         <div className="text-sm text-gray-500">{order.order_number}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-900">{order.supplier}</span>
+                      <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="text-sm text-gray-900 truncate">
+                        <TruncatedText text={order.supplier} maxLength={20} as="span" />
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">

@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Layers, ChevronRight } from 'lucide-react';
 import type { Recipe } from '@/types/recipe';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface RecipeCardProps {
   recipe: Recipe;
@@ -22,8 +23,8 @@ export default function RecipeCard({ recipe, onClick }: RecipeCardProps) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-2 mb-1 flex-wrap">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words">
-                {recipe.product_name}
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                <TruncatedText text={recipe.product_name} maxLength={40} as="span" />
               </h3>
               {!recipe.is_active && (
                 <Badge variant="outline" className="text-xs flex-shrink-0">

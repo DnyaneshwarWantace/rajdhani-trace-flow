@@ -294,7 +294,7 @@ export default function Notifications() {
     ? getFilteredActivityLogs() 
     : getFilteredNotifications();
 
-  // Filter notifications
+  // Filter notifications - keep original order, don't re-sort by status
   const filteredNotifications = baseNotifications
     .filter(n => {
       if (filterType !== 'all' && n.type !== filterType) return false;
@@ -302,16 +302,6 @@ export default function Notifications() {
       if (filterModule !== 'all' && n.module !== filterModule) return false;
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
       return true;
-    })
-    .sort((a, b) => {
-      // Unread notifications first
-      if (a.status === 'unread' && b.status !== 'unread') return -1;
-      if (a.status !== 'unread' && b.status === 'unread') return 1;
-      // Then sort by date (newest first)
-      // For activity logs, use the activity log's created_at from related_data if available
-      const dateA = a.related_data?.created_at || a.created_at;
-      const dateB = b.related_data?.created_at || b.created_at;
-      return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -522,26 +512,27 @@ export default function Notifications() {
             {filteredNotifications.length > 0 ? (
               <div className="space-y-3">
                 {filteredNotifications.map((notification) => (
-                  <ActivityNotificationCard
-                    key={notification.id}
-                    notification={notification}
-                    onClick={() => handleNotificationClick(notification)}
-                    expandedId={expandedNotificationId}
-                    onExpand={(id) => {
-                      setExpandedNotificationId(id);
-                    }}
-                    onMarkAsRead={async (id) => {
-                      try {
-                        await NotificationService.updateNotificationStatus(id, 'read');
-                        // Update local state
-                        setNotifications(prev => 
-                          prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
-                        );
-                      } catch (error) {
-                        console.error('Error marking notification as read:', error);
-                      }
-                    }}
-                  />
+                  <div key={notification.id} id={`notification-${notification.id}`}>
+                    <ActivityNotificationCard
+                      notification={notification}
+                      onClick={() => handleNotificationClick(notification)}
+                      expandedId={expandedNotificationId}
+                      onExpand={(id) => {
+                        setExpandedNotificationId(id);
+                      }}
+                      onMarkAsRead={async (id) => {
+                        try {
+                          await NotificationService.updateNotificationStatus(id, 'read');
+                          // Update local state - notification stays in same position
+                          setNotifications(prev =>
+                            prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
+                          );
+                        } catch (error) {
+                          console.error('Error marking notification as read:', error);
+                        }
+                      }}
+                    />
+                  </div>
                 ))}
               </div>
             ) : (
@@ -578,6 +569,18 @@ export default function Notifications() {
                     }}
                     formatDate={formatDate}
                     compact={false}
+                    expandedId={expandedNotificationId}
+                    onExpand={(id) => setExpandedNotificationId(id)}
+                    onMarkAsRead={async (id) => {
+                      try {
+                        await NotificationService.updateNotificationStatus(id, 'read');
+                        setNotifications(prev =>
+                          prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
+                        );
+                      } catch (error) {
+                        console.error('Error marking notification as read:', error);
+                      }
+                    }}
                   />
                 </CardContent>
               </Card>

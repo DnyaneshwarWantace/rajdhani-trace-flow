@@ -84,7 +84,7 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                     <div className="min-w-0 flex-1">
                       <TruncatedText
                         text={product.name}
-                        maxLength={40}
+                        maxLength={25}
                         className="font-medium text-gray-900"
                         as="p"
                       />

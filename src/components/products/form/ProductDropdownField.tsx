@@ -49,6 +49,21 @@ export default function ProductDropdownField({
     ? options.filter((opt) => opt.toLowerCase().includes(searchTerm.toLowerCase()))
     : options;
 
+  // Get validation rules based on category
+  const getValidationRules = (cat: string) => {
+    switch (cat.toLowerCase()) {
+      case 'category':
+      case 'subcategory':
+        return { maxWords: 5, maxCharsPerWord: 20 };
+      case 'color':
+        return { maxWords: 3, maxCharsPerWord: 15 };
+      case 'pattern':
+        return { maxWords: 4, maxCharsPerWord: 15 };
+      default:
+        return { maxWords: 5, maxCharsPerWord: 20 };
+    }
+  };
+
   const handleAdd = async () => {
     if (!newInput.trim()) return;
     try {
@@ -75,17 +90,65 @@ export default function ProductDropdownField({
     }
   };
 
+  const validationRules = getValidationRules(category);
+
+  const handleInputChange = (value: string) => {
+    let inputValue = value;
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to max words
+    if (words.length > validationRules.maxWords) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === validationRules.maxWords) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to max characters
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > validationRules.maxCharsPerWord ? part.slice(0, validationRules.maxCharsPerWord) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setNewInput(inputValue);
+  };
+
   if (showAdd) {
+    const wordCount = newInput.trim().split(/\s+/).filter(w => w.length > 0).length;
+
     return (
       <div>
         <Label>{label} {required && '*'}</Label>
         <div className="flex gap-2">
-          <Input
-            placeholder={`Enter new ${label.toLowerCase()}`}
-            value={newInput}
-            onChange={(e) => setNewInput(e.target.value)}
-            autoFocus
-          />
+          <div className="flex-1">
+            <Input
+              placeholder={`Enter new ${label.toLowerCase()}`}
+              value={newInput}
+              onChange={(e) => handleInputChange(e.target.value)}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {wordCount}/{validationRules.maxWords} words • Max {validationRules.maxCharsPerWord} characters per word
+            </p>
+          </div>
           <Button size="sm" onClick={handleAdd} className="bg-primary-600 hover:bg-primary-700 text-white">
             Add
           </Button>

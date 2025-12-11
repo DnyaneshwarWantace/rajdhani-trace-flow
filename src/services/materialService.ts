@@ -43,7 +43,8 @@ export class MaterialService {
   }
 
   static async getMaterialById(id: string): Promise<RawMaterial> {
-    const response = await fetch(`${API_URL}/raw-materials/${id}`, {
+    const encodedId = encodeURIComponent(id);
+    const response = await fetch(`${API_URL}/raw-materials/${encodedId}`, {
       headers: this.getHeaders(),
     });
 
@@ -72,7 +73,8 @@ export class MaterialService {
   }
 
   static async updateMaterial(id: string, materialData: Partial<RawMaterialFormData>): Promise<RawMaterial> {
-    const response = await fetch(`${API_URL}/raw-materials/${id}`, {
+    const encodedId = encodeURIComponent(id);
+    const response = await fetch(`${API_URL}/raw-materials/${encodedId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
       body: JSON.stringify(materialData),
@@ -88,7 +90,8 @@ export class MaterialService {
   }
 
   static async deleteMaterial(id: string): Promise<void> {
-    const response = await fetch(`${API_URL}/raw-materials/${id}`, {
+    const encodedId = encodeURIComponent(id);
+    const response = await fetch(`${API_URL}/raw-materials/${encodedId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     });

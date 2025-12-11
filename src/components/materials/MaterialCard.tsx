@@ -96,9 +96,9 @@ export default function MaterialCard({
         {/* Header Section */}
         <div className="mb-4">
           <h3 className="font-semibold text-lg mb-1 text-gray-900">
-            <TruncatedText text={material.name} maxLength={60} as="span" />
+            <TruncatedText text={material.name} maxLength={40} as="span" />
           </h3>
-          <p className="text-sm text-gray-500 mb-2">{material.type || material.category}</p>
+          <p className="text-sm text-gray-500 mb-2 line-clamp-1">{material.type || material.category}</p>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${getStatusColor(material.status)}`} />
             <span className="text-xs text-gray-600 capitalize">
@@ -115,16 +115,14 @@ export default function MaterialCard({
               {formatIndianNumberWithDecimals(Number(material.current_stock || 0), 2)} {material.unit}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600">Category:</span>
-            <span className="text-gray-900">{material.category}</span>
+          <div className="flex justify-between items-start gap-2 min-w-0">
+            <span className="text-gray-600 flex-shrink-0">Category:</span>
+            <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-2">{material.category}</span>
           </div>
           {material.supplier_name && (
-            <div className="flex justify-between">
-              <span className="text-gray-600">Supplier:</span>
-              <span className="text-gray-900 max-w-[60%]">
-                <TruncatedText text={material.supplier_name} maxLength={25} />
-              </span>
+            <div className="flex justify-between items-start gap-2 min-w-0">
+              <span className="text-gray-600 flex-shrink-0">Supplier:</span>
+              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-2">{material.supplier_name}</span>
             </div>
           )}
           <div className="flex justify-between">

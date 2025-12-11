@@ -151,15 +151,16 @@ export default function ManageStock() {
           </div>
         ) : (
           <>
-            {/* Mobile: Card View */}
-            <div className="block lg:hidden space-y-6">
+            {/* Mobile: Masonry Card View */}
+            <div className="block lg:hidden columns-1 md:columns-2 gap-4 space-y-4">
               {filteredOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onStatusUpdate={handleStatusUpdate}
-                  onViewDetails={handleViewDetails}
-                />
+                <div key={order.id} className="break-inside-avoid">
+                  <OrderCard
+                    order={order}
+                    onStatusUpdate={handleStatusUpdate}
+                    onViewDetails={handleViewDetails}
+                  />
+                </div>
               ))}
             </div>
 

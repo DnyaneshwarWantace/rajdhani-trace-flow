@@ -43,3 +43,19 @@ button[class*="bg-primary-700"],
   height: 0;
   background: transparent;
 }
+
+/* Truncate long text in all dropdown options (SelectItem) */
+[data-radix-select-item] {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+/* Also apply to the inner text span */
+[data-radix-select-item] span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: block !important;
+}

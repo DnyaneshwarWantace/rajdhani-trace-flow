@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { ShoppingBag, Package, Calendar, Building2, Loader2 } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/services/manageStockService';
@@ -252,11 +253,17 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 pt-3 border-t">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-gray-400" />
-                      <div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
                         <p className="text-xs text-gray-500">Supplier</p>
-                        <p className="text-sm font-medium text-gray-900">{order.supplier}</p>
+                        <p className="text-sm font-medium text-gray-900 break-words">
+                          {order.supplier ? (
+                            <TruncatedText text={order.supplier} maxLength={40} as="span" />
+                          ) : (
+                            'N/A'
+                          )}
+                        </p>
                       </div>
                     </div>
                     <div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
 import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
@@ -182,12 +183,16 @@ export default function MaterialNotificationsTab() {
                       </div>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="flex items-start justify-between gap-3 mb-1">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-gray-900 mb-1">{notification.title}</h4>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <h4 className="font-semibold text-gray-900 mb-1 break-words min-w-0">
+                              <TruncatedText text={notification.title} maxLength={100} as="span" className="inline-block" />
+                            </h4>
                             {notification.message && notification.message.trim() && notification.message !== notification.title && (
-                              <p className="text-sm text-gray-600">{notification.message}</p>
+                              <p className="text-sm text-gray-600 break-words min-w-0">
+                                <TruncatedText text={notification.message} maxLength={150} as="span" className="inline-block" />
+                              </p>
                             )}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -220,9 +225,11 @@ export default function MaterialNotificationsTab() {
                         {isExpanded && hasDetails && (
                           <div className="bg-gray-50 rounded-lg p-3 my-2 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                             {notification.related_data.materialName && notification.related_data.materialName.trim() && (
-                              <div className="flex items-center gap-2 text-xs">
-                                <span className="text-gray-500 font-medium">Material:</span>
-                                <span className="text-gray-900">{notification.related_data.materialName}</span>
+                              <div className="flex items-start gap-2 text-xs min-w-0">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Material:</span>
+                                <span className="text-gray-900 break-words min-w-0 flex-1">
+                                  <TruncatedText text={notification.related_data.materialName} maxLength={80} as="span" className="inline-block" />
+                                </span>
                               </div>
                             )}
                             {notification.related_data.currentStock !== undefined && notification.related_data.currentStock !== null && (

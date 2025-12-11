@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate, formatIndianDateTime, formatIndianDate, formatCurrency } from '@/utils/formatHelpers';
 import { 
   Package, 
@@ -182,10 +183,10 @@ export default function ActivityNotificationCard({
     <Card
       className={`transition-all hover:shadow-md ${
         notification.status === 'unread'
-          ? 'border-l-4 border-l-blue-500 bg-blue-50/30'
+          ? 'bg-blue-50/30'
           : notification.status === 'dismissed'
-          ? 'border-l-4 border-l-gray-400 bg-gray-50/30 opacity-75'
-          : 'border-l-4 border-l-gray-300'
+          ? 'bg-gray-50/30 opacity-75'
+          : 'bg-white'
       } ${hasDetails() ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
     >
@@ -197,20 +198,24 @@ export default function ActivityNotificationCard({
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-start justify-between gap-4 mb-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className={`text-base font-semibold ${
-                    notification.status === 'unread' ? 'text-gray-900' : 'text-gray-700'
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="flex items-start gap-2 mb-1 min-w-0">
+                  <h3 className={`text-base font-semibold break-words min-w-0 flex-1 ${
+                    notification.status === 'unread' ? 'text-gray-900' : 'text-gray-500'
                   }`}>
-                    {notification.title}
+                    <TruncatedText text={notification.title} maxLength={100} as="span" className="inline-block" />
                   </h3>
                   {notification.status === 'unread' && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1.5"></div>
                   )}
                 </div>
-                <p className="text-sm text-gray-600">{notification.message}</p>
+                {notification.message && notification.message !== notification.title && (
+                  <p className="text-sm text-gray-600 break-words min-w-0">
+                    <TruncatedText text={notification.message} maxLength={150} as="span" className="inline-block" />
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Badge className={getBadgeColor()}>
@@ -260,7 +265,13 @@ export default function ActivityNotificationCard({
                           
                           <div>
                             <p className="text-xs font-medium text-gray-600 mb-1">Material Name</p>
-                            <p className="text-sm text-gray-900">{orderDetails.materialName || 'N/A'}</p>
+                            <p className="text-sm text-gray-900 break-words">
+                              {orderDetails.materialName ? (
+                                <TruncatedText text={orderDetails.materialName} maxLength={60} as="span" />
+                              ) : (
+                                'N/A'
+                              )}
+                            </p>
                           </div>
                           
                           <div>
@@ -436,8 +447,12 @@ export default function ActivityNotificationCard({
                   <p className="text-xs font-medium text-gray-700">
                     {metadata.product_name ? 'Product' : 'Material'}:
                   </p>
-                  <p className="text-xs text-gray-900">
-                    {metadata.product_name || metadata.material_name}
+                  <p className="text-xs text-gray-900 break-words">
+                    <TruncatedText 
+                      text={metadata.product_name || metadata.material_name || ''} 
+                      maxLength={80} 
+                      as="span" 
+                    />
                   </p>
                   {notification.related_id && (
                     <p className="text-xs text-gray-500">
@@ -479,7 +494,9 @@ export default function ActivityNotificationCard({
                         {action.includes('MATERIAL_ADD') ? 'Added Material' : 
                          action.includes('MATERIAL_REMOVE') ? 'Removed Material' : 'Material'}:
                       </p>
-                      <p className="text-xs text-gray-900">{metadata.material_name}</p>
+                      <p className="text-xs text-gray-900 break-words">
+                        <TruncatedText text={metadata.material_name} maxLength={80} as="span" />
+                      </p>
                       {metadata?.quantity_per_sqm && (
                         <p className="text-xs text-gray-500">
                           {metadata.quantity_per_sqm} {metadata.unit || ''}/SQM
@@ -523,22 +540,28 @@ export default function ActivityNotificationCard({
                 <div className="mb-2 pb-2 border-b border-gray-200">
                   <p className="text-xs font-medium text-gray-700 mb-2">Changes Made:</p>
                   <div className="space-y-1.5">
-                    {Object.entries(activityData.changes).slice(0, 5).map(([field, change]: [string, any]) => {
+                            {Object.entries(activityData.changes).slice(0, 5).map(([field, change]: [string, any]) => {
                       if (typeof change === 'object' && change !== null) {
                         if (change.old !== undefined && change.new !== undefined) {
                           return (
-                            <div key={field} className="text-xs">
+                            <div key={field} className="text-xs break-words">
                               <span className="font-medium text-gray-700 capitalize">{field.replace(/_/g, ' ')}:</span>
-                              <span className="text-gray-600 ml-1">"{change.old}"</span>
+                              <span className="text-gray-600 ml-1">
+                                "<TruncatedText text={String(change.old)} maxLength={50} as="span" />"
+                              </span>
                               <span className="text-gray-400 mx-1">→</span>
-                              <span className="text-gray-900 font-medium">"{change.new}"</span>
+                              <span className="text-gray-900 font-medium">
+                                "<TruncatedText text={String(change.new)} maxLength={50} as="span" />"
+                              </span>
                             </div>
                           );
                         } else if (change.new !== undefined) {
                           return (
-                            <div key={field} className="text-xs">
+                            <div key={field} className="text-xs break-words">
                               <span className="font-medium text-gray-700 capitalize">{field.replace(/_/g, ' ')}:</span>
-                              <span className="text-gray-900 font-medium ml-1">"{change.new}"</span>
+                              <span className="text-gray-900 font-medium ml-1">
+                                "<TruncatedText text={String(change.new)} maxLength={50} as="span" />"
+                              </span>
                             </div>
                           );
                         }

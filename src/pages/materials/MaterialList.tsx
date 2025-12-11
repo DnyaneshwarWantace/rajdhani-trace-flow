@@ -95,16 +95,24 @@ export default function MaterialList() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Load stats only on initial mount, not on tab changes
   useEffect(() => {
-    if (activeTab === 'inventory') {
-      loadMaterials();
-      loadStats();
-    } else if (activeTab === 'analytics') {
-      loadStats();
-    } else if (activeTab === 'notifications') {
+    loadStats();
+  }, []);
+
+  // Load data when switching tabs (but NOT stats)
+  useEffect(() => {
+    if (activeTab === 'notifications') {
       loadNotifications();
     } else if (activeTab === 'waste-recovery') {
       loadWasteCount();
+    }
+  }, [activeTab]);
+
+  // Load materials when filters change (but not stats)
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      loadMaterials();
     }
   }, [activeTab, filters]);
 
@@ -112,23 +120,17 @@ export default function MaterialList() {
     loadSuppliers();
   }, []);
 
-  // Load waste count on mount and when needed
-  useEffect(() => {
-    loadWasteCount();
-  }, []);
-
   // Reload materials when page becomes visible (e.g., when returning from Manage Stock page)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-    loadMaterials();
-        loadStats();
+      if (document.visibilityState === 'visible' && activeTab === 'inventory') {
+        loadMaterials();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, []);
+  }, [activeTab]);
 
   const loadMaterials = async () => {
     try {
@@ -216,13 +218,19 @@ export default function MaterialList() {
         throw new Error('Material ID not found');
       }
       await MaterialService.deleteMaterial(materialId);
+
+      // Optimistically remove from local state without full reload
+      setMaterials(prev => prev.filter(m => (m.id || m._id) !== materialId));
+      setTotalMaterials(prev => prev - 1);
+
       toast({
         title: 'Success',
         description: `Material "${materialToDelete.name}" has been deleted successfully`,
       });
       setIsDeleteDialogOpen(false);
       setMaterialToDelete(null);
-      loadMaterials();
+
+      // Refresh stats in background without showing loading state
       loadStats();
     } catch (error) {
       toast({
@@ -550,9 +558,18 @@ export default function MaterialList() {
     setIsAddToInventoryOpen(true);
   };
 
-  const handleMaterialSuccess = () => {
-    loadMaterials();
-    loadStats();
+  const handleMaterialSuccess = async () => {
+    // Reload data in background without showing full page loading
+    try {
+      const { materials: data, total } = await MaterialService.getMaterials(filters);
+      setMaterials(data);
+      setTotalMaterials(total || data.length);
+      loadStats();
+    } catch (err) {
+      console.error('Error refreshing materials:', err);
+      // Fallback to full reload if silent refresh fails
+      loadMaterials();
+    }
     setSelectedMaterial(null);
     setEditMode('create');
   };
@@ -592,10 +609,17 @@ export default function MaterialList() {
     }
   };
 
-  const handleWasteRefresh = () => {
+  const handleWasteRefresh = async () => {
+    // Reload data in background without showing full page loading
     loadWasteCount();
-    loadMaterials();
-    loadStats();
+    try {
+      const { materials: data, total } = await MaterialService.getMaterials(filters);
+      setMaterials(data);
+      setTotalMaterials(total || data.length);
+      loadStats();
+    } catch (err) {
+      console.error('Error refreshing materials:', err);
+    }
   };
 
   return (

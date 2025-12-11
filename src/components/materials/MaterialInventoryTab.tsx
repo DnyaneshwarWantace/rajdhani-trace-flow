@@ -74,31 +74,35 @@ export default function MaterialInventoryTab({
                 onOrder={onOrder}
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
                 {materials.map((material) => (
+                  <div key={material._id} className="break-inside-avoid">
+                    <MaterialCard
+                      material={material}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onOrder={onOrder}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Tablet & Mobile View - Always Masonry (2 columns on tablet, 1 on mobile) */}
+          <div className="lg:hidden">
+            <div className="columns-1 md:columns-2 gap-4 space-y-4">
+              {materials.map((material) => (
+                <div key={material._id} className="break-inside-avoid">
                   <MaterialCard
-                    key={material._id}
                     material={material}
                     onView={onView}
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onOrder={onOrder}
                   />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Mobile View - Always Grid */}
-          <div className="lg:hidden">
-            <div className="grid grid-cols-1 gap-4">
-              {materials.map((material) => (
-                <MaterialCard
-                  key={material._id}
-                  material={material}
-                  onView={onView}
-                  onOrder={onOrder}
-                />
+                </div>
               ))}
             </div>
           </div>

@@ -27,6 +27,51 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  // Handler for category name (max 5 words, max 20 chars per word)
+  const handleCategoryNameChange = (value: string) => {
+    let inputValue = value;
+
+    // Split by spaces to get words
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to 5 words
+    if (words.length > 5) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 5) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to 20 characters
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > 20 ? part.slice(0, 20) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setNewCategoryName(inputValue);
+  };
+
+  // Count words for display
+  const wordCount = newCategoryName.trim().split(/\s+/).filter(w => w.length > 0).length;
+
   const handleAddCategory = async () => {
     if (!newCategoryName.trim() || categories.includes(newCategoryName.trim())) {
       return;
@@ -142,23 +187,23 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
               categories
                 .filter((cat) => cat && cat.trim() !== '')
                 .map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    <div className="flex items-center justify-between w-full">
-                      <span>{cat}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 ml-2"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleDeleteCategory(cat);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </SelectItem>
+                  <div key={cat} className="relative flex items-center">
+                    <SelectItem value={cat} className="flex-1">
+                      {cat}
+                    </SelectItem>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleDeleteCategory(cat);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 ))
             ) : (
               <SelectItem value="no_categories" disabled>
@@ -174,27 +219,33 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
           </SelectContent>
         </Select>
         {showAddCategory && (
-          <div className="flex gap-2">
-            <Input
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Enter new category"
-              className="flex-1"
-            />
-            <Button type="button" size="sm" onClick={handleAddCategory}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setShowAddCategory(false);
-                setNewCategoryName('');
-              }}
-            >
-              Cancel
-            </Button>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => handleCategoryNameChange(e.target.value)}
+                  placeholder="Enter new category"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {wordCount}/5 words • Max 20 characters per word
+                </p>
+              </div>
+              <Button type="button" size="sm" onClick={handleAddCategory}>
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setShowAddCategory(false);
+                  setNewCategoryName('');
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         )}
       </div>

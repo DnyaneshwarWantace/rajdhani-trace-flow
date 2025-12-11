@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, ShoppingCart, Factory, AlertTriangle, Activity, Bell } from 'lucide-react';
 import type { NotificationSection } from '@/utils/notificationCategories';
 import type { Notification } from '@/services/notificationService';
+import ActivityNotificationCard from './ActivityNotificationCard';
 
 interface NotificationSectionProps {
   section: NotificationSection;
@@ -10,6 +11,9 @@ interface NotificationSectionProps {
   getNotificationBgColor: (type: string, priority: string) => string;
   formatDate: (date: string) => string;
   compact?: boolean; // For dropdown view
+  expandedId?: string | null;
+  onExpand?: (id: string | null) => void;
+  onMarkAsRead?: (id: string) => Promise<void>;
 }
 
 export default function NotificationSectionComponent({
@@ -19,6 +23,9 @@ export default function NotificationSectionComponent({
   getNotificationBgColor,
   formatDate,
   compact = false,
+  expandedId,
+  onExpand,
+  onMarkAsRead,
 }: NotificationSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -71,57 +78,17 @@ export default function NotificationSectionComponent({
 
       {/* Section Notifications */}
       {isExpanded && (
-        <div className={`mt-2 ${compact ? 'space-y-0.5' : 'space-y-2'}`}>
+        <div className={`mt-2 ${compact ? 'space-y-0.5' : 'space-y-3'}`}>
           {section.notifications.map((notification) => (
-            <button
-              key={notification.id}
-              onClick={() => onNotificationClick(notification)}
-              className={`w-full text-left p-2 sm:p-3 hover:bg-gray-50 transition-colors border-l-4 rounded-r-lg ${
-                notification.status === 'unread'
-                  ? getNotificationBgColor(notification.type, notification.priority)
-                  : 'bg-white border-transparent'
-              }`}
-            >
-              <div className="flex items-start gap-2 sm:gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  {getNotificationIcon(notification.type, notification.module)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs sm:text-sm font-medium ${
-                        notification.status === 'unread' ? 'text-gray-900' : 'text-gray-700'
-                      }`}>
-                        {notification.title}
-                      </p>
-                      <p className={`text-xs text-gray-600 mt-1 ${compact ? 'line-clamp-1' : 'line-clamp-2'}`}>
-                        {notification.message}
-                      </p>
-                      {!compact && (
-                        <div className="flex items-center gap-1.5 sm:gap-2 mt-2 flex-wrap">
-                          <span className="text-xs text-gray-400 capitalize">
-                            {notification.module}
-                          </span>
-                          <span className="text-xs text-gray-300">•</span>
-                          <span className="text-xs text-gray-400">
-                            {formatDate(notification.created_at)}
-                          </span>
-                          {notification.priority === 'urgent' && (
-                            <>
-                              <span className="text-xs text-gray-300">•</span>
-                              <span className="text-xs font-medium text-red-600">Urgent</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {notification.status === 'unread' && (
-                      <div className="w-2 h-2 bg-primary-600 rounded-full flex-shrink-0 mt-1"></div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </button>
+            <div key={notification.id} id={`notification-${notification.id}`}>
+              <ActivityNotificationCard
+                notification={notification}
+                onClick={() => onNotificationClick(notification)}
+                expandedId={expandedId}
+                onExpand={onExpand}
+                onMarkAsRead={onMarkAsRead}
+              />
+            </div>
           ))}
         </div>
       )}

@@ -95,7 +95,7 @@ export default function ProductCard({
       <div className="p-4">
         {/* Title */}
         <h3 className="font-semibold text-gray-900 text-sm mb-2 min-h-[2.5rem] leading-tight">
-          <TruncatedText text={product.name} maxLength={60} as="span" />
+          <TruncatedText text={product.name} maxLength={40} as="span" />
         </h3>
 
         {/* Essential Info - Single Row */}
@@ -117,9 +117,9 @@ export default function ProductCard({
             </div>
           )}
           {/* Category */}
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Category</span>
-            <span className="font-medium text-gray-900">{product.category}</span>
+          <div className="flex items-center justify-between text-xs gap-2">
+            <span className="text-gray-500 flex-shrink-0">Category</span>
+            <span className="font-medium text-gray-900 text-right line-clamp-2 min-w-0">{product.category}</span>
           </div>
 
           {/* Stock */}
@@ -130,9 +130,9 @@ export default function ProductCard({
 
           {/* Dimensions with SQM */}
           <div className="space-y-0.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Dimensions</span>
-              <span className="font-medium text-gray-900">
+            <div className="flex items-center justify-between text-xs gap-2">
+              <span className="text-gray-500 flex-shrink-0">Dimensions</span>
+              <span className="font-medium text-gray-900 text-right line-clamp-1 min-w-0">
                 {product.dimensions_display || `${product.length}${product.length_unit} × ${product.width}${product.width_unit}`}
               </span>
             </div>

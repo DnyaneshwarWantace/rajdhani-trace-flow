@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Hash, Palette, Calendar, Package, User } from 'lucide-react';
+import { TruncatedText } from '@/components/ui/TruncatedText';
+import { Hash, Palette, Calendar, Package, User, Building2 } from 'lucide-react';
 import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { RawMaterial } from '@/types/material';
 
@@ -14,18 +15,29 @@ export default function MaterialDetailInfo({ material }: MaterialDetailInfoProps
       value: material.id || 'N/A',
       icon: Hash,
       color: 'text-gray-600',
+      truncate: false,
     },
     {
       label: 'Category',
       value: material.category || 'N/A',
       icon: Package,
       color: 'text-purple-600',
+      truncate: false,
     },
     {
       label: 'Color',
       value: material.color && material.color !== 'NA' ? material.color : 'N/A',
       icon: Palette,
       color: 'text-purple-600',
+      truncate: false,
+    },
+    {
+      label: 'Supplier',
+      value: material.supplier_name || 'N/A',
+      icon: Building2,
+      color: 'text-indigo-600',
+      truncate: true,
+      maxLength: 40,
     },
     {
       label: 'Last Restocked',
@@ -34,12 +46,14 @@ export default function MaterialDetailInfo({ material }: MaterialDetailInfoProps
         : 'Never',
       icon: Calendar,
       color: 'text-green-600',
+      truncate: false,
     },
     {
       label: 'Created By',
       value: material.created_by || 'System',
       icon: User,
       color: 'text-blue-600',
+      truncate: false,
     },
     {
       label: 'Created On',
@@ -48,6 +62,7 @@ export default function MaterialDetailInfo({ material }: MaterialDetailInfoProps
         : 'N/A',
       icon: Calendar,
       color: 'text-indigo-600',
+      truncate: false,
     },
   ];
 
@@ -71,7 +86,11 @@ export default function MaterialDetailInfo({ material }: MaterialDetailInfoProps
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-600 mb-1">{item.label}</p>
                   <p className="text-sm font-semibold text-gray-900 break-words">
-                    {item.value}
+                    {item.truncate && item.value !== 'N/A' ? (
+                      <TruncatedText text={item.value} maxLength={item.maxLength || 40} as="span" />
+                    ) : (
+                      item.value
+                    )}
                   </p>
                 </div>
               </div>

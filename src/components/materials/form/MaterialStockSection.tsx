@@ -5,26 +5,22 @@ interface MaterialStockSectionProps {
   currentStock: string;
   minThreshold: string;
   maxCapacity: string;
-  reorderPoint: string;
   showCurrentStock: boolean;
   isCurrentStockEditable?: boolean;
   onCurrentStockChange?: (value: string) => void;
   onMinThresholdChange: (value: string) => void;
   onMaxCapacityChange: (value: string) => void;
-  onReorderPointChange: (value: string) => void;
 }
 
 export default function MaterialStockSection({
   currentStock,
   minThreshold,
   maxCapacity,
-  reorderPoint,
   showCurrentStock,
   isCurrentStockEditable = false,
   onCurrentStockChange,
   onMinThresholdChange,
   onMaxCapacityChange,
-  onReorderPointChange,
 }: MaterialStockSectionProps) {
   const handleNumericChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -83,18 +79,6 @@ export default function MaterialStockSection({
           required
         />
         <p className="text-xs text-muted-foreground mt-1">Maximum quantity the inventory can hold</p>
-      </div>
-      <div>
-        <Label htmlFor="reorderPoint">Reorder Point *</Label>
-        <Input
-          id="reorderPoint"
-          type="text"
-          value={reorderPoint}
-          onChange={(e) => handleNumericChange(e, onReorderPointChange)}
-          placeholder="50"
-          required
-        />
-        <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed</p>
       </div>
     </div>
   );

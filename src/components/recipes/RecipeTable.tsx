@@ -2,6 +2,7 @@ import type { Recipe } from '@/types/recipe';
 import { FileText, Eye, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface RecipeTableProps {
   recipes: Recipe[];
@@ -46,7 +47,7 @@ export default function RecipeTable({ recipes, onView, onEdit, onDelete }: Recip
               <tr key={recipe.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-4 py-4">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-900 break-words">{recipe.product_name}</p>
+                    <TruncatedText text={recipe.product_name} maxLength={25} className="font-medium text-gray-900" as="p" />
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <p className="text-sm text-gray-500 break-words">{recipe.product_id}</p>
                       <Badge className="bg-blue-500 text-white text-xs px-1.5 py-0.5 flex items-center gap-1 flex-shrink-0">

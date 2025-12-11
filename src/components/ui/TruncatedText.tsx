@@ -1,4 +1,10 @@
 import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface TruncatedTextProps {
   text: string;
@@ -11,10 +17,10 @@ interface TruncatedTextProps {
 
 /**
  * TruncatedText Component
- * 
- * Displays text with truncation and optional tooltip for full text.
- * Uses native title attribute for tooltip (works everywhere).
- * 
+ *
+ * Displays text with truncation and fast tooltip for full text.
+ * Uses Radix UI Tooltip for instant display (300ms delay).
+ *
  * @param text - The text to display
  * @param maxLength - Maximum characters before truncation (default: 50)
  * @param className - Additional CSS classes
@@ -31,22 +37,38 @@ export function TruncatedText({
   as: Component = 'span',
 }: TruncatedTextProps) {
   if (!text) return null;
-  
+
   const shouldTruncate = text.length > maxLength;
   const truncatedText = shouldTruncate ? `${text.slice(0, maxLength)}...` : text;
   const displayTooltip = showTooltip && shouldTruncate;
 
+  if (!displayTooltip) {
+    return (
+      <Component className={cn('block', className)}>
+        {truncatedText}
+      </Component>
+    );
+  }
+
   return (
-    <Component
-      className={cn(
-        'block',
-        shouldTruncate && 'truncate',
-        className
-      )}
-      title={displayTooltip ? (tooltipContent || text) : undefined}
-    >
-      {truncatedText}
-    </Component>
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Component
+            className={cn(
+              'block cursor-help',
+              shouldTruncate && 'truncate',
+              className
+            )}
+          >
+            {truncatedText}
+          </Component>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs break-words">
+          <p>{tooltipContent || text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

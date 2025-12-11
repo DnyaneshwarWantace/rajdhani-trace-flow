@@ -38,6 +38,108 @@ export default function CustomerFormDialog({
   selectedCustomer,
   submitting,
 }: CustomerFormDialogProps) {
+  // Handler for name fields (max 8 words, max 20 chars per word)
+  const handleNameChange = (value: string, field: 'name' | 'company_name') => {
+    let inputValue = value;
+
+    // Split by spaces to get words (preserve all spaces)
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to 8 words - if exceeded, truncate at the 8th word
+    if (words.length > 8) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 8) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to 20 characters (preserve spaces)
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > 20 ? part.slice(0, 20) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    onFormDataChange({ ...formData, [field]: inputValue });
+  };
+
+  // Handler for GST number (exactly 15 chars, auto uppercase)
+  const handleGSTChange = (value: string) => {
+    // Remove any non-alphanumeric characters
+    let gstValue = value.replace(/[^a-zA-Z0-9]/g, '');
+
+    // Convert to uppercase
+    gstValue = gstValue.toUpperCase();
+
+    // Limit to 15 characters
+    gstValue = gstValue.slice(0, 15);
+
+    onFormDataChange({ ...formData, gst_number: gstValue });
+  };
+
+  // Handler for address fields (max 100 words, max 20 chars per word)
+  const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+    let inputValue = value;
+
+    // Split by spaces to get words (preserve all spaces)
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+    
+    // Limit to 100 words for address fields
+    if (words.length > 100) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 100) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to 20 characters (preserve spaces)
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > 20 ? part.slice(0, 20) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    onFormDataChange({ ...formData, [field]: inputValue });
+  };
+
+  const nameWordCount = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  const companyWordCount = formData.company_name?.trim() ? formData.company_name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  const addressWordCount = formData.address?.trim() ? formData.address.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -71,9 +173,12 @@ export default function CustomerFormDialog({
               <Label>Name *</Label>
               <Input
                 value={formData.name}
-                onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
+                onChange={(e) => handleNameChange(e.target.value, 'name')}
                 required
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {nameWordCount}/8 words • Max 20 characters per word
+              </p>
             </div>
             <div>
               <Label>Email *</Label>
@@ -99,9 +204,16 @@ export default function CustomerFormDialog({
               <Label>GST Number</Label>
               <Input
                 value={formData.gst_number}
-                onChange={(e) => onFormDataChange({ ...formData, gst_number: e.target.value })}
+                onChange={(e) => handleGSTChange(e.target.value)}
                 maxLength={15}
+                placeholder="27AAPFU0939F1ZV"
+                className="uppercase"
               />
+              {formData.gst_number && formData.gst_number.length !== 15 && (
+                <p className="text-xs text-red-500 mt-1">
+                  GST must be exactly 15 characters ({formData.gst_number.length}/15)
+                </p>
+              )}
             </div>
           </div>
 
@@ -109,9 +221,12 @@ export default function CustomerFormDialog({
             <div>
               <Label>Company Name</Label>
               <Input
-                value={formData.company_name}
-                onChange={(e) => onFormDataChange({ ...formData, company_name: e.target.value })}
+                value={formData.company_name || ''}
+                onChange={(e) => handleNameChange(e.target.value, 'company_name')}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                {companyWordCount}/50 words • Max 20 characters per word
+              </p>
             </div>
           )}
 
@@ -119,21 +234,27 @@ export default function CustomerFormDialog({
             <div>
               <Label>City</Label>
               <Input
-                value={formData.city}
-                onChange={(e) => onFormDataChange({ ...formData, city: e.target.value })}
+                value={formData.city || ''}
+                onChange={(e) => handleAddressChange(e.target.value, 'city')}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Max 100 words • Max 20 characters per word
+              </p>
             </div>
             <div>
               <Label>State</Label>
               <Input
-                value={formData.state}
-                onChange={(e) => onFormDataChange({ ...formData, state: e.target.value })}
+                value={formData.state || ''}
+                onChange={(e) => handleAddressChange(e.target.value, 'state')}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Max 100 words • Max 20 characters per word
+              </p>
             </div>
             <div>
               <Label>Pincode</Label>
               <Input
-                value={formData.pincode}
+                value={formData.pincode || ''}
                 onChange={(e) => onFormDataChange({ ...formData, pincode: e.target.value })}
               />
             </div>
@@ -142,9 +263,12 @@ export default function CustomerFormDialog({
           <div>
             <Label>Address</Label>
             <Input
-              value={formData.address}
-              onChange={(e) => onFormDataChange({ ...formData, address: e.target.value })}
+              value={formData.address || ''}
+              onChange={(e) => handleAddressChange(e.target.value, 'address')}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {addressWordCount}/100 words • Max 20 characters per word
+            </p>
           </div>
 
           <div>
