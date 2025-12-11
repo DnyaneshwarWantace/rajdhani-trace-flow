@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import MaterialHeader from '@/components/materials/MaterialHeader';
@@ -64,6 +64,7 @@ export default function MaterialList() {
     lowStockAlerts: 0,
     outOfStock: 0,
   });
+  const [fullStats, setFullStats] = useState<any>(null); // Full stats for analytics tab
   const [statsLoading, setStatsLoading] = useState(false);
 
   // Notifications state
@@ -95,36 +96,54 @@ export default function MaterialList() {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Load stats only on initial mount, not on tab changes
+  // Load materials FIRST, then stats in background
+  const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
   useEffect(() => {
-    loadStats();
+    if (!hasLoadedInitial) {
+      // Load suppliers for form - non-blocking
+      loadSuppliers();
+      loadNotifications(); // For unread count badge - non-blocking
+      setHasLoadedInitial(true);
+    }
   }, []);
 
-  // Load data when switching tabs (but NOT stats)
+  // Load stats AFTER materials are loaded (in background)
   useEffect(() => {
-    if (activeTab === 'notifications') {
-      loadNotifications();
-    } else if (activeTab === 'waste-recovery') {
-      loadWasteCount();
+    if (materials.length > 0 && materialStats.totalMaterials === 0) {
+      // Stats load in background after materials are visible
+      loadStats();
     }
-  }, [activeTab]);
+  }, [materials]);
 
-  // Load materials when filters change (but not stats)
+  // Track last loaded filters to prevent unnecessary reloads
+  const lastLoadedFiltersRef = useRef<string | null>(null);
+
+  // Load inventory materials ONLY when filters actually change (not when switching tabs)
   useEffect(() => {
     if (activeTab === 'inventory') {
-      loadMaterials();
+      const currentFiltersKey = JSON.stringify(filters);
+
+      // Only load if filters changed OR first time loading
+      if (lastLoadedFiltersRef.current !== currentFiltersKey) {
+        loadMaterialsFast();
+        lastLoadedFiltersRef.current = currentFiltersKey;
+      }
     }
-  }, [activeTab, filters]);
+  }, [filters, activeTab]);
 
-  useEffect(() => {
-    loadSuppliers();
-  }, []);
-
-  // Reload materials when page becomes visible (e.g., when returning from Manage Stock page)
+  // Reload materials when page becomes visible ONLY if coming back from another window
+  // (not when switching tabs within the app)
+  const lastVisitRef = useRef(Date.now());
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && activeTab === 'inventory') {
-        loadMaterials();
+        // Only reload if page was hidden for more than 30 seconds (likely went to another app)
+        const timeSinceLastVisit = Date.now() - lastVisitRef.current;
+        if (timeSinceLastVisit > 30000) {
+          loadMaterials();
+        }
+      } else if (document.visibilityState === 'hidden') {
+        lastVisitRef.current = Date.now();
       }
     };
 
@@ -132,8 +151,15 @@ export default function MaterialList() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [activeTab]);
 
-  const loadMaterials = async () => {
+  // Track if already loading to prevent duplicate calls
+  const loadingRef = useRef(false);
+
+  // Fast materials load - only fetches materials, no stats
+  const loadMaterialsFast = async () => {
+    if (loadingRef.current) return; // Prevent duplicate calls
+
     try {
+      loadingRef.current = true;
       setLoading(true);
       setError(null);
       const { materials: data, total } = await MaterialService.getMaterials(filters);
@@ -143,14 +169,40 @@ export default function MaterialList() {
       setError(err instanceof Error ? err.message : 'Failed to load materials');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
-  const loadStats = async () => {
+  // Full reload with stats (used after create/edit/delete)
+  const loadMaterials = async () => {
     try {
+      setLoading(true);
+      setError(null);
+      const { materials: data, total } = await MaterialService.getMaterials(filters);
+      setMaterials(data);
+      setTotalMaterials(total || data.length);
+      // Also refresh stats
+      loadStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load materials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statsLoadingRef = useRef(false);
+  const loadStats = async () => {
+    if (statsLoadingRef.current) return;
+
+    try {
+      statsLoadingRef.current = true;
       setStatsLoading(true);
-      // Fetch stats from backend (without pagination/filters for accurate totals)
       const stats = await MaterialService.getMaterialStats();
+
+      // Save full stats for analytics tab
+      setFullStats(stats);
+
+      // Save summary for stat boxes
       setMaterialStats({
         totalMaterials: stats.totalMaterials || 0,
         lowStockAlerts: stats.lowStock || 0,
@@ -158,7 +210,6 @@ export default function MaterialList() {
       });
     } catch (err) {
       console.error('Failed to load stats:', err);
-      // Fallback: use total from pagination if stats endpoint fails
       setMaterialStats({
         totalMaterials: totalMaterials || 0,
         lowStockAlerts: 0,
@@ -166,6 +217,7 @@ export default function MaterialList() {
       });
     } finally {
       setStatsLoading(false);
+      statsLoadingRef.current = false;
     }
   };
 
@@ -243,14 +295,20 @@ export default function MaterialList() {
     }
   };
 
+  const suppliersLoadingRef = useRef(false);
   const loadSuppliers = async () => {
+    if (suppliersLoadingRef.current) return;
+
     try {
+      suppliersLoadingRef.current = true;
       const result = await SupplierService.getSuppliers();
       if (result.data) {
         setSuppliers(result.data);
       }
     } catch (error) {
       console.error('Error loading suppliers:', error);
+    } finally {
+      suppliersLoadingRef.current = false;
     }
   };
 
@@ -580,19 +638,20 @@ export default function MaterialList() {
     setEditMode('create');
   };
 
+  const notificationsLoadingRef = useRef(false);
   const loadNotifications = async () => {
+    if (notificationsLoadingRef.current) return;
+
     try {
-      // Load material-related notifications
+      notificationsLoadingRef.current = true;
       const { NotificationService } = await import('@/services/notificationService');
       const materialNotifications = await NotificationService.getNotificationsByModule('materials');
-      
-      // Filter for unread notifications only
       const unreadNotifications = (materialNotifications || []).filter(n => n.status === 'unread');
-      
       setNotifications(unreadNotifications);
-      console.log('📢 Loaded material notifications:', unreadNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
+    } finally {
+      notificationsLoadingRef.current = false;
     }
   };
 
@@ -689,7 +748,7 @@ export default function MaterialList() {
 
         {/* Analytics Tab Content */}
         {activeTab === 'analytics' && (
-          <MaterialAnalyticsTab />
+          <MaterialAnalyticsTab initialStats={fullStats} />
         )}
 
         {/* Notifications Tab Content */}

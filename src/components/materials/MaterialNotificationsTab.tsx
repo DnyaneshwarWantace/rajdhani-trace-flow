@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, RefreshCw, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bell, CheckCircle, Loader2, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +14,7 @@ export default function MaterialNotificationsTab() {
   const [loading, setLoading] = useState(true);
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
 
+  // Load only when component mounts (tab is active)
   useEffect(() => {
     loadNotifications();
   }, []);
@@ -21,14 +22,9 @@ export default function MaterialNotificationsTab() {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      // Load material-related notifications
       const materialNotifications = await NotificationService.getNotificationsByModule('materials');
-      
-      // Filter for unread notifications only
       const unreadNotifications = (materialNotifications || []).filter(n => n.status === 'unread');
-      
       setNotifications(unreadNotifications);
-      console.log('📢 Loaded material notifications:', unreadNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
       toast({
@@ -128,7 +124,7 @@ export default function MaterialNotificationsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
       </div>
     );
   }

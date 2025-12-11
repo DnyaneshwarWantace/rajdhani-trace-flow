@@ -43,8 +43,8 @@ export default function MaterialInventoryTab({
 }: MaterialInventoryTabProps) {
   return (
     <>
-      {/* Loading */}
-      {loading && materials.length === 0 && (
+      {/* Loading State - Same as products */}
+      {loading && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />

@@ -62,6 +62,7 @@ export default function MaterialTable({
                       <img
                         src={material.image_url}
                         alt={material.name}
+                        loading="lazy"
                         className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';

@@ -5,13 +5,23 @@ import { MaterialService } from '@/services/materialService';
 import { useState, useEffect } from 'react';
 import type { MaterialStats } from '@/types/material';
 
-export default function MaterialAnalyticsTab() {
-  const [stats, setStats] = useState<MaterialStats | null>(null);
-  const [loading, setLoading] = useState(true);
+interface MaterialAnalyticsTabProps {
+  initialStats?: MaterialStats | null;
+}
 
+export default function MaterialAnalyticsTab({ initialStats }: MaterialAnalyticsTabProps = {}) {
+  const [stats, setStats] = useState<MaterialStats | null>(initialStats || null);
+  const [loading, setLoading] = useState(!initialStats);
+
+  // Use initial stats if provided, otherwise load
   useEffect(() => {
-    loadAnalytics();
-  }, []);
+    if (initialStats) {
+      setStats(initialStats);
+      setLoading(false);
+    } else if (!stats) {
+      loadAnalytics();
+    }
+  }, [initialStats]);
 
   const loadAnalytics = async () => {
     try {
@@ -28,10 +38,7 @@ export default function MaterialAnalyticsTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading analytics...</p>
-        </div>
+        <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }

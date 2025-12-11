@@ -65,6 +65,7 @@ export default function MaterialCard({
           <img
             src={material.image_url}
             alt={material.name}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
