@@ -160,22 +160,38 @@ export default function ProductDropdownField({
     );
   }
 
+  // Check if current value exists in options
+  const valueExistsInOptions = value && options.includes(value);
+
+  // Use value only if it exists in options, otherwise empty string
+  const selectValue = valueExistsInOptions ? value : (allowNA ? 'N/A' : '');
+
   return (
     <div>
       <Label>{label} {required && '*'}</Label>
+
+      {/* Show current value if it's not in dropdown */}
+      {value && !valueExistsInOptions && (
+        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+          <span className="text-blue-700">Current: {value}</span>
+          <span className="text-blue-500 ml-2">(Not in dropdown)</span>
+        </div>
+      )}
+
       <Select
-        value={value || (allowNA ? 'N/A' : '')}
+        value={selectValue}
         onValueChange={(selectedValue) => {
           if (selectedValue === 'add_new') {
             setShowAdd(true);
-          } else {
+          } else if (selectedValue && selectedValue !== '') {
+            // Only update if we have a real non-empty value
             onValueChange(selectedValue === 'N/A' ? '' : selectedValue);
             setSearchTerm('');
           }
         }}
       >
         <SelectTrigger>
-          <SelectValue placeholder={placeholder || `Select ${label.toLowerCase()}`} />
+          <SelectValue placeholder={value || placeholder || `Select ${label.toLowerCase()}`} />
         </SelectTrigger>
         <SelectContent>
           {searchable && (

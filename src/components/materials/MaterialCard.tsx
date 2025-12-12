@@ -93,23 +93,23 @@ export default function MaterialCard({
         </div>
       )}
 
-      <div className="p-4">
+      <div className="p-3">
         {/* Header Section */}
-        <div className="mb-3">
-          <h3 className="font-semibold text-sm mb-1 text-gray-900 line-clamp-2 leading-tight">
-            <TruncatedText text={material.name} maxLength={50} as="span" />
+        <div className="mb-2">
+          <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight">
+            {material.name}
           </h3>
-          <p className="text-xs text-gray-500 mb-1 line-clamp-1">{material.type || material.category}</p>
-          <div className="flex items-center gap-1.5">
+          <p className="text-[10px] text-gray-500 mb-1 line-clamp-1">{material.type || material.category}</p>
+          <div className="flex items-center gap-1">
             <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor(material.status)}`} />
-            <span className="text-xs text-gray-600 capitalize">
+            <span className="text-[10px] text-gray-600 capitalize">
               {material.status.replace('-', ' ')}
             </span>
           </div>
         </div>
 
         {/* Info Section */}
-        <div className="space-y-1.5 text-xs mb-3">
+        <div className="space-y-1.5 text-[10px] mb-2">
           <div className="flex justify-between gap-2">
             <span className="text-gray-600 flex-shrink-0">Stock:</span>
             <span className="font-medium text-gray-900 truncate">
@@ -150,7 +150,7 @@ export default function MaterialCard({
 
         {/* Actions */}
         {showActions && (
-          <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+          <div className="mt-2 pt-2 border-t border-gray-100 flex gap-1.5">
             {onView && (
               <Button
                 variant="outline"
@@ -159,7 +159,7 @@ export default function MaterialCard({
                   e.stopPropagation();
                   onView(material);
                 }}
-                className="flex-1 text-xs py-1.5 h-auto"
+                className="flex-1 text-[10px] py-1.5 h-auto"
               >
                 Details
               </Button>
@@ -172,9 +172,9 @@ export default function MaterialCard({
                   e.stopPropagation();
                   onEdit(material);
                 }}
-                className="flex-1 text-xs py-1.5 h-auto"
+                className="flex-1 text-[10px] py-1.5 h-auto"
               >
-                <Edit className="w-3.5 h-3.5 mr-1" />
+                <Edit className="w-3 h-3 mr-1" />
                 Edit
               </Button>
             )}
@@ -186,9 +186,9 @@ export default function MaterialCard({
                   e.stopPropagation();
                   onDelete(material);
                 }}
-                className="flex-1 text-xs py-1.5 h-auto text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="flex-1 text-[10px] py-1.5 h-auto text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                <Trash2 className="w-3 h-3 mr-1" />
                 Delete
               </Button>
             )}
@@ -200,9 +200,9 @@ export default function MaterialCard({
                   e.stopPropagation();
                   onOrder(material);
                 }}
-                className="flex-1 text-xs py-1.5 h-auto"
+                className="flex-1 text-[10px] py-1.5 h-auto"
               >
-                <ShoppingCart className="w-3.5 h-3.5 mr-1" />
+                <ShoppingCart className="w-3 h-3 mr-1" />
                 Order
               </Button>
             )}

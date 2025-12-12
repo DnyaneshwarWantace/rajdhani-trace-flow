@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, X, ArrowRight, RefreshCw, Clock, Factory, AlertCircle, Info } from 'lucide-react';
+import { Bell, CheckCircle, X, ArrowRight, RefreshCw, Clock, Factory, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,6 +18,19 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddingToProduction, setIsAddingToProduction] = useState<string | null>(null);
+  const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
+
+  const toggleNotification = (notificationId: string) => {
+    setExpandedNotifications(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(notificationId)) {
+        newSet.delete(notificationId);
+      } else {
+        newSet.add(notificationId);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     loadNotifications();
@@ -165,11 +178,11 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
     switch (type) {
       case 'low_stock':
       case 'out_of_stock':
-        return <AlertCircle className="w-5 h-5 text-orange-500" />;
+        return <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />;
       case 'production_request':
-        return <Factory className="w-5 h-5 text-blue-500" />;
+        return <Factory className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />;
       default:
-        return <Info className="w-5 h-5 text-gray-500" />;
+        return <Info className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />;
     }
   };
 
@@ -200,21 +213,21 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
       {notifications.length > 0 ? (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary-50 rounded-lg">
-                <Bell className="w-5 h-5 text-primary-600" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="p-2 bg-primary-50 rounded-lg flex-shrink-0">
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Product Notifications</h2>
-                <p className="text-sm text-gray-500">{notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Product Notifications</h2>
+                <p className="text-xs sm:text-sm text-gray-500">{notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleClearAllNotifications}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-gray-600 hover:text-gray-900 text-xs sm:text-sm w-full sm:w-auto"
             >
               Clear All
             </Button>
@@ -222,115 +235,150 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
           {/* Notifications List */}
           <div className="space-y-3">
-            {notifications.map((notification) => (
-              <Card key={notification.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0 mt-0.5">
-                      {getNotificationIcon(notification.type)}
-                    </div>
+            {notifications.map((notification) => {
+              const isExpanded = expandedNotifications.has(notification.id);
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 mb-1">{notification.title}</h4>
-                          <p className="text-sm text-gray-600 mb-3">{notification.message}</p>
+              return (
+                <Card key={notification.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
+                  <CardContent className="p-3 sm:p-4">
+                    {/* Header - Always visible */}
+                    <div
+                      className="flex items-start gap-2 sm:gap-3 cursor-pointer"
+                      onClick={() => toggleNotification(notification.id)}
+                    >
+                      {/* Icon */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="w-4 h-4 sm:w-5 sm:h-5">
+                          {getNotificationIcon(notification.type)}
                         </div>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs font-medium ${getPriorityColor(notification.priority)}`}
-                        >
-                          {notification.priority}
-                        </Badge>
                       </div>
 
-                      {/* Related Data */}
-                      {notification.related_data && (
-                        <div className="bg-gray-50 rounded-lg p-3 mb-3 space-y-1.5">
-                          {notification.related_data.productName && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Product:</span>
-                              <span className="text-gray-900">{notification.related_data.productName}</span>
-                            </div>
-                          )}
-                          {notification.related_data.requiredQuantity && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Required:</span>
-                              <span className="text-gray-900">{notification.related_data.requiredQuantity} products</span>
-                            </div>
-                          )}
-                          {notification.related_data.availableStock !== undefined && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Available:</span>
-                              <span className="text-gray-900">{notification.related_data.availableStock} products</span>
-                            </div>
-                          )}
-                          {notification.related_data.shortfall && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Shortfall:</span>
-                              <span className="text-red-600 font-semibold">{notification.related_data.shortfall} products</span>
-                            </div>
-                          )}
-                          {notification.related_data.threshold && (
-                            <div className="flex items-center gap-2 text-xs">
-                              <span className="text-gray-500 font-medium">Threshold:</span>
-                              <span className="text-gray-900">{notification.related_data.threshold} units</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>{formatIndianDateTime(notification.created_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {notification.type === 'production_request' || notification.type === 'low_stock' || notification.type === 'order_alert' ? (
-                            notification.related_data && hasIndividualStock(notification.related_data.productId) ? (
-                              <Button
-                                size="sm"
-                                className="bg-primary-600 text-white hover:bg-primary-700 h-8 text-xs"
-                                onClick={() => handleAddToProductionFromNotification(notification)}
-                                disabled={isAddingToProduction === notification.related_data?.productId}
-                              >
-                                {isAddingToProduction === notification.related_data?.productId ? (
-                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <ArrowRight className="w-3 h-3 mr-1" />
-                                )}
-                                {isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}
-                              </Button>
+                      {/* Collapsed Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-1 sm:gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-[11px] sm:text-sm text-gray-900 line-clamp-1 break-all">{notification.title}</h4>
+                            {!isExpanded && (
+                              <p className="text-[10px] sm:text-xs text-gray-600 line-clamp-1 break-all">{notification.message}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] sm:text-[10px] font-medium px-1 py-0 ${getPriorityColor(notification.priority)}`}
+                            >
+                              {notification.priority}
+                            </Badge>
+                            {isExpanded ? (
+                              <ChevronUp className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
                             ) : (
-                              <span className="text-xs text-gray-500">Bulk Product</span>
-                            )
-                          ) : null}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-gray-600 hover:text-gray-900"
-                            onClick={() => handleMarkAsRead(notification.id)}
-                          >
-                            Mark Read
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 text-xs text-gray-600 hover:text-red-600"
-                            onClick={() => handleResolveNotification(notification.id)}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </Button>
+                              <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+
+                    {/* Expanded Content */}
+                    {isExpanded && (
+                      <div className="mt-3 ml-8 sm:ml-9">
+                        <p className="text-xs sm:text-sm text-gray-600 mb-3 break-words">{notification.message}</p>
+
+                        {/* Related Data */}
+                        {notification.related_data && (
+                          <div className="bg-gray-50 rounded-lg p-2 sm:p-3 mb-3 space-y-1.5 overflow-hidden">
+                            {notification.related_data.productName && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Product:</span>
+                                <span className="text-gray-900 break-words">{notification.related_data.productName}</span>
+                              </div>
+                            )}
+                            {notification.related_data.requiredQuantity && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Required:</span>
+                                <span className="text-gray-900">{notification.related_data.requiredQuantity} products</span>
+                              </div>
+                            )}
+                            {notification.related_data.availableStock !== undefined && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Available:</span>
+                                <span className="text-gray-900">{notification.related_data.availableStock} products</span>
+                              </div>
+                            )}
+                            {notification.related_data.shortfall && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Shortfall:</span>
+                                <span className="text-red-600 font-semibold">{notification.related_data.shortfall} products</span>
+                              </div>
+                            )}
+                            {notification.related_data.threshold && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">Threshold:</span>
+                                <span className="text-gray-900">{notification.related_data.threshold} units</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Footer */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                            <span className="truncate">{formatIndianDateTime(notification.created_at)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                            {notification.type === 'production_request' || notification.type === 'low_stock' || notification.type === 'order_alert' ? (
+                              notification.related_data && hasIndividualStock(notification.related_data.productId) ? (
+                                <Button
+                                  size="sm"
+                                  className="bg-primary-600 text-white hover:bg-primary-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToProductionFromNotification(notification);
+                                  }}
+                                  disabled={isAddingToProduction === notification.related_data?.productId}
+                                >
+                                  {isAddingToProduction === notification.related_data?.productId ? (
+                                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                  )}
+                                  <span className="truncate">{isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}</span>
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-gray-500">Bulk Product</span>
+                              )
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 sm:h-8 text-xs text-gray-600 hover:text-gray-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                            >
+                              Mark Read
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 sm:h-8 text-xs text-gray-600 hover:text-red-600 px-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResolveNotification(notification.id);
+                              }}
+                            >
+                              <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       ) : (

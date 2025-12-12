@@ -92,31 +92,31 @@ export default function ActivityNotificationCard({
   // Get icon based on action
   const getIcon = () => {
     if (action.includes('DELETE')) {
-      return <Trash2 className="w-5 h-5 text-red-600" />;
+      return <Trash2 className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />;
     }
     if (action.includes('CREATE')) {
-      return <Plus className="w-5 h-5 text-green-600" />;
+      return <Plus className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />;
     }
     if (action.includes('UPDATE')) {
-      return <Edit className="w-5 h-5 text-blue-600" />;
+      return <Edit className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />;
     }
-    
+
     switch (actionCategory) {
       case 'PRODUCT':
-        return <Package className="w-5 h-5 text-blue-600" />;
+        return <Package className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />;
       case 'MATERIAL':
-        return <Factory className="w-5 h-5 text-indigo-600" />;
+        return <Factory className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-600" />;
       case 'ORDER':
-        return <ShoppingCart className="w-5 h-5 text-purple-600" />;
+        return <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />;
       case 'RECIPE':
       case 'PRODUCTION':
-        return <Factory className="w-5 h-5 text-orange-600" />;
+        return <Factory className="w-4 h-4 sm:w-5 sm:h-5 text-orange-600" />;
       case 'SETTINGS':
-        return <Settings className="w-5 h-5 text-gray-600" />;
+        return <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />;
       case 'USER':
-        return <User className="w-5 h-5 text-gray-600" />;
+        return <User className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />;
       default:
-        return <Info className="w-5 h-5 text-gray-600" />;
+        return <Info className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />;
     }
   };
 
@@ -190,35 +190,37 @@ export default function ActivityNotificationCard({
       } ${hasDetails() ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
     >
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex gap-4">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex gap-2 sm:gap-3">
           {/* Icon */}
-          <div className="flex-shrink-0 mt-1">
-            {getIcon()}
+          <div className="flex-shrink-0 mt-0.5">
+            <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">
+              {getIcon()}
+            </div>
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <div className="flex items-start justify-between gap-4 mb-2">
-              <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-start gap-2 mb-1 min-w-0">
-                  <h3 className={`text-base font-semibold break-words min-w-0 flex-1 ${
+                  <h3 className={`text-xs sm:text-sm font-semibold min-w-0 flex-1 line-clamp-2 ${
                     notification.status === 'unread' ? 'text-gray-900' : 'text-gray-500'
                   }`}>
-                    <TruncatedText text={notification.title} maxLength={100} as="span" className="inline-block" />
+                    {notification.title}
                   </h3>
                   {notification.status === 'unread' && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1.5"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1"></div>
                   )}
                 </div>
                 {notification.message && notification.message !== notification.title && (
-                  <p className="text-sm text-gray-600 break-words min-w-0">
-                    <TruncatedText text={notification.message} maxLength={150} as="span" className="inline-block" />
+                  <p className="text-[10px] sm:text-xs text-gray-600 min-w-0 line-clamp-1">
+                    {notification.message}
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Badge className={getBadgeColor()}>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Badge className={`${getBadgeColor()} text-[10px] px-1.5 py-0.5`}>
                   {getActionLabel()}
                 </Badge>
                 {hasDetails() && (
@@ -232,9 +234,9 @@ export default function ActivityNotificationCard({
                     aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                   >
                     {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-gray-500" />
+                      <ChevronUp className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                      <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
                     )}
                   </button>
                 )}

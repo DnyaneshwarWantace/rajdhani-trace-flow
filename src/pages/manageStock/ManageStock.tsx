@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import OrderStatsBoxes from '@/components/manageStock/OrderStatsBoxes';
 import OrderFilters from '@/components/manageStock/OrderFilters';
-import OrderCard from '@/components/manageStock/OrderCard';
+import OrderCardNew from '@/components/manageStock/OrderCardNew';
 import OrderTable from '@/components/manageStock/OrderTable';
 import OrderDetailsDialog from '@/components/manageStock/OrderDetailsDialog';
 import { ManageStockService } from '@/services/manageStockService';
@@ -151,21 +151,20 @@ export default function ManageStock() {
           </div>
         ) : (
           <>
-            {/* Mobile: Masonry Card View */}
-            <div className="block lg:hidden columns-1 md:columns-2 gap-4 space-y-4">
+            {/* Mobile & Tablet: Grid Card View */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:hidden gap-4">
               {filteredOrders.map((order) => (
-                <div key={order.id} className="break-inside-avoid">
-                  <OrderCard
-                    order={order}
-                    onStatusUpdate={handleStatusUpdate}
-                    onViewDetails={handleViewDetails}
-                  />
-                </div>
+                <OrderCardNew
+                  key={order.id}
+                  order={order}
+                  onStatusUpdate={handleStatusUpdate}
+                  onViewDetails={handleViewDetails}
+                />
               ))}
             </div>
 
             {/* Desktop: Table View */}
-            <div className="hidden lg:block">
+            <div className="hidden xl:block">
               <OrderTable
                 orders={filteredOrders}
                 onStatusUpdate={handleStatusUpdate}

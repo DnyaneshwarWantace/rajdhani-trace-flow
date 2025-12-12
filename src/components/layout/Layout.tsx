@@ -43,10 +43,10 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 w-full overflow-x-hidden">
       <Header onMenuClick={toggleSidebar} isSidebarOpen={isSidebarOpen} />
 
-      <div className="flex">
+      <div className="flex w-full overflow-x-hidden pt-16">
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={closeSidebar}
@@ -60,9 +60,14 @@ export default function Layout({ children }: LayoutProps) {
             ${isSidebarOpen ? 'lg:ml-56' : 'lg:ml-16'}
             pt-0
             px-2 sm:px-3 lg:px-4
+            w-full
+            min-w-0
+            overflow-x-hidden
           `}
         >
-          {children}
+          <div className="w-full max-w-full overflow-x-hidden">
+            {children}
+          </div>
         </main>
       </div>
     </div>

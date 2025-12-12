@@ -91,18 +91,18 @@ export default function ProductCard({
       </div>
 
       {/* Content Section - Clean and Compact */}
-      <div className="p-4">
+      <div className="p-3">
         {/* Title */}
-        <h3 className="font-semibold text-gray-900 text-sm mb-2 leading-tight line-clamp-2">
+        <h3 className="font-semibold text-gray-900 text-xs mb-2 leading-tight line-clamp-2">
           {product.name}
         </h3>
 
         {/* Essential Info - Single Row */}
-        <div className="space-y-2 mb-3">
+        <div className="space-y-1.5 mb-2">
           {/* QR Code */}
           {product.qr_code && onQRCode && (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">QR Code</span>
+            <div className="flex items-center justify-between text-[10px]">
+              <span className="text-gray-500">QR</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -111,32 +111,32 @@ export default function ProductCard({
                 className="p-1 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                 title={`QR Code: ${product.qr_code}`}
               >
-                <QrCode className="w-3.5 h-3.5" />
+                <QrCode className="w-3 h-3" />
               </button>
             </div>
           )}
           {/* Category */}
-          <div className="flex items-center justify-between text-xs gap-2">
-            <span className="text-gray-500 flex-shrink-0">Category</span>
+          <div className="flex items-center justify-between text-[10px] gap-1">
+            <span className="text-gray-500 flex-shrink-0">Cat</span>
             <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.category}</span>
           </div>
 
           {/* Stock */}
-          <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center justify-between text-[10px]">
             <span className="text-gray-500">Stock</span>
             <span className="font-bold text-primary-600">{formatStockRolls(product.current_stock)}</span>
           </div>
 
           {/* Dimensions with SQM */}
           <div className="space-y-0.5">
-            <div className="flex items-center justify-between text-xs gap-2">
-              <span className="text-gray-500 flex-shrink-0">Dimensions</span>
+            <div className="flex items-center justify-between text-[10px] gap-1">
+              <span className="text-gray-500 flex-shrink-0">Dim</span>
               <span className="font-medium text-gray-900 text-right truncate min-w-0">
                 {product.dimensions_display || `${product.length}${product.length_unit} × ${product.width}${product.width_unit}`}
               </span>
             </div>
             {product.sqm && (
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">SQM</span>
                 <span className="font-medium text-gray-900 truncate">{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
               </div>
@@ -146,17 +146,17 @@ export default function ProductCard({
 
         {/* Actions - Only if needed */}
         {showActions && (
-          <div className="pt-3 border-t border-gray-100">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="pt-2 border-t border-gray-100">
+            <div className="grid grid-cols-2 gap-1.5">
               {onView && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onView(product);
                   }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-600 bg-primary-50 rounded-md hover:bg-primary-100 transition-colors"
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-primary-600 bg-primary-50 rounded-md hover:bg-primary-100 transition-colors"
                 >
-                  <Eye className="w-3.5 h-3.5" />
+                  <Eye className="w-3 h-3" />
                   View
                 </button>
               )}
@@ -166,25 +166,25 @@ export default function ProductCard({
                     e.stopPropagation();
                     onEdit(product);
                   }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                  className="flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
                 >
-                  <Edit className="w-3.5 h-3.5" />
+                  <Edit className="w-3 h-3" />
                   Edit
                 </button>
               )}
             </div>
             {(onDuplicate || onStock || onProduction) && (
-              <div className="grid grid-cols-3 gap-2 mt-2">
+              <div className="grid grid-cols-3 gap-1.5 mt-1.5">
                 {onDuplicate && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onDuplicate(product);
                     }}
-                    className="flex items-center justify-center px-2 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                    className="flex items-center justify-center px-1.5 py-1.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
                     title="Duplicate"
                   >
-                    <Copy className="w-3.5 h-3.5" />
+                    <Copy className="w-3 h-3" />
                   </button>
                 )}
                 {onStock && (
@@ -193,10 +193,10 @@ export default function ProductCard({
                       e.stopPropagation();
                       onStock(product);
                     }}
-                    className="flex items-center justify-center px-2 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                    className="flex items-center justify-center px-1.5 py-1.5 text-[10px] font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
                     title="Stock"
                   >
-                    <BarChart3 className="w-3.5 h-3.5" />
+                    <BarChart3 className="w-3 h-3" />
                   </button>
                 )}
                 {onProduction && (
@@ -205,10 +205,10 @@ export default function ProductCard({
                       e.stopPropagation();
                       onProduction(product);
                     }}
-                    className="flex items-center justify-center px-2 py-1.5 text-xs font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 transition-colors"
+                    className="flex items-center justify-center px-1.5 py-1.5 text-[10px] font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100 transition-colors"
                     title="Produce"
                   >
-                    <Factory className="w-3.5 h-3.5" />
+                    <Factory className="w-3 h-3" />
                   </button>
                 )}
               </div>

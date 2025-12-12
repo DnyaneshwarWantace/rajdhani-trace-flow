@@ -113,15 +113,6 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   // Populate form when product data changes
   useEffect(() => {
     if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
-      console.log('🔍 Populating form with product:', product);
-      console.log('🔍 Product dimensions:', {
-        length: product.length,
-        width: product.width,
-        weight: product.weight,
-        length_unit: product.length_unit,
-        width_unit: product.width_unit,
-        weight_unit: product.weight_unit
-      });
         setFormData({
           name: mode === 'duplicate' ? `${product.name} (Copy)` : product.name,
           category: product.category,

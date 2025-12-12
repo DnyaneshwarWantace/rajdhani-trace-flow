@@ -6,6 +6,7 @@ import { TruncatedText } from '@/components/ui/TruncatedText';
 import { Recycle, Package, Loader2, RefreshCw } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { useToast } from '@/hooks/use-toast';
+import WasteCard from './waste/WasteCard';
 
 interface WasteRecoveryTabProps {
   onRefresh?: () => void;
@@ -157,8 +158,22 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <>
+              {/* Card View - Mobile (1 col) & Tablet (2 cols) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:hidden gap-4">
+                {wasteData.map((waste) => (
+                  <WasteCard
+                    key={waste.id}
+                    waste={waste}
+                    onReturn={handleReturnToInventory}
+                    isReturning={returningIds.has(waste.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Table View - Desktop (from xl breakpoint: 1280px+) */}
+              <div className="hidden xl:block overflow-x-auto">
+                <table className="w-full">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-4 font-medium text-gray-700">Status</th>
@@ -273,7 +288,8 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

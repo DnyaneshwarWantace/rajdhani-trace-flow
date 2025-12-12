@@ -74,6 +74,9 @@ export default function ProductStockGrid({
                   key={item.id}
                   individualProduct={item}
                   onClick={() => navigate(`/products/${productId}/stock/${item.id}`)}
+                  lengthUnit={product?.length_unit}
+                  widthUnit={product?.width_unit}
+                  weightUnit={product?.weight_unit}
                 />
               ))}
             </div>

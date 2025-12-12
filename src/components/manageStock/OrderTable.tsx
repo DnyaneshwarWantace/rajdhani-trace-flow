@@ -97,17 +97,27 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                       {formatIndianDate(order.expectedDelivery)}
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {(order.status === 'ordered' || order.status === 'pending') && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onStatusUpdate(order.id, 'approved')}
-                          className="text-xs"
-                        >
-                          Approve
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onStatusUpdate(order.id, 'approved')}
+                            className="text-xs"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onStatusUpdate(order.id, 'cancelled')}
+                            className="text-xs text-red-600 hover:bg-red-50 border-red-200"
+                          >
+                            Cancel
+                          </Button>
+                        </>
                       )}
                       {order.status === 'approved' && (
                         <Button

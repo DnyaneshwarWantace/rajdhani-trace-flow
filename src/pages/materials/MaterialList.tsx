@@ -140,7 +140,7 @@ export default function MaterialList() {
         // Only reload if page was hidden for more than 30 seconds (likely went to another app)
         const timeSinceLastVisit = Date.now() - lastVisitRef.current;
         if (timeSinceLastVisit > 30000) {
-          loadMaterials();
+    loadMaterials();
         }
       } else if (document.visibilityState === 'hidden') {
         lastVisitRef.current = Date.now();
@@ -879,7 +879,7 @@ export default function MaterialList() {
                               Type: {item.type} | Cost: ₹{item.costPerUnit} | Unit: {item.unit}
                             </div>
                           )}
-                        </div>
+                    </div>
                       ))}
                     </div>
                   </div>
