@@ -3,7 +3,6 @@ import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHe
 import { ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface MaterialCardProps {
   material: RawMaterial;

@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Package, Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle, Eye } from 'lucide-react';
+import { Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle, Eye } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/types/manageStock';
 
