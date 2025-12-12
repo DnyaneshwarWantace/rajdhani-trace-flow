@@ -87,21 +87,30 @@ export default function SupplierFormDialog({
     onFormDataChange({ ...formData, gst_number: gstValue });
   };
 
-  // Handler for address fields (max 100 words, max 20 chars per word)
+  // Handler for address fields with different limits based on field type
   const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
     let inputValue = value;
 
+    // Different limits for different fields
+    const limits = {
+      address: { maxWords: 100, maxCharsPerWord: 20 },
+      city: { maxWords: 3, maxCharsPerWord: 25 },
+      state: { maxWords: 3, maxCharsPerWord: 25 }
+    };
+
+    const { maxWords, maxCharsPerWord } = limits[field];
+
     // Split by spaces to get words (preserve all spaces)
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);
-    
-    // Limit to 100 words for address fields
-    if (words.length > 100) {
+
+    // Limit to max words
+    if (words.length > maxWords) {
       let wordCount = 0;
       let pos = inputValue.length;
       for (let i = 0; i < inputValue.length; i++) {
         if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
           wordCount++;
-          if (wordCount === 100) {
+          if (wordCount === maxWords) {
             let endPos = i;
             while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
               endPos++;
@@ -114,13 +123,13 @@ export default function SupplierFormDialog({
       inputValue = inputValue.substring(0, pos);
     }
 
-    // Limit each word to 20 characters (preserve spaces)
+    // Limit each word to max characters (preserve spaces)
     const parts = inputValue.split(/(\s+)/);
     const processedParts = parts.map(part => {
       if (/^\s+$/.test(part)) {
         return part;
       } else if (part.trim().length > 0) {
-        return part.length > 20 ? part.slice(0, 20) : part;
+        return part.length > maxCharsPerWord ? part.slice(0, maxCharsPerWord) : part;
       }
       return part;
     });
@@ -132,6 +141,15 @@ export default function SupplierFormDialog({
   const nameWordCount = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const contactWordCount = formData.contact_person?.trim() ? formData.contact_person.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const addressWordCount = formData.address?.trim() ? formData.address.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  const cityWordCount = formData.city?.trim() ? formData.city.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  const stateWordCount = formData.state?.trim() ? formData.state.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+
+  // Handler for pincode (max 10 digits)
+  const handlePincodeChange = (value: string) => {
+    // Only allow digits and limit to 10 characters
+    const numericValue = value.replace(/\D/g, '').slice(0, 10);
+    onFormDataChange({ ...formData, pincode: numericValue });
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -207,9 +225,10 @@ export default function SupplierFormDialog({
               <Input
                 value={formData.city || ''}
                 onChange={(e) => handleAddressChange(e.target.value, 'city')}
+                placeholder="e.g., Mumbai"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Max 100 words • Max 20 characters per word
+                {cityWordCount}/3 words • Max 25 characters per word
               </p>
             </div>
             <div>
@@ -217,17 +236,23 @@ export default function SupplierFormDialog({
               <Input
                 value={formData.state || ''}
                 onChange={(e) => handleAddressChange(e.target.value, 'state')}
+                placeholder="e.g., Maharashtra"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Max 100 words • Max 20 characters per word
+                {stateWordCount}/3 words • Max 25 characters per word
               </p>
             </div>
             <div>
               <Label>Pincode</Label>
               <Input
                 value={formData.pincode || ''}
-                onChange={(e) => onFormDataChange({ ...formData, pincode: e.target.value })}
+                onChange={(e) => handlePincodeChange(e.target.value)}
+                placeholder="e.g., 400001"
+                maxLength={10}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Max 10 digits
+              </p>
             </div>
           </div>
 

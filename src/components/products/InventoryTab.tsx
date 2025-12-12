@@ -24,6 +24,8 @@ interface InventoryTabProps {
   onStock: (product: Product) => void;
   onProduction: (product: Product) => void;
   onQRCode?: (product: Product) => void;
+  onDelete?: (product: Product) => void;
+  isAdmin?: boolean;
 }
 
 export default function InventoryTab({
@@ -45,6 +47,8 @@ export default function InventoryTab({
   onStock,
   onProduction,
   onQRCode,
+  onDelete,
+  isAdmin = false,
 }: InventoryTabProps) {
   return (
     <>
@@ -93,6 +97,8 @@ export default function InventoryTab({
                 onStock={onStock}
                 onProduction={onProduction}
                 onQRCode={onQRCode}
+                onDelete={onDelete}
+                isAdmin={isAdmin}
               />
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -37,6 +37,7 @@ import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import { canDelete } from '@/utils/permissions';
 
 type TabValue = 'inventory' | 'waste-recovery' | 'analytics' | 'notifications';
 
@@ -80,7 +81,8 @@ export default function MaterialList() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+  const [canDeleteMaterials, setCanDeleteMaterials] = useState(false);
+
   // Restock dialog states
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false);
   const [selectedRestockMaterial, setSelectedRestockMaterial] = useState<RawMaterial | null>(null);
@@ -94,6 +96,11 @@ export default function MaterialList() {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
+
+  // Check delete permission on mount
+  useEffect(() => {
+    setCanDeleteMaterials(canDelete('materials'));
+  }, []);
 
   // Load materials FIRST, then stats in background
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
@@ -737,6 +744,7 @@ export default function MaterialList() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onOrder={handleOrder}
+            canDelete={canDeleteMaterials}
           />
         )}
 
