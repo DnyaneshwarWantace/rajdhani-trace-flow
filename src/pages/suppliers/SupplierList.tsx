@@ -204,7 +204,7 @@ export default function SupplierList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Suppliers</h1>
               <p className="text-sm text-gray-600">Manage your supplier database</p>
             </div>
-            <Button onClick={handleCreate} className="w-full sm:w-auto">
+            <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Add Supplier
             </Button>

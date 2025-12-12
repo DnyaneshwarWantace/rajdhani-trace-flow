@@ -100,7 +100,7 @@ export default function SupplierDetail() {
               <ArrowLeft className="w-4 h-4" />
               Back to Suppliers
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={handleEdit} className="bg-primary-600 hover:bg-primary-700 text-white">
               <Edit className="w-4 h-4 mr-2" />
               Edit Supplier
             </Button>

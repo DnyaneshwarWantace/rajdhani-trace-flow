@@ -91,7 +91,14 @@ export default function CustomerList() {
       }
 
       if (data) {
-        setCustomers(data);
+        // Sort by created_at descending (newest first)
+        const sortedData = [...data].sort((a, b) => {
+          const dateA = new Date(a.created_at || 0).getTime();
+          const dateB = new Date(b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+
+        setCustomers(sortedData);
         setStats({
           total: data.length,
           active: data.filter((c) => c.status === 'active').length,
@@ -225,7 +232,7 @@ export default function CustomerList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Customers</h1>
               <p className="text-sm text-gray-600">Manage your customer database</p>
             </div>
-            <Button onClick={handleCreate} className="w-full sm:w-auto">
+            <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Add Customer
             </Button>

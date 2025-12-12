@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import type { Customer, CreateCustomerData } from '@/services/customerService';
+import { useState } from 'react';
+import { GSTApiService } from '@/services/gstApiService';
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -80,8 +82,11 @@ export default function CustomerFormDialog({
     onFormDataChange({ ...formData, [field]: inputValue });
   };
 
-  // Handler for GST number (exactly 15 chars, auto uppercase)
-  const handleGSTChange = (value: string) => {
+  // Handler for GST number (exactly 15 chars, auto uppercase, with autofill)
+  const [fetchingGST, setFetchingGST] = useState(false);
+  const [gstError, setGstError] = useState<string | null>(null);
+
+  const handleGSTChange = async (value: string) => {
     // Remove any non-alphanumeric characters
     let gstValue = value.replace(/[^a-zA-Z0-9]/g, '');
 
@@ -92,6 +97,36 @@ export default function CustomerFormDialog({
     gstValue = gstValue.slice(0, 15);
 
     onFormDataChange({ ...formData, gst_number: gstValue });
+    setGstError(null);
+
+    // Auto-fetch details when GST number is complete (15 characters)
+    if (gstValue.length === 15) {
+      setFetchingGST(true);
+      try {
+        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
+
+        if (error) {
+          setGstError(error);
+        } else if (data) {
+          // Auto-fill customer details from GST data
+          onFormDataChange({
+            ...formData,
+            gst_number: gstValue,
+            name: data.name || formData.name,
+            company_name: data.companyName || formData.company_name,
+            address: data.address || formData.address,
+            city: data.city || formData.city,
+            state: data.state || formData.state,
+            pincode: data.pincode || formData.pincode,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching GST details:', error);
+        setGstError('Failed to fetch GST details');
+      } finally {
+        setFetchingGST(false);
+      }
+    }
   };
 
   // Handler for address fields with different limits based on field type
@@ -151,11 +186,36 @@ export default function CustomerFormDialog({
   const cityWordCount = formData.city?.trim() ? formData.city.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const stateWordCount = formData.state?.trim() ? formData.state.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
 
-  // Handler for pincode (max 10 digits)
-  const handlePincodeChange = (value: string) => {
+  // Handler for pincode (max 10 digits) with auto-fill
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  const handlePincodeChange = async (value: string) => {
     // Only allow digits and limit to 10 characters
     const numericValue = value.replace(/\D/g, '').slice(0, 10);
     onFormDataChange({ ...formData, pincode: numericValue });
+
+    // Auto-fetch city and state when pincode is 6 digits (Indian pincode format)
+    if (numericValue.length === 6) {
+      setFetchingLocation(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
+        const data = await response.json();
+
+        if (data && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+          const postOffice = data[0].PostOffice[0];
+          onFormDataChange({
+            ...formData,
+            pincode: numericValue,
+            city: postOffice.District || formData.city,
+            state: postOffice.State || formData.state,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching location from pincode:', error);
+      } finally {
+        setFetchingLocation(false);
+      }
+    }
   };
 
   return (
@@ -220,16 +280,31 @@ export default function CustomerFormDialog({
             </div>
             <div>
               <Label>GST Number</Label>
-              <Input
-                value={formData.gst_number}
-                onChange={(e) => handleGSTChange(e.target.value)}
-                maxLength={15}
-                placeholder="27AAPFU0939F1ZV"
-                className="uppercase"
-              />
-              {formData.gst_number && formData.gst_number.length !== 15 && (
+              <div className="relative">
+                <Input
+                  value={formData.gst_number}
+                  onChange={(e) => handleGSTChange(e.target.value)}
+                  maxLength={15}
+                  placeholder="27AAPFU0939F1ZV"
+                  className="uppercase"
+                />
+                {fetchingGST && (
+                  <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                )}
+              </div>
+              {formData.gst_number && formData.gst_number.length !== 15 && !gstError && (
                 <p className="text-xs text-red-500 mt-1">
                   GST must be exactly 15 characters ({formData.gst_number.length}/15)
+                </p>
+              )}
+              {gstError && (
+                <p className="text-xs text-amber-600 mt-1">
+                  {gstError}
+                </p>
+              )}
+              {formData.gst_number && formData.gst_number.length === 15 && !gstError && !fetchingGST && (
+                <p className="text-xs text-green-600 mt-1">
+                  ✓ Auto-filled from GST
                 </p>
               )}
             </div>
@@ -273,14 +348,19 @@ export default function CustomerFormDialog({
             </div>
             <div>
               <Label>Pincode</Label>
-              <Input
-                value={formData.pincode || ''}
-                onChange={(e) => handlePincodeChange(e.target.value)}
-                placeholder="e.g., 400001"
-                maxLength={10}
-              />
+              <div className="relative">
+                <Input
+                  value={formData.pincode || ''}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  placeholder="e.g., 400001"
+                  maxLength={10}
+                />
+                {fetchingLocation && (
+                  <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Max 10 digits
+                Max 10 digits • Auto-fills city & state
               </p>
             </div>
           </div>
@@ -314,7 +394,7 @@ export default function CustomerFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting} className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white">
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {selectedCustomer ? 'Update' : 'Create'}
             </Button>
