@@ -14,8 +14,6 @@ interface CustomerFiltersProps {
   onSearchChange: (value: string) => void;
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
-  statusFilter: string;
-  onStatusFilterChange: (value: string) => void;
 }
 
 export default function CustomerFilters({
@@ -23,8 +21,6 @@ export default function CustomerFilters({
   onSearchChange,
   typeFilter,
   onTypeFilterChange,
-  statusFilter,
-  onStatusFilterChange,
 }: CustomerFiltersProps) {
   return (
     <Card className="mb-6">
@@ -48,19 +44,6 @@ export default function CustomerFilters({
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="individual">Individual</SelectItem>
                 <SelectItem value="business">Business</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full lg:w-40">
-            <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
           </div>

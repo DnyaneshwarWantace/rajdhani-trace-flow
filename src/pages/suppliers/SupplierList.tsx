@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
 import { SupplierService, type Supplier, type CreateSupplierData } from '@/services/supplierService';
 import { ManageStockService, type StockOrder } from '@/services/manageStockService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import SupplierStatsBoxes from '@/components/suppliers/SupplierStatsBoxes';
 import SupplierFilters from '@/components/suppliers/SupplierFilters';
+import SupplierTable from '@/components/suppliers/SupplierTable';
 import SupplierGrid from '@/components/suppliers/SupplierGrid';
+import SupplierDetailModal from '@/components/suppliers/SupplierDetailModal';
 import SupplierEmptyState from '@/components/suppliers/SupplierEmptyState';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 import SupplierDeleteDialog from '@/components/suppliers/SupplierDeleteDialog';
@@ -21,8 +23,10 @@ export default function SupplierList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -126,6 +130,11 @@ export default function SupplierList() {
     setIsDialogOpen(true);
   };
 
+  const handleView = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setIsDetailModalOpen(true);
+  };
+
   const handleDelete = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
     setIsDeleteDialogOpen(true);
@@ -135,6 +144,12 @@ export default function SupplierList() {
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
       toast({ title: 'Validation Error', description: 'Please fill in required field: Name', variant: 'destructive' });
+      return;
+    }
+
+    // Validate GST number if provided
+    if (formData.gst_number && formData.gst_number.trim().length > 0 && formData.gst_number.length !== 15) {
+      toast({ title: 'Validation Error', description: 'GST number must be exactly 15 characters', variant: 'destructive' });
       return;
     }
 
@@ -204,10 +219,31 @@ export default function SupplierList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Suppliers</h1>
               <p className="text-sm text-gray-600">Manage your supplier database</p>
             </div>
-            <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Supplier
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View Toggle - Hidden on mobile/tablet */}
+              <div className="hidden lg:flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className={viewMode === 'table' ? 'bg-primary-600 text-white' : ''}
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className={viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Supplier
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -231,6 +267,14 @@ export default function SupplierList() {
           </div>
         ) : suppliers.length === 0 ? (
           <SupplierEmptyState onCreate={handleCreate} />
+        ) : viewMode === 'table' ? (
+          <SupplierTable
+            suppliers={suppliers}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            canDelete={user?.role === 'admin' || false}
+          />
         ) : (
           <SupplierGrid
             suppliers={suppliers}
@@ -240,6 +284,12 @@ export default function SupplierList() {
             canDelete={user?.role === 'admin' || false}
           />
         )}
+
+        <SupplierDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          supplier={selectedSupplier}
+        />
 
         <SupplierFormDialog
           isOpen={isDialogOpen}

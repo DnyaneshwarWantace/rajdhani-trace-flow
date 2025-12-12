@@ -20,7 +20,16 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   useEffect(() => {
     if (isOpen) {
       loadNotifications();
+      // Prevent body scroll when dropdown is open
+      document.body.classList.add('modal-open');
+    } else {
+      // Restore body scroll when dropdown is closed
+      document.body.classList.remove('modal-open');
     }
+
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
   }, [isOpen]);
 
   // Close dropdown when clicking outside
@@ -115,10 +124,19 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
   if (!isOpen) return null;
 
   return (
-    <div
-      ref={dropdownRef}
-      className="fixed sm:absolute right-2 sm:right-0 top-16 sm:top-full sm:mt-2 w-[calc(100vw-1rem)] sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[calc(100vh-5rem)] sm:max-h-[600px] flex flex-col"
-    >
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/20 z-[9998]"
+        onClick={onClose}
+      />
+
+      {/* Dropdown */}
+      <div
+        ref={dropdownRef}
+        className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] max-h-[calc(100vh-5rem)] sm:max-h-[600px] flex flex-col"
+        style={{ position: 'absolute' }}
+      >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <div className="flex items-center gap-2">
@@ -188,7 +206,8 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
           </button>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

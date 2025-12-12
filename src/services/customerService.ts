@@ -5,7 +5,7 @@ const API_URL = getApiUrl();
 export interface Customer {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   address?: string;
   city?: string;
@@ -28,9 +28,16 @@ export interface Customer {
   updated_at: string;
 }
 
+export interface AddressData {
+  address: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
 export interface CreateCustomerData {
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   address?: string;
   city?: string;
@@ -43,6 +50,10 @@ export interface CreateCustomerData {
   delivery_address?: string; // JSON string
   credit_limit?: string;
   notes?: string;
+  // For form handling
+  permanentAddress?: AddressData;
+  deliveryAddress?: AddressData;
+  sameAsPermanent?: boolean;
 }
 
 export interface UpdateCustomerData extends Partial<CreateCustomerData> {

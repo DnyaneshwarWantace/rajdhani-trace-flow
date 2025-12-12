@@ -13,6 +13,8 @@ import { Loader2 } from 'lucide-react';
 import type { Supplier, CreateSupplierData } from '@/services/supplierService';
 import { useState } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 interface SupplierFormDialogProps {
   isOpen: boolean;
@@ -133,6 +135,12 @@ export default function SupplierFormDialog({
   // Handler for address fields with different limits based on field type
   const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
     let inputValue = value;
+
+    // For city and state, reject numbers
+    if (field === 'city' || field === 'state') {
+      // Remove any digits from city and state
+      inputValue = inputValue.replace(/\d/g, '');
+    }
 
     // Different limits for different fields
     const limits = {
@@ -265,10 +273,15 @@ export default function SupplierFormDialog({
             </div>
             <div>
               <Label>Phone</Label>
-              <Input
+              <PhoneInput
+                defaultCountry="in"
                 value={formData.phone}
-                onChange={(e) => onFormDataChange({ ...formData, phone: e.target.value })}
+                onChange={(value) => onFormDataChange({ ...formData, phone: value })}
+                placeholder="Enter phone number"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Select country and enter number
+              </p>
             </div>
           </div>
 

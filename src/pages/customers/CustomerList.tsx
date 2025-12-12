@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
 import { CustomerService, type Customer, type CreateCustomerData } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import CustomerStatsBoxes from '@/components/customers/CustomerStatsBoxes';
 import CustomerFilters from '@/components/customers/CustomerFilters';
+import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerGrid from '@/components/customers/CustomerGrid';
+import CustomerDetailModal from '@/components/customers/CustomerDetailModal';
 import CustomerEmptyState from '@/components/customers/CustomerEmptyState';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';
@@ -22,9 +24,10 @@ export default function CustomerList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -43,19 +46,32 @@ export default function CustomerList() {
     gst_number: '',
     credit_limit: '0.00',
     notes: '',
+    permanentAddress: {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    },
+    deliveryAddress: {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    },
+    sameAsPermanent: true,
   });
 
   const [stats, setStats] = useState({
     total: 0,
-    active: 0,
     business: 0,
+    individual: 0,
     totalRevenue: 0,
   });
 
   useEffect(() => {
     loadCustomers();
     loadOrders();
-  }, [searchTerm, typeFilter, statusFilter]);
+  }, [searchTerm, typeFilter]);
 
   const loadOrders = async () => {
     try {
@@ -81,7 +97,6 @@ export default function CustomerList() {
       setLoading(true);
       const { data, error } = await CustomerService.getCustomers({
         search: searchTerm,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
         customer_type: typeFilter !== 'all' ? typeFilter : undefined,
       });
 
@@ -99,11 +114,26 @@ export default function CustomerList() {
         });
 
         setCustomers(sortedData);
+
+        // Calculate total revenue from orders
+        const totalRevenue = orders.reduce((sum, order) => {
+          // Check if order belongs to any customer in the list
+          const hasCustomer = data.some(c =>
+            (order.customer_id && order.customer_id === c.id) ||
+            (!order.customer_id && c.name && order.customer?.toLowerCase().trim() === c.name.toLowerCase().trim())
+          );
+
+          if (hasCustomer && order.totalPrice) {
+            return sum + parseFloat(order.totalPrice.toString());
+          }
+          return sum;
+        }, 0);
+
         setStats({
           total: data.length,
-          active: data.filter((c) => c.status === 'active').length,
           business: data.filter((c) => c.customer_type === 'business').length,
-          totalRevenue: data.reduce((sum, c) => sum + parseFloat(c.total_value || '0'), 0),
+          individual: data.filter((c) => c.customer_type === 'individual').length,
+          totalRevenue: totalRevenue,
         });
       }
     } catch (error) {
@@ -126,8 +156,20 @@ export default function CustomerList() {
       customer_type: 'individual',
       company_name: '',
       gst_number: '',
-      credit_limit: '0.00',
       notes: '',
+      permanentAddress: {
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+      },
+      deliveryAddress: {
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+      },
+      sameAsPermanent: true,
     });
     setSelectedCustomer(null);
     setIsDialogOpen(true);
@@ -135,6 +177,43 @@ export default function CustomerList() {
 
   const handleEdit = (customer: Customer) => {
     setSelectedCustomer(customer);
+
+    // Parse JSON address fields if they exist
+    let permanentAddr = { address: '', city: '', state: '', pincode: '' };
+    let deliveryAddr = { address: '', city: '', state: '', pincode: '' };
+
+    if (customer.permanent_address) {
+      try {
+        permanentAddr = JSON.parse(customer.permanent_address);
+      } catch (e) {
+        // Fallback to old fields
+        permanentAddr = {
+          address: customer.address || '',
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+        };
+      }
+    } else {
+      // Use old fields as permanent address
+      permanentAddr = {
+        address: customer.address || '',
+        city: customer.city || '',
+        state: customer.state || '',
+        pincode: customer.pincode || '',
+      };
+    }
+
+    if (customer.delivery_address) {
+      try {
+        deliveryAddr = JSON.parse(customer.delivery_address);
+      } catch (e) {
+        deliveryAddr = permanentAddr;
+      }
+    } else {
+      deliveryAddr = permanentAddr;
+    }
+
     setFormData({
       name: customer.name,
       email: customer.email,
@@ -146,10 +225,17 @@ export default function CustomerList() {
       customer_type: customer.customer_type,
       company_name: customer.company_name || '',
       gst_number: customer.gst_number || '',
-      credit_limit: customer.credit_limit || '0.00',
       notes: customer.notes || '',
+      permanentAddress: permanentAddr,
+      deliveryAddress: deliveryAddr,
+      sameAsPermanent: JSON.stringify(permanentAddr) === JSON.stringify(deliveryAddr),
     });
     setIsDialogOpen(true);
+  };
+
+  const handleView = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsDetailModalOpen(true);
   };
 
   const handleDelete = (customer: Customer) => {
@@ -161,15 +247,39 @@ export default function CustomerList() {
 
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
-      toast({ title: 'Validation Error', description: 'Please fill in required fields', variant: 'destructive' });
+    if (!formData.name.trim() || !formData.phone.trim()) {
+      toast({ title: 'Validation Error', description: 'Please fill in required fields (Name and Phone)', variant: 'destructive' });
+      return;
+    }
+
+    // Validate GST number if provided
+    if (formData.gst_number && formData.gst_number.trim().length > 0 && formData.gst_number.length !== 15) {
+      toast({ title: 'Validation Error', description: 'GST number must be exactly 15 characters', variant: 'destructive' });
       return;
     }
 
     try {
       setSubmitting(true);
+
+      // Prepare data with serialized addresses
+      const submitData = {
+        ...formData,
+        permanent_address: formData.permanentAddress ? JSON.stringify(formData.permanentAddress) : undefined,
+        delivery_address: formData.deliveryAddress ? JSON.stringify(formData.deliveryAddress) : undefined,
+        // Backward compatibility - keep old fields
+        address: formData.permanentAddress?.address || formData.address,
+        city: formData.permanentAddress?.city || formData.city,
+        state: formData.permanentAddress?.state || formData.state,
+        pincode: formData.permanentAddress?.pincode || formData.pincode,
+      };
+
+      // Remove form-only fields
+      delete submitData.permanentAddress;
+      delete submitData.deliveryAddress;
+      delete submitData.sameAsPermanent;
+
       if (selectedCustomer) {
-        const { data, error } = await CustomerService.updateCustomer(selectedCustomer.id, formData);
+        const { data, error} = await CustomerService.updateCustomer(selectedCustomer.id, submitData);
         if (error) {
           toast({ title: 'Error', description: error, variant: 'destructive' });
           return;
@@ -180,7 +290,7 @@ export default function CustomerList() {
           loadCustomers();
         }
       } else {
-        const { data, error } = await CustomerService.createCustomer(formData);
+        const { data, error } = await CustomerService.createCustomer(submitData);
         if (error) {
           toast({ title: 'Error', description: error, variant: 'destructive' });
           return;
@@ -232,17 +342,38 @@ export default function CustomerList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Customers</h1>
               <p className="text-sm text-gray-600">Manage your customer database</p>
             </div>
-            <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Customer
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View Toggle - Hidden on mobile/tablet */}
+              <div className="hidden lg:flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className={viewMode === 'table' ? 'bg-primary-600 text-white' : ''}
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className={viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Customer
+              </Button>
+            </div>
           </div>
         </div>
 
         <CustomerStatsBoxes
           total={stats.total}
-          active={stats.active}
           business={stats.business}
+          individual={stats.individual}
           totalRevenue={stats.totalRevenue}
         />
 
@@ -251,8 +382,6 @@ export default function CustomerList() {
           onSearchChange={setSearchTerm}
           typeFilter={typeFilter}
           onTypeFilterChange={setTypeFilter}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
         />
 
         {loading ? (
@@ -261,6 +390,14 @@ export default function CustomerList() {
           </div>
         ) : customers.length === 0 ? (
           <CustomerEmptyState onCreate={handleCreate} />
+        ) : viewMode === 'table' ? (
+          <CustomerTable
+            customers={customers}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            canDelete={user?.role === 'admin' || false}
+          />
         ) : (
           <CustomerGrid
             customers={customers}
@@ -270,6 +407,12 @@ export default function CustomerList() {
             canDelete={user?.role === 'admin' || false}
           />
         )}
+
+        <CustomerDetailModal
+          isOpen={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          customer={selectedCustomer}
+        />
 
         <CustomerFormDialog
           isOpen={isDialogOpen}

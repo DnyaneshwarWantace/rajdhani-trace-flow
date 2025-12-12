@@ -20,6 +20,8 @@ import { Loader2 } from 'lucide-react';
 import type { Customer, CreateCustomerData } from '@/services/customerService';
 import { useState } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -132,6 +134,12 @@ export default function CustomerFormDialog({
   // Handler for address fields with different limits based on field type
   const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
     let inputValue = value;
+
+    // For city and state, reject numbers
+    if (field === 'city' || field === 'state') {
+      // Remove any digits from city and state
+      inputValue = inputValue.replace(/\d/g, '');
+    }
 
     // Different limits for different fields
     const limits = {
@@ -259,12 +267,11 @@ export default function CustomerFormDialog({
               </p>
             </div>
             <div>
-              <Label>Email *</Label>
+              <Label>Email</Label>
               <Input
                 type="email"
                 value={formData.email}
                 onChange={(e) => onFormDataChange({ ...formData, email: e.target.value })}
-                required
               />
             </div>
           </div>
@@ -272,11 +279,15 @@ export default function CustomerFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Phone *</Label>
-              <Input
+              <PhoneInput
+                defaultCountry="in"
                 value={formData.phone}
-                onChange={(e) => onFormDataChange({ ...formData, phone: e.target.value })}
-                required
+                onChange={(value) => onFormDataChange({ ...formData, phone: value })}
+                placeholder="Enter phone number"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Select country and enter number
+              </p>
             </div>
             <div>
               <Label>GST Number</Label>
@@ -323,70 +334,253 @@ export default function CustomerFormDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* Permanent Address */}
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Permanent Address</h3>
+
             <div>
-              <Label>City</Label>
+              <Label>Address</Label>
               <Input
-                value={formData.city || ''}
-                onChange={(e) => handleAddressChange(e.target.value, 'city')}
-                placeholder="e.g., Mumbai"
+                value={formData.permanentAddress?.address || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  handleAddressChange(value, 'address');
+                  onFormDataChange({
+                    ...formData,
+                    permanentAddress: { ...formData.permanentAddress!, address: value }
+                  });
+                }}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {cityWordCount}/3 words • Max 25 characters per word
+                Max 100 words • Max 20 characters per word
               </p>
             </div>
-            <div>
-              <Label>State</Label>
-              <Input
-                value={formData.state || ''}
-                onChange={(e) => handleAddressChange(e.target.value, 'state')}
-                placeholder="e.g., Maharashtra"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                {stateWordCount}/3 words • Max 25 characters per word
-              </p>
-            </div>
-            <div>
-              <Label>Pincode</Label>
-              <div className="relative">
+
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              <div>
+                <Label>City</Label>
                 <Input
-                  value={formData.pincode || ''}
-                  onChange={(e) => handlePincodeChange(e.target.value)}
-                  placeholder="e.g., 400001"
-                  maxLength={10}
+                  value={formData.permanentAddress?.city || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleAddressChange(value, 'city');
+                    onFormDataChange({
+                      ...formData,
+                      permanentAddress: { ...formData.permanentAddress!, city: value }
+                    });
+                  }}
+                  placeholder="e.g., Mumbai"
                 />
-                {fetchingLocation && (
-                  <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max 3 words • Max 25 characters per word
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Max 10 digits • Auto-fills city & state
-              </p>
+              <div>
+                <Label>State</Label>
+                <Input
+                  value={formData.permanentAddress?.state || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleAddressChange(value, 'state');
+                    onFormDataChange({
+                      ...formData,
+                      permanentAddress: { ...formData.permanentAddress!, state: value }
+                    });
+                  }}
+                  placeholder="e.g., Maharashtra"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max 3 words • Max 25 characters per word
+                </p>
+              </div>
+              <div>
+                <Label>Pincode</Label>
+                <div className="relative">
+                  <Input
+                    value={formData.permanentAddress?.pincode || ''}
+                    onChange={async (e) => {
+                      const numericValue = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      onFormDataChange({
+                        ...formData,
+                        permanentAddress: { ...formData.permanentAddress!, pincode: numericValue }
+                      });
+
+                      if (numericValue.length === 6) {
+                        setFetchingLocation(true);
+                        try {
+                          const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
+                          const data = await response.json();
+                          if (data && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+                            const postOffice = data[0].PostOffice[0];
+                            onFormDataChange({
+                              ...formData,
+                              permanentAddress: {
+                                ...formData.permanentAddress!,
+                                pincode: numericValue,
+                                city: postOffice.District || formData.permanentAddress?.city || '',
+                                state: postOffice.State || formData.permanentAddress?.state || '',
+                              }
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Error fetching location:', error);
+                        } finally {
+                          setFetchingLocation(false);
+                        }
+                      }
+                    }}
+                    placeholder="e.g., 400001"
+                    maxLength={10}
+                  />
+                  {fetchingLocation && (
+                    <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max 10 digits • Auto-fills city & state
+                </p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <Label>Address</Label>
-            <Input
-              value={formData.address || ''}
-              onChange={(e) => handleAddressChange(e.target.value, 'address')}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              {addressWordCount}/100 words • Max 20 characters per word
-            </p>
+          {/* Delivery Address */}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Delivery Address</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.sameAsPermanent}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    onFormDataChange({
+                      ...formData,
+                      sameAsPermanent: checked,
+                      deliveryAddress: checked ? formData.permanentAddress : formData.deliveryAddress
+                    });
+                  }}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm text-gray-600">Same as Permanent</span>
+              </label>
+            </div>
+
+            {!formData.sameAsPermanent && (
+              <>
+                <div>
+                  <Label>Address</Label>
+                  <Input
+                    value={formData.deliveryAddress?.address || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleAddressChange(value, 'address');
+                      onFormDataChange({
+                        ...formData,
+                        deliveryAddress: { ...formData.deliveryAddress!, address: value }
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Max 100 words • Max 20 characters per word
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <Label>City</Label>
+                    <Input
+                      value={formData.deliveryAddress?.city || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleAddressChange(value, 'city');
+                        onFormDataChange({
+                          ...formData,
+                          deliveryAddress: { ...formData.deliveryAddress!, city: value }
+                        });
+                      }}
+                      placeholder="e.g., Mumbai"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Max 3 words • Max 25 characters per word
+                    </p>
+                  </div>
+                  <div>
+                    <Label>State</Label>
+                    <Input
+                      value={formData.deliveryAddress?.state || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleAddressChange(value, 'state');
+                        onFormDataChange({
+                          ...formData,
+                          deliveryAddress: { ...formData.deliveryAddress!, state: value }
+                        });
+                      }}
+                      placeholder="e.g., Maharashtra"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Max 3 words • Max 25 characters per word
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Pincode</Label>
+                    <div className="relative">
+                      <Input
+                        value={formData.deliveryAddress?.pincode || ''}
+                        onChange={async (e) => {
+                          const numericValue = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          onFormDataChange({
+                            ...formData,
+                            deliveryAddress: { ...formData.deliveryAddress!, pincode: numericValue }
+                          });
+
+                          if (numericValue.length === 6) {
+                            setFetchingLocation(true);
+                            try {
+                              const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
+                              const data = await response.json();
+                              if (data && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+                                const postOffice = data[0].PostOffice[0];
+                                onFormDataChange({
+                                  ...formData,
+                                  deliveryAddress: {
+                                    ...formData.deliveryAddress!,
+                                    pincode: numericValue,
+                                    city: postOffice.District || formData.deliveryAddress?.city || '',
+                                    state: postOffice.State || formData.deliveryAddress?.state || '',
+                                  }
+                                });
+                              }
+                            } catch (error) {
+                              console.error('Error fetching location:', error);
+                            } finally {
+                              setFetchingLocation(false);
+                            }
+                          }
+                        }}
+                        placeholder="e.g., 400001"
+                        maxLength={10}
+                      />
+                      {fetchingLocation && (
+                        <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Max 10 digits • Auto-fills city & state
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          <div>
-            <Label>Credit Limit (₹)</Label>
+          {/* Notes */}
+          <div className="mt-4">
+            <Label>Notes</Label>
             <Input
-              type="text"
-              value={formData.credit_limit}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                  onFormDataChange({ ...formData, credit_limit: v });
-                }
-              }}
+              value={formData.notes || ''}
+              onChange={(e) => onFormDataChange({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes..."
             />
           </div>
 
