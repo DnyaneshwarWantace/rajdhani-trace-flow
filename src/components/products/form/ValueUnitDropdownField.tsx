@@ -74,16 +74,6 @@ export default function ValueUnitDropdownField({
   const displayValue = value !== null && value !== undefined && value !== '' ? String(value) : '';
   const currentCombinedValue = displayValue && unit ? `${displayValue} ${unit}`.trim() : '';
 
-  // Debug logging
-  console.log(`🔍 ${label} Field State:`, {
-    receivedValue: value,
-    receivedUnit: unit,
-    displayValue,
-    currentCombinedValue,
-    combinedValuesCount: combinedValues.length,
-    combinedValuesPreview: combinedValues.slice(0, 3)
-  });
-
   // Filter combined values based on search
   const filteredValues = combinedValues.filter((val) =>
     val.toLowerCase().includes(searchTerm.toLowerCase())
@@ -93,7 +83,6 @@ export default function ValueUnitDropdownField({
   const handleSelectChange = (selectedValue: string) => {
     // Don't process empty string selections - this happens when value is not in dropdown
     if (!selectedValue || selectedValue === '') {
-      console.log('🔍 Ignoring empty selection');
       return;
     }
 
@@ -111,7 +100,6 @@ export default function ValueUnitDropdownField({
       setSearchTerm('');
     } else {
       const parsed = parseValueWithUnit(selectedValue);
-      console.log('🔍 ValueUnitDropdownField - Parsed:', { selectedValue, parsed });
       // Use combined change callback if available (better for React state updates)
       if (onCombinedChange) {
         onCombinedChange(parsed.value || '', parsed.unit || '');
@@ -423,13 +411,6 @@ export default function ValueUnitDropdownField({
 
   // Always use empty string instead of undefined to keep it controlled
   const selectValue = valueExistsInDropdown && exactMatch ? exactMatch : '';
-
-  console.log(`🔍 ${label} Dropdown Match:`, {
-    currentCombinedValue,
-    valueExistsInDropdown,
-    exactMatch,
-    selectValue
-  });
 
   return (
     <div>

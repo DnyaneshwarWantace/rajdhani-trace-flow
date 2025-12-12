@@ -11,6 +11,14 @@ body {
   max-width: 100%;
 }
 
+/* Prevent background scroll when modal is open */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
 #root {
   background-color: #f9fafb; /* gray-50 */
   min-height: 100vh;
@@ -48,30 +56,29 @@ button[class*="bg-primary-700"],
   color: white !important;
 }
 
-/* Thin, styled scrollbars that look good - visible on hover or when scrolling */
+/* Thin, styled scrollbars - optimized for Safari and all browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #E0ECFB;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #C0D9F7;
+}
+
+/* Firefox */
 * {
-  scrollbar-width: thin; /* Firefox - thin scrollbar */
-  scrollbar-color: rgba(156, 163, 175, 0.3) transparent; /* Firefox - gray thumb, transparent track */
-  -ms-overflow-style: -ms-autohiding-scrollbar; /* IE and Edge - auto-hide */
-}
-
-*::-webkit-scrollbar {
-  width: 6px; /* Thin scrollbar width */
-  height: 6px; /* Thin scrollbar height */
-}
-
-*::-webkit-scrollbar-track {
-  background: transparent; /* Transparent track */
-}
-
-*::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.3); /* Light gray thumb */
-  border-radius: 3px; /* Rounded corners */
-  transition: background-color 0.2s ease;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.5); /* Darker on hover */
+  scrollbar-width: thin;
+  scrollbar-color: #E0ECFB transparent;
 }
 
 /* Hide scrollbars for small elements (like dropdowns) to keep them clean */

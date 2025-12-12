@@ -773,20 +773,22 @@ export default function MaterialList() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Delete Material</DialogTitle>
-            <DialogDescription className="break-words">
-              Are you sure you want to delete "
-              {materialToDelete?.name ? (
-                <TruncatedText text={materialToDelete.name} maxLength={50} as="span" className="font-semibold" />
-              ) : (
-                'this material'
-              )}
-              "? This action cannot be undone.
-            </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <div className="text-sm text-muted-foreground break-words overflow-hidden">
+            Are you sure you want to delete{' '}
+            <span className="font-semibold text-gray-900 break-all">
+              {materialToDelete?.name ? (
+                <TruncatedText text={`"${materialToDelete.name}"`} maxLength={50} as="span" />
+              ) : (
+                '"this material"'
+              )}
+            </span>
+            ? This action cannot be undone.
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -798,9 +800,9 @@ export default function MaterialList() {
               Cancel
             </Button>
             <Button
-              variant="destructive"
               onClick={handleConfirmDelete}
               disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
               {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>

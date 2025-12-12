@@ -49,7 +49,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     subcategory: '',
     color: '',
     pattern: '',
-    base_quantity: 0, // Will be converted to empty string for display
+    base_quantity: '' as any, // Start empty, will be converted to 0 on submit
     unit: '',
     individual_stock_tracking: true, // DEFAULT: YES - track individual pieces with QR codes
     length: '',
@@ -119,7 +119,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           subcategory: product.subcategory || '',
           color: product.color || '',
           pattern: product.pattern || '',
-          base_quantity: mode === 'duplicate' ? 0 : (product.base_quantity || 0),
+          base_quantity: mode === 'duplicate' ? '' as any : (product.base_quantity || 0),
           unit: product.unit,
           individual_stock_tracking: product.individual_stock_tracking,
           length: product.length !== null && product.length !== undefined && product.length !== '' ? String(product.length) : '',
@@ -177,7 +177,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       subcategory: '',
       color: '',
       pattern: '',
-      base_quantity: 0,
+      base_quantity: '' as any,
       unit: '',
       individual_stock_tracking: true, // DEFAULT: YES
       length: '',
@@ -335,9 +335,23 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         missingFields.push('Weight');
       }
       
-      // base_quantity can be 0, so we only check if it's a valid number (not negative)
-      if (formData.base_quantity < 0 || isNaN(formData.base_quantity)) {
-        missingFields.push('Base Quantity (must be >= 0)');
+      // base_quantity is required for create and duplicate, check if it's a valid number (not negative)
+      if (mode === 'create' || mode === 'duplicate') {
+        const quantityValue = formData.base_quantity as any;
+        if (quantityValue === '' || quantityValue === null || quantityValue === undefined || (typeof quantityValue === 'string' && quantityValue.trim() === '')) {
+          missingFields.push('Base Quantity');
+        } else {
+          const quantity = Number(quantityValue);
+          if (quantity < 0 || isNaN(quantity)) {
+            missingFields.push('Base Quantity (must be >= 0)');
+          }
+        }
+      } else {
+        // For edit mode, allow empty but validate if provided
+        const quantity = (formData.base_quantity === null || formData.base_quantity === undefined || isNaN(Number(formData.base_quantity))) ? 0 : Number(formData.base_quantity);
+        if (quantity < 0 || isNaN(quantity)) {
+          missingFields.push('Base Quantity (must be >= 0)');
+        }
       }
 
       if (missingFields.length > 0) {
@@ -383,7 +397,11 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         imageUrl = product.image_url;
       }
 
-      const finalFormData = { ...formData, image_url: imageUrl };
+      const finalFormData = {
+        ...formData,
+        image_url: imageUrl,
+        base_quantity: Number(formData.base_quantity) || 0
+      };
 
       let createdProduct;
       if (mode === 'edit' && product) {
@@ -537,13 +555,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   // Lock body scroll when dialog is open
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.classList.add('modal-open');
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.classList.remove('modal-open');
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.classList.remove('modal-open');
     };
   }, [isOpen]);
 

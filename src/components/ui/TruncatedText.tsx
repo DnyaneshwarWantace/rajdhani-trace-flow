@@ -44,7 +44,7 @@ export function TruncatedText({
 
   if (!displayTooltip) {
     return (
-      <Component className={cn('block', className)}>
+      <Component className={cn('inline', className)}>
         {truncatedText}
       </Component>
     );
@@ -56,8 +56,7 @@ export function TruncatedText({
         <TooltipTrigger asChild>
           <Component
             className={cn(
-              'block cursor-help',
-              shouldTruncate && 'truncate',
+              'inline cursor-help',
               className
             )}
           >

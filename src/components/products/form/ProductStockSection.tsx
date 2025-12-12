@@ -45,12 +45,12 @@ export default function ProductStockSection({
             <Input
               id="quantity"
               type="number"
-              value={formData.base_quantity === 0 && formData.base_quantity !== undefined ? '' : (formData.base_quantity ?? '')}
+              value={formData.base_quantity ?? ''}
               onChange={(e) => {
                 const value = e.target.value;
                 // Allow empty string, 0, or any positive number
                 if (value === '') {
-                  onFormDataChange({ base_quantity: 0 });
+                  onFormDataChange({ base_quantity: '' as any });
                 } else {
                   const numValue = Number(value);
                   if (!isNaN(numValue) && numValue >= 0) {
@@ -122,4 +122,3 @@ export default function ProductStockSection({
     </>
   );
 }
-
