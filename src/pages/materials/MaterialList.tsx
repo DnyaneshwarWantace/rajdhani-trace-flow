@@ -14,7 +14,6 @@ import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
