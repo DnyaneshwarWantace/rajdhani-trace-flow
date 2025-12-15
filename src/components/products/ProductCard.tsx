@@ -121,6 +121,22 @@ export default function ProductCard({
             <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.category}</span>
           </div>
 
+          {/* Color - Only show if available and not N/A */}
+          {product.color && product.color.trim() !== '' && product.color.toLowerCase() !== 'n/a' && (
+            <div className="flex items-center justify-between text-[10px] gap-1">
+              <span className="text-gray-500 flex-shrink-0">Color</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.color}</span>
+            </div>
+          )}
+
+          {/* Pattern - Only show if available and not N/A */}
+          {product.pattern && product.pattern.trim() !== '' && product.pattern.toLowerCase() !== 'n/a' && (
+            <div className="flex items-center justify-between text-[10px] gap-1">
+              <span className="text-gray-500 flex-shrink-0">Pattern</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.pattern}</span>
+            </div>
+          )}
+
           {/* Stock */}
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-gray-500">Stock</span>

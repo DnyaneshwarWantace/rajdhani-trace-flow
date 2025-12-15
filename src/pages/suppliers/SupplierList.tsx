@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
@@ -10,12 +11,12 @@ import SupplierStatsBoxes from '@/components/suppliers/SupplierStatsBoxes';
 import SupplierFilters from '@/components/suppliers/SupplierFilters';
 import SupplierTable from '@/components/suppliers/SupplierTable';
 import SupplierGrid from '@/components/suppliers/SupplierGrid';
-import SupplierDetailModal from '@/components/suppliers/SupplierDetailModal';
 import SupplierEmptyState from '@/components/suppliers/SupplierEmptyState';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 import SupplierDeleteDialog from '@/components/suppliers/SupplierDeleteDialog';
 
 export default function SupplierList() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -131,8 +132,7 @@ export default function SupplierList() {
   };
 
   const handleView = (supplier: Supplier) => {
-    setSelectedSupplier(supplier);
-    setIsDetailModalOpen(true);
+    navigate(`/suppliers/${supplier.id}`);
   };
 
   const handleDelete = (supplier: Supplier) => {
@@ -285,11 +285,6 @@ export default function SupplierList() {
           />
         )}
 
-        <SupplierDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
-          supplier={selectedSupplier}
-        />
 
         <SupplierFormDialog
           isOpen={isDialogOpen}

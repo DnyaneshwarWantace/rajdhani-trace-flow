@@ -71,6 +71,8 @@ export default function MaterialSelectorDialog({
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [selectedColor, setSelectedColor] = useState('all');
+  const [selectedPattern, setSelectedPattern] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
   const [selectedLength, setSelectedLength] = useState('all');
   const [selectedWidth, setSelectedWidth] = useState('all');
   const [selectedWeight, setSelectedWeight] = useState('all');
@@ -96,6 +98,27 @@ export default function MaterialSelectorDialog({
   const [productsPage, setProductsPage] = useState(1);
   const itemsPerPage = 12;
 
+  // Helper to fully reset local state when dialog closes
+  const resetState = () => {
+    setSelectionStep('type');
+    setChosenType(null);
+    setMaterialSearchTerm('');
+    setSelectedCategory('all');
+    setSelectedSupplier('all');
+    setSelectedColor('all');
+    setSelectedPattern('all');
+    setSelectedSubcategory('all');
+    setSelectedLength('all');
+    setSelectedWidth('all');
+    setSelectedWeight('all');
+    setSelectedItems([]);
+    setMaterialsPage(1);
+    setProductsPage(1);
+    setRawMaterials([]);
+    setProducts([]);
+    setAllProducts([]);
+  };
+
   // Load materials with pagination
   const loadMaterials = async () => {
     if (chosenType !== 'material') return;
@@ -118,7 +141,9 @@ export default function MaterialSelectorDialog({
     }
   };
 
-  // Load products with pagination
+  // Load all products (we'll filter client-side for length/width/weight/color)
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  
   const loadProducts = async () => {
     if (chosenType !== 'product') return;
     
@@ -127,17 +152,118 @@ export default function MaterialSelectorDialog({
       const filters: ProductFilters = {
         search: materialSearchTerm || undefined,
         category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        page: productsPage,
-        limit: itemsPerPage,
+        page: 1,
+        limit: 1000, // Load all products for client-side filtering
       };
       const { products: data, total } = await ProductService.getProducts(filters);
-      setProducts(data);
+      setAllProducts(data);
       setProductsTotal(total);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
       setProductsLoading(false);
     }
+  };
+
+  // Filter products client-side based on selected filters
+  const getFilteredProducts = () => {
+    let filtered = [...allProducts];
+
+    // Filter by color
+    if (selectedColor !== 'all') {
+      filtered = filtered.filter(p => p.color === selectedColor);
+    }
+
+    // Filter by pattern
+    if (selectedPattern !== 'all') {
+      filtered = filtered.filter(p => {
+        const productPattern = p.pattern || '';
+        return productPattern === selectedPattern;
+      });
+    }
+
+    // Filter by subcategory
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const productSubcategory = p.subcategory || '';
+        return productSubcategory === selectedSubcategory;
+      });
+    }
+
+    // Filter by length (format: "value unit")
+    if (selectedLength !== 'all') {
+      filtered = filtered.filter(p => {
+        const productLength = `${p.length} ${p.length_unit || ''}`.trim();
+        return productLength === selectedLength;
+      });
+    }
+
+    // Filter by width (format: "value unit")
+    if (selectedWidth !== 'all') {
+      filtered = filtered.filter(p => {
+        const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
+        return productWidth === selectedWidth;
+      });
+    }
+
+    // Filter by weight (format: "value unit")
+    if (selectedWeight !== 'all') {
+      filtered = filtered.filter(p => {
+        const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
+        return productWeight === selectedWeight;
+      });
+    }
+
+    // Apply pagination
+    const startIndex = (productsPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filtered.slice(startIndex, endIndex);
+  };
+
+  // Calculate pagination for filtered products
+  const getFilteredProductsTotal = () => {
+    let filtered = [...allProducts];
+
+    if (selectedColor !== 'all') {
+      filtered = filtered.filter(p => p.color === selectedColor);
+    }
+
+    if (selectedPattern !== 'all') {
+      filtered = filtered.filter(p => {
+        const productPattern = p.pattern || '';
+        return productPattern === selectedPattern;
+      });
+    }
+
+    if (selectedSubcategory !== 'all') {
+      filtered = filtered.filter(p => {
+        const productSubcategory = p.subcategory || '';
+        return productSubcategory === selectedSubcategory;
+      });
+    }
+
+    if (selectedLength !== 'all') {
+      filtered = filtered.filter(p => {
+        const productLength = `${p.length} ${p.length_unit || ''}`.trim();
+        return productLength === selectedLength;
+      });
+    }
+
+    if (selectedWidth !== 'all') {
+      filtered = filtered.filter(p => {
+        const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
+        return productWidth === selectedWidth;
+      });
+    }
+
+    if (selectedWeight !== 'all') {
+      filtered = filtered.filter(p => {
+        const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
+        return productWeight === selectedWeight;
+      });
+    }
+
+    return filtered.length;
   };
 
   // Load initial counts when dialog opens
@@ -170,12 +296,19 @@ export default function MaterialSelectorDialog({
     }
   }, [isOpen, chosenType, materialSearchTerm, selectedCategory, materialsPage, productsPage, itemsPerPage]);
 
+  // Reset products page when filters change (for products)
+  useEffect(() => {
+    if (chosenType === 'product') {
+      setProductsPage(1);
+    }
+  }, [selectedColor, selectedPattern, selectedSubcategory, selectedLength, selectedWidth, selectedWeight, chosenType]);
+
   // Get unique values for filters (from all loaded data)
   const getUniqueCategories = () => {
     if (chosenType === 'material') {
       return [...new Set(rawMaterials.map(m => m.category).filter(Boolean))];
     }
-    return [...new Set(products.map(p => p.category).filter(Boolean))];
+    return [...new Set(allProducts.map(p => p.category).filter(Boolean))];
   };
 
   const getUniqueSuppliers = () => {
@@ -183,25 +316,34 @@ export default function MaterialSelectorDialog({
   };
 
   const getUniqueProductColors = () => {
-    return [...new Set(products.map(p => p.color).filter((c): c is string => Boolean(c)))];
+    return [...new Set(allProducts.map(p => p.color).filter((c): c is string => Boolean(c)))];
+  };
+
+  const getUniqueProductPatterns = () => {
+    return [...new Set(allProducts.map(p => p.pattern).filter((p): p is string => Boolean(p)))];
+  };
+
+  const getUniqueProductSubcategories = () => {
+    return [...new Set(allProducts.map(p => p.subcategory).filter((s): s is string => Boolean(s)))];
   };
 
   const getUniqueProductLengths = () => {
-    return [...new Set(products.map(p => `${p.length} ${p.length_unit || ''}`).filter(Boolean))];
+    return [...new Set(allProducts.map(p => `${p.length} ${p.length_unit || ''}`).filter(Boolean))];
   };
 
   const getUniqueProductWidths = () => {
-    return [...new Set(products.map(p => `${p.width} ${p.width_unit || ''}`).filter(Boolean))];
+    return [...new Set(allProducts.map(p => `${p.width} ${p.width_unit || ''}`).filter(Boolean))];
   };
 
   const getUniqueProductWeights = () => {
-    return [...new Set(products.map(p => `${p.weight} ${p.weight_unit || ''}`).filter(Boolean))];
+    return [...new Set(allProducts.map(p => `${p.weight || ''} ${p.weight_unit || ''}`).filter(Boolean))];
   };
 
   // Calculate pagination
-  const currentTotal = chosenType === 'product' ? productsTotal : materialsTotal;
+  const currentTotal = chosenType === 'product' ? getFilteredProductsTotal() : materialsTotal;
   const currentPage = chosenType === 'product' ? productsPage : materialsPage;
   const totalPages = Math.ceil(currentTotal / itemsPerPage);
+  const filteredProducts = chosenType === 'product' ? getFilteredProducts() : [];
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -262,24 +404,19 @@ export default function MaterialSelectorDialog({
   };
 
   const handleClose = () => {
-    // Reset all state
-    setSelectionStep('type');
-    setChosenType(null);
-    setMaterialSearchTerm('');
-    setSelectedCategory('all');
-    setSelectedSupplier('all');
-    setSelectedColor('all');
-    setSelectedLength('all');
-    setSelectedWidth('all');
-    setSelectedWeight('all');
-    setSelectedItems([]);
-    setMaterialsPage(1);
-    setProductsPage(1);
-    setRawMaterials([]);
-    setProducts([]);
+    // Reset all local state when user closes via button / overlay
+    resetState();
     // Don't reset totals - they will be reloaded when dialog opens again
     onClose();
   };
+
+  // Also reset local state whenever parent closes the dialog
+  useEffect(() => {
+    if (!isOpen) {
+      resetState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // Check if an item is already selected
   const isItemSelected = (itemId: string) => {
@@ -369,6 +506,8 @@ export default function MaterialSelectorDialog({
                     setSelectedCategory('all');
                     setSelectedSupplier('all');
                     setSelectedColor('all');
+                    setSelectedPattern('all');
+                    setSelectedSubcategory('all');
                     setSelectedLength('all');
                     setSelectedWidth('all');
                     setSelectedWeight('all');
@@ -451,6 +590,44 @@ export default function MaterialSelectorDialog({
                           .map((color) => (
                             <SelectItem key={color} value={color}>
                               {color}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">Pattern</Label>
+                    <Select value={selectedPattern} onValueChange={setSelectedPattern}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Patterns</SelectItem>
+                        {getUniqueProductPatterns()
+                          .filter((pattern) => pattern && pattern.trim() !== '')
+                          .map((pattern) => (
+                            <SelectItem key={pattern} value={pattern}>
+                              {pattern}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">Subcategory</Label>
+                    <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Subcategories</SelectItem>
+                        {getUniqueProductSubcategories()
+                          .filter((subcategory) => subcategory && subcategory.trim() !== '')
+                          .map((subcategory) => (
+                            <SelectItem key={subcategory} value={subcategory}>
+                              {subcategory}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -581,9 +758,9 @@ export default function MaterialSelectorDialog({
                   </div>
                 ) : (
                   <>
-                    {chosenType === 'product' && products.length > 0 && (
+                    {chosenType === 'product' && filteredProducts.length > 0 && (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {products.map((product) => {
+                        {filteredProducts.map((product) => {
                           // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
                           const productId = product.id || product._id;
                           const isSelected = isItemSelected(productId);
@@ -619,8 +796,8 @@ export default function MaterialSelectorDialog({
                       </div>
                     )}
 
-                    {((chosenType === 'product' && products.length === 0) ||
-                      (chosenType === 'material' && rawMaterials.length === 0)) && (
+                    {((chosenType === 'product' && filteredProducts.length === 0 && !productsLoading) ||
+                      (chosenType === 'material' && rawMaterials.length === 0 && !materialsLoading)) && (
                       <div className="p-8 text-center text-gray-500">
                         <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                         <p className="text-lg font-medium mb-2">

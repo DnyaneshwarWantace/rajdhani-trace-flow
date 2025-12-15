@@ -24,25 +24,19 @@ export default function SupplierTable({
         <table className="w-full text-sm text-left text-gray-500 table-fixed">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[30%]">
                 Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
-                Contact Person
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                 Phone
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                 Email
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                 City
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                GST Number
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                 Actions
               </th>
             </tr>
@@ -60,9 +54,6 @@ export default function SupplierTable({
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <TruncatedText text={supplier.contact_person || '-'} className="text-sm text-gray-900" />
-                </td>
-                <td className="px-4 py-4">
                   <TruncatedText text={supplier.phone || '-'} className="text-sm text-gray-900" />
                 </td>
                 <td className="px-4 py-4">
@@ -70,9 +61,6 @@ export default function SupplierTable({
                 </td>
                 <td className="px-4 py-4">
                   <TruncatedText text={supplier.city || '-'} className="text-sm text-gray-500" />
-                </td>
-                <td className="px-4 py-4">
-                  <TruncatedText text={supplier.gst_number || '-'} className="text-sm text-gray-500 font-mono" />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
