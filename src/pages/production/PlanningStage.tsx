@@ -61,7 +61,7 @@ export default function PlanningStage() {
     }
   }, [formData.planned_quantity, selectedProduct, recipe]);
 
-  // Debounced draft save whenever materials or form data change
+  // Debounced draft save whenever materials, consumed materials, or form data change
   useEffect(() => {
     if (!selectedProduct) return;
 
@@ -78,7 +78,7 @@ export default function PlanningStage() {
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [materials, formData, selectedProduct]);
+  }, [materials, consumedMaterials, formData, selectedProduct]);
 
   const loadBatchAndProduct = async (batchId: string) => {
     setLoading(true);
@@ -130,6 +130,9 @@ export default function PlanningStage() {
       }
       if (draft?.materials) {
         setMaterials(draft.materials);
+      }
+      if (draft?.consumed_materials) {
+        setConsumedMaterials(draft.consumed_materials);
       }
 
       const recipeData = await RecipeService.getRecipeByProductId(product.id);
@@ -247,6 +250,7 @@ export default function PlanningStage() {
       await ProductionService.saveDraftPlanningState(selectedProduct.id, {
         formData,
         materials,
+        consumedMaterials,
       });
     } catch (error) {
       console.error('Error saving draft state to backend:', error);
@@ -478,10 +482,26 @@ export default function PlanningStage() {
       }
 
       // 3. Move ALL materials (including insufficient ones) to consumed section
-      setConsumedMaterials([...consumedMaterials, ...materials]);
+      // Prevent duplicates by checking if material already exists
+      const existingMaterialIds = new Set(consumedMaterials.map((m) => m.material_id));
+      const newMaterialsToAdd = materials.filter((m) => !existingMaterialIds.has(m.material_id));
+      
+      if (newMaterialsToAdd.length > 0) {
+        setConsumedMaterials([...consumedMaterials, ...newMaterialsToAdd]);
+      } else {
+        toast({
+          title: 'Info',
+          description: 'All materials are already added to production',
+          variant: 'default',
+        });
+      }
 
-      // 4. Clear materials from requirements section
-      setMaterials([]);
+      // 4. Clear materials from requirements section only if they were added
+      if (newMaterialsToAdd.length > 0) {
+        // Remove only the materials that were successfully added
+        const addedMaterialIds = new Set(newMaterialsToAdd.map((m) => m.material_id));
+        setMaterials(materials.filter((m) => !addedMaterialIds.has(m.material_id)));
+      }
 
       toast({
         title: 'Success',

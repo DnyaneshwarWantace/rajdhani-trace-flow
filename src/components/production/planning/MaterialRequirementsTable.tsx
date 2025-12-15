@@ -116,16 +116,19 @@ export default function MaterialRequirementsTable({
             </div>
 
             <div className="space-y-4">
-              {materials.map((material) => {
+              {materials.map((material, index) => {
                 const sqmPerProduct = totalSQM / targetQuantity;
 
                 // For products: quantity_per_sqm is actually pieces per SQM, not a rate
                 // For raw materials: quantity_per_sqm is kg/m/etc per SQM
                 const quantityPerProduct = material.quantity_per_sqm * sqmPerProduct;
 
+                // Use a unique key combining material_id and index to handle duplicates
+                const uniqueKey = `${material.material_id}-${index}`;
+
                 return (
                   <div
-                    key={material.material_id}
+                    key={uniqueKey}
                     className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
                   >
                     <div className="flex items-start justify-between mb-4">
