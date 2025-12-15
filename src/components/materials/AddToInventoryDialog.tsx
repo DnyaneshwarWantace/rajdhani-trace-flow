@@ -418,22 +418,53 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   // Lock body scroll when dialog is open
   useEffect(() => {
     if (isOpen) {
+      // Prevent scrolling on body
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      // Prevent touch move on iOS
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
       loadDropdowns();
     } else {
-      document.body.style.overflow = 'unset';
+      // Restore scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
     };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      onClick={(e) => {
+        // Close dialog if clicking on backdrop
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>

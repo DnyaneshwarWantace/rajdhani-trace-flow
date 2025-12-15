@@ -51,8 +51,11 @@ export default function MaterialList() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [filters, setFilters] = useState<MaterialFiltersType>({
     search: '',
-    category: '',
+    category: [],
     status: '',
+    type: [],
+    color: [],
+    supplier: [],
     page: 1,
     limit: 50,
   });
@@ -232,12 +235,24 @@ export default function MaterialList() {
     setFilters({ ...filters, search: value, page: 1 });
   };
 
-  const handleCategoryFilter = (value: string) => {
-    setFilters({ ...filters, category: value, page: 1 });
+  const handleCategoryFilter = (values: string[]) => {
+    setFilters({ ...filters, category: values, page: 1 });
   };
 
   const handleStatusFilter = (value: string) => {
     setFilters({ ...filters, status: value, page: 1 });
+  };
+
+  const handleTypeFilter = (values: string[]) => {
+    setFilters({ ...filters, type: values, page: 1 });
+  };
+
+  const handleColorFilter = (values: string[]) => {
+    setFilters({ ...filters, color: values, page: 1 });
+  };
+
+  const handleSupplierFilter = (values: string[]) => {
+    setFilters({ ...filters, supplier: values, page: 1 });
   };
 
   const handlePageChange = (page: number) => {
@@ -721,6 +736,9 @@ export default function MaterialList() {
             onSearchChange={handleSearch}
             onCategoryChange={handleCategoryFilter}
             onStatusChange={handleStatusFilter}
+            onTypeChange={handleTypeFilter}
+            onColorChange={handleColorFilter}
+            onSupplierChange={handleSupplierFilter}
             onViewModeChange={setViewMode}
           />
         )}

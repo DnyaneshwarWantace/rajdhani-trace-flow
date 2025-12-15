@@ -9,13 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Search, Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
@@ -66,15 +60,15 @@ export default function MaterialSelectionDialog({
 }: MaterialSelectionDialogProps) {
   const [activeTab, setActiveTab] = useState<'raw_materials' | 'products'>('raw_materials');
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [subcategoryFilter, setSubcategoryFilter] = useState('all');
-  const [materialTypeFilter, setMaterialTypeFilter] = useState('all');
-  const [colorFilter, setColorFilter] = useState('all');
-  const [patternFilter, setPatternFilter] = useState('all');
-  const [supplierFilter, setSupplierFilter] = useState('all');
-  const [lengthFilter, setLengthFilter] = useState('all');
-  const [widthFilter, setWidthFilter] = useState('all');
-  const [weightFilter, setWeightFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]); // Multi-select
+  const [subcategoryFilter, setSubcategoryFilter] = useState<string[]>([]); // Multi-select
+  const [materialTypeFilter, setMaterialTypeFilter] = useState<string[]>([]); // Multi-select
+  const [colorFilter, setColorFilter] = useState<string[]>([]); // Multi-select
+  const [patternFilter, setPatternFilter] = useState<string[]>([]); // Multi-select
+  const [supplierFilter, setSupplierFilter] = useState<string[]>([]); // Multi-select
+  const [lengthFilter, setLengthFilter] = useState<string[]>([]); // Multi-select
+  const [widthFilter, setWidthFilter] = useState<string[]>([]); // Multi-select
+  const [weightFilter, setWeightFilter] = useState<string[]>([]); // Multi-select
   const [rawMaterials, setRawMaterials] = useState<Material[]>([]);
   const [products, setProducts] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
@@ -100,15 +94,59 @@ export default function MaterialSelectionDialog({
   const [materialSuppliers, setMaterialSuppliers] = useState<string[]>([]);
   const [materialColors, setMaterialColors] = useState<string[]>([]);
 
+  // Lock body scroll when dialog is open
+  useEffect(() => {
+    if (isOpen) {
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
+    } else {
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [isOpen]);
+
+  // Load filter options only once when dialog opens or tab changes
+  useEffect(() => {
+    if (isOpen) {
+      loadFilterOptions();
+    }
+  }, [isOpen, activeTab]);
+
+  // Load materials when filters change
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
       loadMaterials();
     }
-  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter, currentPage]);
+  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
 
-  const loadMaterials = async () => {
-    setLoading(true);
+  // Load filtered materials when page changes
+  useEffect(() => {
+    if (isOpen) {
+      loadMaterials();
+    }
+  }, [currentPage]);
+
+  const loadFilterOptions = async () => {
     try {
       if (activeTab === 'raw_materials') {
         // Fetch all materials for filter extraction
@@ -127,44 +165,6 @@ export default function MaterialSelectionDialog({
 
         const suppliers = Array.from(new Set(allMaterials.map((m: any) => m.supplier_name).filter(Boolean))).sort();
         setMaterialSuppliers(suppliers);
-
-        // Fetch filtered materials for display
-        const response = await MaterialService.getMaterials({
-          search: searchQuery || undefined,
-          category: categoryFilter !== 'all' ? categoryFilter : undefined,
-          page: currentPage,
-          limit: itemsPerPage,
-        });
-
-        let materialsData = response.materials || [];
-
-        // Apply client-side filters (for filters not supported by backend)
-        if (materialTypeFilter !== 'all') {
-          materialsData = materialsData.filter((m: any) => m.material_type === materialTypeFilter);
-        }
-        if (colorFilter !== 'all') {
-          materialsData = materialsData.filter((m: any) => m.color === colorFilter);
-        }
-        if (supplierFilter !== 'all') {
-          materialsData = materialsData.filter((m: any) => m.supplier_name === supplierFilter);
-        }
-
-        setRawMaterials(
-          materialsData.map((m: any) => ({
-            id: m.id,
-            name: m.name,
-            current_stock: m.current_stock || 0,
-            unit: m.unit || 'kg',
-            type: 'raw_material' as const,
-            category: m.category,
-            material_type: m.material_type,
-            supplier: m.supplier_name,
-            cost: m.cost_per_unit,
-            color: m.color,
-          }))
-        );
-
-        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
       } else {
         // Fetch all products for filter extraction
         const allProductsResponse = await ProductService.getProducts({ limit: 1000 });
@@ -192,31 +192,125 @@ export default function MaterialSelectionDialog({
 
         const weights = Array.from(new Set(allProducts.map((p: any) => p.weight).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
         setProductWeights(weights);
+      }
+    } catch (error) {
+      console.error('Error loading filter options:', error);
+    }
+  };
 
+  const loadMaterials = async () => {
+    setLoading(true);
+    try {
+      if (activeTab === 'raw_materials') {
+
+        // Fetch filtered materials for display
+        // Fetch all materials if multiple categories or use single category
+        const response = await MaterialService.getMaterials({
+          search: searchQuery || undefined,
+          category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
+          page: currentPage,
+          limit: categoryFilter.length > 1 ? 1000 : itemsPerPage, // Fetch all if multiple categories
+        });
+
+        let materialsData = response.materials || [];
+
+        // Apply multi-select category filter client-side if multiple selected
+        if (categoryFilter.length > 0) {
+          materialsData = materialsData.filter((m: any) => categoryFilter.includes(m.category));
+        }
+
+        // Apply other client-side filters (for filters not supported by backend)
+        if (materialTypeFilter.length > 0) {
+          materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.material_type));
+        }
+        if (colorFilter.length > 0) {
+          materialsData = materialsData.filter((m: any) => colorFilter.includes(m.color));
+        }
+        if (supplierFilter.length > 0) {
+          materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
+        }
+
+        // Paginate client-side if multiple filters selected
+        const totalFilteredCount = materialsData.length;
+        if (categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1) {
+          const startIdx = (currentPage - 1) * itemsPerPage;
+          const endIdx = startIdx + itemsPerPage;
+          materialsData = materialsData.slice(startIdx, endIdx);
+        }
+
+        setRawMaterials(
+          materialsData.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            current_stock: m.current_stock || 0,
+            unit: m.unit || 'kg',
+            type: 'raw_material' as const,
+            category: m.category,
+            material_type: m.material_type,
+            supplier: m.supplier_name,
+            cost: m.cost_per_unit,
+            color: m.color,
+          }))
+        );
+
+        setTotalPages(Math.ceil((categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
+      } else {
         // Fetch filtered products for display
         const response = await ProductService.getProducts({
           search: searchQuery || undefined,
-          category: categoryFilter !== 'all' ? categoryFilter : undefined,
-          color: colorFilter !== 'all' ? colorFilter : undefined,
-          pattern: patternFilter !== 'all' ? patternFilter : undefined,
+          category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
+          color: colorFilter.length > 0 ? colorFilter : undefined,
+          pattern: patternFilter.length > 0 ? patternFilter : undefined,
+          subcategory: subcategoryFilter.length > 0 ? subcategoryFilter : undefined,
+          length: lengthFilter.length > 0 ? lengthFilter : undefined,
+          width: widthFilter.length > 0 ? widthFilter : undefined,
+          weight: weightFilter.length > 0 ? weightFilter : undefined,
           page: currentPage,
-          limit: itemsPerPage,
+          limit: categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? 1000 : itemsPerPage,
         });
 
         let productsData = response.products || [];
 
-        // Apply client-side filters (for filters not supported by backend)
-        if (subcategoryFilter !== 'all') {
-          productsData = productsData.filter((p: any) => p.subcategory === subcategoryFilter);
+        // Apply multi-select category filter client-side if multiple selected
+        if (categoryFilter.length > 0) {
+          productsData = productsData.filter((p: any) => categoryFilter.includes(p.category));
         }
-        if (lengthFilter !== 'all') {
-          productsData = productsData.filter((p: any) => p.length === lengthFilter);
+
+        // Apply client-side filters (for filters not fully supported by backend or multi-select)
+        if (subcategoryFilter.length > 0) {
+          productsData = productsData.filter((p: any) => subcategoryFilter.includes(p.subcategory));
         }
-        if (widthFilter !== 'all') {
-          productsData = productsData.filter((p: any) => p.width === widthFilter);
+        if (colorFilter.length > 0) {
+          productsData = productsData.filter((p: any) => colorFilter.includes(p.color));
         }
-        if (weightFilter !== 'all') {
-          productsData = productsData.filter((p: any) => p.weight === weightFilter);
+        if (patternFilter.length > 0) {
+          productsData = productsData.filter((p: any) => patternFilter.includes(p.pattern));
+        }
+        if (lengthFilter.length > 0) {
+          productsData = productsData.filter((p: any) => {
+            const productLength = `${p.length} ${p.length_unit || ''}`.trim();
+            return lengthFilter.includes(productLength) || lengthFilter.includes(p.length?.toString());
+          });
+        }
+        if (widthFilter.length > 0) {
+          productsData = productsData.filter((p: any) => {
+            const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
+            return widthFilter.includes(productWidth) || widthFilter.includes(p.width?.toString());
+          });
+        }
+        if (weightFilter.length > 0) {
+          productsData = productsData.filter((p: any) => {
+            const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
+            return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
+          });
+        }
+
+        // Paginate client-side if multiple filters selected
+        const totalFilteredCount = productsData.length;
+        if (categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1) {
+          const startIdx = (currentPage - 1) * itemsPerPage;
+          const endIdx = startIdx + itemsPerPage;
+          productsData = productsData.slice(startIdx, endIdx);
         }
 
         setProducts(
@@ -238,7 +332,7 @@ export default function MaterialSelectionDialog({
           }))
         );
 
-        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
+        setTotalPages(Math.ceil((categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
       }
     } catch (error) {
       console.error('Error loading materials:', error);
@@ -273,15 +367,15 @@ export default function MaterialSelectionDialog({
   const handleTabChange = (value: string) => {
     setActiveTab(value as 'raw_materials' | 'products');
     setCurrentPage(1);
-    setCategoryFilter('all');
-    setSubcategoryFilter('all');
-    setMaterialTypeFilter('all');
-    setColorFilter('all');
-    setPatternFilter('all');
-    setSupplierFilter('all');
-    setLengthFilter('all');
-    setWidthFilter('all');
-    setWeightFilter('all');
+    setCategoryFilter([]); // Reset to empty array for multi-select
+    setSubcategoryFilter([]);
+    setMaterialTypeFilter([]);
+    setColorFilter([]);
+    setPatternFilter([]);
+    setSupplierFilter([]);
+    setLengthFilter([]);
+    setWidthFilter([]);
+    setWeightFilter([]);
     setSearchQuery('');
   };
 
@@ -429,12 +523,11 @@ export default function MaterialSelectionDialog({
     );
   };
 
-  const currentCategories = activeTab === 'raw_materials' ? rawMaterialCategories : productCategories;
   const currentMaterials = activeTab === 'raw_materials' ? rawMaterials : products;
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] p-0 gap-0 flex flex-col">
+    <Dialog open={isOpen} onOpenChange={onClose} modal={true}>
+      <DialogContent className="max-w-5xl h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
         {/* Header - Fixed */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -537,68 +630,40 @@ export default function MaterialSelectionDialog({
                   />
                 </div>
 
-                {/* Category Filter */}
-                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {rawMaterialCategories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Category Filter - Multi-select */}
+                <MultiSelect
+                  options={rawMaterialCategories.map(cat => ({ label: cat, value: cat }))}
+                  selected={categoryFilter}
+                  onChange={(values) => { setCategoryFilter(values); setCurrentPage(1); }}
+                  placeholder="All Categories"
+                />
 
-                {/* Material Type Filter */}
-                <Select value={materialTypeFilter} onValueChange={(v) => { setMaterialTypeFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Material Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Material Types</SelectItem>
-                    {materialTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Material Type Filter - Multi-select */}
+                <MultiSelect
+                  options={materialTypes.map(type => ({ label: type, value: type }))}
+                  selected={materialTypeFilter}
+                  onChange={(values) => { setMaterialTypeFilter(values); setCurrentPage(1); }}
+                  placeholder="All Material Types"
+                />
               </div>
 
               {/* Second Row: Color, Supplier */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Color Filter */}
-                <Select value={colorFilter} onValueChange={(v) => { setColorFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Colors" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Colors</SelectItem>
-                    {materialColors.map((color) => (
-                      <SelectItem key={color} value={color}>
-                        {color}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Color Filter - Multi-select */}
+                <MultiSelect
+                  options={materialColors.map(color => ({ label: color, value: color }))}
+                  selected={colorFilter}
+                  onChange={(values) => { setColorFilter(values); setCurrentPage(1); }}
+                  placeholder="All Colors"
+                />
 
-                {/* Supplier Filter */}
-                <Select value={supplierFilter} onValueChange={(v) => { setSupplierFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Suppliers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Suppliers</SelectItem>
-                    {materialSuppliers.map((supplier) => (
-                      <SelectItem key={supplier} value={supplier}>
-                        {supplier}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Supplier Filter - Multi-select */}
+                <MultiSelect
+                  options={materialSuppliers.map(supplier => ({ label: supplier, value: supplier }))}
+                  selected={supplierFilter}
+                  onChange={(values) => { setSupplierFilter(values); setCurrentPage(1); }}
+                  placeholder="All Suppliers"
+                />
               </div>
             </>
           ) : (
@@ -620,133 +685,92 @@ export default function MaterialSelectionDialog({
                   />
                 </div>
 
-                {/* Category Filter */}
-                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {productCategories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Category Filter - Multi-select */}
+                <MultiSelect
+                  options={productCategories.map(cat => ({ label: cat, value: cat }))}
+                  selected={categoryFilter}
+                  onChange={(values) => { setCategoryFilter(values); setCurrentPage(1); }}
+                  placeholder="All Categories"
+                />
 
-                {/* Subcategory Filter */}
-                <Select value={subcategoryFilter} onValueChange={(v) => { setSubcategoryFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Subcategories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Subcategories</SelectItem>
-                    {productSubcategories.map((sub) => (
-                      <SelectItem key={sub} value={sub}>
-                        {sub}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Subcategory Filter - Multi-select */}
+                <MultiSelect
+                  options={productSubcategories.map(sub => ({ label: sub, value: sub }))}
+                  selected={subcategoryFilter}
+                  onChange={(values) => { setSubcategoryFilter(values); setCurrentPage(1); }}
+                  placeholder="All Subcategories"
+                />
               </div>
 
               {/* Second Row: Color, Pattern */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                {/* Color Filter */}
-                <Select value={colorFilter} onValueChange={(v) => { setColorFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Colors" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Colors</SelectItem>
-                    {productColors.map((color) => (
-                      <SelectItem key={color} value={color}>
-                        {color}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Color Filter - Multi-select */}
+                <MultiSelect
+                  options={productColors.map(color => ({ label: color, value: color }))}
+                  selected={colorFilter}
+                  onChange={(values) => { setColorFilter(values); setCurrentPage(1); }}
+                  placeholder="All Colors"
+                />
 
-                {/* Pattern Filter */}
-                <Select value={patternFilter} onValueChange={(v) => { setPatternFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Patterns" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Patterns</SelectItem>
-                    {productPatterns.map((pattern) => (
-                      <SelectItem key={pattern} value={pattern}>
-                        {pattern}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Pattern Filter - Multi-select */}
+                <MultiSelect
+                  options={productPatterns.map(pattern => ({ label: pattern, value: pattern }))}
+                  selected={patternFilter}
+                  onChange={(values) => { setPatternFilter(values); setCurrentPage(1); }}
+                  placeholder="All Patterns"
+                />
               </div>
 
-              {/* Third Row: Length, Width, Weight - Dropdown Filters */}
+              {/* Third Row: Length, Width, Weight - Multi-select Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* Length Filter */}
-                <Select value={lengthFilter} onValueChange={(v) => { setLengthFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Lengths" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Lengths</SelectItem>
-                    {productLengths.map((length) => (
-                      <SelectItem key={length} value={length}>
-                        {length}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Length Filter - Multi-select */}
+                <MultiSelect
+                  options={productLengths.map(length => ({ label: length, value: length }))}
+                  selected={lengthFilter}
+                  onChange={(values) => { setLengthFilter(values); setCurrentPage(1); }}
+                  placeholder="All Lengths"
+                />
 
-                {/* Width Filter */}
-                <Select value={widthFilter} onValueChange={(v) => { setWidthFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Widths" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Widths</SelectItem>
-                    {productWidths.map((width) => (
-                      <SelectItem key={width} value={width}>
-                        {width}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Width Filter - Multi-select */}
+                <MultiSelect
+                  options={productWidths.map(width => ({ label: width, value: width }))}
+                  selected={widthFilter}
+                  onChange={(values) => { setWidthFilter(values); setCurrentPage(1); }}
+                  placeholder="All Widths"
+                />
 
-                {/* Weight Filter */}
-                <Select value={weightFilter} onValueChange={(v) => { setWeightFilter(v); setCurrentPage(1); }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Weights" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Weights</SelectItem>
-                    {productWeights.map((weight) => (
-                      <SelectItem key={weight} value={weight}>
-                        {weight}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Weight Filter - Multi-select */}
+                <MultiSelect
+                  options={productWeights.map(weight => ({ label: weight, value: weight }))}
+                  selected={weightFilter}
+                  onChange={(values) => { setWeightFilter(values); setCurrentPage(1); }}
+                  placeholder="All Weights"
+                />
               </div>
             </>
           )}
         </div>
 
-        {/* Content Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto px-6">
+        {/* Content Area - Scrollable with fixed min-height */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 min-h-[400px] max-h-full">
           {loading ? (
-            <div className="text-center py-12 text-gray-500">Loading...</div>
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+                <p className="text-gray-600 font-medium">Loading {activeTab === 'raw_materials' ? 'raw materials' : 'products'}...</p>
+                <p className="text-sm text-gray-500 mt-1">Please wait</p>
+              </div>
+            </div>
           ) : currentMaterials.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-              <p className="text-gray-600">No {activeTab === 'raw_materials' ? 'raw materials' : 'products'} found</p>
-              <p className="text-sm text-gray-500 mt-1">Try adjusting your filters</p>
+            <div className="flex items-center justify-center h-full min-h-[400px]">
+              <div className="text-center">
+                <Package className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-600">No {activeTab === 'raw_materials' ? 'raw materials' : 'products'} found</p>
+                <p className="text-sm text-gray-500 mt-1">Try adjusting your filters</p>
+              </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
               {currentMaterials.map((material) => (
                 <MaterialCard key={material.id} material={material} />
               ))}

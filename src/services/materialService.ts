@@ -16,14 +16,36 @@ export class MaterialService {
   static async getMaterials(filters?: MaterialFilters): Promise<{ materials: RawMaterial[]; total: number }> {
     const queryParams = new URLSearchParams();
     if (filters?.search) queryParams.append('search', filters.search);
-    if (filters?.category) queryParams.append('category', filters.category);
+
+    // Handle array filters - append each value separately
+    if (filters?.category) {
+      const categories = Array.isArray(filters.category) ? filters.category : [filters.category];
+      categories.forEach(cat => cat && queryParams.append('category', cat));
+    }
+
     if (filters?.status) queryParams.append('status', filters.status);
-    
+
+    // Handle other array filters
+    if (filters?.type) {
+      const types = Array.isArray(filters.type) ? filters.type : [filters.type];
+      types.forEach(type => type && queryParams.append('type', type));
+    }
+
+    if (filters?.color) {
+      const colors = Array.isArray(filters.color) ? filters.color : [filters.color];
+      colors.forEach(color => color && queryParams.append('color', color));
+    }
+
+    if (filters?.supplier) {
+      const suppliers = Array.isArray(filters.supplier) ? filters.supplier : [filters.supplier];
+      suppliers.forEach(supplier => supplier && queryParams.append('supplier', supplier));
+    }
+
     // Backend uses offset and limit, not page
     const limit = filters?.limit || 20;
     const page = filters?.page || 1;
     const offset = (page - 1) * limit;
-    
+
     queryParams.append('limit', limit.toString());
     queryParams.append('offset', offset.toString());
 

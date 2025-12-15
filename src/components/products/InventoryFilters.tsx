@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { ProductService } from '@/services/productService';
 import type { ProductFilters } from '@/types/product';
 
@@ -13,14 +14,14 @@ interface InventoryFiltersProps {
   filters: ProductFilters;
   viewMode: 'grid' | 'table';
   onSearchChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
+  onCategoryChange: (values: string[]) => void;
   onStatusChange: (value: string) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
-  onColorChange?: (value: string) => void;
-  onPatternChange?: (value: string) => void;
-  onLengthChange?: (value: string) => void;
-  onWidthChange?: (value: string) => void;
-  onWeightChange?: (value: string) => void;
+  onColorChange?: (values: string[]) => void;
+  onPatternChange?: (values: string[]) => void;
+  onLengthChange?: (values: string[]) => void;
+  onWidthChange?: (values: string[]) => void;
+  onWeightChange?: (values: string[]) => void;
 }
 
 export default function InventoryFilters({
@@ -71,20 +72,40 @@ export default function InventoryFilters({
       ).sort();
       setPatterns(uniquePatterns);
 
-      // Extract unique lengths, widths, weights
-      const uniqueLengths = Array.from(
-        new Set(products.map((p: any) => p.length).filter(Boolean))
-      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      // Extract unique lengths with units
+      const lengthsWithUnits = products
+        .map((p: any) => {
+          if (!p.length) return null;
+          const unit = p.length_unit || '';
+          return `${p.length} ${unit}`.trim();
+        })
+        .filter((v): v is string => Boolean(v));
+      const uniqueLengths = Array.from(new Set(lengthsWithUnits))
+        .sort((a, b) => parseFloat(a) - parseFloat(b));
       setLengths(uniqueLengths);
 
-      const uniqueWidths = Array.from(
-        new Set(products.map((p: any) => p.width).filter(Boolean))
-      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      // Extract unique widths with units
+      const widthsWithUnits = products
+        .map((p: any) => {
+          if (!p.width) return null;
+          const unit = p.width_unit || '';
+          return `${p.width} ${unit}`.trim();
+        })
+        .filter((v): v is string => Boolean(v));
+      const uniqueWidths = Array.from(new Set(widthsWithUnits))
+        .sort((a, b) => parseFloat(a) - parseFloat(b));
       setWidths(uniqueWidths);
 
-      const uniqueWeights = Array.from(
-        new Set(products.map((p: any) => p.weight).filter(Boolean))
-      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      // Extract unique weights with units
+      const weightsWithUnits = products
+        .map((p: any) => {
+          if (!p.weight) return null;
+          const unit = p.weight_unit || '';
+          return `${p.weight} ${unit}`.trim();
+        })
+        .filter((v): v is string => Boolean(v));
+      const uniqueWeights = Array.from(new Set(weightsWithUnits))
+        .sort((a, b) => parseFloat(a) - parseFloat(b));
       setWeights(uniqueWeights);
     } catch (error) {
       console.error('Error loading filter options:', error);
@@ -94,9 +115,9 @@ export default function InventoryFilters({
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
       {/* First Row: Search, Category, Status, View */}
-      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center mb-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
         {/* Search */}
-        <div className="relative flex-1 w-full lg:w-auto">
+        <div className="relative lg:col-span-4">
           <input
             type="text"
             placeholder="Search products..."
@@ -114,25 +135,18 @@ export default function InventoryFilters({
           </svg>
         </div>
 
-        {/* Category Filter */}
-        <div className="w-full lg:w-48">
-          <Select value={filters.category || 'all'} onValueChange={(value) => onCategoryChange(value === 'all' ? '' : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Category Filter - Multi-select */}
+        <div className="lg:col-span-3">
+          <MultiSelect
+            options={categories.map(cat => ({ label: cat, value: cat }))}
+            selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
+            onChange={onCategoryChange}
+            placeholder="All Categories"
+          />
         </div>
 
         {/* Status Filter */}
-        <div className="w-full lg:w-48">
+        <div className="lg:col-span-3">
           <Select value={filters.status || 'all'} onValueChange={(value) => onStatusChange(value === 'all' ? '' : value)}>
             <SelectTrigger>
               <SelectValue placeholder="All Status" />
@@ -147,11 +161,11 @@ export default function InventoryFilters({
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-          <span className="text-sm text-gray-600 whitespace-nowrap">View:</span>
+        <div className="lg:col-span-2 flex items-center gap-2">
+          <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
           <button
             onClick={() => onViewModeChange('table')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'table'
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -161,7 +175,7 @@ export default function InventoryFilters({
           </button>
           <button
             onClick={() => onViewModeChange('grid')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'grid'
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -174,112 +188,57 @@ export default function InventoryFilters({
 
       {/* Second Row: Additional Filters (Color, Pattern, Length, Width, Weight) */}
       {(onColorChange || onPatternChange || onLengthChange || onWidthChange || onWeightChange) && (
-        <>
-          {/* Row 2a: Color, Pattern */}
-          {(onColorChange || onPatternChange) && (
-            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
-              {/* Color Filter */}
-              {onColorChange && colors.length > 0 && (
-                <div className="w-full lg:w-48">
-                  <Select value={filters.color || 'all'} onValueChange={(value) => onColorChange(value === 'all' ? '' : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Colors" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Colors</SelectItem>
-                      {colors.map((color) => (
-                        <SelectItem key={color} value={color}>
-                          {color}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Pattern Filter */}
-              {onPatternChange && patterns.length > 0 && (
-                <div className="w-full lg:w-48">
-                  <Select value={filters.pattern || 'all'} onValueChange={(value) => onPatternChange(value === 'all' ? '' : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Patterns" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Patterns</SelectItem>
-                      {patterns.map((pattern) => (
-                        <SelectItem key={pattern} value={pattern}>
-                          {pattern}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Color Filter - Multi-select */}
+          {onColorChange && (
+            <MultiSelect
+              options={colors.map(color => ({ label: color, value: color }))}
+              selected={Array.isArray(filters.color) ? filters.color : (filters.color ? [filters.color] : [])}
+              onChange={onColorChange}
+              placeholder="All Colors"
+            />
           )}
 
-          {/* Row 2b: Length, Width, Weight */}
-          {(onLengthChange || onWidthChange || onWeightChange) && (
-            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center mt-3">
-              {/* Length Filter */}
-              {onLengthChange && lengths.length > 0 && (
-                <div className="w-full lg:w-48">
-                  <Select value={filters.length || 'all'} onValueChange={(value) => onLengthChange(value === 'all' ? '' : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Lengths" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Lengths</SelectItem>
-                      {lengths.map((length) => (
-                        <SelectItem key={length} value={length}>
-                          {length}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Width Filter */}
-              {onWidthChange && widths.length > 0 && (
-                <div className="w-full lg:w-48">
-                  <Select value={filters.width || 'all'} onValueChange={(value) => onWidthChange(value === 'all' ? '' : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Widths" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Widths</SelectItem>
-                      {widths.map((width) => (
-                        <SelectItem key={width} value={width}>
-                          {width}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Weight Filter */}
-              {onWeightChange && weights.length > 0 && (
-                <div className="w-full lg:w-48">
-                  <Select value={filters.weight || 'all'} onValueChange={(value) => onWeightChange(value === 'all' ? '' : value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Weights" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Weights</SelectItem>
-                      {weights.map((weight) => (
-                        <SelectItem key={weight} value={weight}>
-                          {weight}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+          {/* Pattern Filter - Multi-select */}
+          {onPatternChange && (
+            <MultiSelect
+              options={patterns.map(pattern => ({ label: pattern, value: pattern }))}
+              selected={Array.isArray(filters.pattern) ? filters.pattern : (filters.pattern ? [filters.pattern] : [])}
+              onChange={onPatternChange}
+              placeholder="All Patterns"
+            />
           )}
-        </>
+
+          {/* Length Filter - Multi-select */}
+          {onLengthChange && (
+            <MultiSelect
+              options={lengths.map(length => ({ label: length, value: length }))}
+              selected={Array.isArray(filters.length) ? filters.length : (filters.length ? [filters.length] : [])}
+              onChange={onLengthChange}
+              placeholder="All Lengths"
+            />
+          )}
+
+          {/* Width Filter - Multi-select */}
+          {onWidthChange && (
+            <MultiSelect
+              options={widths.map(width => ({ label: width, value: width }))}
+              selected={Array.isArray(filters.width) ? filters.width : (filters.width ? [filters.width] : [])}
+              onChange={onWidthChange}
+              placeholder="All Widths"
+            />
+          )}
+
+          {/* Weight Filter - Multi-select */}
+          {onWeightChange && (
+            <MultiSelect
+              options={weights.map(weight => ({ label: weight, value: weight }))}
+              selected={Array.isArray(filters.weight) ? filters.weight : (filters.weight ? [filters.weight] : [])}
+              onChange={onWeightChange}
+              placeholder="All Weights"
+            />
+          )}
+        </div>
       )}
     </div>
   );

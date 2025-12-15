@@ -87,14 +87,15 @@ export interface ProductStats {
 
 export interface ProductFilters {
   search?: string;
-  category?: string;
+  category?: string | string[]; // Support both single and multi-select
+  subcategory?: string | string[]; // Support both single and multi-select
   status?: string;
   stock_status?: string;
-  color?: string;
-  pattern?: string;
-  length?: string;
-  width?: string;
-  weight?: string;
+  color?: string | string[];
+  pattern?: string | string[];
+  length?: string | string[];
+  width?: string | string[];
+  weight?: string | string[];
   page?: number;
   limit?: number;
 }

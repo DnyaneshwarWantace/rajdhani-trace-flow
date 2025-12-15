@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Badge } from '@/components/ui/badge';
 import {
   Pagination,
@@ -68,14 +69,20 @@ export default function MaterialSelectorDialog({
   const [selectionStep, setSelectionStep] = useState<SelectionStep>('type');
   const [chosenType, setChosenType] = useState<MaterialType>(null);
   const [materialSearchTerm, setMaterialSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSupplier, setSelectedSupplier] = useState('all');
-  const [selectedColor, setSelectedColor] = useState('all');
-  const [selectedPattern, setSelectedPattern] = useState('all');
+
+  // Shared / material filters (multi-select where it makes sense)
+  const [selectedCategory, setSelectedCategory] = useState<string[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState<string[]>([]);
+  const [selectedMaterialTypes, setSelectedMaterialTypes] = useState<string[]>([]);
+  const [selectedMaterialColors, setSelectedMaterialColors] = useState<string[]>([]);
+
+  // Product filters - now support multi-select (arrays)
+  const [selectedColor, setSelectedColor] = useState<string[]>([]);
+  const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
   const [selectedSubcategory, setSelectedSubcategory] = useState('all');
-  const [selectedLength, setSelectedLength] = useState('all');
-  const [selectedWidth, setSelectedWidth] = useState('all');
-  const [selectedWeight, setSelectedWeight] = useState('all');
+  const [selectedLength, setSelectedLength] = useState<string[]>([]);
+  const [selectedWidth, setSelectedWidth] = useState<string[]>([]);
+  const [selectedWeight, setSelectedWeight] = useState<string[]>([]);
   const [selectedItems, setSelectedItems] = useState<Array<{
     materialId: string;
     materialName: string;
@@ -87,6 +94,7 @@ export default function MaterialSelectorDialog({
 
   // Data loading state
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [allRawMaterials, setAllRawMaterials] = useState<RawMaterial[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [materialsTotal, setMaterialsTotal] = useState(0);
@@ -102,14 +110,16 @@ export default function MaterialSelectorDialog({
     setSelectionStep('type');
     setChosenType(null);
     setMaterialSearchTerm('');
-    setSelectedCategory('all');
-    setSelectedSupplier('all');
-    setSelectedColor('all');
-    setSelectedPattern('all');
+    setSelectedCategory([]);
+    setSelectedSupplier([]);
+    setSelectedMaterialTypes([]);
+    setSelectedMaterialColors([]);
+    setSelectedColor([]);
+    setSelectedPattern([]);
     setSelectedSubcategory('all');
-    setSelectedLength('all');
-    setSelectedWidth('all');
-    setSelectedWeight('all');
+    setSelectedLength([]);
+    setSelectedWidth([]);
+    setSelectedWeight([]);
     setSelectedItems([]);
     setMaterialsPage(1);
     setProductsPage(1);
@@ -117,7 +127,7 @@ export default function MaterialSelectorDialog({
     setAllProducts([]);
   };
 
-  // Load materials with pagination
+  // Load materials with pagination (respecting filters)
   const loadMaterials = async () => {
     if (chosenType !== 'material') return;
     
@@ -125,7 +135,10 @@ export default function MaterialSelectorDialog({
       setMaterialsLoading(true);
       const filters: MaterialFilters = {
         search: materialSearchTerm || undefined,
-        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        category: selectedCategory.length > 0 ? selectedCategory : undefined,
+        type: selectedMaterialTypes.length > 0 ? selectedMaterialTypes : undefined,
+        color: selectedMaterialColors.length > 0 ? selectedMaterialColors : undefined,
+        supplier: selectedSupplier.length > 0 ? selectedSupplier : undefined,
         page: materialsPage,
         limit: itemsPerPage,
       };
@@ -139,7 +152,7 @@ export default function MaterialSelectorDialog({
     }
   };
 
-  // Load all products (we'll filter client-side for length/width/weight/color)
+  // Load products for filters and listing (limited to avoid loading all products at once)
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   
   const loadProducts = async () => {
@@ -149,9 +162,11 @@ export default function MaterialSelectorDialog({
       setProductsLoading(true);
       const filters: ProductFilters = {
         search: materialSearchTerm || undefined,
-        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        category: selectedCategory.length > 0 ? selectedCategory : undefined,
         page: 1,
-        limit: 1000, // Load all products for client-side filtering
+        // Limit the number of products loaded for filtering to improve performance
+        // We still filter client-side for color/pattern/length/width/weight
+        limit: 200,
       };
       const { products: data, total } = await ProductService.getProducts(filters);
       setAllProducts(data);
@@ -167,16 +182,16 @@ export default function MaterialSelectorDialog({
   const getFilteredProducts = () => {
     let filtered = [...allProducts];
 
-    // Filter by color
-    if (selectedColor !== 'all') {
-      filtered = filtered.filter(p => p.color === selectedColor);
+    // Filter by color (multi-select)
+    if (selectedColor.length > 0) {
+      filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
     }
 
-    // Filter by pattern
-    if (selectedPattern !== 'all') {
+    // Filter by pattern (multi-select)
+    if (selectedPattern.length > 0) {
       filtered = filtered.filter(p => {
         const productPattern = p.pattern || '';
-        return productPattern === selectedPattern;
+        return selectedPattern.includes(productPattern);
       });
     }
 
@@ -188,27 +203,27 @@ export default function MaterialSelectorDialog({
       });
     }
 
-    // Filter by length (format: "value unit")
-    if (selectedLength !== 'all') {
+    // Filter by length (format: "value unit", multi-select)
+    if (selectedLength.length > 0) {
       filtered = filtered.filter(p => {
         const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-        return productLength === selectedLength;
+        return selectedLength.includes(productLength);
       });
     }
 
-    // Filter by width (format: "value unit")
-    if (selectedWidth !== 'all') {
+    // Filter by width (format: "value unit", multi-select)
+    if (selectedWidth.length > 0) {
       filtered = filtered.filter(p => {
         const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-        return productWidth === selectedWidth;
+        return selectedWidth.includes(productWidth);
       });
     }
 
-    // Filter by weight (format: "value unit")
-    if (selectedWeight !== 'all') {
+    // Filter by weight (format: "value unit", multi-select)
+    if (selectedWeight.length > 0) {
       filtered = filtered.filter(p => {
         const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-        return productWeight === selectedWeight;
+        return selectedWeight.includes(productWeight);
       });
     }
 
@@ -222,14 +237,14 @@ export default function MaterialSelectorDialog({
   const getFilteredProductsTotal = () => {
     let filtered = [...allProducts];
 
-    if (selectedColor !== 'all') {
-      filtered = filtered.filter(p => p.color === selectedColor);
+    if (selectedColor.length > 0) {
+      filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
     }
 
-    if (selectedPattern !== 'all') {
+    if (selectedPattern.length > 0) {
       filtered = filtered.filter(p => {
         const productPattern = p.pattern || '';
-        return productPattern === selectedPattern;
+        return selectedPattern.includes(productPattern);
       });
     }
 
@@ -240,24 +255,24 @@ export default function MaterialSelectorDialog({
       });
     }
 
-    if (selectedLength !== 'all') {
+    if (selectedLength.length > 0) {
       filtered = filtered.filter(p => {
         const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-        return productLength === selectedLength;
+        return selectedLength.includes(productLength);
       });
     }
 
-    if (selectedWidth !== 'all') {
+    if (selectedWidth.length > 0) {
       filtered = filtered.filter(p => {
         const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-        return productWidth === selectedWidth;
+        return selectedWidth.includes(productWidth);
       });
     }
 
-    if (selectedWeight !== 'all') {
+    if (selectedWeight.length > 0) {
       filtered = filtered.filter(p => {
         const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-        return productWeight === selectedWeight;
+        return selectedWeight.includes(productWeight);
       });
     }
 
@@ -274,9 +289,10 @@ export default function MaterialSelectorDialog({
           const productsResult = await ProductService.getProducts({ limit: 1 });
           setProductsTotal(productsResult.total || 0);
           
-          // Load materials count
-          const materialsResult = await MaterialService.getMaterials({ limit: 1 });
+          // Load materials count + full list for filter options (like main material page)
+          const materialsResult = await MaterialService.getMaterials({ limit: 1000 });
           setMaterialsTotal(materialsResult.total || 0);
+          setAllRawMaterials(materialsResult.materials || []);
         } catch (err) {
           console.error('Failed to load initial counts:', err);
         }
@@ -292,7 +308,14 @@ export default function MaterialSelectorDialog({
     } else if (isOpen && chosenType === 'product') {
       loadProducts();
     }
-  }, [isOpen, chosenType, materialSearchTerm, selectedCategory, materialsPage, productsPage, itemsPerPage]);
+  }, [isOpen, chosenType, materialSearchTerm, selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, materialsPage, productsPage, itemsPerPage]);
+
+  // Reset materials page when filters change (for materials)
+  useEffect(() => {
+    if (chosenType === 'material') {
+      setMaterialsPage(1);
+    }
+  }, [selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, materialSearchTerm, chosenType]);
 
   // Reset products page when filters change (for products)
   useEffect(() => {
@@ -304,13 +327,37 @@ export default function MaterialSelectorDialog({
   // Get unique values for filters (from all loaded data)
   const getUniqueCategories = () => {
     if (chosenType === 'material') {
-      return [...new Set(rawMaterials.map(m => m.category).filter(Boolean))];
+      const source = allRawMaterials.length > 0 ? allRawMaterials : rawMaterials;
+      return [...new Set(source.map(m => m.category).filter(Boolean))];
     }
     return [...new Set(allProducts.map(p => p.category).filter(Boolean))];
   };
 
   const getUniqueSuppliers = () => {
-    return [...new Set(rawMaterials.map(m => m.supplier_name).filter(Boolean))];
+    const source = allRawMaterials.length > 0 ? allRawMaterials : rawMaterials;
+    return [...new Set(source.map(m => m.supplier_name).filter(Boolean))];
+  };
+
+  const getUniqueMaterialTypes = () => {
+    const source = allRawMaterials.length > 0 ? allRawMaterials : rawMaterials;
+    return [
+      ...new Set(
+        source
+          .map(m => m.type)
+          .filter((t): t is string => Boolean(t && t !== 'N/A'))
+      ),
+    ];
+  };
+
+  const getUniqueMaterialColors = () => {
+    const source = allRawMaterials.length > 0 ? allRawMaterials : rawMaterials;
+    return [
+      ...new Set(
+        source
+          .map(m => m.color)
+          .filter((c): c is string => Boolean(c && c !== 'N/A'))
+      ),
+    ];
   };
 
   const getUniqueProductColors = () => {
@@ -498,17 +545,7 @@ export default function MaterialSelectorDialog({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setSelectionStep('type');
-                    setChosenType(null);
-                    setMaterialSearchTerm('');
-                    setSelectedCategory('all');
-                    setSelectedSupplier('all');
-                    setSelectedColor('all');
-                    setSelectedPattern('all');
-                    setSelectedSubcategory('all');
-                    setSelectedLength('all');
-                    setSelectedWidth('all');
-                    setSelectedWeight('all');
+                    resetState();
                   }}
                 >
                   <ArrowRight className="w-4 h-4 mr-1 rotate-180" />
@@ -532,43 +569,69 @@ export default function MaterialSelectorDialog({
 
               {/* Type-specific Filters */}
               {chosenType === 'material' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Category - multi-select */}
                   <div>
                     <Label className="text-sm font-medium">Category</Label>
-                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {getUniqueCategories()
-                          .filter((category) => category && category.trim() !== '')
-                          .map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueCategories()
+                        .filter((category) => category && category.trim() !== '')
+                        .map((category) => ({ label: category, value: category }))}
+                      selected={selectedCategory}
+                      onChange={(values) => {
+                        setSelectedCategory(values);
+                        setMaterialsPage(1);
+                      }}
+                      placeholder="All Categories"
+                    />
                   </div>
 
+                  {/* Type - multi-select */}
                   <div>
+                    <Label className="text-sm font-medium">Type</Label>
+                    <MultiSelect
+                      options={getUniqueMaterialTypes()
+                        .filter((type) => type && type.trim() !== '')
+                        .map((type) => ({ label: type, value: type }))}
+                      selected={selectedMaterialTypes}
+                      onChange={(values) => {
+                        setSelectedMaterialTypes(values);
+                        setMaterialsPage(1);
+                      }}
+                      placeholder="All Types"
+                    />
+                  </div>
+
+                  {/* Color - multi-select */}
+                  <div>
+                    <Label className="text-sm font-medium">Color</Label>
+                    <MultiSelect
+                      options={getUniqueMaterialColors()
+                        .filter((color) => color && color.trim() !== '')
+                        .map((color) => ({ label: color, value: color }))}
+                      selected={selectedMaterialColors}
+                      onChange={(values) => {
+                        setSelectedMaterialColors(values);
+                        setMaterialsPage(1);
+                      }}
+                      placeholder="All Colors"
+                    />
+                  </div>
+
+                  {/* Supplier - multi-select */}
+                  <div className="md:col-span-3">
                     <Label className="text-sm font-medium">Supplier</Label>
-                    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Suppliers</SelectItem>
-                        {getUniqueSuppliers()
-                          .filter((supplier) => supplier && supplier.trim() !== '')
-                          .map((supplier) => (
-                            <SelectItem key={supplier} value={supplier}>
-                              {supplier}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueSuppliers()
+                        .filter((supplier) => supplier && supplier.trim() !== '')
+                        .map((supplier) => ({ label: supplier, value: supplier }))}
+                      selected={selectedSupplier}
+                      onChange={(values) => {
+                        setSelectedSupplier(values);
+                        setMaterialsPage(1);
+                      }}
+                      placeholder="All Suppliers"
+                    />
                   </div>
                 </div>
               )}
@@ -577,40 +640,32 @@ export default function MaterialSelectorDialog({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label className="text-sm font-medium">Color</Label>
-                    <Select value={selectedColor} onValueChange={setSelectedColor}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Colors</SelectItem>
-                        {getUniqueProductColors()
-                          .filter((color) => color && color.trim() !== '')
-                          .map((color) => (
-                            <SelectItem key={color} value={color}>
-                              {color}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductColors()
+                        .filter((color) => color && color.trim() !== '')
+                        .map((color) => ({ label: color, value: color }))}
+                      selected={selectedColor}
+                      onChange={(values) => {
+                        setSelectedColor(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Colors"
+                    />
                   </div>
 
                   <div>
                     <Label className="text-sm font-medium">Pattern</Label>
-                    <Select value={selectedPattern} onValueChange={setSelectedPattern}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Patterns</SelectItem>
-                        {getUniqueProductPatterns()
-                          .filter((pattern) => pattern && pattern.trim() !== '')
-                          .map((pattern) => (
-                            <SelectItem key={pattern} value={pattern}>
-                              {pattern}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductPatterns()
+                        .filter((pattern) => pattern && pattern.trim() !== '')
+                        .map((pattern) => ({ label: pattern, value: pattern }))}
+                      selected={selectedPattern}
+                      onChange={(values) => {
+                        setSelectedPattern(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Patterns"
+                    />
                   </div>
 
                   <div>
@@ -634,59 +689,47 @@ export default function MaterialSelectorDialog({
 
                   <div>
                     <Label className="text-sm font-medium">Length</Label>
-                    <Select value={selectedLength} onValueChange={setSelectedLength}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Lengths</SelectItem>
-                        {getUniqueProductLengths()
-                          .filter((length) => length && length.trim() !== '')
-                          .map((length) => (
-                            <SelectItem key={length} value={length}>
-                              {length}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductLengths()
+                        .filter((length) => length && length.trim() !== '')
+                        .map((length) => ({ label: length, value: length }))}
+                      selected={selectedLength}
+                      onChange={(values) => {
+                        setSelectedLength(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Lengths"
+                    />
                   </div>
 
                   <div>
                     <Label className="text-sm font-medium">Width</Label>
-                    <Select value={selectedWidth} onValueChange={setSelectedWidth}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Widths</SelectItem>
-                        {getUniqueProductWidths()
-                          .filter((width) => width && width.trim() !== '')
-                          .map((width) => (
-                            <SelectItem key={width} value={width}>
-                              {width}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductWidths()
+                        .filter((width) => width && width.trim() !== '')
+                        .map((width) => ({ label: width, value: width }))}
+                      selected={selectedWidth}
+                      onChange={(values) => {
+                        setSelectedWidth(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Widths"
+                    />
                   </div>
 
                   <div>
                     <Label className="text-sm font-medium">Weight</Label>
-                    <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Weights</SelectItem>
-                        {getUniqueProductWeights()
-                          .filter((weight) => weight && weight.trim() !== '')
-                          .map((weight) => (
-                            <SelectItem key={weight} value={weight}>
-                              {weight}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductWeights()
+                        .filter((weight) => weight && weight.trim() !== '')
+                        .map((weight) => ({ label: weight, value: weight }))}
+                      selected={selectedWeight}
+                      onChange={(values) => {
+                        setSelectedWeight(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Weights"
+                    />
                   </div>
                 </div>
               )}

@@ -119,6 +119,18 @@ export default function MaterialCard({
             <span className="text-gray-600 flex-shrink-0">Category:</span>
             <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.category}</span>
           </div>
+          {material.type && material.type.trim() !== '' && material.type !== 'N/A' && (
+            <div className="flex justify-between items-start gap-2 min-w-0">
+              <span className="text-gray-600 flex-shrink-0">Type:</span>
+              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.type}</span>
+            </div>
+          )}
+          {material.color && material.color.trim() !== '' && material.color !== 'N/A' && (
+            <div className="flex justify-between items-start gap-2 min-w-0">
+              <span className="text-gray-600 flex-shrink-0">Color:</span>
+              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.color}</span>
+            </div>
+          )}
           {material.supplier_name && (
             <div className="flex justify-between items-start gap-2 min-w-0">
               <span className="text-gray-600 flex-shrink-0">Supplier:</span>
@@ -131,20 +143,6 @@ export default function MaterialCard({
               {formatCurrency(material.cost_per_unit || 0)}
             </span>
           </div>
-          <div className="flex justify-between gap-2">
-            <span className="text-gray-600 flex-shrink-0">Reorder:</span>
-            <span className="text-gray-900 truncate">
-              {formatIndianNumberWithDecimals(Number(material.reorder_point || 0), 2)} {material.unit}
-            </span>
-          </div>
-          {material.min_threshold && (
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-600 flex-shrink-0">Min:</span>
-              <span className="text-gray-900 truncate">
-                {formatIndianNumberWithDecimals(Number(material.min_threshold || 0), 2)} {material.unit}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Actions */}

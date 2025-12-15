@@ -34,7 +34,7 @@ export default function ProductSearchSection({
 }: ProductSearchSectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('');
-  const [subcategory, setSubcategory] = useState('');
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
@@ -52,7 +52,7 @@ export default function ProductSearchSection({
     // Reset page when filters change
     setPage(1);
     loadProducts(1);
-  }, [searchTerm, category, subcategory, limit]);
+  }, [searchTerm, category, selectedSubcategories, limit]);
 
   const loadInitialData = async () => {
     try {
@@ -90,19 +90,23 @@ export default function ProductSearchSection({
       if (category) {
         filters.category = category;
       }
-      if (subcategory) {
-        filters.subcategory = subcategory;
+      if (selectedSubcategories.length > 0) {
+        filters.subcategory = selectedSubcategories;
       }
 
       const { products: newProducts, total: totalCount } = await ProductService.getProducts(filters);
       
-      // Filter by subcategory client-side if needed (since API doesn't support it)
+      // Filter by subcategory client-side as well (defensive, in case API doesn't support arrays)
       let filteredProducts = newProducts || [];
-      if (subcategory) {
-        filteredProducts = filteredProducts.filter((p) => p.subcategory === subcategory);
+      if (selectedSubcategories.length > 0) {
+        filteredProducts = filteredProducts.filter((p) =>
+          selectedSubcategories.includes(p.subcategory || '')
+        );
         // Adjust total for client-side filtering
         const allProducts = await ProductService.getProducts({ ...filters, limit: 1000 });
-        const filteredTotal = allProducts.products.filter((p) => p.subcategory === subcategory).length;
+        const filteredTotal = allProducts.products.filter((p) =>
+          selectedSubcategories.includes(p.subcategory || '')
+        ).length;
         setTotal(filteredTotal);
       } else {
         setTotal(totalCount || 0);
@@ -214,12 +218,12 @@ export default function ProductSearchSection({
         {/* Filters */}
         <ProductFilters
           category={category}
-          subcategory={subcategory}
+          subcategoriesSelected={selectedSubcategories}
           onCategoryChange={(value) => {
             setCategory(value);
-            setSubcategory(''); // Reset subcategory when category changes
+            setSelectedSubcategories([]); // Reset subcategories when category changes
           }}
-          onSubcategoryChange={setSubcategory}
+          onSubcategoriesChange={setSelectedSubcategories}
           categories={categories}
           subcategories={subcategories}
         />

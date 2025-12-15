@@ -6,21 +6,22 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 interface ProductFiltersProps {
   category: string;
-  subcategory: string;
+  subcategoriesSelected: string[];
   onCategoryChange: (value: string) => void;
-  onSubcategoryChange: (value: string) => void;
+  onSubcategoriesChange: (values: string[]) => void;
   categories: string[];
   subcategories: string[];
 }
 
 export default function ProductFilters({
   category,
-  subcategory,
+  subcategoriesSelected,
   onCategoryChange,
-  onSubcategoryChange,
+  onSubcategoriesChange,
   categories,
   subcategories,
 }: ProductFiltersProps) {
@@ -52,19 +53,16 @@ export default function ProductFilters({
         <Label htmlFor="subcategory-filter" className="text-sm font-medium text-gray-700">
           Subcategory
         </Label>
-        <Select value={subcategory || 'all'} onValueChange={(value) => onSubcategoryChange(value === 'all' ? '' : value)}>
-          <SelectTrigger id="subcategory-filter" className="mt-1">
-            <SelectValue placeholder="All Subcategories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subcategories</SelectItem>
-            {filteredSubcategories.filter(sub => sub && sub.trim()).map((sub) => (
-              <SelectItem key={sub} value={sub}>
-                {sub}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="mt-1">
+          <MultiSelect
+            options={filteredSubcategories
+              .filter((sub) => sub && sub.trim())
+              .map((sub) => ({ label: sub, value: sub }))}
+            selected={subcategoriesSelected}
+            onChange={onSubcategoriesChange}
+            placeholder="All Subcategories"
+          />
+        </div>
       </div>
     </div>
   );

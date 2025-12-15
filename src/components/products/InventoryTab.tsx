@@ -13,13 +13,13 @@ interface InventoryTabProps {
   viewMode: 'grid' | 'table';
   totalProducts: number;
   onSearchChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
+  onCategoryChange: (values: string[]) => void;
   onStatusChange: (value: string) => void;
-  onColorChange?: (value: string) => void;
-  onPatternChange?: (value: string) => void;
-  onLengthChange?: (value: string) => void;
-  onWidthChange?: (value: string) => void;
-  onWeightChange?: (value: string) => void;
+  onColorChange?: (values: string[]) => void;
+  onPatternChange?: (values: string[]) => void;
+  onLengthChange?: (values: string[]) => void;
+  onWidthChange?: (values: string[]) => void;
+  onWeightChange?: (values: string[]) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
@@ -116,18 +116,20 @@ export default function InventoryTab({
                 isAdmin={isAdmin}
               />
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              // Masonry-style grid using CSS columns
+              <div className="columns-1 md:columns-2 xl:columns-3 gap-4 space-y-4">
                 {products.map((product) => (
-                  <ProductCard
-                    key={product._id}
-                    product={product}
-                    onView={onView}
-                    onEdit={onEdit}
-                    onDuplicate={onDuplicate}
-                    onStock={onStock}
-                    onProduction={onProduction}
-                    onQRCode={onQRCode}
-                  />
+                  <div key={product._id} className="break-inside-avoid">
+                    <ProductCard
+                      product={product}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onDuplicate={onDuplicate}
+                      onStock={onStock}
+                      onProduction={onProduction}
+                      onQRCode={onQRCode}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -135,17 +137,19 @@ export default function InventoryTab({
 
           {/* Mobile View - Always Grid */}
           <div className="lg:hidden">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Masonry-style grid on mobile/tablet as well */}
+            <div className="columns-1 sm:columns-2 gap-4 space-y-4">
               {products.map((product) => (
-                <ProductCard
-                  key={product._id}
-                  product={product}
-                  onView={onView}
-                  onEdit={onEdit}
-                  onDuplicate={onDuplicate}
-                  onStock={onStock}
-                  onProduction={onProduction}
-                />
+                <div key={product._id} className="break-inside-avoid">
+                  <ProductCard
+                    product={product}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onDuplicate={onDuplicate}
+                    onStock={onStock}
+                    onProduction={onProduction}
+                  />
+                </div>
               ))}
             </div>
           </div>

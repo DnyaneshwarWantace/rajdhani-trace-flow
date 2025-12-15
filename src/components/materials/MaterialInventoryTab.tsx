@@ -12,7 +12,7 @@ interface MaterialInventoryTabProps {
   viewMode: 'grid' | 'table';
   totalMaterials: number;
   onSearchChange: (value: string) => void;
-  onCategoryChange: (value: string) => void;
+  onCategoryChange: (values: string[]) => void;
   onStatusChange: (value: string) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
   onPageChange: (page: number) => void;

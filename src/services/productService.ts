@@ -15,14 +15,71 @@ export class ProductService {
   static async getProducts(filters?: ProductFilters): Promise<{ products: Product[]; total: number }> {
     const queryParams = new URLSearchParams();
     if (filters?.search) queryParams.append('search', filters.search);
-    if (filters?.category && filters.category !== 'all') queryParams.append('category', filters.category);
+
+    // Handle array filters - append each value separately
+    if (filters?.category) {
+      const categories = Array.isArray(filters.category) ? filters.category : [filters.category];
+      categories.forEach(cat => cat && cat !== 'all' && queryParams.append('category', cat));
+    }
+
+    if ((filters as any)?.subcategory) {
+      const subs = Array.isArray((filters as any).subcategory)
+        ? (filters as any).subcategory
+        : [(filters as any).subcategory];
+      subs.forEach((sub: string) => sub && sub !== 'all' && queryParams.append('subcategory', sub));
+    }
+
     if (filters?.status && filters.status !== 'all') queryParams.append('status', filters.status);
-    
+
+    // Handle other array filters
+    if (filters?.color) {
+      const colors = Array.isArray(filters.color) ? filters.color : [filters.color];
+      colors.forEach(color => color && queryParams.append('color', color));
+    }
+
+    if (filters?.pattern) {
+      const patterns = Array.isArray(filters.pattern) ? filters.pattern : [filters.pattern];
+      patterns.forEach(pattern => pattern && queryParams.append('pattern', pattern));
+    }
+
+    if (filters?.length) {
+      const lengths = Array.isArray(filters.length) ? filters.length : [filters.length];
+      // Extract numeric part only (e.g., "500 GSM" -> "500")
+      lengths.forEach(length => {
+        if (length) {
+          const numericValue = length.split(' ')[0];
+          queryParams.append('length', numericValue);
+        }
+      });
+    }
+
+    if (filters?.width) {
+      const widths = Array.isArray(filters.width) ? filters.width : [filters.width];
+      // Extract numeric part only (e.g., "100 cm" -> "100")
+      widths.forEach(width => {
+        if (width) {
+          const numericValue = width.split(' ')[0];
+          queryParams.append('width', numericValue);
+        }
+      });
+    }
+
+    if (filters?.weight) {
+      const weights = Array.isArray(filters.weight) ? filters.weight : [filters.weight];
+      // Extract numeric part only (e.g., "5 kg" -> "5")
+      weights.forEach(weight => {
+        if (weight) {
+          const numericValue = weight.split(' ')[0];
+          queryParams.append('weight', numericValue);
+        }
+      });
+    }
+
     // Backend uses offset and limit, not page
     const limit = filters?.limit || 20;
     const page = filters?.page || 1;
     const offset = (page - 1) * limit;
-    
+
     queryParams.append('limit', limit.toString());
     queryParams.append('offset', offset.toString());
 

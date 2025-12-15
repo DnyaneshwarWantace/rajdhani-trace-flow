@@ -36,8 +36,13 @@ export default function ProductList() {
   const [totalProducts, setTotalProducts] = useState(0);
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
-    category: '',
+    category: [],
     status: '',
+    color: [],
+    pattern: [],
+    length: [],
+    width: [],
+    weight: [],
     page: 1,
     limit: 50,
   });
@@ -79,14 +84,21 @@ export default function ProductList() {
     setCanDeleteProducts(canDelete('products'));
   }, []);
 
+  // Load stats only when activeTab changes (not when filters change)
   useEffect(() => {
     if (activeTab === 'inventory') {
       loadInventoryStats();
-      loadProducts();
     } else if (activeTab === 'analytics') {
       loadAnalytics();
     } else if (activeTab === 'notifications') {
       loadNotifications();
+    }
+  }, [activeTab]);
+
+  // Load products when filters change
+  useEffect(() => {
+    if (activeTab === 'inventory') {
+      loadProducts();
     }
   }, [activeTab, filters]);
 
@@ -165,32 +177,32 @@ export default function ProductList() {
     setFilters({ ...filters, search: value, page: 1 });
   };
 
-  const handleCategoryFilter = (value: string) => {
-    setFilters({ ...filters, category: value, page: 1 });
+  const handleCategoryFilter = (values: string[]) => {
+    setFilters({ ...filters, category: values, page: 1 });
   };
 
   const handleStatusFilter = (value: string) => {
     setFilters({ ...filters, status: value, page: 1 });
   };
 
-  const handleColorFilter = (value: string) => {
-    setFilters({ ...filters, color: value, page: 1 });
+  const handleColorFilter = (values: string[]) => {
+    setFilters({ ...filters, color: values, page: 1 });
   };
 
-  const handlePatternFilter = (value: string) => {
-    setFilters({ ...filters, pattern: value, page: 1 });
+  const handlePatternFilter = (values: string[]) => {
+    setFilters({ ...filters, pattern: values, page: 1 });
   };
 
-  const handleLengthFilter = (value: string) => {
-    setFilters({ ...filters, length: value, page: 1 });
+  const handleLengthFilter = (values: string[]) => {
+    setFilters({ ...filters, length: values, page: 1 });
   };
 
-  const handleWidthFilter = (value: string) => {
-    setFilters({ ...filters, width: value, page: 1 });
+  const handleWidthFilter = (values: string[]) => {
+    setFilters({ ...filters, width: values, page: 1 });
   };
 
-  const handleWeightFilter = (value: string) => {
-    setFilters({ ...filters, weight: value, page: 1 });
+  const handleWeightFilter = (values: string[]) => {
+    setFilters({ ...filters, weight: values, page: 1 });
   };
 
   const handlePageChange = (page: number) => {
