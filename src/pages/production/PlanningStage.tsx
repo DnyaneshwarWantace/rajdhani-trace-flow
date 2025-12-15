@@ -37,6 +37,7 @@ export default function PlanningStage() {
   const [consumedMaterials, setConsumedMaterials] = useState<any[]>([]); // Confirmed materials (bottom section)
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [recipeModified, setRecipeModified] = useState(false);
+  const [draftSaveTimeout, setDraftSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -59,6 +60,25 @@ export default function PlanningStage() {
       calculateMaterialRequirements(selectedProduct, recipe, formData.planned_quantity);
     }
   }, [formData.planned_quantity, selectedProduct, recipe]);
+
+  // Debounced draft save whenever materials or form data change
+  useEffect(() => {
+    if (!selectedProduct) return;
+
+    if (draftSaveTimeout) {
+      clearTimeout(draftSaveTimeout);
+    }
+
+    const timeout = setTimeout(() => {
+      saveDraftStateToBackend();
+    }, 1000);
+
+    setDraftSaveTimeout(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [materials, formData, selectedProduct]);
 
   const loadBatchAndProduct = async (batchId: string) => {
     setLoading(true);
@@ -97,12 +117,29 @@ export default function PlanningStage() {
   const loadRecipeAndCalculate = async (product: Product, quantity?: number) => {
     setLoading(true);
     try {
+      // Attempt to restore draft state (materials + form data)
+      const { data: draft } = await ProductionService.getDraftPlanningState(product.id);
+
+      if (draft?.form_data) {
+        setFormData({
+          planned_quantity: draft.form_data.planned_quantity || 0,
+          priority: draft.form_data.priority || 'medium',
+          completion_date: draft.form_data.completion_date || '',
+          notes: draft.form_data.notes || '',
+        });
+      }
+      if (draft?.materials) {
+        setMaterials(draft.materials);
+      }
+
       const recipeData = await RecipeService.getRecipeByProductId(product.id);
 
       if (recipeData) {
         setRecipe(recipeData);
         if (quantity && quantity > 0) {
           calculateMaterialRequirements(product, recipeData, quantity);
+        } else if (draft?.form_data?.planned_quantity) {
+          calculateMaterialRequirements(product, recipeData, draft.form_data.planned_quantity);
         }
       } else {
         setRecipe(null);
@@ -199,6 +236,20 @@ export default function PlanningStage() {
     } catch (error) {
       console.error('Error calculating material requirements:', error);
       setMaterials([]);
+    }
+  };
+
+  // Persist draft state (materials + form data) to backend for refresh/other users
+  const saveDraftStateToBackend = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      await ProductionService.saveDraftPlanningState(selectedProduct.id, {
+        formData,
+        materials,
+      });
+    } catch (error) {
+      console.error('Error saving draft state to backend:', error);
     }
   };
 
@@ -347,13 +398,13 @@ export default function PlanningStage() {
     const finalMaterials = [...updatedMaterials, ...toAdd];
 
     setMaterials(finalMaterials);
-    setRecipeModified(true); // Mark as modified, don't save yet
+    setRecipeModified(true); // mark for save on Add to Production
   };
 
   const handleRemoveMaterial = (materialId: string) => {
     const updatedMaterials = materials.filter((m) => m.material_id !== materialId);
     setMaterials(updatedMaterials);
-    setRecipeModified(true); // Mark as modified, don't save yet
+    setRecipeModified(true); // mark for save on Add to Production
   };
 
   const handleUpdateQuantity = (materialId: string, quantityPerSqm: number) => {
@@ -377,7 +428,7 @@ export default function PlanningStage() {
     });
 
     setMaterials(updatedMaterials);
-    setRecipeModified(true); // Mark as modified, don't save yet
+    setRecipeModified(true); // mark for save on Add to Production
   };
 
   const handleAddToProduction = async () => {
@@ -401,7 +452,7 @@ export default function PlanningStage() {
 
     setSubmitting(true);
     try {
-      // 1. Update recipe if materials were modified
+      // 1. Persist latest recipe changes only when user confirms add
       if (recipeModified) {
         await updateRecipeInDatabase(materials);
         setRecipeModified(false);

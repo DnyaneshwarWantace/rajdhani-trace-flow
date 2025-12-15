@@ -226,6 +226,7 @@ export class ProductionService {
     draftState: {
       formData: any;
       recipeData?: any;
+      materials?: any[];
     }
   ): Promise<{ data: any | null; error: string | null }> {
     try {
@@ -236,6 +237,7 @@ export class ProductionService {
           product_id: productId,
           form_data: draftState.formData,
           recipe_data: draftState.recipeData,
+          materials: draftState.materials,
         }),
       });
 
