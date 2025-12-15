@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
@@ -10,13 +11,13 @@ import CustomerStatsBoxes from '@/components/customers/CustomerStatsBoxes';
 import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerGrid from '@/components/customers/CustomerGrid';
-import CustomerDetailModal from '@/components/customers/CustomerDetailModal';
 import CustomerEmptyState from '@/components/customers/CustomerEmptyState';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';
 import type { Order } from '@/services/orderService';
 
 export default function CustomerList() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -27,7 +28,6 @@ export default function CustomerList() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -233,8 +233,7 @@ export default function CustomerList() {
   };
 
   const handleView = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setIsDetailModalOpen(true);
+    navigate(`/customers/${customer.id}`);
   };
 
   const handleDelete = (customer: Customer) => {
@@ -407,11 +406,6 @@ export default function CustomerList() {
           />
         )}
 
-        <CustomerDetailModal
-          isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
-          customer={selectedCustomer}
-        />
 
         <CustomerFormDialog
           isOpen={isDialogOpen}

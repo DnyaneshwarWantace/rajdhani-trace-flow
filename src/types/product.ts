@@ -90,6 +90,11 @@ export interface ProductFilters {
   category?: string;
   status?: string;
   stock_status?: string;
+  color?: string;
+  pattern?: string;
+  length?: string;
+  width?: string;
+  weight?: string;
   page?: number;
   limit?: number;
 }

@@ -32,6 +32,7 @@ interface Material {
   category?: string;
   subcategory?: string;
   supplier?: string;
+  material_type?: string;
   cost?: number;
   length?: string;
   width?: string;
@@ -66,7 +67,14 @@ export default function MaterialSelectionDialog({
   const [activeTab, setActiveTab] = useState<'raw_materials' | 'products'>('raw_materials');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [stockFilter, setStockFilter] = useState('all');
+  const [subcategoryFilter, setSubcategoryFilter] = useState('all');
+  const [materialTypeFilter, setMaterialTypeFilter] = useState('all');
+  const [colorFilter, setColorFilter] = useState('all');
+  const [patternFilter, setPatternFilter] = useState('all');
+  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [lengthFilter, setLengthFilter] = useState('all');
+  const [widthFilter, setWidthFilter] = useState('all');
+  const [weightFilter, setWeightFilter] = useState('all');
   const [rawMaterials, setRawMaterials] = useState<Material[]>([]);
   const [products, setProducts] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
@@ -79,30 +87,68 @@ export default function MaterialSelectionDialog({
   const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
-  // Categories
+  // Dynamic filter options
   const [rawMaterialCategories, setRawMaterialCategories] = useState<string[]>([]);
+  const [materialTypes, setMaterialTypes] = useState<string[]>([]);
   const [productCategories, setProductCategories] = useState<string[]>([]);
+  const [productSubcategories, setProductSubcategories] = useState<string[]>([]);
+  const [productColors, setProductColors] = useState<string[]>([]);
+  const [productPatterns, setProductPatterns] = useState<string[]>([]);
+  const [productLengths, setProductLengths] = useState<string[]>([]);
+  const [productWidths, setProductWidths] = useState<string[]>([]);
+  const [productWeights, setProductWeights] = useState<string[]>([]);
+  const [materialSuppliers, setMaterialSuppliers] = useState<string[]>([]);
+  const [materialColors, setMaterialColors] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
       loadMaterials();
     }
-  }, [isOpen, activeTab, searchQuery, categoryFilter, stockFilter, currentPage]);
+  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter, currentPage]);
 
   const loadMaterials = async () => {
     setLoading(true);
     try {
       if (activeTab === 'raw_materials') {
+        // Fetch all materials for filter extraction
+        const allMaterialsResponse = await MaterialService.getMaterials({ limit: 1000 });
+        const allMaterials = allMaterialsResponse.materials || [];
+
+        // Extract unique filter values - ONLY these 4 filters
+        const categories = Array.from(new Set(allMaterials.map((m: any) => m.category).filter(Boolean))).sort();
+        setRawMaterialCategories(categories);
+
+        const types = Array.from(new Set(allMaterials.map((m: any) => m.material_type).filter(Boolean))).sort();
+        setMaterialTypes(types);
+
+        const colors = Array.from(new Set(allMaterials.map((m: any) => m.color).filter((c) => c && c !== 'N/A'))).sort();
+        setMaterialColors(colors);
+
+        const suppliers = Array.from(new Set(allMaterials.map((m: any) => m.supplier_name).filter(Boolean))).sort();
+        setMaterialSuppliers(suppliers);
+
+        // Fetch filtered materials for display
         const response = await MaterialService.getMaterials({
           search: searchQuery || undefined,
           category: categoryFilter !== 'all' ? categoryFilter : undefined,
-          status: stockFilter !== 'all' ? stockFilter : undefined,
           page: currentPage,
           limit: itemsPerPage,
         });
 
-        const materialsData = response.materials || [];
+        let materialsData = response.materials || [];
+
+        // Apply client-side filters (for filters not supported by backend)
+        if (materialTypeFilter !== 'all') {
+          materialsData = materialsData.filter((m: any) => m.material_type === materialTypeFilter);
+        }
+        if (colorFilter !== 'all') {
+          materialsData = materialsData.filter((m: any) => m.color === colorFilter);
+        }
+        if (supplierFilter !== 'all') {
+          materialsData = materialsData.filter((m: any) => m.supplier_name === supplierFilter);
+        }
+
         setRawMaterials(
           materialsData.map((m: any) => ({
             id: m.id,
@@ -111,24 +157,68 @@ export default function MaterialSelectionDialog({
             unit: m.unit || 'kg',
             type: 'raw_material' as const,
             category: m.category,
+            material_type: m.material_type,
             supplier: m.supplier_name,
             cost: m.cost_per_unit,
+            color: m.color,
           }))
         );
 
-        // Extract unique categories
-        const categories = Array.from(new Set(materialsData.map((m: any) => m.category).filter(Boolean)));
-        setRawMaterialCategories(categories);
         setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
       } else {
+        // Fetch all products for filter extraction
+        const allProductsResponse = await ProductService.getProducts({ limit: 1000 });
+        const allProducts = allProductsResponse.products || [];
+
+        // Extract unique filter values
+        const categories = Array.from(new Set(allProducts.map((p: any) => p.category).filter(Boolean))).sort();
+        setProductCategories(categories);
+
+        const subcategories = Array.from(new Set(allProducts.map((p: any) => p.subcategory).filter(Boolean))).sort();
+        setProductSubcategories(subcategories);
+
+        const colors = Array.from(new Set(allProducts.map((p: any) => p.color).filter((c) => c && c !== 'N/A'))).sort();
+        setProductColors(colors);
+
+        const patterns = Array.from(new Set(allProducts.map((p: any) => p.pattern).filter((p) => p && p !== 'N/A'))).sort();
+        setProductPatterns(patterns);
+
+        // Extract unique lengths, widths, weights
+        const lengths = Array.from(new Set(allProducts.map((p: any) => p.length).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
+        setProductLengths(lengths);
+
+        const widths = Array.from(new Set(allProducts.map((p: any) => p.width).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
+        setProductWidths(widths);
+
+        const weights = Array.from(new Set(allProducts.map((p: any) => p.weight).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
+        setProductWeights(weights);
+
+        // Fetch filtered products for display
         const response = await ProductService.getProducts({
           search: searchQuery || undefined,
           category: categoryFilter !== 'all' ? categoryFilter : undefined,
+          color: colorFilter !== 'all' ? colorFilter : undefined,
+          pattern: patternFilter !== 'all' ? patternFilter : undefined,
           page: currentPage,
           limit: itemsPerPage,
         });
 
-        const productsData = response.products || [];
+        let productsData = response.products || [];
+
+        // Apply client-side filters (for filters not supported by backend)
+        if (subcategoryFilter !== 'all') {
+          productsData = productsData.filter((p: any) => p.subcategory === subcategoryFilter);
+        }
+        if (lengthFilter !== 'all') {
+          productsData = productsData.filter((p: any) => p.length === lengthFilter);
+        }
+        if (widthFilter !== 'all') {
+          productsData = productsData.filter((p: any) => p.width === widthFilter);
+        }
+        if (weightFilter !== 'all') {
+          productsData = productsData.filter((p: any) => p.weight === weightFilter);
+        }
+
         setProducts(
           productsData.map((p: any) => ({
             id: p.id,
@@ -140,15 +230,14 @@ export default function MaterialSelectionDialog({
             subcategory: p.subcategory,
             length: p.length,
             width: p.width,
+            length_unit: p.length_unit,
+            width_unit: p.width_unit,
             weight: p.weight,
             color: p.color,
             pattern: p.pattern,
           }))
         );
 
-        // Extract unique categories
-        const categories = Array.from(new Set(productsData.map((p: any) => p.category).filter(Boolean)));
-        setProductCategories(categories);
         setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
       }
     } catch (error) {
@@ -185,7 +274,14 @@ export default function MaterialSelectionDialog({
     setActiveTab(value as 'raw_materials' | 'products');
     setCurrentPage(1);
     setCategoryFilter('all');
-    setStockFilter('all');
+    setSubcategoryFilter('all');
+    setMaterialTypeFilter('all');
+    setColorFilter('all');
+    setPatternFilter('all');
+    setSupplierFilter('all');
+    setLengthFilter('all');
+    setWidthFilter('all');
+    setWeightFilter('all');
     setSearchQuery('');
   };
 
@@ -421,52 +517,222 @@ export default function MaterialSelectionDialog({
         </div>
 
         {/* Filters - Fixed */}
-        <div className="px-6 pt-3 pb-3 flex-shrink-0">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Search */}
-            <div className="relative col-span-1 md:col-span-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by name..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-10"
-              />
-            </div>
+        <div className="px-6 pt-3 pb-3 flex-shrink-0 border-b border-gray-200">
+          {activeTab === 'raw_materials' ? (
+            // RAW MATERIALS: Only 4 filters - Category, Material Type, Color, Supplier
+            <>
+              {/* First Row: Search, Category, Material Type */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-10"
+                  />
+                </div>
 
-            {/* Category Filter */}
-            <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {currentCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                {/* Category Filter */}
+                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {rawMaterialCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            {/* Stock Filter - only for raw materials */}
-            {activeTab === 'raw_materials' && (
-              <Select value={stockFilter} onValueChange={(v) => { setStockFilter(v); setCurrentPage(1); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Stock Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stock Status</SelectItem>
-                  <SelectItem value="in-stock">In Stock</SelectItem>
-                  <SelectItem value="low-stock">Low Stock</SelectItem>
-                  <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+                {/* Material Type Filter */}
+                <Select value={materialTypeFilter} onValueChange={(v) => { setMaterialTypeFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Material Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Material Types</SelectItem>
+                    {materialTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Second Row: Color, Supplier */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Color Filter */}
+                <Select value={colorFilter} onValueChange={(v) => { setColorFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Colors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Colors</SelectItem>
+                    {materialColors.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        {color}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Supplier Filter */}
+                <Select value={supplierFilter} onValueChange={(v) => { setSupplierFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Suppliers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Suppliers</SelectItem>
+                    {materialSuppliers.map((supplier) => (
+                      <SelectItem key={supplier} value={supplier}>
+                        {supplier}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : (
+            // PRODUCTS: Category, Subcategory, Color, Pattern, Length, Width, Weight
+            <>
+              {/* First Row: Search, Category, Subcategory */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by name..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Category Filter */}
+                <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {productCategories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Subcategory Filter */}
+                <Select value={subcategoryFilter} onValueChange={(v) => { setSubcategoryFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Subcategories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subcategories</SelectItem>
+                    {productSubcategories.map((sub) => (
+                      <SelectItem key={sub} value={sub}>
+                        {sub}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Second Row: Color, Pattern */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                {/* Color Filter */}
+                <Select value={colorFilter} onValueChange={(v) => { setColorFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Colors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Colors</SelectItem>
+                    {productColors.map((color) => (
+                      <SelectItem key={color} value={color}>
+                        {color}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Pattern Filter */}
+                <Select value={patternFilter} onValueChange={(v) => { setPatternFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Patterns" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Patterns</SelectItem>
+                    {productPatterns.map((pattern) => (
+                      <SelectItem key={pattern} value={pattern}>
+                        {pattern}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Third Row: Length, Width, Weight - Dropdown Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Length Filter */}
+                <Select value={lengthFilter} onValueChange={(v) => { setLengthFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Lengths" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Lengths</SelectItem>
+                    {productLengths.map((length) => (
+                      <SelectItem key={length} value={length}>
+                        {length}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Width Filter */}
+                <Select value={widthFilter} onValueChange={(v) => { setWidthFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Widths" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Widths</SelectItem>
+                    {productWidths.map((width) => (
+                      <SelectItem key={width} value={width}>
+                        {width}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Weight Filter */}
+                <Select value={weightFilter} onValueChange={(v) => { setWeightFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Weights" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Weights</SelectItem>
+                    {productWeights.map((weight) => (
+                      <SelectItem key={weight} value={weight}>
+                        {weight}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Content Area - Scrollable */}

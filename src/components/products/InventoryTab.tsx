@@ -15,6 +15,8 @@ interface InventoryTabProps {
   onSearchChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onStatusChange: (value: string) => void;
+  onColorChange?: (value: string) => void;
+  onPatternChange?: (value: string) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
@@ -38,6 +40,8 @@ export default function InventoryTab({
   onSearchChange,
   onCategoryChange,
   onStatusChange,
+  onColorChange,
+  onPatternChange,
   onViewModeChange,
   onPageChange,
   onLimitChange,
@@ -58,6 +62,8 @@ export default function InventoryTab({
         onSearchChange={onSearchChange}
         onCategoryChange={onCategoryChange}
         onStatusChange={onStatusChange}
+        onColorChange={onColorChange}
+        onPatternChange={onPatternChange}
         onViewModeChange={onViewModeChange}
       />
 

@@ -173,6 +173,14 @@ export default function ProductList() {
     setFilters({ ...filters, status: value, page: 1 });
   };
 
+  const handleColorFilter = (value: string) => {
+    setFilters({ ...filters, color: value, page: 1 });
+  };
+
+  const handlePatternFilter = (value: string) => {
+    setFilters({ ...filters, pattern: value, page: 1 });
+  };
+
   const handlePageChange = (page: number) => {
     setFilters({ ...filters, page });
   };
@@ -320,6 +328,8 @@ export default function ProductList() {
             onSearchChange={handleSearch}
             onCategoryChange={handleCategoryFilter}
             onStatusChange={handleStatusFilter}
+            onColorChange={handleColorFilter}
+            onPatternChange={handlePatternFilter}
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}

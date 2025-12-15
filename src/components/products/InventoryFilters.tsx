@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   Select,
   SelectContent,
@@ -5,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ProductService } from '@/services/productService';
 import type { ProductFilters } from '@/types/product';
 
 interface InventoryFiltersProps {
@@ -14,6 +16,11 @@ interface InventoryFiltersProps {
   onCategoryChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
+  onColorChange?: (value: string) => void;
+  onPatternChange?: (value: string) => void;
+  onLengthChange?: (value: string) => void;
+  onWidthChange?: (value: string) => void;
+  onWeightChange?: (value: string) => void;
 }
 
 export default function InventoryFilters({
@@ -23,10 +30,68 @@ export default function InventoryFilters({
   onCategoryChange,
   onStatusChange,
   onViewModeChange,
+  onColorChange,
+  onPatternChange,
 }: InventoryFiltersProps) {
+  const [categories, setCategories] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>([]);
+  const [patterns, setPatterns] = useState<string[]>([]);
+  const [lengths, setLengths] = useState<string[]>([]);
+  const [widths, setWidths] = useState<string[]>([]);
+  const [weights, setWeights] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, []);
+
+  const loadFilterOptions = async () => {
+    try {
+      // Fetch all products to extract unique filter values
+      const response = await ProductService.getProducts({ limit: 1000 });
+      const products = response.products || [];
+
+      // Extract unique categories
+      const uniqueCategories = Array.from(
+        new Set(products.map((p: any) => p.category).filter(Boolean))
+      ).sort();
+      setCategories(uniqueCategories);
+
+      // Extract unique colors
+      const uniqueColors = Array.from(
+        new Set(products.map((p: any) => p.color).filter((c) => c && c !== 'N/A'))
+      ).sort();
+      setColors(uniqueColors);
+
+      // Extract unique patterns
+      const uniquePatterns = Array.from(
+        new Set(products.map((p: any) => p.pattern).filter((p) => p && p !== 'N/A'))
+      ).sort();
+      setPatterns(uniquePatterns);
+
+      // Extract unique lengths, widths, weights
+      const uniqueLengths = Array.from(
+        new Set(products.map((p: any) => p.length).filter(Boolean))
+      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      setLengths(uniqueLengths);
+
+      const uniqueWidths = Array.from(
+        new Set(products.map((p: any) => p.width).filter(Boolean))
+      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      setWidths(uniqueWidths);
+
+      const uniqueWeights = Array.from(
+        new Set(products.map((p: any) => p.weight).filter(Boolean))
+      ).sort((a, b) => parseFloat(a) - parseFloat(b));
+      setWeights(uniqueWeights);
+    } catch (error) {
+      console.error('Error loading filter options:', error);
+    }
+  };
+
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+      {/* First Row: Search, Category, Status, View */}
+      <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center mb-3">
         {/* Search */}
         <div className="relative flex-1 w-full lg:w-auto">
           <input
@@ -54,9 +119,11 @@ export default function InventoryFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="carpet">Carpet</SelectItem>
-              <SelectItem value="rug">Rug</SelectItem>
-              <SelectItem value="mat">Mat</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -101,6 +168,49 @@ export default function InventoryFilters({
           </button>
         </div>
       </div>
+
+      {/* Second Row: Additional Filters (Color, Pattern) */}
+      {(onColorChange || onPatternChange) && (
+        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+          {/* Color Filter */}
+          {onColorChange && colors.length > 0 && (
+            <div className="w-full lg:w-48">
+              <Select value={filters.color || 'all'} onValueChange={(value) => onColorChange(value === 'all' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Colors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Colors</SelectItem>
+                  {colors.map((color) => (
+                    <SelectItem key={color} value={color}>
+                      {color}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Pattern Filter */}
+          {onPatternChange && patterns.length > 0 && (
+            <div className="w-full lg:w-48">
+              <Select value={filters.pattern || 'all'} onValueChange={(value) => onPatternChange(value === 'all' ? '' : value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Patterns" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Patterns</SelectItem>
+                  {patterns.map((pattern) => (
+                    <SelectItem key={pattern} value={pattern}>
+                      {pattern}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

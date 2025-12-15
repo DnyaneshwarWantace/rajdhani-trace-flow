@@ -3,7 +3,7 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { SupplierService, type Supplier } from '@/services/supplierService';
+import { SupplierService, type Supplier, type CreateSupplierData } from '@/services/supplierService';
 import { ManageStockService, type StockOrder } from '@/services/manageStockService';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import SupplierDetailInfo from '@/components/suppliers/detail/SupplierDetailInfo
 import SupplierDetailOrderSummary from '@/components/suppliers/detail/SupplierDetailOrderSummary';
 import SupplierDetailOrderStats from '@/components/suppliers/detail/SupplierDetailOrderStats';
 import SupplierDetailOrderHistory from '@/components/suppliers/detail/SupplierDetailOrderHistory';
+import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 
 export default function SupplierDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,19 @@ export default function SupplierDetail() {
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<CreateSupplierData>({
+    name: '',
+    contact_person: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    gst_number: '',
+  });
 
   useEffect(() => {
     if (id) {
@@ -67,7 +81,54 @@ export default function SupplierDetail() {
   };
 
   const handleEdit = () => {
-    navigate(`/suppliers?edit=${id}`);
+    if (!supplier) return;
+    
+    setFormData({
+      name: supplier.name,
+      contact_person: supplier.contact_person || '',
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      address: supplier.address || '',
+      city: supplier.city || '',
+      state: supplier.state || '',
+      pincode: supplier.pincode || '',
+      gst_number: supplier.gst_number || '',
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Please fill in required field: Name', variant: 'destructive' });
+      return;
+    }
+
+    // Validate GST number if provided
+    if (formData.gst_number && formData.gst_number.trim().length > 0 && formData.gst_number.length !== 15) {
+      toast({ title: 'Validation Error', description: 'GST number must be exactly 15 characters', variant: 'destructive' });
+      return;
+    }
+
+    if (!id || !supplier) return;
+
+    try {
+      setSubmitting(true);
+      const { data, error } = await SupplierService.updateSupplier(id, formData);
+      if (error) {
+        toast({ title: 'Error', description: error, variant: 'destructive' });
+        return;
+      }
+      if (data) {
+        toast({ title: 'Success', description: 'Supplier updated successfully' });
+        setIsDialogOpen(false);
+        loadSupplier(); // Reload supplier data
+      }
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      toast({ title: 'Error', description: 'Failed to update supplier', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -123,6 +184,16 @@ export default function SupplierDetail() {
           </div>
         </div>
       </div>
+
+      <SupplierFormDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSubmit={handleSubmit}
+        formData={formData}
+        onFormDataChange={setFormData}
+        selectedSupplier={supplier}
+        submitting={submitting}
+      />
     </Layout>
   );
 }

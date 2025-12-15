@@ -3,7 +3,7 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { CustomerService, type Customer } from '@/services/customerService';
+import { CustomerService, type Customer, type CreateCustomerData } from '@/services/customerService';
 import { OrderService, type Order } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import CustomerDetailInfo from '@/components/customers/detail/CustomerDetailInfo
 import CustomerDetailFinancial from '@/components/customers/detail/CustomerDetailFinancial';
 import CustomerDetailOrderStats from '@/components/customers/detail/CustomerDetailOrderStats';
 import CustomerDetailOrderHistory from '@/components/customers/detail/CustomerDetailOrderHistory';
+import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,35 @@ export default function CustomerDetail() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState<CreateCustomerData>({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+    customer_type: 'individual',
+    company_name: '',
+    gst_number: '',
+    credit_limit: '0.00',
+    notes: '',
+    permanentAddress: {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    },
+    deliveryAddress: {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    },
+    sameAsPermanent: true,
+  });
 
   useEffect(() => {
     if (id) {
@@ -72,7 +102,96 @@ export default function CustomerDetail() {
   };
 
   const handleEdit = () => {
-    navigate(`/customers?edit=${id}`);
+    if (!customer) return;
+    
+    let permanentAddr = {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    };
+    let deliveryAddr = {
+      address: '',
+      city: '',
+      state: '',
+      pincode: '',
+    };
+
+    if (customer.permanent_address) {
+      try {
+        permanentAddr = JSON.parse(customer.permanent_address);
+      } catch (e) {
+        permanentAddr = {
+          address: customer.address || '',
+          city: customer.city || '',
+          state: customer.state || '',
+          pincode: customer.pincode || '',
+        };
+      }
+    } else {
+      permanentAddr = {
+        address: customer.address || '',
+        city: customer.city || '',
+        state: customer.state || '',
+        pincode: customer.pincode || '',
+      };
+    }
+
+    if (customer.delivery_address) {
+      try {
+        deliveryAddr = JSON.parse(customer.delivery_address);
+      } catch (e) {
+        deliveryAddr = permanentAddr;
+      }
+    } else {
+      deliveryAddr = permanentAddr;
+    }
+
+    setFormData({
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      pincode: customer.pincode || '',
+      customer_type: customer.customer_type,
+      company_name: customer.company_name || '',
+      gst_number: customer.gst_number || '',
+      notes: customer.notes || '',
+      permanentAddress: permanentAddr,
+      deliveryAddress: deliveryAddr,
+      sameAsPermanent: JSON.stringify(permanentAddr) === JSON.stringify(deliveryAddr),
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.name.trim() || !formData.phone.trim()) {
+      toast({ title: 'Validation Error', description: 'Please fill in required fields (Name and Phone)', variant: 'destructive' });
+      return;
+    }
+
+    if (!id || !customer) return;
+
+    try {
+      setSubmitting(true);
+      const { data, error } = await CustomerService.updateCustomer(id, formData);
+      if (error) {
+        toast({ title: 'Error', description: error, variant: 'destructive' });
+        return;
+      }
+      if (data) {
+        toast({ title: 'Success', description: 'Customer updated successfully' });
+        setIsDialogOpen(false);
+        loadCustomer(); // Reload customer data
+      }
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      toast({ title: 'Error', description: 'Failed to update customer', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -128,6 +247,16 @@ export default function CustomerDetail() {
           </div>
         </div>
       </div>
+
+      <CustomerFormDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSubmit={handleSubmit}
+        formData={formData}
+        onFormDataChange={setFormData}
+        selectedCustomer={customer}
+        submitting={submitting}
+      />
     </Layout>
   );
 }
