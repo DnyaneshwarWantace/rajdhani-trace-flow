@@ -87,7 +87,6 @@ export default function MaterialSelectorDialog({
 
   // Data loading state
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [materialsTotal, setMaterialsTotal] = useState(0);
@@ -115,7 +114,6 @@ export default function MaterialSelectorDialog({
     setMaterialsPage(1);
     setProductsPage(1);
     setRawMaterials([]);
-    setProducts([]);
     setAllProducts([]);
   };
 

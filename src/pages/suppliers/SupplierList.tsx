@@ -27,7 +27,6 @@ export default function SupplierList() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);

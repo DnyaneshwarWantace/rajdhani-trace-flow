@@ -32,6 +32,9 @@ export default function InventoryFilters({
   onViewModeChange,
   onColorChange,
   onPatternChange,
+  onLengthChange,
+  onWidthChange,
+  onWeightChange,
 }: InventoryFiltersProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
@@ -169,47 +172,114 @@ export default function InventoryFilters({
         </div>
       </div>
 
-      {/* Second Row: Additional Filters (Color, Pattern) */}
-      {(onColorChange || onPatternChange) && (
-        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
-          {/* Color Filter */}
-          {onColorChange && colors.length > 0 && (
-            <div className="w-full lg:w-48">
-              <Select value={filters.color || 'all'} onValueChange={(value) => onColorChange(value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Colors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Colors</SelectItem>
-                  {colors.map((color) => (
-                    <SelectItem key={color} value={color}>
-                      {color}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Second Row: Additional Filters (Color, Pattern, Length, Width, Weight) */}
+      {(onColorChange || onPatternChange || onLengthChange || onWidthChange || onWeightChange) && (
+        <>
+          {/* Row 2a: Color, Pattern */}
+          {(onColorChange || onPatternChange) && (
+            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
+              {/* Color Filter */}
+              {onColorChange && colors.length > 0 && (
+                <div className="w-full lg:w-48">
+                  <Select value={filters.color || 'all'} onValueChange={(value) => onColorChange(value === 'all' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Colors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Colors</SelectItem>
+                      {colors.map((color) => (
+                        <SelectItem key={color} value={color}>
+                          {color}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Pattern Filter */}
+              {onPatternChange && patterns.length > 0 && (
+                <div className="w-full lg:w-48">
+                  <Select value={filters.pattern || 'all'} onValueChange={(value) => onPatternChange(value === 'all' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Patterns" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Patterns</SelectItem>
+                      {patterns.map((pattern) => (
+                        <SelectItem key={pattern} value={pattern}>
+                          {pattern}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Pattern Filter */}
-          {onPatternChange && patterns.length > 0 && (
-            <div className="w-full lg:w-48">
-              <Select value={filters.pattern || 'all'} onValueChange={(value) => onPatternChange(value === 'all' ? '' : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Patterns" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Patterns</SelectItem>
-                  {patterns.map((pattern) => (
-                    <SelectItem key={pattern} value={pattern}>
-                      {pattern}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Row 2b: Length, Width, Weight */}
+          {(onLengthChange || onWidthChange || onWeightChange) && (
+            <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center mt-3">
+              {/* Length Filter */}
+              {onLengthChange && lengths.length > 0 && (
+                <div className="w-full lg:w-48">
+                  <Select value={filters.length || 'all'} onValueChange={(value) => onLengthChange(value === 'all' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Lengths" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Lengths</SelectItem>
+                      {lengths.map((length) => (
+                        <SelectItem key={length} value={length}>
+                          {length}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Width Filter */}
+              {onWidthChange && widths.length > 0 && (
+                <div className="w-full lg:w-48">
+                  <Select value={filters.width || 'all'} onValueChange={(value) => onWidthChange(value === 'all' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Widths" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Widths</SelectItem>
+                      {widths.map((width) => (
+                        <SelectItem key={width} value={width}>
+                          {width}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Weight Filter */}
+              {onWeightChange && weights.length > 0 && (
+                <div className="w-full lg:w-48">
+                  <Select value={filters.weight || 'all'} onValueChange={(value) => onWeightChange(value === 'all' ? '' : value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Weights" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Weights</SelectItem>
+                      {weights.map((weight) => (
+                        <SelectItem key={weight} value={weight}>
+                          {weight}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           )}
-        </div>
+        </>
       )}
     </div>
   );

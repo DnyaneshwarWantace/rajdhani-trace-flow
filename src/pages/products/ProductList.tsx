@@ -181,6 +181,18 @@ export default function ProductList() {
     setFilters({ ...filters, pattern: value, page: 1 });
   };
 
+  const handleLengthFilter = (value: string) => {
+    setFilters({ ...filters, length: value, page: 1 });
+  };
+
+  const handleWidthFilter = (value: string) => {
+    setFilters({ ...filters, width: value, page: 1 });
+  };
+
+  const handleWeightFilter = (value: string) => {
+    setFilters({ ...filters, weight: value, page: 1 });
+  };
+
   const handlePageChange = (page: number) => {
     setFilters({ ...filters, page });
   };
@@ -330,6 +342,9 @@ export default function ProductList() {
             onStatusChange={handleStatusFilter}
             onColorChange={handleColorFilter}
             onPatternChange={handlePatternFilter}
+            onLengthChange={handleLengthFilter}
+            onWidthChange={handleWidthFilter}
+            onWeightChange={handleWeightFilter}
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}
