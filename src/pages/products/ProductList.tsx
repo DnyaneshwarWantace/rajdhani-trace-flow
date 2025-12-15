@@ -197,8 +197,10 @@ export default function ProductList() {
   };
 
   const handleProduction = (product: Product) => {
-    console.log('Set to production:', product);
-    alert(`Setting ${product.name} to production - This will be implemented`);
+    // Navigate to production create page with product data
+    navigate('/production/new', {
+      state: { product }
+    });
   };
 
   const handleQRCode = (product: Product) => {
@@ -301,7 +303,7 @@ export default function ProductList() {
         {/* Inventory Tab Content */}
         {activeTab === 'inventory' && (
           <InventoryTab
-            products={products}
+                      products={products}
             loading={loading}
             error={error}
             filters={filters}
@@ -313,11 +315,11 @@ export default function ProductList() {
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDuplicate={handleDuplicate}
+                      onView={handleView}
+                      onEdit={handleEdit}
+                      onDuplicate={handleDuplicate}
             onStock={handleStock}
-            onProduction={handleProduction}
+                      onProduction={handleProduction}
             onQRCode={handleQRCode}
             onDelete={handleDelete}
             isAdmin={canDeleteProducts}

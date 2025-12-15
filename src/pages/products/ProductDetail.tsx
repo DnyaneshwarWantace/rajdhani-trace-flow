@@ -15,7 +15,7 @@ import ProductDetailRecipe from '@/components/products/detail/ProductDetailRecip
 import { RecipeService } from '@/services/recipeService';
 import type { Recipe } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Factory, Package, Edit } from 'lucide-react';
 import ProductFormModal from '@/components/products/ProductFormModal';
 
 export default function ProductDetail() {
@@ -180,10 +180,32 @@ export default function ProductDetail() {
               {/* Quick Actions Card */}
               <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                <ProductDetailActions
-                  onEdit={handleEdit}
-                  onStock={handleStock}
-                />
+                <div className="space-y-3">
+                  {handleEdit && (
+                    <Button className="w-full justify-start" onClick={handleEdit}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Product
+                    </Button>
+                  )}
+                  {handleStock && (
+                    <Button variant="outline" className="w-full justify-start" onClick={handleStock}>
+                      <Package className="w-4 h-4 mr-2" />
+                      Stock
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                    onClick={() => {
+                      navigate('/production/new', {
+                        state: { product }
+                      });
+                    }}
+                  >
+                    <Factory className="w-4 h-4 mr-2" />
+                    Create Production Batch
+                  </Button>
+                </div>
               </div>
 
               {/* Additional Info */}

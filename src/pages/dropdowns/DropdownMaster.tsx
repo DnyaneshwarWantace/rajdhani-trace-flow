@@ -93,57 +93,55 @@ export default function DropdownMaster() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dropdown Master</h1>
-            <p className="text-gray-600">Manage all dropdown options, units, and data</p>
-          </div>
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Dropdown Master</h1>
+          <p className="text-sm text-gray-600">Manage all dropdown options, units, and data</p>
+        </div>
 
-          {/* Navigation Tabs - Same style as Product page */}
-          <DropdownTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        {/* Navigation Tabs - Same style as Product page */}
+        <DropdownTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {/* Tab Content */}
-          <div className="space-y-6">
-            {activeTab === 'product' && (
-              <ProductTab
-                getOptionsByCategory={getOptionsByCategory}
-                formData={formData}
-                simpleFormData={simpleFormData}
-                onEdit={handleEdit}
-                onDelete={(opt) => setDeletingOption(opt)}
-                onToggleActive={toggleActive}
-                onAddCombined={handleAddCombined}
-                onAddSimple={handleAddSimple}
-                onFormDataChange={handleFormDataChange}
-                onSimpleFormDataChange={handleSimpleFormDataChange}
-              />
-            )}
+        {/* Tab Content */}
+        <div className="space-y-6">
+          {activeTab === 'product' && (
+            <ProductTab
+              getOptionsByCategory={getOptionsByCategory}
+              formData={formData}
+              simpleFormData={simpleFormData}
+              onEdit={handleEdit}
+              onDelete={(opt) => setDeletingOption(opt)}
+              onToggleActive={toggleActive}
+              onAddCombined={handleAddCombined}
+              onAddSimple={handleAddSimple}
+              onFormDataChange={handleFormDataChange}
+              onSimpleFormDataChange={handleSimpleFormDataChange}
+            />
+          )}
 
-            {activeTab === 'material' && (
-              <MaterialTab
-                getOptionsByCategory={getOptionsByCategory}
-                simpleFormData={simpleFormData}
-                onEdit={handleEdit}
-                onDelete={(opt) => setDeletingOption(opt)}
-                onToggleActive={toggleActive}
-                onAddSimple={handleAddSimple}
-                onSimpleFormDataChange={handleSimpleFormDataChange}
-              />
-            )}
+          {activeTab === 'material' && (
+            <MaterialTab
+              getOptionsByCategory={getOptionsByCategory}
+              simpleFormData={simpleFormData}
+              onEdit={handleEdit}
+              onDelete={(opt) => setDeletingOption(opt)}
+              onToggleActive={toggleActive}
+              onAddSimple={handleAddSimple}
+              onSimpleFormDataChange={handleSimpleFormDataChange}
+            />
+          )}
 
-            {activeTab === 'production' && (
-              <ProductionTab
-                getOptionsByCategory={getOptionsByCategory}
-                simpleFormData={simpleFormData}
-                onEdit={handleEdit}
-                onDelete={(opt) => setDeletingOption(opt)}
-                onToggleActive={toggleActive}
-                onAddSimple={handleAddSimple}
-                onSimpleFormDataChange={handleSimpleFormDataChange}
-              />
-            )}
-          </div>
+          {activeTab === 'production' && (
+            <ProductionTab
+              getOptionsByCategory={getOptionsByCategory}
+              simpleFormData={simpleFormData}
+              onEdit={handleEdit}
+              onDelete={(opt) => setDeletingOption(opt)}
+              onToggleActive={toggleActive}
+              onAddSimple={handleAddSimple}
+              onSimpleFormDataChange={handleSimpleFormDataChange}
+            />
+          )}
         </div>
 
         {/* Edit Dialog */}

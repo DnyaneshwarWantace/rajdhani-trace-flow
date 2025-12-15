@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 interface MenuItem {
   name: string;
@@ -137,8 +138,25 @@ const menuItems: MenuItem[] = [
 export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const location = useLocation();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
+  const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
 
   const isActive = (path: string) => location.pathname === path;
+
+  useEffect(() => {
+    if (hoveredItem && linkRefs.current.has(hoveredItem)) {
+      const element = linkRefs.current.get(hoveredItem);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setTooltipPosition({
+          top: rect.top + rect.height / 2,
+          left: rect.right + 8,
+        });
+      }
+    } else {
+      setTooltipPosition(null);
+    }
+  }, [hoveredItem]);
 
   return (
     <>
@@ -156,8 +174,7 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           fixed top-16 left-0 z-50 h-[calc(100vh-4rem)]
           bg-white border-r border-gray-200 shadow-lg
           transition-all duration-300 ease-in-out
-          ${isOpen ? 'w-56 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16'}
-          ${isOpen ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden lg:overflow-visible'}
+          ${isOpen ? 'w-56 translate-x-0 overflow-y-auto overflow-x-hidden' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16 overflow-y-auto overflow-x-visible'}
         `}
       >
         <div className={`flex flex-col h-full p-3 ${isOpen ? 'min-w-[14rem]' : 'lg:min-w-[4rem]'}`}>
@@ -187,11 +204,14 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </div>
 
           {/* Navigation Menu */}
-          <nav className="flex-1 space-y-1 overflow-y-auto">
+          <nav className={`flex-1 space-y-1 ${isOpen ? 'overflow-y-auto' : 'overflow-visible'}`}>
             {menuItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
+                ref={(el) => {
+                  if (el) linkRefs.current.set(item.name, el);
+                }}
                 onClick={() => {
                   setHoveredItem(null); // Clear hover state immediately
                   // Only close sidebar on mobile (not on desktop when already collapsed)
@@ -202,15 +222,14 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
                 onMouseEnter={() => !isOpen && setHoveredItem(item.name)} // Only hover when collapsed
                 onMouseLeave={() => setHoveredItem(null)}
                 className={`
-                  relative flex items-center gap-3 px-3 py-3 rounded-xl
+                  relative flex items-center gap-3 rounded-lg
                   transition-all duration-200
                   ${
                     isActive(item.path)
                       ? 'bg-primary-50 text-primary-600'
                       : 'text-gray-600 hover:bg-gray-100'
                   }
-                  ${isOpen ? 'justify-start' : 'justify-center lg:justify-center'}
-                  ${!isOpen ? 'lg:min-w-[3rem]' : 'w-full'}
+                  ${isOpen ? 'justify-start px-3 py-3 w-full' : 'justify-center p-2 w-9 mx-auto'}
                 `}
               >
                 <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-current">
@@ -224,14 +243,6 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
                   </span>
                 )}
 
-                {/* Tooltip - Show when sidebar is collapsed on desktop */}
-                {!isOpen && hoveredItem === item.name && (
-                  <div className="hidden lg:block absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap z-[9999] shadow-xl pointer-events-none">
-                    {item.name}
-                    <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
-                  </div>
-                )}
-
                 {/* Active Indicator */}
                 {isActive(item.path) && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary-600 rounded-r-full"></div>
@@ -241,6 +252,24 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           </nav>
         </div>
       </aside>
+
+      {/* Portal-based Tooltip - Rendered at body level */}
+      {!isOpen && hoveredItem && tooltipPosition &&
+        createPortal(
+          <div
+            className="hidden lg:block fixed px-3 py-2 bg-white text-gray-900 text-sm rounded-lg whitespace-nowrap shadow-xl border border-gray-200 pointer-events-none"
+            style={{
+              top: `${tooltipPosition.top}px`,
+              left: `${tooltipPosition.left}px`,
+              transform: 'translateY(-50%)',
+              zIndex: 99999,
+            }}
+          >
+            {hoveredItem}
+            <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2 bg-white border-l border-b border-gray-200 rotate-45"></div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

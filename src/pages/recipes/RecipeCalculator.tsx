@@ -370,10 +370,10 @@ export default function RecipeCalculator() {
 
   return (
     <Layout>
-      <div className="flex-1 space-y-4 p-4 md:p-6">
-        <div className="mb-4">
-          <h1 className="text-2xl md:text-3xl font-bold">Recipe Calculator</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-1">
+      <div className="space-y-4">
+        <div className="mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Recipe Calculator</h1>
+          <p className="text-sm text-gray-600 mt-2">
             Calculate raw materials needed for production using SQM-based recipes
           </p>
         </div>

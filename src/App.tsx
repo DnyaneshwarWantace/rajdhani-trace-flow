@@ -25,6 +25,10 @@ import CustomerList from '@/pages/customers/CustomerList';
 import CustomerDetail from '@/pages/customers/CustomerDetail';
 import SupplierList from '@/pages/suppliers/SupplierList';
 import SupplierDetail from '@/pages/suppliers/SupplierDetail';
+import ProductionList from '@/pages/production/ProductionList';
+import ProductionDetail from '@/pages/production/ProductionDetail';
+import ProductionCreate from '@/pages/production/ProductionCreate';
+import PlanningStage from '@/pages/production/PlanningStage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -121,6 +125,38 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <ManageStock />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/production"
+        element={
+          <PrivateRoute>
+            <ProductionList />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/production/new"
+        element={
+          <PrivateRoute>
+            <ProductionCreate />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/production/planning"
+        element={
+          <PrivateRoute>
+            <PlanningStage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/production/:id"
+        element={
+          <PrivateRoute>
+            <ProductionDetail />
           </PrivateRoute>
         }
       />

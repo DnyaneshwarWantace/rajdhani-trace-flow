@@ -10,10 +10,15 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   // Initialize activity logs (Socket.IO connection)
   useActivityLogs();
-  // Initialize sidebar state: closed on mobile, open on desktop
+  // Initialize sidebar state: use localStorage to persist user preference
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-    // Check if we're on desktop (lg breakpoint = 1024px)
     if (typeof window !== 'undefined') {
+      // Check localStorage first
+      const savedState = localStorage.getItem('sidebarOpen');
+      if (savedState !== null) {
+        return savedState === 'true';
+      }
+      // Default: open on desktop, closed on mobile
       return window.innerWidth >= 1024;
     }
     return false; // Default to closed on SSR
@@ -35,11 +40,14 @@ export default function Layout({ children }: LayoutProps) {
   }, [isSidebarOpen]);
 
   const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+    const newState = !isSidebarOpen;
+    setIsSidebarOpen(newState);
+    localStorage.setItem('sidebarOpen', String(newState));
   };
 
   const closeSidebar = () => {
     setIsSidebarOpen(false);
+    localStorage.setItem('sidebarOpen', 'false');
   };
 
   return (

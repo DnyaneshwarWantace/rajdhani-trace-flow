@@ -1,0 +1,298 @@
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
+
+export interface ProductionBatch {
+  id: string;
+  batch_number: string;
+  product_id: string;
+  product_name?: string;
+  order_id?: string;
+  planned_quantity: number;
+  actual_quantity?: number;
+  start_date?: string;
+  completion_date?: string;
+  status: 'planned' | 'in_progress' | 'in_production' | 'completed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  operator?: string;
+  supervisor?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  // Product details (populated when needed)
+  category?: string;
+  subcategory?: string;
+  length?: string;
+  width?: string;
+  length_unit?: string;
+  width_unit?: string;
+  weight?: string;
+  weight_unit?: string;
+  color?: string;
+  pattern?: string;
+}
+
+export interface CreateProductionBatchData {
+  product_id: string;
+  planned_quantity: number;
+  order_id?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  start_date?: string;
+  completion_date?: string;
+  operator?: string;
+  supervisor?: string;
+  notes?: string;
+}
+
+export interface UpdateProductionBatchData extends Partial<CreateProductionBatchData> {
+  status?: 'planned' | 'in_progress' | 'in_production' | 'completed';
+  actual_quantity?: number;
+}
+
+export class ProductionService {
+  private static getHeaders(): HeadersInit {
+    const token = localStorage.getItem('auth_token');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    };
+  }
+
+  static async createBatch(batchData: CreateProductionBatchData): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(batchData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to create production batch' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in createBatch:', error);
+      return { data: null, error: 'Failed to create production batch' };
+    }
+  }
+
+  static async getBatches(filters?: {
+    search?: string;
+    status?: string;
+    priority?: string;
+  }): Promise<{ data: ProductionBatch[] | null; error: string | null }> {
+    try {
+      const params = new URLSearchParams();
+
+      if (filters?.search) params.append('search', filters.search);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.priority) params.append('priority', filters.priority);
+
+      const response = await fetch(`${API_URL}/production/batches?${params}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch production batches' };
+      }
+
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error in getBatches:', error);
+      return { data: null, error: 'Failed to fetch production batches' };
+    }
+  }
+
+  static async getBatchById(batchId: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Batch not found' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in getBatchById:', error);
+      return { data: null, error: 'Failed to fetch batch' };
+    }
+  }
+
+  static async updateBatch(batchId: string, updateData: UpdateProductionBatchData): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(updateData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to update batch' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in updateBatch:', error);
+      return { data: null, error: 'Failed to update batch' };
+    }
+  }
+
+  static async deleteBatch(batchId: string): Promise<{ data: boolean | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to delete batch' };
+      }
+
+      return { data: result.success, error: null };
+    } catch (error) {
+      console.error('Error in deleteBatch:', error);
+      return { data: null, error: 'Failed to delete batch' };
+    }
+  }
+
+  static async getProductionStats(): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/stats`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch production stats' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in getProductionStats:', error);
+      return { data: null, error: 'Failed to fetch production stats' };
+    }
+  }
+
+  static async getProductionFlowByBatchId(batchId: string): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/flows/batch/${batchId}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch production flow' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in getProductionFlowByBatchId:', error);
+      return { data: null, error: 'Failed to fetch production flow' };
+    }
+  }
+
+  static async getMaterialConsumption(batchId: string): Promise<{ data: any[] | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/material-consumption?production_batch_id=${batchId}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch material consumption' };
+      }
+
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error in getMaterialConsumption:', error);
+      return { data: null, error: 'Failed to fetch material consumption' };
+    }
+  }
+
+  // Planning Draft State methods
+  static async saveDraftPlanningState(
+    productId: string,
+    draftState: {
+      formData: any;
+      recipeData?: any;
+    }
+  ): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/planning-draft`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          product_id: productId,
+          form_data: draftState.formData,
+          recipe_data: draftState.recipeData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to save draft state' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in saveDraftPlanningState:', error);
+      return { data: null, error: 'Failed to save draft state' };
+    }
+  }
+
+  static async getDraftPlanningState(productId: string): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/planning-draft/${productId}`, {
+        headers: this.getHeaders(),
+      });
+
+      const result = await response.json();
+
+      if (response.status === 404) {
+        return { data: null, error: null }; // No draft state found, not an error
+      }
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch draft state' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in getDraftPlanningState:', error);
+      return { data: null, error: 'Failed to fetch draft state' };
+    }
+  }
+
+  static async deleteDraftPlanningState(productId: string): Promise<{ data: boolean | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/planning-draft/${productId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to delete draft state' };
+      }
+
+      return { data: result.success, error: null };
+    } catch (error) {
+      console.error('Error in deleteDraftPlanningState:', error);
+      return { data: null, error: 'Failed to delete draft state' };
+    }
+  }
+}
+
