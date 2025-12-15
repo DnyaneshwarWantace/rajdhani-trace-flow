@@ -89,6 +89,7 @@ export interface ProductFilters {
   search?: string;
   category?: string;
   status?: string;
+  stock_status?: string;
   page?: number;
   limit?: number;
 }

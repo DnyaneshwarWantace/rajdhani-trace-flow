@@ -15,8 +15,8 @@ export class ProductService {
   static async getProducts(filters?: ProductFilters): Promise<{ products: Product[]; total: number }> {
     const queryParams = new URLSearchParams();
     if (filters?.search) queryParams.append('search', filters.search);
-    if (filters?.category) queryParams.append('category', filters.category);
-    if (filters?.status) queryParams.append('status', filters.status);
+    if (filters?.category && filters.category !== 'all') queryParams.append('category', filters.category);
+    if (filters?.status && filters.status !== 'all') queryParams.append('status', filters.status);
     
     // Backend uses offset and limit, not page
     const limit = filters?.limit || 20;

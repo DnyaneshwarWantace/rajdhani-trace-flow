@@ -10,7 +10,6 @@ import ProductDetailStats from '@/components/products/detail/ProductDetailStats'
 import ProductDetailInfo from '@/components/products/detail/ProductDetailInfo';
 import ProductDetailDimensions from '@/components/products/detail/ProductDetailDimensions';
 import ProductDetailStock from '@/components/products/detail/ProductDetailStock';
-import ProductDetailActions from '@/components/products/detail/ProductDetailActions';
 import ProductDetailRecipe from '@/components/products/detail/ProductDetailRecipe';
 import { RecipeService } from '@/services/recipeService';
 import type { Recipe } from '@/types/recipe';

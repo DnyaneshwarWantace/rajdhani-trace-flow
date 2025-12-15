@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Mail, Phone, MapPin, User, FileText, Calendar } from 'lucide-react';
+import { Mail, Phone, User, FileText, Calendar } from 'lucide-react';
 
 interface SupplierDetailModalProps {
   isOpen: boolean;
@@ -61,11 +61,13 @@ export default function SupplierDetailModal({
               {supplier.gst_number && (
                 <InfoRow icon={FileText} label="GST Number" value={supplier.gst_number} />
               )}
-              <InfoRow
-                icon={Calendar}
-                label="Added On"
-                value={new Date(supplier.created_at).toLocaleDateString()}
-              />
+              {supplier.created_at && (
+                <InfoRow
+                  icon={Calendar}
+                  label="Added On"
+                  value={new Date(supplier.created_at).toLocaleDateString()}
+                />
+              )}
             </div>
           </div>
 
@@ -87,11 +89,11 @@ export default function SupplierDetailModal({
           )}
 
           {/* Additional Information */}
-          {supplier.notes && (
+          {(supplier as any).notes && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Notes</h3>
               <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-700">{supplier.notes}</p>
+                <p className="text-sm text-gray-700">{(supplier as any).notes}</p>
               </div>
             </div>
           )}

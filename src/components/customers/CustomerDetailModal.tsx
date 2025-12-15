@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, MapPin, Building, FileText, Calendar } from 'lucide-react';
+import { Mail, Phone, FileText, Calendar } from 'lucide-react';
 
 interface CustomerDetailModalProps {
   isOpen: boolean;

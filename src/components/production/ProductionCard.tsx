@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, ClipboardList, Factory, Trash, Package } from 'lucide-react';
+import { Edit, Trash2, Eye, ClipboardList, Factory } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -38,8 +38,6 @@ export default function ProductionCard({ batch, onEdit, onDelete, canDelete }: P
     const stage = getCurrentStage();
     if (stage === 'planning') navigate(`/production/planning?batchId=${batch.id}`);
     else if (stage === 'machine') navigate(`/production/${batch.id}/machine`);
-    else if (stage === 'wastage') navigate(`/production/${batch.id}/wastage`);
-    else if (stage === 'individual-products') navigate(`/production/${batch.id}/individual-products`);
   };
 
   const getStageButton = () => {
@@ -59,24 +57,6 @@ export default function ProductionCard({ batch, onEdit, onDelete, canDelete }: P
         <Button variant="outline" size="sm" className="w-full text-xs py-1 h-7 bg-green-50 border-green-300 text-green-700" onClick={handleStageClick}>
           <Factory className="w-3 h-3 mr-1" />
           Machine
-        </Button>
-      );
-    }
-
-    if (stage === 'wastage') {
-      return (
-        <Button variant="outline" size="sm" className="w-full text-xs py-1 h-7 bg-orange-50 border-orange-300 text-orange-700" onClick={handleStageClick}>
-          <Trash className="w-3 h-3 mr-1" />
-          Wastage
-        </Button>
-      );
-    }
-
-    if (stage === 'individual-products') {
-      return (
-        <Button variant="outline" size="sm" className="w-full text-xs py-1 h-7 bg-purple-50 border-purple-300 text-purple-700" onClick={handleStageClick}>
-          <Package className="w-3 h-3 mr-1" />
-          Products
         </Button>
       );
     }

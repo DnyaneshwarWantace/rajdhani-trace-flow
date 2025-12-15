@@ -132,13 +132,12 @@ export default function CustomerFormDialog({
   };
 
   // Handler for address fields with different limits based on field type
-  const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+  const handleAddressChange = (value: string, field: 'address' | 'city' | 'state'): string => {
     let inputValue = value;
 
-    // For city and state, reject numbers
+    // For city and state, allow only letters and spaces
     if (field === 'city' || field === 'state') {
-      // Remove any digits from city and state
-      inputValue = inputValue.replace(/\d/g, '');
+      inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
     }
 
     // Different limits for different fields
@@ -186,45 +185,18 @@ export default function CustomerFormDialog({
 
     inputValue = processedParts.join('');
     onFormDataChange({ ...formData, [field]: inputValue });
+    return inputValue;
   };
 
   const nameWordCount = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const companyWordCount = formData.company_name?.trim() ? formData.company_name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  const addressWordCount = formData.address?.trim() ? formData.address.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  const cityWordCount = formData.city?.trim() ? formData.city.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  const stateWordCount = formData.state?.trim() ? formData.state.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  // Future word-count validation (currently unused)
+  // const addressWordCount = ...
+  // const cityWordCount = ...
+  // const stateWordCount = ...
 
   // Handler for pincode (max 10 digits) with auto-fill
   const [fetchingLocation, setFetchingLocation] = useState(false);
-
-  const handlePincodeChange = async (value: string) => {
-    // Only allow digits and limit to 10 characters
-    const numericValue = value.replace(/\D/g, '').slice(0, 10);
-    onFormDataChange({ ...formData, pincode: numericValue });
-
-    // Auto-fetch city and state when pincode is 6 digits (Indian pincode format)
-    if (numericValue.length === 6) {
-      setFetchingLocation(true);
-      try {
-        const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
-        const data = await response.json();
-
-        if (data && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
-          const postOffice = data[0].PostOffice[0];
-          onFormDataChange({
-            ...formData,
-            pincode: numericValue,
-            city: postOffice.District || formData.city,
-            state: postOffice.State || formData.state,
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching location from pincode:', error);
-      } finally {
-        setFetchingLocation(false);
-      }
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -362,11 +334,10 @@ export default function CustomerFormDialog({
                 <Input
                   value={formData.permanentAddress?.city || ''}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    handleAddressChange(value, 'city');
+                    const cleaned = handleAddressChange(e.target.value, 'city');
                     onFormDataChange({
                       ...formData,
-                      permanentAddress: { ...formData.permanentAddress!, city: value }
+                      permanentAddress: { ...formData.permanentAddress!, city: cleaned }
                     });
                   }}
                   placeholder="e.g., Mumbai"
@@ -380,11 +351,10 @@ export default function CustomerFormDialog({
                 <Input
                   value={formData.permanentAddress?.state || ''}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    handleAddressChange(value, 'state');
+                    const cleaned = handleAddressChange(e.target.value, 'state');
                     onFormDataChange({
                       ...formData,
-                      permanentAddress: { ...formData.permanentAddress!, state: value }
+                      permanentAddress: { ...formData.permanentAddress!, state: cleaned }
                     });
                   }}
                   placeholder="e.g., Maharashtra"

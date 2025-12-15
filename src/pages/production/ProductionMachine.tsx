@@ -5,12 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowLeft, Trash2 } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
-import { useToast } from '@/hooks/use-toast';
 
 export default function ProductionMachine() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [batch, setBatch] = useState<ProductionBatch | null>(null);
   const [loading, setLoading] = useState(true);
 

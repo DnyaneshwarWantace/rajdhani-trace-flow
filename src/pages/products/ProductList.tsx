@@ -110,7 +110,15 @@ export default function ProductList() {
     try {
       setLoading(true);
       setError(null);
-      const { products: data, total } = await ProductService.getProducts(filters);
+      
+      // Backend expects 'status' parameter with values: 'in-stock', 'low-stock', 'out-of-stock'
+      // Only send status if it's not empty
+      const statusParam = filters.status && filters.status !== 'all' ? filters.status : undefined;
+
+      const { products: data, total } = await ProductService.getProducts({
+        ...filters,
+        status: statusParam,
+      });
       setProducts(data);
       setTotalProducts(total);
     } catch (err) {

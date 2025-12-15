@@ -117,14 +117,13 @@ export default function CustomerList() {
 
         // Calculate total revenue from orders
         const totalRevenue = orders.reduce((sum, order) => {
-          // Check if order belongs to any customer in the list
           const hasCustomer = data.some(c =>
-            (order.customer_id && order.customer_id === c.id) ||
-            (!order.customer_id && c.name && order.customer?.toLowerCase().trim() === c.name.toLowerCase().trim())
+            (order.customerId && order.customerId === c.id) ||
+            (!order.customerId && c.name && order.customerName?.toLowerCase().trim() === c.name.toLowerCase().trim())
           );
 
-          if (hasCustomer && order.totalPrice) {
-            return sum + parseFloat(order.totalPrice.toString());
+          if (hasCustomer && order.totalAmount) {
+            return sum + Number(order.totalAmount);
           }
           return sum;
         }, 0);

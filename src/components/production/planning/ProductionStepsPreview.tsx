@@ -36,7 +36,6 @@ export default function ProductionStepsPreview({ steps }: ProductionStepsPreview
   }
 
   const totalDuration = steps.reduce((sum, step) => sum + (step.estimated_duration || 0), 0);
-  const completedSteps = steps.filter(s => s.status === 'completed').length;
 
   return (
     <Card>
@@ -63,7 +62,7 @@ export default function ProductionStepsPreview({ steps }: ProductionStepsPreview
 
         {/* Steps List */}
         <div className="space-y-3">
-          {steps.map((step, index) => (
+          {steps.map((step) => (
             <div
               key={step.step_number}
               className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
