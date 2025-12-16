@@ -1,19 +1,13 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Search } from 'lucide-react';
 
 interface ProductionFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  priorityFilter: string;
-  onPriorityFilterChange: (value: string) => void;
+  priorityFilter: string[];
+  onPriorityFilterChange: (values: string[]) => void;
 }
 
 export default function ProductionFilters({
@@ -35,19 +29,18 @@ export default function ProductionFilters({
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
-          <div className="w-full lg:w-40">
-            <Select value={priorityFilter} onValueChange={onPriorityFilterChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Priority</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-full lg:w-48">
+            <MultiSelect
+              options={[
+                { label: 'Low', value: 'low' },
+                { label: 'Medium', value: 'medium' },
+                { label: 'High', value: 'high' },
+                { label: 'Urgent', value: 'urgent' },
+              ]}
+              selected={priorityFilter}
+              onChange={onPriorityFilterChange}
+              placeholder="All Priority"
+            />
           </div>
         </div>
       </CardContent>

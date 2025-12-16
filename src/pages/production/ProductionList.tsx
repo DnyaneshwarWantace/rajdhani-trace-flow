@@ -25,7 +25,7 @@ export default function ProductionList() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -163,9 +163,9 @@ export default function ProductionList() {
       );
     }
 
-    // Filter by priority
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(batch => batch.priority === priorityFilter);
+    // Filter by priority (multi-select)
+    if (priorityFilter.length > 0) {
+      filtered = filtered.filter(batch => priorityFilter.includes(batch.priority));
     }
 
     setFilteredBatches(filtered);

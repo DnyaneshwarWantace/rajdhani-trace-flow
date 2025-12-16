@@ -32,7 +32,7 @@ export default function ProductList() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [viewMode, setViewMode] = useState<'grid' | 'table' | 'grouped'>('table');
   const [totalProducts, setTotalProducts] = useState(0);
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
@@ -367,7 +367,7 @@ export default function ProductList() {
                       onProduction={handleProduction}
             onQRCode={handleQRCode}
             onDelete={handleDelete}
-            isAdmin={canDeleteProducts}
+            canDelete={canDeleteProducts}
           />
         )}
 

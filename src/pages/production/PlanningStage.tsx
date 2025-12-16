@@ -17,6 +17,7 @@ import ProductionOverviewStats from '@/components/production/planning/Production
 import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
 import MaterialRequirementsTable from '@/components/production/planning/MaterialRequirementsTable';
 import MaterialSelectionDialog from '@/components/production/planning/MaterialSelectionDialog';
+import MachineSelectionDialog from '@/components/production/planning/MachineSelectionDialog';
 
 export default function PlanningStage() {
   const navigate = useNavigate();
@@ -27,6 +28,8 @@ export default function PlanningStage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
+  const [showMachineDialog, setShowMachineDialog] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     planned_quantity: 0,
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
@@ -488,29 +491,44 @@ export default function PlanningStage() {
       
       if (newMaterialsToAdd.length > 0) {
         setConsumedMaterials([...consumedMaterials, ...newMaterialsToAdd]);
-      } else {
+        
+        // 4. Clear ALL materials from requirements section that are now in production
+        // This includes both newly added materials AND materials that were already in production
+        // (to prevent confusion where same material appears in both sections)
+        const allProductionMaterialIds = new Set([
+          ...consumedMaterials.map((m) => m.material_id),
+          ...newMaterialsToAdd.map((m) => m.material_id),
+        ]);
+        setMaterials(materials.filter((m) => !allProductionMaterialIds.has(m.material_id)));
+
         toast({
-          title: 'Info',
-          description: 'All materials are already added to production',
-          variant: 'default',
+          title: 'Success',
+          description: `${newMaterialsToAdd.length} new material(s) added to production${
+            insufficientMaterials.length > 0
+              ? '. Note: Some materials have insufficient stock.'
+              : ''
+          }`,
         });
+      } else {
+        // Even if no new materials, remove duplicates from requirements section
+        const allProductionMaterialIds = new Set(consumedMaterials.map((m) => m.material_id));
+        const remainingMaterials = materials.filter((m) => !allProductionMaterialIds.has(m.material_id));
+        
+        if (remainingMaterials.length < materials.length) {
+          setMaterials(remainingMaterials);
+          toast({
+            title: 'Info',
+            description: 'Removed duplicate materials from requirements section',
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: 'Info',
+            description: 'All materials are already added to production',
+            variant: 'default',
+          });
+        }
       }
-
-      // 4. Clear materials from requirements section only if they were added
-      if (newMaterialsToAdd.length > 0) {
-        // Remove only the materials that were successfully added
-        const addedMaterialIds = new Set(newMaterialsToAdd.map((m) => m.material_id));
-        setMaterials(materials.filter((m) => !addedMaterialIds.has(m.material_id)));
-      }
-
-      toast({
-        title: 'Success',
-        description: `${materials.length} material(s) added to production${
-          insufficientMaterials.length > 0
-            ? '. Note: Some materials have insufficient stock.'
-            : ''
-        }`,
-      });
     } catch (error) {
       console.error('Error adding materials to production:', error);
       toast({
@@ -621,13 +639,44 @@ export default function PlanningStage() {
                 targetQuantity={formData.planned_quantity}
                 totalSQM={totalSQM}
                 recipeBased={false}
-                onRemoveMaterial={(materialId) => {
+                onRemoveMaterial={async (materialId) => {
+                  const materialToRemove = consumedMaterials.find((m) => m.material_id === materialId);
                   const updatedConsumed = consumedMaterials.filter((m) => m.material_id !== materialId);
                   setConsumedMaterials(updatedConsumed);
-                  toast({
-                    title: 'Material Removed',
-                    description: 'Material removed from production',
-                  });
+                  
+                  // Also update recipe to remove this material
+                  if (recipe && materialToRemove) {
+                    try {
+                      const currentMaterials = recipe.materials || [];
+                      const updatedRecipeMaterials = currentMaterials.filter(
+                        (m) => m.material_id !== materialId
+                      );
+                      await RecipeService.updateRecipe(recipe.id, { materials: updatedRecipeMaterials });
+                      
+                      // Update local recipe state
+                      setRecipe({
+                        ...recipe,
+                        materials: updatedRecipeMaterials,
+                      });
+                      
+                      toast({
+                        title: 'Material Removed',
+                        description: 'Material removed from production and recipe updated',
+                      });
+                    } catch (error) {
+                      console.error('Error updating recipe after removal:', error);
+                      toast({
+                        title: 'Material Removed',
+                        description: 'Material removed from production, but recipe update failed',
+                        variant: 'destructive',
+                      });
+                    }
+                  } else {
+                    toast({
+                      title: 'Material Removed',
+                      description: 'Material removed from production',
+                    });
+                  }
                 }}
               />
 
@@ -642,46 +691,9 @@ export default function PlanningStage() {
                   </div>
                 )}
                 <Button
-                  onClick={async () => {
-                    if (!selectedProduct) return;
-
-                    setSubmitting(true);
-                    try {
-                      const batchData = {
-                        product_id: selectedProduct.id,
-                        planned_quantity: formData.planned_quantity,
-                        priority: formData.priority,
-                        completion_date: formData.completion_date || undefined,
-                        notes: formData.notes,
-                      };
-
-                      const { error } = await ProductionService.createBatch(batchData);
-
-                      if (error) {
-                        toast({
-                          title: 'Error',
-                          description: error,
-                          variant: 'destructive',
-                        });
-                        return;
-                      }
-
-                      toast({
-                        title: 'Success',
-                        description: 'Production batch created successfully',
-                      });
-
-                      navigate('/production');
-                    } catch (error) {
-                      console.error('Error creating batch:', error);
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to create production batch',
-                        variant: 'destructive',
-                      });
-                    } finally {
-                      setSubmitting(false);
-                    }
+                  onClick={() => {
+                    // Open machine selection dialog first
+                    setShowMachineDialog(true);
                   }}
                   disabled={
                     submitting ||
@@ -721,6 +733,85 @@ export default function PlanningStage() {
           quantity_per_sqm: m.quantity_per_sqm,
           unit: m.unit,
         }))}
+      />
+
+      {/* Machine Selection Dialog */}
+      <MachineSelectionDialog
+        isOpen={showMachineDialog}
+        onClose={() => {
+          // Don't allow closing without selecting a machine
+          if (!selectedMachine) {
+            toast({
+              title: 'Machine Required',
+              description: 'Please select a machine to continue',
+              variant: 'destructive',
+            });
+            return;
+          }
+          setShowMachineDialog(false);
+        }}
+        onSelect={async (machine) => {
+          if (!machine) {
+            toast({
+              title: 'Machine Required',
+              description: 'Please select a machine to continue',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          setSelectedMachine(machine);
+          setShowMachineDialog(false);
+          
+          // After machine selection, create the batch
+          if (!selectedProduct) return;
+
+          setSubmitting(true);
+          try {
+            const batchData = {
+              product_id: selectedProduct.id,
+              planned_quantity: formData.planned_quantity,
+              priority: formData.priority,
+              completion_date: formData.completion_date || undefined,
+              notes: formData.notes,
+              machine_id: machine.id, // Machine is required now
+            };
+
+            const { data: batch, error } = await ProductionService.createBatch(batchData);
+
+            if (error || !batch) {
+              toast({
+                title: 'Error',
+                description: error || 'Failed to create batch',
+                variant: 'destructive',
+              });
+              return;
+            }
+
+            toast({
+              title: 'Success',
+              description: `Production batch created with machine: ${machine.machine_name}`,
+            });
+
+            // Delete draft state after successful batch creation
+            if (selectedProduct) {
+              await ProductionService.deleteDraftPlanningState(selectedProduct.id);
+            }
+
+            // Navigate to machine stage
+            navigate(`/production/${batch.id}/machine`);
+          } catch (error) {
+            console.error('Error creating batch:', error);
+            toast({
+              title: 'Error',
+              description: 'Failed to create production batch',
+              variant: 'destructive',
+            });
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+        selectedMachineId={selectedMachine?.id}
       />
     </Layout>
   );

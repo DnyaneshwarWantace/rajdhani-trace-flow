@@ -12,11 +12,11 @@ import type { ProductFilters } from '@/types/product';
 
 interface InventoryFiltersProps {
   filters: ProductFilters;
-  viewMode: 'grid' | 'table';
+  viewMode: 'grid' | 'table' | 'grouped';
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
   onStatusChange: (value: string) => void;
-  onViewModeChange: (mode: 'grid' | 'table') => void;
+  onViewModeChange: (mode: 'grid' | 'table' | 'grouped') => void;
   onColorChange?: (values: string[]) => void;
   onPatternChange?: (values: string[]) => void;
   onLengthChange?: (values: string[]) => void;
@@ -161,7 +161,7 @@ export default function InventoryFilters({
         </div>
 
         {/* View Mode Toggle */}
-        <div className="lg:col-span-2 flex items-center gap-2">
+        <div className="lg:col-span-3 flex items-center gap-2">
           <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
           <button
             onClick={() => onViewModeChange('table')}
@@ -182,6 +182,16 @@ export default function InventoryFilters({
             }`}
           >
             Grid
+          </button>
+          <button
+            onClick={() => onViewModeChange('grouped')}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'grouped'
+                ? 'bg-primary-100 text-primary-700'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            Grouped
           </button>
         </div>
       </div>

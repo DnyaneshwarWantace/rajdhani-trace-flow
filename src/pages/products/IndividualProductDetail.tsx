@@ -148,18 +148,18 @@ export default function IndividualProductDetail() {
           {/* Product Context Card */}
           <Card className="mb-6 shadow-sm">
             <CardContent className="pt-6">
-              <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4">
                 {product.image_url ? (
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
+                <img
+                  src={product.image_url}
+                  alt={product.name}
                     className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg object-cover border border-gray-200 flex-shrink-0"
                   />
                 ) : (
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
                     <Package className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400" />
-                  </div>
-                )}
+                      </div>
+                    )}
                 <div className="min-w-0 flex-1">
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 line-clamp-2 break-words">
                     {product.name}
@@ -168,7 +168,7 @@ export default function IndividualProductDetail() {
                     {`${product.category}${product.color ? ` • ${product.color}` : ''}${product.pattern ? ` • ${product.pattern}` : ''}`}
                   </p>
                 </div>
-              </div>
+                    </div>
             </CardContent>
           </Card>
 

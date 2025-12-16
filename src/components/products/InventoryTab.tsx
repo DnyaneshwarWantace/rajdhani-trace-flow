@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react';
 import ProductTable from '@/components/products/ProductTable';
 import ProductCard from '@/components/products/ProductCard';
+import ProductGroupedView from '@/components/products/ProductGroupedView';
 import InventoryFilters from './InventoryFilters';
 import ProductPagination from './ProductPagination';
 import type { Product, ProductFilters } from '@/types/product';
@@ -10,7 +11,7 @@ interface InventoryTabProps {
   loading: boolean;
   error: string | null;
   filters: ProductFilters;
-  viewMode: 'grid' | 'table';
+  viewMode: 'grid' | 'table' | 'grouped';
   totalProducts: number;
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
@@ -20,7 +21,7 @@ interface InventoryTabProps {
   onLengthChange?: (values: string[]) => void;
   onWidthChange?: (values: string[]) => void;
   onWeightChange?: (values: string[]) => void;
-  onViewModeChange: (mode: 'grid' | 'table') => void;
+  onViewModeChange: (mode: 'grid' | 'table' | 'grouped') => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
   onView: (product: Product) => void;
@@ -30,7 +31,7 @@ interface InventoryTabProps {
   onProduction: (product: Product) => void;
   onQRCode?: (product: Product) => void;
   onDelete?: (product: Product) => void;
-  isAdmin?: boolean;
+  canDelete?: boolean;
 }
 
 export default function InventoryTab({
@@ -58,7 +59,7 @@ export default function InventoryTab({
   onProduction,
   onQRCode,
   onDelete,
-  isAdmin = false,
+  canDelete = false,
 }: InventoryTabProps) {
   return (
     <>
@@ -113,7 +114,19 @@ export default function InventoryTab({
                 onProduction={onProduction}
                 onQRCode={onQRCode}
                 onDelete={onDelete}
-                isAdmin={isAdmin}
+                canDelete={canDelete}
+              />
+            ) : viewMode === 'grouped' ? (
+              <ProductGroupedView
+                products={products}
+                onView={onView}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onDuplicate={onDuplicate}
+                onStock={onStock}
+                onProduction={onProduction}
+                onQRCode={onQRCode}
+                canDelete={canDelete}
               />
             ) : (
               // Masonry-style grid using CSS columns
@@ -128,6 +141,8 @@ export default function InventoryTab({
                       onStock={onStock}
                       onProduction={onProduction}
                       onQRCode={onQRCode}
+                      onDelete={onDelete}
+                      canDelete={canDelete}
                     />
                   </div>
                 ))}
@@ -148,6 +163,9 @@ export default function InventoryTab({
                     onDuplicate={onDuplicate}
                     onStock={onStock}
                     onProduction={onProduction}
+                    onQRCode={onQRCode}
+                    onDelete={onDelete}
+                    canDelete={canDelete}
                   />
                 </div>
               ))}

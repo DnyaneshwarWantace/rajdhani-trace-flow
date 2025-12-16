@@ -267,8 +267,8 @@ export default function Notifications() {
       if (filterStatus !== 'all' && n.status !== filterStatus) return false;
       if (filterModule !== 'all' && n.module !== filterModule) return false;
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
-      return true;
-    });
+    return true;
+  });
 
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
   const allUnreadCount = allNotifications.filter(n => n.status === 'unread').length;
@@ -426,7 +426,7 @@ export default function Notifications() {
                       <SelectItem value="production">Production</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
+        </div>
 
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-1 block">Priority</label>
@@ -467,7 +467,7 @@ export default function Notifications() {
           <Card>
             <CardContent className="p-12 text-center">
               <Bell className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-600 text-lg">No notifications found</p>
+            <p className="text-gray-600 text-lg">No notifications found</p>
               <p className="text-gray-500 text-sm mt-2">Try adjusting your filters</p>
             </CardContent>
           </Card>
@@ -476,8 +476,8 @@ export default function Notifications() {
           <div>
             {/* Activity Logs List */}
             {filteredNotifications.length > 0 ? (
-              <div className="space-y-3">
-                {filteredNotifications.map((notification) => (
+          <div className="space-y-3">
+            {filteredNotifications.map((notification) => (
                   <div key={notification.id} id={`notification-${notification.id}`}>
                     <ActivityNotificationCard
                       notification={notification}

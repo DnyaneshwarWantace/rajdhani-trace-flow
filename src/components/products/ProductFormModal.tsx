@@ -135,8 +135,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           image_url: product.image_url || '',
           status: product.status,
         });
-      if (product.image_url) {
-        setImagePreview(product.image_url);
+        if (product.image_url) {
+          setImagePreview(product.image_url);
       } else {
         setImagePreview('');
       }
@@ -660,8 +660,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                   <h3 className="text-lg font-medium">Product Recipe (Materials Used)</h3>
                   <div className="text-xs sm:text-sm text-gray-600 bg-primary-50 px-3 py-1.5 rounded-lg">
                     Recipe is based on <strong>1 SQM</strong> (1 square meter) of this product
-                  </div>
                 </div>
+              </div>
 
                 {/* SQM Calculation Display */}
                 {formData.length && formData.width && formData.length_unit && formData.width_unit && (
@@ -739,7 +739,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           {/* Fixed Footer */}
           <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
             <Button 
-              type="button" 
+              type="button"
               variant="outline" 
               onClick={(e) => {
                 e.preventDefault();
@@ -750,8 +750,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
               Cancel
             </Button>
             <Button 
-              type="submit" 
-              disabled={loading} 
+              type="submit"
+              disabled={loading}
               className="bg-primary-600 hover:bg-primary-700"
               onClick={(e) => {
                 // Ensure this is the only way to submit

@@ -42,6 +42,7 @@ export interface CreateProductionBatchData {
   operator?: string;
   supervisor?: string;
   notes?: string;
+  machine_id?: string;
 }
 
 export interface UpdateProductionBatchData extends Partial<CreateProductionBatchData> {
@@ -296,6 +297,59 @@ export class ProductionService {
     } catch (error) {
       console.error('Error in deleteDraftPlanningState:', error);
       return { data: null, error: 'Failed to delete draft state' };
+    }
+  }
+
+  // Production Machine methods
+  static async getMachines(filters?: {
+    status?: string;
+    machine_type?: string;
+    location?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ machines: any[]; total: number }> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters?.status) queryParams.append('status', filters.status);
+      if (filters?.machine_type) queryParams.append('machine_type', filters.machine_type);
+      if (filters?.location) queryParams.append('location', filters.location);
+      if (filters?.limit) queryParams.append('limit', filters.limit.toString());
+      if (filters?.offset) queryParams.append('offset', filters.offset.toString());
+
+      const response = await fetch(`${API_URL}/production/machines?${queryParams}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch machines');
+      }
+
+      const data = await response.json();
+      return {
+        machines: data.data || [],
+        total: data.count || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+      throw error;
+    }
+  }
+
+  static async getMachineById(id: string): Promise<any> {
+    try {
+      const response = await fetch(`${API_URL}/production/machines/${id}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch machine');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Error fetching machine:', error);
+      throw error;
     }
   }
 }

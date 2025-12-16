@@ -2,7 +2,7 @@ import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
+import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
@@ -13,6 +13,8 @@ interface ProductCardProps {
   onStock?: (product: Product) => void;
   onProduction?: (product: Product) => void;
   onQRCode?: (product: Product) => void;
+  onDelete?: (product: Product) => void;
+  canDelete?: boolean;
   showActions?: boolean;
   variant?: 'default' | 'compact' | 'detailed';
   isSelected?: boolean;
@@ -27,6 +29,8 @@ export default function ProductCard({
   onStock,
   onProduction,
   onQRCode,
+  onDelete,
+  canDelete = false,
   showActions = true,
   variant: _variant = 'default',
   isSelected = false,
@@ -189,8 +193,8 @@ export default function ProductCard({
                 </button>
               )}
             </div>
-            {(onDuplicate || onStock || onProduction) && (
-              <div className="grid grid-cols-3 gap-1.5 mt-1.5">
+            {(onDuplicate || onStock || onProduction || (canDelete && onDelete)) && (
+              <div className={`grid ${canDelete && onDelete ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5 mt-1.5`}>
                 {onDuplicate && (
                   <button
                     onClick={(e) => {
@@ -225,6 +229,18 @@ export default function ProductCard({
                     title="Produce"
                   >
                     <Factory className="w-3 h-3" />
+                  </button>
+                )}
+                {canDelete && onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(product);
+                    }}
+                    className="flex items-center justify-center px-1.5 py-1.5 text-[10px] font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3 h-3" />
                   </button>
                 )}
               </div>
