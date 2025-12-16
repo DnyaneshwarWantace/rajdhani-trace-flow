@@ -297,7 +297,9 @@ export default function ValueUnitDropdownField({
               value={newValueInput}
               onChange={(e) => {
                 const val = e.target.value;
-                if (/^\d*\.?\d*$/.test(val)) {
+                // Allow only numbers with max 4 digits before decimal and 2 after
+                // Pattern: up to 4 digits, optional decimal, up to 2 digits after decimal
+                if (/^\d{0,4}(\.\d{0,2})?$/.test(val)) {
                   setNewValueInput(val);
                 }
               }}

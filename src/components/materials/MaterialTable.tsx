@@ -76,12 +76,10 @@ export default function MaterialTable({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <TruncatedText
-                        text={material.name}
-                        maxLength={25}
-                        className="font-medium text-gray-900"
-                        as="p"
-                      />
+                      <p className="font-medium text-gray-900 truncate" title={material.name}>
+                        {material.name.split(' ').slice(0, 10).join(' ')}
+                        {material.name.split(' ').length > 10 && '...'}
+                      </p>
                       <p className="text-sm text-gray-500 truncate">{material.id}</p>
                     </div>
                   </div>

@@ -27,8 +27,17 @@ export default function MaterialStockSection({
     setter: (value: string) => void
   ) => {
     const value = e.target.value;
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    // Allow max 4 digits before decimal, 2 after decimal
+    if (value === '' || /^\d{0,4}(\.\d{0,2})?$/.test(value)) {
       setter(value);
+    }
+  };
+
+  const handleMinThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Min threshold: max 10 digits
+    if (value === '' || /^\d{0,10}$/.test(value)) {
+      onMinThresholdChange(value);
     }
   };
 
@@ -62,11 +71,11 @@ export default function MaterialStockSection({
           id="minThreshold"
           type="text"
           value={minThreshold}
-          onChange={(e) => handleNumericChange(e, onMinThresholdChange)}
+          onChange={handleMinThresholdChange}
           placeholder="10"
           required
         />
-        <p className="text-xs text-muted-foreground mt-1">Minimum quantity before low stock alert</p>
+        <p className="text-xs text-muted-foreground mt-1">Max 10 digits - Minimum quantity before alert</p>
       </div>
       <div>
         <Label htmlFor="maxCapacity">Max Stock Capacity *</Label>

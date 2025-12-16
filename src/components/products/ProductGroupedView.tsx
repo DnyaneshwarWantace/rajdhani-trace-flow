@@ -301,12 +301,10 @@ export default function ProductGroupedView({
                           <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <TruncatedText
-                            text={firstProduct.name}
-                            maxLength={25}
-                            className="font-medium text-gray-900"
-                            as="p"
-                          />
+                          <p className="font-medium text-gray-900 truncate" title={firstProduct.name}>
+                            {firstProduct.name.split(' ').slice(0, 10).join(' ')}
+                            {firstProduct.name.split(' ').length > 10 && '...'}
+                          </p>
                           <p className="text-sm text-blue-600 font-medium mt-1">
                             ({groupProducts.length} Variant{groupProducts.length !== 1 ? 's' : ''})
                           </p>

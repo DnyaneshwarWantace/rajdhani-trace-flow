@@ -42,22 +42,22 @@ export default function ProductBasicInfoSection({
             let inputValue = e.target.value;
 
             // Allow ALL characters - no character restrictions
-            // Only enforce: max 50 words, max 20 characters per word
+            // Only enforce: max 10 words, max 20 characters per word
 
             // Split by spaces to get words (preserve all spaces)
             const words = inputValue.split(/\s+/).filter(w => w.length > 0);
-            
-            // Limit to 50 words - if exceeded, truncate at the 50th word
-            if (words.length > 50) {
-              // Find position where 50th word ends
+
+            // Limit to 10 words - if exceeded, truncate at the 10th word
+            if (words.length > 10) {
+              // Find position where 10th word ends
               let wordCount = 0;
               let pos = inputValue.length;
               for (let i = 0; i < inputValue.length; i++) {
                 // Check if we're at the start of a word (non-space after space or start of string)
                 if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
                   wordCount++;
-                  if (wordCount === 50) {
-                    // Find the end of this 50th word
+                  if (wordCount === 10) {
+                    // Find the end of this 10th word
                     let endPos = i;
                     while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
                       endPos++;
@@ -97,7 +97,7 @@ export default function ProductBasicInfoSection({
           const totalChars = formData.name.length;
           return (
             <p className="text-xs text-muted-foreground mt-1">
-              {wordCount}/50 words • Max 20 characters per word • {totalChars} total characters
+              {wordCount}/10 words • Max 20 characters per word • {totalChars} total characters
               {hasLongWord && <span className="text-red-600 ml-1">(Some words exceed 20 characters)</span>}
             </p>
           );
