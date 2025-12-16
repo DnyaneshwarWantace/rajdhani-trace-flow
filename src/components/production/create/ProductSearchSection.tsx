@@ -196,12 +196,12 @@ export default function ProductSearchSection({
   const endItem = Math.min(page * limit, total);
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card>
       <CardHeader className="px-3 py-3">
         <CardTitle className="text-base font-semibold">Select Product</CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-3 flex-1 flex flex-col px-3 py-0 pb-3">
+      <CardContent className="space-y-3 px-3 py-0 pb-3">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -252,7 +252,7 @@ export default function ProductSearchSection({
         />
 
         {/* Product List */}
-        <div className="flex-1 min-h-0">
+        <div>
           <ProductList
             products={products}
             selectedProductId={selectedProductId}

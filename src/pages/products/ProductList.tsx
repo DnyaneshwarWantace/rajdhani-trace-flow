@@ -84,6 +84,11 @@ export default function ProductList() {
     setCanDeleteProducts(canDelete('products'));
   }, []);
 
+  // Load notifications count on mount
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
   // Load stats only when activeTab changes (not when filters change)
   useEffect(() => {
     if (activeTab === 'inventory') {

@@ -95,53 +95,37 @@ export default function ProductList({
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white max-h-[600px] overflow-y-auto">
+    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white max-h-[500px] overflow-y-auto">
       <div>
         {sortedGroupKeys.map((groupKey) => {
           const groupProducts = groupedProducts[groupKey];
           const isExpanded = expandedGroups.has(groupKey);
-          const hasVariations = groupProducts.length > 1;
           const firstProduct = groupProducts[0];
 
           return (
             <div key={groupKey} className="border-b border-gray-100 last:border-b-0">
-              {/* Group Row - Only Product Name */}
+              {/* Group Row - Product Name with Variant Count */}
               <div
-                className={`px-2 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer ${
-                  !hasVariations && selectedProductId === firstProduct.id ? 'bg-primary-50' : ''
-                }`}
-                onClick={() => hasVariations ? toggleGroup(groupKey) : onSelect(firstProduct)}
+                className="px-2 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => toggleGroup(groupKey)}
               >
-                {hasVariations ? (
-                  isExpanded ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  )
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                 ) : (
-                  <div className="w-3.5" />
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-900 truncate" title={firstProduct.name}>
                     {firstProduct.name}
                   </p>
-                  {hasVariations && (
-                    <p className="text-[10px] text-blue-600 font-medium">
-                      ({groupProducts.length} Variant{groupProducts.length !== 1 ? 's' : ''})
-                    </p>
-                  )}
+                  <p className="text-[10px] text-blue-600 font-medium">
+                    ({groupProducts.length} Variant{groupProducts.length !== 1 ? 's' : ''})
+                  </p>
                 </div>
-                {!hasVariations && selectedProductId === firstProduct.id && (
-                  <div className="w-4 h-4 bg-primary-600 rounded-full flex items-center justify-center">
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
               </div>
 
               {/* Variant Rows - Show table with headers */}
-              {hasVariations && isExpanded && (
+              {isExpanded && (
                 <div className="bg-gray-50 border-t border-gray-200">
                   {/* Table Header for Variants */}
                   <div className="bg-white border-b border-gray-200 px-2 py-1.5">

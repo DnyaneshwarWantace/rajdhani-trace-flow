@@ -116,29 +116,7 @@ export default function ProductionCreate() {
                 />
 
                 {selectedProduct && (
-                  <>
-                    <SelectedProductCard product={selectedProduct} onClear={handleProductClear} />
-                    <Card className="border-primary-200 bg-primary-50/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-900 mb-1">Ready to Plan?</p>
-                            <p className="text-sm text-gray-600">
-                              Add this product to the planning stage to prepare for production
-                            </p>
-                          </div>
-                          <Button
-                            onClick={() => navigate('/production/planning', { 
-                              state: { product: selectedProduct } 
-                            })}
-                            className="bg-primary-600 hover:bg-primary-700 text-white"
-                          >
-                            Go to Planning Stage
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </>
+                  <SelectedProductCard product={selectedProduct} onClear={handleProductClear} />
                 )}
               </div>
 
