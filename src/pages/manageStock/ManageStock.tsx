@@ -55,14 +55,14 @@ export default function ManageStock() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const { data, total } = await ManageStockService.getOrders({
+      const { data, count } = await ManageStockService.getOrders({
         search: filters.search,
         status: filters.status,
         limit: filters.limit,
         offset: (filters.page - 1) * filters.limit,
       });
       setOrders(data);
-      setTotalOrders(total || data.length);
+      setTotalOrders(count || data.length);
     } catch (error) {
       console.error('Error loading orders:', error);
       toast({
