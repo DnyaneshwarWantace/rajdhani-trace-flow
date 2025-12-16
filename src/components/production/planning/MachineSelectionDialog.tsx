@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Search, CheckCircle, AlertCircle } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import { useToast } from '@/hooks/use-toast';
 
