@@ -11,9 +11,11 @@ interface RecipeListProps {
   recipes: Recipe[];
   loading: boolean;
   onRecipeClick?: (recipe: Recipe) => void;
+  onEdit?: (recipe: Recipe) => void;
+  onDelete?: (recipe: Recipe) => void;
 }
 
-export default function RecipeList({ recipes, loading, onRecipeClick }: RecipeListProps) {
+export default function RecipeList({ recipes, loading, onRecipeClick, onEdit, onDelete }: RecipeListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
@@ -116,6 +118,8 @@ export default function RecipeList({ recipes, loading, onRecipeClick }: RecipeLi
           <RecipeTable
             recipes={filteredRecipes}
             onView={onRecipeClick}
+            onEdit={onEdit}
+            onDelete={onDelete}
           />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">

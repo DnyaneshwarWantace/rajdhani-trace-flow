@@ -28,6 +28,12 @@ export interface UserPermissions {
     delete?: boolean;
     view?: boolean;
   };
+  recipes?: {
+    create?: boolean;
+    edit?: boolean;
+    delete?: boolean;
+    view?: boolean;
+  };
   [key: string]: any;
 }
 
@@ -35,7 +41,7 @@ export interface UserPermissions {
  * Check if user has permission to delete items
  * Admin always has permission, or user must have specific delete permission
  */
-export function canDelete(module: 'products' | 'materials' | 'customers' | 'suppliers'): boolean {
+export function canDelete(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
   try {
     // Get user from localStorage
     const userStr = localStorage.getItem('user');
@@ -63,7 +69,7 @@ export function canDelete(module: 'products' | 'materials' | 'customers' | 'supp
 /**
  * Check if user has permission to create items
  */
-export function canCreate(module: 'products' | 'materials' | 'customers' | 'suppliers'): boolean {
+export function canCreate(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
   try {
     const userStr = localStorage.getItem('user');
     if (!userStr) return false;
@@ -85,7 +91,7 @@ export function canCreate(module: 'products' | 'materials' | 'customers' | 'supp
 /**
  * Check if user has permission to edit items
  */
-export function canEdit(module: 'products' | 'materials' | 'customers' | 'suppliers'): boolean {
+export function canEdit(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
   try {
     const userStr = localStorage.getItem('user');
     if (!userStr) return false;

@@ -199,7 +199,19 @@ export default function ProductSelectorDialog({
     return acc;
   }, {} as Record<string, Product[]>);
 
-  const sortedGroupKeys = Object.keys(groupedProducts).sort();
+  // Sort groups: products with recipes first, then products without recipes
+  const sortedGroupKeys = Object.keys(groupedProducts).sort((a, b) => {
+    const aHasRecipe = groupedProducts[a].some(p => p.has_recipe);
+    const bHasRecipe = groupedProducts[b].some(p => p.has_recipe);
+
+    // If both have recipe or both don't have recipe, sort alphabetically
+    if (aHasRecipe === bHasRecipe) {
+      return a.localeCompare(b);
+    }
+
+    // Products with recipes come first
+    return bHasRecipe ? 1 : -1;
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

@@ -264,59 +264,79 @@ export default function RecipeManagementCard({
           </DialogHeader>
           {editingMaterial && (
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="material-type">Material Type</Label>
-                <Select
-                  value={editingMaterial.material_type}
-                  onValueChange={(value) => setEditingMaterial({ ...editingMaterial, material_type: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="raw_material">Raw Material</SelectItem>
-                    <SelectItem value="product">Product</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {editingMaterial.id ? (
+                <>
+                  <div>
+                    <Label>Material Type</Label>
+                    <div className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
+                      {editingMaterial.material_type === 'product' ? 'Product' : 'Raw Material'}
+                    </div>
+                  </div>
 
-              <div>
-                <Label htmlFor="material-select">Material</Label>
-                <Select
-                  value={editingMaterial.material_id}
-                  onValueChange={(value) => {
-                    const selected =
-                      editingMaterial.material_type === 'raw_material'
-                        ? rawMaterials.find((m) => m.id === value)
-                        : products.find((p) => p.id === value);
-                    if (selected) {
-                      setEditingMaterial({
-                        ...editingMaterial,
-                        material_id: value,
-                        material_name: selected.name,
-                        unit: selected.unit || 'kg',
-                      });
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select material" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {editingMaterial.material_type === 'raw_material'
-                      ? rawMaterials.map((material) => (
-                          <SelectItem key={material.id} value={material.id}>
-                            {material.name} ({material.unit})
-                          </SelectItem>
-                        ))
-                      : products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} ({product.unit})
-                          </SelectItem>
-                        ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <div>
+                    <Label>Material</Label>
+                    <div className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
+                      {editingMaterial.material_name}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="material-type">Material Type</Label>
+                    <Select
+                      value={editingMaterial.material_type}
+                      onValueChange={(value) => setEditingMaterial({ ...editingMaterial, material_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="raw_material">Raw Material</SelectItem>
+                        <SelectItem value="product">Product</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="material-select">Material</Label>
+                    <Select
+                      value={editingMaterial.material_id}
+                      onValueChange={(value) => {
+                        const selected =
+                          editingMaterial.material_type === 'raw_material'
+                            ? rawMaterials.find((m) => m.id === value)
+                            : products.find((p) => p.id === value);
+                        if (selected) {
+                          setEditingMaterial({
+                            ...editingMaterial,
+                            material_id: value,
+                            material_name: selected.name,
+                            unit: selected.unit || 'kg',
+                          });
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select material" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {editingMaterial.material_type === 'raw_material'
+                          ? rawMaterials.map((material) => (
+                              <SelectItem key={material.id} value={material.id}>
+                                {material.name} ({material.unit})
+                              </SelectItem>
+                            ))
+                          : products.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.unit})
+                              </SelectItem>
+                            ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
 
               <div>
                 <Label htmlFor="quantity">Quantity (for 1 sqm)</Label>
@@ -339,14 +359,23 @@ export default function RecipeManagementCard({
                 </p>
               </div>
 
-              <div>
-                <Label htmlFor="unit">Unit</Label>
-                <Input
-                  id="unit"
-                  value={editingMaterial.unit}
-                  onChange={(e) => setEditingMaterial({ ...editingMaterial, unit: e.target.value })}
-                />
-              </div>
+              {editingMaterial.id ? (
+                <div>
+                  <Label>Unit</Label>
+                  <div className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
+                    {editingMaterial.unit}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="unit">Unit</Label>
+                  <Input
+                    id="unit"
+                    value={editingMaterial.unit}
+                    onChange={(e) => setEditingMaterial({ ...editingMaterial, unit: e.target.value })}
+                  />
+                </div>
+              )}
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsMaterialDialogOpen(false)}>

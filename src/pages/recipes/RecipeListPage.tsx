@@ -8,6 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Plus, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Recipe } from '@/types/recipe';
+import { canEdit, canDelete } from '@/utils/permissions';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function RecipeListPage() {
   const navigate = useNavigate();
@@ -16,9 +25,16 @@ export default function RecipeListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalRecipes, setTotalRecipes] = useState(0);
+  const [canEditRecipes, setCanEditRecipes] = useState(false);
+  const [canDeleteRecipes, setCanDeleteRecipes] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadRecipes();
+    setCanEditRecipes(canEdit('recipes'));
+    setCanDeleteRecipes(canDelete('recipes'));
   }, []);
 
   const loadRecipes = async () => {
@@ -47,6 +63,41 @@ export default function RecipeListPage() {
   const handleRecipeClick = (recipe: Recipe) => {
     // Navigate to recipe detail page (to be created)
     navigate(`/recipes/${recipe.id}`);
+  };
+
+  const handleEdit = (recipe: Recipe) => {
+    // Navigate to edit page - user can only edit values, not options
+    navigate(`/recipes/${recipe.id}/edit`);
+  };
+
+  const handleDelete = (recipe: Recipe) => {
+    setRecipeToDelete(recipe);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!recipeToDelete) return;
+
+    try {
+      setIsDeleting(true);
+      await RecipeService.deleteRecipe(recipeToDelete.id);
+      toast({
+        title: 'Success',
+        description: 'Recipe deleted successfully',
+      });
+      loadRecipes();
+      setIsDeleteDialogOpen(false);
+      setRecipeToDelete(null);
+    } catch (error) {
+      console.error('Error deleting recipe:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete recipe',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (error && !loading) {
@@ -134,7 +185,38 @@ export default function RecipeListPage() {
           recipes={recipes}
           loading={loading}
           onRecipeClick={handleRecipeClick}
+          onEdit={canEditRecipes ? handleEdit : undefined}
+          onDelete={canDeleteRecipes ? handleDelete : undefined}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Recipe</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete the recipe for "{recipeToDelete?.product_name}"?
+                This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
