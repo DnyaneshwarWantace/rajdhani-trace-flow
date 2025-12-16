@@ -11,6 +11,68 @@ body {
   max-width: 100%;
 }
 
+/* Prevent accidental text selection on mobile (single tap) */
+@media (max-width: 1023px) {
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+
+  /* Prevent selection on all elements by default */
+  * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Allow text selection in input fields, textareas, and content areas */
+  input,
+  textarea,
+  [contenteditable="true"],
+  .selectable,
+  .selectable * {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+  }
+
+  /* Prevent selection on interactive elements */
+  button, a, [role="button"], .cursor-pointer, [onclick], [onClick] {
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+
+  /* Allow selection on text content only on long press (browser default behavior) */
+  /* Text will be selectable on long press but not on single tap */
+  p, span:not(button *):not(a *):not([role="button"] *), 
+  div:not(button):not(a):not([role="button"]), 
+  h1, h2, h3, h4, h5, h6, li, td, th, label {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    /* But prevent immediate selection on tap */
+    -webkit-touch-callout: default;
+  }
+}
+
+/* Allow text selection on desktop for better UX */
+@media (min-width: 1024px) {
+  html,
+  body {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+}
+
 /* Prevent background scroll when modal is open */
 body.modal-open {
   overflow: hidden !important;

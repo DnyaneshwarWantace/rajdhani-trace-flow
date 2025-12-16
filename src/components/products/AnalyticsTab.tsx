@@ -11,21 +11,29 @@ interface AnalyticsTabProps {
   products: Product[];
 }
 
-export default function AnalyticsTab({ products }: AnalyticsTabProps) {
+export default function AnalyticsTab({ products: _products }: AnalyticsTabProps) {
   const [stats, setStats] = useState<ProductStats | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadStats();
+    loadAnalyticsData();
   }, []);
 
-  const loadStats = async () => {
+  const loadAnalyticsData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await ProductService.getProductStats();
-      setStats(data);
+      
+      // Fetch stats and all products in parallel
+      const [statsData, productsData] = await Promise.all([
+        ProductService.getProductStats(),
+        ProductService.getProducts({ limit: 10000 }) // Fetch all products for analytics
+      ]);
+      
+      setStats(statsData);
+      setAllProducts(productsData.products || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
       console.error('Error loading analytics:', err);
@@ -55,23 +63,21 @@ export default function AnalyticsTab({ products }: AnalyticsTabProps) {
       ].filter((item) => item.value > 0)
     : [];
 
-  // Category distribution
+  // Category distribution - use all products
   const categoryMap = new Map<string, number>();
-  products.forEach((product) => {
+  allProducts.forEach((product) => {
     const count = categoryMap.get(product.category) || 0;
     categoryMap.set(product.category, count + 1);
   });
   const categoryData = Array.from(categoryMap.entries())
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+    .sort((a, b) => b.count - a.count);
 
-  // Top products by stock (for stock level chart)
-  const topProductsByStock = products
+  // Stock levels overview - use all products, show more products
+  const productsByStock = allProducts
     .sort((a, b) => b.current_stock - a.current_stock)
-    .slice(0, 8)
     .map((product) => ({
-      name: product.name.length > 15 ? product.name.substring(0, 15) + '...' : product.name,
+      name: product.name.length > 20 ? product.name.substring(0, 20) + '...' : product.name,
       current: product.current_stock,
       min: product.min_stock_level,
       max: product.max_stock_level,
@@ -149,9 +155,9 @@ export default function AnalyticsTab({ products }: AnalyticsTabProps) {
       </div>
 
       {/* Stock Levels Chart */}
-      {topProductsByStock.length > 0 && (
+      {productsByStock.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:gap-6">
-          <StockLevelChart data={topProductsByStock} />
+          <StockLevelChart data={productsByStock} />
         </div>
       )}
 

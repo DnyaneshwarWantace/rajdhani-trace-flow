@@ -1,5 +1,4 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Building } from 'lucide-react';
 import type { Supplier } from '@/services/supplierService';
 
@@ -8,15 +7,6 @@ interface SupplierDetailHeaderProps {
 }
 
 export default function SupplierDetailHeader({ supplier }: SupplierDetailHeaderProps) {
-  const getStatusBadge = (status?: string) => {
-    const styles = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      suspended: 'bg-red-100 text-red-800',
-    };
-    return <Badge className={styles[status as keyof typeof styles] || 'bg-gray-100'}>{status || 'Unknown'}</Badge>;
-  };
-
   return (
     <Card>
       <CardContent className="p-6">
@@ -27,7 +17,6 @@ export default function SupplierDetailHeader({ supplier }: SupplierDetailHeaderP
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold text-gray-900">{supplier.name}</h1>
-              {getStatusBadge(supplier.status)}
             </div>
             {supplier.contact_person && (
               <p className="text-lg text-gray-600 mb-2">Contact: {supplier.contact_person}</p>

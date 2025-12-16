@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calculator, Plus, Minus, RefreshCw } from 'lucide-react';
+import { Calculator, Plus, Minus, RefreshCw, Search } from 'lucide-react';
 import type { Product } from '@/types/product';
+import ProductSelectorDialog from './ProductSelectorDialog';
 
 interface RecipeCalculationItem {
   productId: string;
@@ -32,6 +33,19 @@ export default function ProductSelectionCard({
   onCalculate,
   isCalculating,
 }: ProductSelectionCardProps) {
+  const [openDialogIndex, setOpenDialogIndex] = useState<number | null>(null);
+
+  const handleProductSelect = (index: number, product: Product) => {
+    onUpdateItem(index, 'productId', product.id);
+    onUpdateItem(index, 'productName', product.name);
+    onUpdateItem(index, 'unit', product.unit || 'piece');
+    setOpenDialogIndex(null);
+  };
+
+  const getSelectedProduct = (productId: string) => {
+    return products.find((p) => p.id === productId);
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -62,18 +76,29 @@ export default function ProductSelectionCard({
                 <Label htmlFor={`product-${index}`} className="text-sm font-medium">
                   Product
                 </Label>
-                <Select value={item.productId} onValueChange={(value) => onUpdateItem(index, 'productId', value)}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} ({product.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setOpenDialogIndex(index)}
+                  className="w-full mt-1 justify-start text-left font-normal h-10"
+                >
+                  <Search className="w-4 h-4 mr-2 text-gray-400" />
+                  {item.productId ? (
+                    <span className="truncate">
+                      {getSelectedProduct(item.productId)?.name || item.productName || 'Select a product'}
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">Select a product</span>
+                  )}
+                </Button>
+                {openDialogIndex === index && (
+                  <ProductSelectorDialog
+                    isOpen={true}
+                    onClose={() => setOpenDialogIndex(null)}
+                    onSelect={(product) => handleProductSelect(index, product)}
+                    selectedProductId={item.productId}
+                  />
+                )}
               </div>
 
               {/* Quantity - Smaller on mobile */}

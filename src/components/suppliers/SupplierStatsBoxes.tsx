@@ -4,14 +4,13 @@ import { formatCurrency } from '@/utils/formatHelpers';
 
 interface SupplierStatsBoxesProps {
   total: number;
-  active: number;
   totalOrders: number;
   totalValue: number;
 }
 
-export default function SupplierStatsBoxes({ total, active, totalOrders, totalValue }: SupplierStatsBoxesProps) {
+export default function SupplierStatsBoxes({ total, totalOrders, totalValue }: SupplierStatsBoxesProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -20,17 +19,6 @@ export default function SupplierStatsBoxes({ total, active, totalOrders, totalVa
               <p className="text-xl sm:text-2xl font-bold text-gray-900">{total}</p>
             </div>
             <Building className="w-8 h-8 text-blue-600 opacity-50" />
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs sm:text-sm text-gray-600">Active</p>
-              <p className="text-xl sm:text-2xl font-bold text-green-600">{active}</p>
-            </div>
-            <Building className="w-8 h-8 text-green-600 opacity-50" />
           </div>
         </CardContent>
       </Card>

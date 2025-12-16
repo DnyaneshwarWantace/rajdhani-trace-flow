@@ -21,15 +21,6 @@ export default function SupplierCard({ supplier, orders, onEdit, onDelete, canDe
   const handleView = () => {
     navigate(`/suppliers/${supplier.id}`);
   };
-  const getStatusBadge = (status?: string) => {
-    const styles = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      suspended: 'bg-red-100 text-red-800',
-    };
-    return <Badge className={styles[status as keyof typeof styles] || 'bg-gray-100'}>{status || 'Unknown'}</Badge>;
-  };
-
   const getSupplierOrders = () => {
     const supplierName = supplier.name || '';
     return orders.filter(order => {
@@ -69,9 +60,6 @@ export default function SupplierCard({ supplier, orders, onEdit, onDelete, canDe
           <div className="flex-1">
             <h3 className="font-semibold text-base mb-1">{supplier.name}</h3>
             {supplier.contact_person && <p className="text-xs text-gray-600 mb-2">Contact: {supplier.contact_person}</p>}
-            <div className="flex items-center gap-2 flex-wrap">
-              {getStatusBadge(supplier.status)}
-            </div>
           </div>
         </div>
 

@@ -66,8 +66,7 @@ export default function Layout({ children }: LayoutProps) {
           className={`
             flex-1 transition-all duration-300
             ${isSidebarOpen ? 'lg:ml-56' : 'lg:ml-16'}
-            pt-0
-            px-2 sm:px-3 lg:px-4
+            p-2 sm:p-3 lg:p-4
             w-full
             min-w-0
             overflow-x-hidden

@@ -40,7 +40,6 @@ export default function SupplierList() {
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -65,7 +64,6 @@ export default function SupplierList() {
 
   const [stats, setStats] = useState({
     total: 0,
-    active: 0,
     totalOrders: 0,
     totalValue: 0,
   });
@@ -73,7 +71,7 @@ export default function SupplierList() {
   useEffect(() => {
     loadSuppliers();
     loadOrders();
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm]);
 
   useEffect(() => {
     // Apply pagination to filtered suppliers
@@ -82,14 +80,13 @@ export default function SupplierList() {
         supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         supplier.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         supplier.phone?.includes(searchTerm);
-      const matchesStatus = statusFilter === 'all' || supplier.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
 
     const start = (page - 1) * limit;
     const end = start + limit;
     setSuppliers(filtered.slice(start, end));
-  }, [allSuppliers, page, limit, searchTerm, statusFilter]);
+  }, [allSuppliers, page, limit, searchTerm]);
 
   const loadOrders = async () => {
     try {
@@ -117,7 +114,6 @@ export default function SupplierList() {
         setAllSuppliers(data);
         setStats({
           total: data.length,
-          active: data.filter((s) => s.status === 'active').length,
           totalOrders: data.reduce((sum, s) => sum + (s.total_orders || 0), 0),
           totalValue: data.reduce((sum, s) => sum + (s.total_value || 0), 0),
         });
@@ -280,7 +276,6 @@ export default function SupplierList() {
 
         <SupplierStatsBoxes
           total={stats.total}
-          active={stats.active}
           totalOrders={stats.totalOrders}
           totalValue={stats.totalValue}
         />
@@ -288,8 +283,6 @@ export default function SupplierList() {
         <SupplierFilters
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
         />
 
         {loading ? (
@@ -323,8 +316,7 @@ export default function SupplierList() {
               supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
               supplier.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
               supplier.phone?.includes(searchTerm);
-            const matchesStatus = statusFilter === 'all' || supplier.status === statusFilter;
-            return matchesSearch && matchesStatus;
+            return matchesSearch;
           });
           const totalSuppliers = filtered.length;
           const totalPages = Math.ceil(totalSuppliers / limit);

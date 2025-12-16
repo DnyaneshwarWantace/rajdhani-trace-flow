@@ -6,8 +6,8 @@ interface StockLevelChartProps {
 }
 
 export default function StockLevelChart({ data }: StockLevelChartProps) {
-  // Prepare data - take first 8 products
-  const chartData = data.slice(0, 8);
+  // Use all products for stock levels overview
+  const chartData = data;
 
   const option = {
     backgroundColor: 'transparent',
@@ -45,7 +45,7 @@ export default function StockLevelChart({ data }: StockLevelChartProps) {
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '15%',
+      bottom: chartData.length > 20 ? '20%' : '15%',
       top: '10%',
       containLabel: true,
       backgroundColor: 'transparent',
@@ -53,7 +53,7 @@ export default function StockLevelChart({ data }: StockLevelChartProps) {
     xAxis: {
       type: 'category',
       boundaryGap: true,
-      data: chartData.map((item) => item.name.length > 10 ? item.name.substring(0, 10) + '...' : item.name),
+      data: chartData.map((item) => item.name.length > 15 ? item.name.substring(0, 15) + '...' : item.name),
       axisLabel: {
         color: '#6b7280',
         fontSize: 11,
@@ -193,13 +193,20 @@ export default function StockLevelChart({ data }: StockLevelChartProps) {
         <CardTitle className="text-base sm:text-lg font-semibold text-gray-900">Stock Levels Overview</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="h-64 sm:h-80 bg-white rounded-lg border border-gray-200 p-4">
-          <ReactECharts
-            option={option}
-            style={{ height: '100%', width: '100%' }}
-            opts={{ renderer: 'svg' }}
-          />
+        <div className="h-64 sm:h-80 lg:h-96 bg-white rounded-lg border border-gray-200 p-4 overflow-x-auto">
+          <div style={{ minWidth: chartData.length > 20 ? `${chartData.length * 40}px` : '100%' }}>
+            <ReactECharts
+              option={option}
+              style={{ height: '100%', width: chartData.length > 20 ? `${chartData.length * 40}px` : '100%' }}
+              opts={{ renderer: 'svg' }}
+            />
+          </div>
         </div>
+        {chartData.length > 0 && (
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            Showing {chartData.length} product{chartData.length !== 1 ? 's' : ''} sorted by stock level
+          </p>
+        )}
       </CardContent>
     </Card>
   );
