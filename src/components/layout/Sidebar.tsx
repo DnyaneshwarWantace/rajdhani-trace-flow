@@ -174,7 +174,9 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
           fixed top-16 left-0 z-50 h-[calc(100vh-4rem)]
           bg-white border-r border-gray-200 shadow-lg
           transition-all duration-300 ease-in-out
-          ${isOpen ? 'w-56 translate-x-0 overflow-y-auto overflow-x-hidden' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-16 overflow-y-auto overflow-x-visible'}
+          ${isOpen 
+            ? 'w-56 translate-x-0 overflow-y-auto overflow-x-hidden' 
+            : '-translate-x-full w-0 lg:translate-x-0 lg:w-16 overflow-y-auto overflow-x-visible pointer-events-none lg:pointer-events-auto'}
         `}
       >
         <div className={`flex flex-col h-full p-3 ${isOpen ? 'min-w-[14rem]' : 'lg:min-w-[4rem]'}`}>
