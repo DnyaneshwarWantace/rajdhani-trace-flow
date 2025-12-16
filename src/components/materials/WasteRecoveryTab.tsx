@@ -29,20 +29,20 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
       
       // Map waste data to display format
       const mappedWaste: WasteItem[] = wasteItems.map((item: any) => {
-        // Determine status
-        const isAdded = item.added_at || item.status === 'added_to_inventory' || item.status === 'reused';
-        
+        // Use backend status directly, but map 'generated' to display status based on can_be_reused
         let status: 'available_for_reuse' | 'added_to_inventory' | 'disposed' | 'reused';
         
-        if (isAdded) {
+        // If backend status is already set, use it
+        if (item.status === 'added_to_inventory' || item.added_at) {
           status = 'added_to_inventory';
+        } else if (item.status === 'disposed') {
+          status = 'disposed';
+        } else if (item.status === 'reused') {
+          status = 'reused';
         } else {
+          // For 'generated' status, determine display status based on can_be_reused
           const canBeReused = item.can_be_reused === true || item.can_be_reused === 'true' || item.waste_category === 'reusable';
-          if (canBeReused) {
-            status = 'available_for_reuse';
-          } else {
-            status = 'disposed';
-          }
+          status = canBeReused ? 'available_for_reuse' : 'disposed';
         }
         
         return {

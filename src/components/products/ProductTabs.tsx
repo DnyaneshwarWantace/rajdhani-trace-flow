@@ -1,4 +1,4 @@
-type TabValue = 'inventory' | 'analytics' | 'notifications';
+type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
 interface ProductTabsProps {
   activeTab: TabValue;
@@ -46,6 +46,16 @@ export default function ProductTabs({ activeTab, onTabChange, unreadCount }: Pro
                 {unreadCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => onTabChange('wastage')}
+            className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all ${
+              activeTab === 'wastage'
+                ? 'bg-white text-primary-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            Wastage
           </button>
         </nav>
       </div>

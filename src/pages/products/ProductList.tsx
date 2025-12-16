@@ -7,6 +7,7 @@ import ProductTabs from '@/components/products/ProductTabs';
 import InventoryTab from '@/components/products/InventoryTab';
 import AnalyticsTab from '@/components/products/AnalyticsTab';
 import NotificationsTab from '@/components/products/NotificationsTab';
+import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
 import {
   Dialog,
@@ -23,7 +24,7 @@ import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import { canDelete } from '@/utils/permissions';
 
-type TabValue = 'inventory' | 'analytics' | 'notifications';
+type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
 export default function ProductList() {
   const navigate = useNavigate();
@@ -98,6 +99,7 @@ export default function ProductList() {
     } else if (activeTab === 'notifications') {
       loadNotifications();
     }
+    // wastage tab loads its own data
   }, [activeTab]);
 
   // Load products when filters change
@@ -383,6 +385,9 @@ export default function ProductList() {
         {activeTab === 'notifications' && (
           <NotificationsTab products={products} />
         )}
+
+        {/* Wastage Tab Content */}
+        {activeTab === 'wastage' && <ProductWastageTab />}
 
         {/* Modals */}
         <ProductFormModal

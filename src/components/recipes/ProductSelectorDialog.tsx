@@ -12,6 +12,15 @@ import { Search, Check, ChevronDown, ChevronRight, Package } from 'lucide-react'
 import { ProductService } from '@/services/productService';
 import type { Product } from '@/types/product';
 import { MultiSelect } from '@/components/ui/multi-select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
 
 interface ProductSelectorDialogProps {
   isOpen: boolean;
@@ -27,6 +36,7 @@ export default function ProductSelectorDialog({
   selectedProductId,
 }: ProductSelectorDialogProps) {
   const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -44,6 +54,8 @@ export default function ProductSelectorDialog({
   const [lengths, setLengths] = useState<string[]>([]);
   const [widths, setWidths] = useState<string[]>([]);
   const [weights, setWeights] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,6 +69,7 @@ export default function ProductSelectorDialog({
       setSelectedWidths([]);
       setSelectedWeights([]);
       setExpandedGroups(new Set());
+      setCurrentPage(1);
     }
   }, [isOpen]);
 
@@ -71,6 +84,7 @@ export default function ProductSelectorDialog({
         selectedWidths.length > 0 ||
         selectedWeights.length > 0)
     ) {
+      setCurrentPage(1);
       loadProducts();
     }
   }, [
@@ -83,6 +97,11 @@ export default function ProductSelectorDialog({
     selectedWeights,
     isOpen,
   ]);
+
+  useEffect(() => {
+    // Apply pagination to filtered products
+    applyPagination();
+  }, [allProducts, currentPage, itemsPerPage, searchTerm]);
 
   const loadProducts = async () => {
     try {
@@ -112,9 +131,9 @@ export default function ProductSelectorDialog({
       }
 
       const result = await ProductService.getProducts(filters);
-      const allProducts = result.products || [];
+      const loadedProducts = result.products || [];
 
-      setProducts(allProducts);
+      setAllProducts(loadedProducts);
 
       // Get unique filter options
       const uniqueCategories = Array.from(
@@ -161,6 +180,26 @@ export default function ProductSelectorDialog({
     }
   };
 
+  const applyPagination = () => {
+    // Filter products by search term
+    const filtered = searchTerm.trim()
+      ? allProducts.filter(
+          (product) =>
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : allProducts;
+
+    // Apply pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedProducts = filtered.slice(startIndex, endIndex);
+
+    setProducts(paginatedProducts);
+  };
+
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => {
       const newSet = new Set(prev);
@@ -178,16 +217,22 @@ export default function ProductSelectorDialog({
     onClose();
   };
 
-  // Filter products by search term
-  const filteredProducts = searchTerm.trim()
-    ? products.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : products;
+  // Get filtered products count for pagination
+  const getFilteredProducts = () => {
+    return searchTerm.trim()
+      ? allProducts.filter(
+          (product) =>
+            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : allProducts;
+  };
+
+  const filteredProducts = products;
+  const totalFiltered = getFilteredProducts().length;
+  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
   // Group products by name
   const groupedProducts = filteredProducts.reduce((acc, product) => {
@@ -460,6 +505,84 @@ export default function ProductSelectorDialog({
               </table>
             )}
           </div>
+
+          {/* Pagination */}
+          {!loading && filteredProducts.length > 0 && totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalFiltered)} of {totalFiltered} products
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    
+                    {/* Page Numbers */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => setCurrentPage(pageNum)}
+                            isActive={currentPage === pageNum}
+                            className="cursor-pointer"
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+
+                    {totalPages > 5 && currentPage < totalPages - 2 && (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )}
+
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+
+                <div className="flex items-center gap-2 ml-4">
+                  <span className="text-sm text-gray-600">Per page:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      setItemsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="border rounded px-2 py-1 text-sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

@@ -18,7 +18,7 @@ export interface WasteItem {
   batch_id?: string;
   product_id?: string;
   product_name?: string;
-  status: 'generated' | 'collected' | 'processed' | 'disposed' | 'recycled' | 'reused' | 'available_for_reuse' | 'added_to_inventory';
+  status: 'generated' | 'disposed' | 'reused' | 'added_to_inventory' | 'available_for_reuse'; // 'available_for_reuse' is frontend display only
   generation_date?: string;
   created_at?: string;
   added_at?: string;
