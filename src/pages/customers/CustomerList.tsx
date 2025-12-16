@@ -15,17 +15,36 @@ import CustomerEmptyState from '@/components/customers/CustomerEmptyState';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';
 import type { Order } from '@/services/orderService';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function CustomerList() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -73,6 +92,22 @@ export default function CustomerList() {
     loadOrders();
   }, [searchTerm, typeFilter]);
 
+  useEffect(() => {
+    // Apply pagination to filtered customers
+    const filtered = allCustomers.filter((customer) => {
+      const matchesSearch =
+        customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        customer.phone?.includes(searchTerm);
+      const matchesType = typeFilter === 'all' || customer.customer_type === typeFilter;
+      return matchesSearch && matchesType;
+    });
+
+    const start = (page - 1) * limit;
+    const end = start + limit;
+    setCustomers(filtered.slice(start, end));
+  }, [allCustomers, page, limit, searchTerm, typeFilter]);
+
   const loadOrders = async () => {
     try {
       const { data, error } = await OrderService.getOrders({ limit: 1000 });
@@ -95,10 +130,7 @@ export default function CustomerList() {
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await CustomerService.getCustomers({
-        search: searchTerm,
-        customer_type: typeFilter !== 'all' ? typeFilter : undefined,
-      });
+      const { data, error } = await CustomerService.getCustomers({});
 
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
@@ -113,7 +145,7 @@ export default function CustomerList() {
           return dateB - dateA;
         });
 
-        setCustomers(sortedData);
+        setAllCustomers(sortedData);
 
         // Calculate total revenue from orders
         const totalRevenue = orders.reduce((sum, order) => {
@@ -406,6 +438,113 @@ export default function CustomerList() {
           />
         )}
 
+        {/* Pagination */}
+        {!loading && customers.length > 0 && (() => {
+          const filtered = allCustomers.filter((customer) => {
+            const matchesSearch =
+              customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              customer.phone?.includes(searchTerm);
+            const matchesType = typeFilter === 'all' || customer.customer_type === typeFilter;
+            return matchesSearch && matchesType;
+          });
+          const totalCustomers = filtered.length;
+          const totalPages = Math.ceil(totalCustomers / limit);
+          const pages: (number | 'ellipsis')[] = [];
+
+          if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) {
+              pages.push(i);
+            }
+          } else {
+            pages.push(1);
+            if (page > 3) pages.push('ellipsis');
+
+            const start = Math.max(2, page - 1);
+            const end = Math.min(totalPages - 1, page + 1);
+
+            for (let i = start; i <= end; i++) {
+              if (i !== 1 && i !== totalPages) {
+                pages.push(i);
+              }
+            }
+
+            if (page < totalPages - 2) pages.push('ellipsis');
+            if (totalPages > 1) pages.push(totalPages);
+          }
+
+          return (
+            <div className="mt-6">
+              <Pagination className="w-full">
+                <PaginationContent className="w-full justify-center flex-wrap gap-1">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (page > 1) setPage(page - 1);
+                      }}
+                      className={`${page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+
+                  {pages.map((p, index) => (
+                    <PaginationItem key={index} className={p === 'ellipsis' ? 'hidden sm:block' : ''}>
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          isActive={p === page}
+                          onClick={() => setPage(p as number)}
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
+                            Math.abs((p as number) - page) > 1 && (p as number) !== 1 && (p as number) !== totalPages
+                              ? 'hidden sm:flex'
+                              : ''
+                          }`}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (page < totalPages) setPage(page + 1);
+                      }}
+                      className={`${page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalCustomers)} of {totalCustomers} customers
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">Per page:</label>
+                  <Select
+                    value={limit.toString()}
+                    onValueChange={(value) => {
+                      setLimit(parseInt(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-16 sm:w-20 h-8 sm:h-10 text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <CustomerFormDialog
           isOpen={isDialogOpen}

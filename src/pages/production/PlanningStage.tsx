@@ -261,7 +261,7 @@ export default function PlanningStage() {
   };
 
   const updateRecipeInDatabase = async (updatedMaterials: any[]) => {
-    if (!recipe || !selectedProduct) return;
+    if (!selectedProduct) return;
 
     try {
       // Prepare payload for backend
@@ -278,44 +278,66 @@ export default function PlanningStage() {
         waste_factor: m.waste_factor ?? 0,
       }));
 
-      await RecipeService.updateRecipe(recipe.id, { materials: materialsPayload });
+      let updatedRecipe: Recipe;
 
-      // Update local state with a fully-typed RecipeMaterial[]
-      const updatedRecipe: Recipe = {
-        ...recipe,
-        materials: materialsPayload.map((m) => {
-          const existing =
-            recipe.materials?.find((rm) => rm.material_id === m.material_id);
-          return {
-            id: existing?.id || `${m.material_id}-temp`,
-            recipe_id: recipe.id,
-            material_id: m.material_id,
-            material_name: m.material_name,
-            material_type: m.material_type,
-            quantity_per_sqm: m.quantity_per_sqm,
-            unit: m.unit,
-            cost_per_unit: m.cost_per_unit ?? 0,
-            specifications: m.specifications ?? '',
-            quality_requirements: m.quality_requirements ?? '',
-            is_optional: m.is_optional ?? false,
-            waste_factor: m.waste_factor ?? 0,
-            total_cost_per_sqm: existing?.total_cost_per_sqm ?? 0,
-            created_at: existing?.created_at || new Date().toISOString(),
-          };
-        }),
-      };
+      if (recipe) {
+        // Recipe exists - update it
+        updatedRecipe = await RecipeService.updateRecipe(recipe.id, { materials: materialsPayload });
+        
+        // Update local state with a fully-typed RecipeMaterial[]
+        updatedRecipe = {
+          ...recipe,
+          materials: materialsPayload.map((m) => {
+            const existing =
+              recipe.materials?.find((rm) => rm.material_id === m.material_id);
+            return {
+              id: existing?.id || `${m.material_id}-temp`,
+              recipe_id: recipe.id,
+              material_id: m.material_id,
+              material_name: m.material_name,
+              material_type: m.material_type,
+              quantity_per_sqm: m.quantity_per_sqm,
+              unit: m.unit,
+              cost_per_unit: m.cost_per_unit ?? 0,
+              specifications: m.specifications ?? '',
+              quality_requirements: m.quality_requirements ?? '',
+              is_optional: m.is_optional ?? false,
+              waste_factor: m.waste_factor ?? 0,
+              total_cost_per_sqm: existing?.total_cost_per_sqm ?? 0,
+              created_at: existing?.created_at || new Date().toISOString(),
+            };
+          }),
+        };
+      } else {
+        // Recipe doesn't exist - create it
+        updatedRecipe = await RecipeService.createRecipe(selectedProduct.id, {
+          materials: materialsPayload,
+          description: `Recipe for ${selectedProduct.name}`,
+          created_by: 'system',
+        });
+
+        // Reload the recipe to get full data with materials
+        const loadedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
+        if (loadedRecipe) {
+          updatedRecipe = loadedRecipe;
+        }
+      }
 
       setRecipe(updatedRecipe);
 
       toast({
-        title: 'Recipe Updated',
-        description: 'Recipe has been automatically updated',
+        title: recipe ? 'Recipe Updated' : 'Recipe Created',
+        description: recipe 
+          ? 'Recipe has been automatically updated'
+          : 'Recipe has been automatically created',
       });
     } catch (error) {
-      console.error('Error updating recipe:', error);
+      console.error('Error saving recipe:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update recipe automatically',
+        description: recipe 
+          ? 'Failed to update recipe automatically'
+          : 'Failed to create recipe automatically',
         variant: 'destructive',
       });
     }
@@ -452,6 +474,17 @@ export default function PlanningStage() {
       toast({
         title: 'Validation Error',
         description: 'Please add materials to production',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate that all materials have quantity_per_sqm > 0
+    const materialsWithZeroQuantity = materials.filter((m) => !m.quantity_per_sqm || m.quantity_per_sqm <= 0);
+    if (materialsWithZeroQuantity.length > 0) {
+      toast({
+        title: 'Validation Error',
+        description: `Please enter quantity per sqm (greater than 0) for: ${materialsWithZeroQuantity.map(m => m.material_name).join(', ')}`,
         variant: 'destructive',
       });
       return;
@@ -645,19 +678,50 @@ export default function PlanningStage() {
                   setConsumedMaterials(updatedConsumed);
                   
                   // Also update recipe to remove this material
-                  if (recipe && materialToRemove) {
+                  if (materialToRemove && selectedProduct) {
                     try {
-                      const currentMaterials = recipe.materials || [];
-                      const updatedRecipeMaterials = currentMaterials.filter(
-                        (m) => m.material_id !== materialId
-                      );
-                      await RecipeService.updateRecipe(recipe.id, { materials: updatedRecipeMaterials });
-                      
-                      // Update local recipe state
-                      setRecipe({
-                        ...recipe,
-                        materials: updatedRecipeMaterials,
-                      });
+                      if (recipe) {
+                        // Recipe exists - update it
+                        const currentMaterials = recipe.materials || [];
+                        const updatedRecipeMaterials = currentMaterials.filter(
+                          (m) => m.material_id !== materialId
+                        );
+                        await RecipeService.updateRecipe(recipe.id, { materials: updatedRecipeMaterials });
+                        
+                        // Update local recipe state
+                        setRecipe({
+                          ...recipe,
+                          materials: updatedRecipeMaterials,
+                        });
+                      } else {
+                        // Recipe doesn't exist - create it with remaining materials
+                        const remainingMaterials = updatedConsumed.map((m) => ({
+                          material_id: m.material_id,
+                          material_name: m.material_name,
+                          material_type: m.material_type,
+                          quantity_per_sqm: m.quantity_per_sqm,
+                          unit: m.unit,
+                          cost_per_unit: m.cost_per_unit ?? 0,
+                          specifications: m.specifications ?? '',
+                          quality_requirements: m.quality_requirements ?? '',
+                          is_optional: m.is_optional ?? false,
+                          waste_factor: m.waste_factor ?? 0,
+                        }));
+
+                        if (remainingMaterials.length > 0) {
+                          await RecipeService.createRecipe(selectedProduct.id, {
+                            materials: remainingMaterials,
+                            description: `Recipe for ${selectedProduct.name}`,
+                            created_by: 'system',
+                          });
+                          
+                          // Reload the recipe to get full data with materials
+                          const loadedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
+                          if (loadedRecipe) {
+                            setRecipe(loadedRecipe);
+                          }
+                        }
+                      }
                       
                       toast({
                         title: 'Material Removed',
@@ -739,15 +803,7 @@ export default function PlanningStage() {
       <MachineSelectionDialog
         isOpen={showMachineDialog}
         onClose={() => {
-          // Don't allow closing without selecting a machine
-          if (!selectedMachine) {
-            toast({
-              title: 'Machine Required',
-              description: 'Please select a machine to continue',
-              variant: 'destructive',
-            });
-            return;
-          }
+          // Allow closing the dialog (cancel/X button)
           setShowMachineDialog(false);
         }}
         onSelect={async (machine) => {

@@ -52,7 +52,7 @@ export default function MaterialList() {
   const [filters, setFilters] = useState<MaterialFiltersType>({
     search: '',
     category: [],
-    status: '',
+    status: [],
     type: [],
     color: [],
     supplier: [],
@@ -239,8 +239,8 @@ export default function MaterialList() {
     setFilters({ ...filters, category: values, page: 1 });
   };
 
-  const handleStatusFilter = (value: string) => {
-    setFilters({ ...filters, status: value, page: 1 });
+  const handleStatusFilter = (values: string[]) => {
+    setFilters({ ...filters, status: values, page: 1 });
   };
 
   const handleTypeFilter = (values: string[]) => {
@@ -434,28 +434,74 @@ export default function MaterialList() {
     };
   };
 
-  const handleOrder = (material: RawMaterial) => {
+  const handleOrder = async (material: RawMaterial) => {
     setSelectedRestockMaterial(material);
+
+    // Fetch last purchase order for this material to get previous supplier
+    let previousSupplier = '';
+    try {
+      const { getApiUrl } = await import('@/utils/apiConfig');
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch(`${API_URL}/purchase-orders?limit=1000`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        const orders = result.data || [];
+        
+        // Find orders containing this material
+        const matchingOrders = orders.filter((order: any) => {
+          if (order.items && order.items.length > 0) {
+            return order.items.some((item: any) => 
+              item.material_id === material.id || 
+              (item.material_name && item.material_name.toLowerCase().trim() === material.name.toLowerCase().trim())
+            );
+          }
+          const materialDetails = order.material_details || {};
+          return materialDetails.materialName && 
+                 materialDetails.materialName.toLowerCase().trim() === material.name.toLowerCase().trim();
+        });
+        
+        // Get the most recent order (sorted by order_date descending)
+        if (matchingOrders.length > 0) {
+          const sortedOrders = matchingOrders.sort((a: any, b: any) => {
+            const dateA = new Date(a.order_date || a.created_at || 0).getTime();
+            const dateB = new Date(b.order_date || b.created_at || 0).getTime();
+            return dateB - dateA;
+          });
+          previousSupplier = sortedOrders[0].supplier_name || '';
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching previous supplier:', error);
+    }
 
     // Get suppliers for this material's category
     const categorySuppliers = getSuppliersForCategory(material.category);
 
-    // Pre-fill with first available supplier from category if any
-    if (categorySuppliers.length > 0) {
-      const firstSupplier = categorySuppliers[0];
+    // Pre-fill with previous supplier if available, otherwise use first available supplier from category
+    let selectedSupplier = previousSupplier || (categorySuppliers.length > 0 ? categorySuppliers[0].supplier.name : '');
+    
+    if (selectedSupplier) {
       const supplierDetails = getSupplierDetails(
-        firstSupplier.supplier.name,
+        selectedSupplier,
         material.category,
         material.name
       );
       const materialIsOutOfStock = material.status === 'out-of-stock';
       setRestockForm({
-        supplier: firstSupplier.supplier.name,
-        type: supplierDetails.type || firstSupplier.type || '',
+        supplier: selectedSupplier,
+        type: supplierDetails.type || (categorySuppliers.find(s => s.supplier.name === selectedSupplier)?.type || ''),
         quantity: '',
         costPerUnit: supplierDetails.costPerUnit > 0 
           ? supplierDetails.costPerUnit.toString() 
-          : (firstSupplier.costPerUnit?.toString() || ''),
+          : (categorySuppliers.find(s => s.supplier.name === selectedSupplier)?.costPerUnit?.toString() || ''),
         expectedDelivery: '',
         notes: `${materialIsOutOfStock ? 'Order' : 'Restock'} for ${material.name}`,
       });
@@ -916,13 +962,14 @@ export default function MaterialList() {
               {/* Supplier Selection */}
               <div>
                 <Label htmlFor="restockSupplier" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Select Supplier *
+                  Select Supplier * {restockForm.supplier && <span className="text-xs text-gray-500 font-normal">(Previous supplier - cannot be changed)</span>}
                 </Label>
                 <Select
                   value={restockForm.supplier}
                   onValueChange={handleRestockSupplierChange}
+                  disabled={!!restockForm.supplier}
                 >
-                  <SelectTrigger className="bg-white">
+                  <SelectTrigger className="bg-white [&>span]:text-left [&>span]:justify-start" disabled={!!restockForm.supplier}>
                     <SelectValue placeholder="Select supplier" />
                   </SelectTrigger>
                   <SelectContent className="bg-white max-h-[300px]">
@@ -938,10 +985,10 @@ export default function MaterialList() {
                           value={supplier.name}
                           className="bg-white hover:bg-gray-100"
                         >
-                          <div className="flex flex-col">
-                            <span className="font-medium">{supplier.name}</span>
+                          <div className="flex flex-col text-left">
+                            <span className="font-medium text-left">{supplier.name}</span>
                             {supplierDetails.type && supplierDetails.costPerUnit > 0 && (
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-500 text-left">
                                 {supplierDetails.type} • ₹{supplierDetails.costPerUnit} • {supplierDetails.unit || 'unit'}
                               </span>
                             )}

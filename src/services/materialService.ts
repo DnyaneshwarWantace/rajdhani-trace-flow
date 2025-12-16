@@ -23,7 +23,10 @@ export class MaterialService {
       categories.forEach(cat => cat && queryParams.append('category', cat));
     }
 
-    if (filters?.status) queryParams.append('status', filters.status);
+    if (filters?.status) {
+      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+      statuses.forEach(status => status && queryParams.append('status', status));
+    }
 
     // Handle other array filters
     if (filters?.type) {

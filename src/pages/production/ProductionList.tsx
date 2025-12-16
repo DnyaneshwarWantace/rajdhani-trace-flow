@@ -15,6 +15,22 @@ import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
 import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 
 export default function ProductionList() {
   const { toast } = useToast();
@@ -27,7 +43,10 @@ export default function ProductionList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
-  
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalBatches, setTotalBatches] = useState(0);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<ProductionBatch | null>(null);
@@ -54,7 +73,12 @@ export default function ProductionList() {
 
   useEffect(() => {
     filterBatches();
-  }, [activeSection, allBatches, searchTerm, priorityFilter]);
+  }, [activeSection, allBatches, searchTerm, priorityFilter, page, limit]);
+
+  useEffect(() => {
+    // Reset to page 1 when filters change
+    setPage(1);
+  }, [activeSection, searchTerm, priorityFilter]);
 
   const enrichBatchesWithProductNames = async (batches: ProductionBatch[]): Promise<ProductionBatch[]> => {
     const enrichedBatches = await Promise.all(
@@ -168,7 +192,14 @@ export default function ProductionList() {
       filtered = filtered.filter(batch => priorityFilter.includes(batch.priority));
     }
 
-    setFilteredBatches(filtered);
+    setTotalBatches(filtered.length);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedBatches = filtered.slice(startIndex, endIndex);
+
+    setFilteredBatches(paginatedBatches);
   };
 
   const calculateStats = (batchesList: ProductionBatch[]) => {
@@ -333,6 +364,105 @@ export default function ProductionList() {
             canDelete={user?.role === 'admin' || false}
           />
         )}
+
+        {/* Pagination */}
+        {!loading && filteredBatches.length > 0 && (() => {
+          const totalPages = Math.ceil(totalBatches / limit);
+          const pages: (number | 'ellipsis')[] = [];
+
+          if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) {
+              pages.push(i);
+            }
+          } else {
+            pages.push(1);
+            if (page > 3) pages.push('ellipsis');
+
+            const start = Math.max(2, page - 1);
+            const end = Math.min(totalPages - 1, page + 1);
+
+            for (let i = start; i <= end; i++) {
+              if (i !== 1 && i !== totalPages) {
+                pages.push(i);
+              }
+            }
+
+            if (page < totalPages - 2) pages.push('ellipsis');
+            if (totalPages > 1) pages.push(totalPages);
+          }
+
+          return (
+            <div className="mt-6">
+              <Pagination className="w-full">
+                <PaginationContent className="w-full justify-center flex-wrap gap-1">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (page > 1) setPage(page - 1);
+                      }}
+                      className={`${page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+
+                  {pages.map((p, index) => (
+                    <PaginationItem key={index} className={p === 'ellipsis' ? 'hidden sm:block' : ''}>
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          isActive={p === page}
+                          onClick={() => setPage(p as number)}
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
+                            Math.abs((p as number) - page) > 1 && (p as number) !== 1 && (p as number) !== totalPages
+                              ? 'hidden sm:flex'
+                              : ''
+                          }`}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (page < totalPages) setPage(page + 1);
+                      }}
+                      className={`${page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalBatches)} of {totalBatches} batches
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">Per page:</label>
+                  <Select
+                    value={limit.toString()}
+                    onValueChange={(value) => {
+                      setLimit(Number(value));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-16 sm:w-20 h-8 sm:h-10 text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <ProductionFormDialog
           isOpen={isDialogOpen}

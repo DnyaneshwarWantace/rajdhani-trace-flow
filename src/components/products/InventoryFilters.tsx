@@ -160,12 +160,14 @@ export default function InventoryFilters({
           </Select>
         </div>
 
-        {/* View Mode Toggle */}
+        {/* View Mode Toggle - Only Grid on mobile, all options on desktop */}
         <div className="lg:col-span-3 flex items-center gap-2">
           <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
+
+          {/* Desktop: Show all 3 options */}
           <button
             onClick={() => onViewModeChange('table')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'table'
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-gray-600 hover:bg-gray-100'
@@ -185,7 +187,7 @@ export default function InventoryFilters({
           </button>
           <button
             onClick={() => onViewModeChange('grouped')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'grouped'
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-gray-600 hover:bg-gray-100'

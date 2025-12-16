@@ -79,6 +79,34 @@ export class RecipeService {
     }
   }
 
+  static async createRecipe(productId: string, recipeData: { materials: any[]; description?: string; version?: string; created_by?: string }): Promise<Recipe> {
+    const response = await fetch(`${API_URL}/recipes`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        product_id: productId,
+        materials: recipeData.materials,
+        description: recipeData.description,
+        version: recipeData.version,
+        created_by: recipeData.created_by || 'system',
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create recipe');
+    }
+
+    const data = await response.json();
+    // Backend returns { success: true, data: { recipe, materials, ... } }
+    // We need to combine recipe with materials to match Recipe type
+    const recipe = data.data.recipe;
+    return {
+      ...recipe,
+      materials: data.data.materials || [],
+    };
+  }
+
   static async updateRecipe(recipeId: string, recipeData: { materials: any[] }): Promise<Recipe> {
     const response = await fetch(`${API_URL}/recipes/${recipeId}`, {
       method: 'PUT',

@@ -473,24 +473,20 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             await RecipeService.deleteRecipe(existingRecipe.id);
           }
           
-          // Create new recipe via API (or recreate if editing)
-          const { getApiUrl } = await import('@/utils/apiConfig');
-          const response = await fetch(`${getApiUrl()}/recipes`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-            },
-            body: JSON.stringify(recipeData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Failed to save recipe:', errorData);
+          // Create new recipe via RecipeService (or recreate if editing)
+          try {
+            await RecipeService.createRecipe(createdProduct.id, {
+              materials: recipeData.materials,
+              description: recipeData.description,
+              version: recipeData.version,
+              created_by: recipeData.created_by,
+            });
+          } catch (recipeError: any) {
+            console.error('Failed to save recipe:', recipeError);
             // Show warning but don't fail the product save
             toast({
               title: 'Recipe Warning',
-              description: errorData.error || 'Recipe could not be saved, but product was created successfully',
+              description: recipeError?.message || 'Recipe could not be saved, but product was created successfully',
               variant: 'destructive',
             });
           }

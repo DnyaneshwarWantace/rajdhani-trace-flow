@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Search, Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { Search, Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,7 @@ interface Material {
   length_unit?: string;
   width_unit?: string;
   weight?: string;
+  weight_unit?: string;
   color?: string;
   pattern?: string;
 }
@@ -59,6 +60,7 @@ export default function MaterialSelectionDialog({
   existingMaterials = [],
 }: MaterialSelectionDialogProps) {
   const [activeTab, setActiveTab] = useState<'raw_materials' | 'products'>('raw_materials');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]); // Multi-select
   const [subcategoryFilter, setSubcategoryFilter] = useState<string[]>([]); // Multi-select
@@ -327,6 +329,7 @@ export default function MaterialSelectionDialog({
             length_unit: p.length_unit,
             width_unit: p.width_unit,
             weight: p.weight,
+            weight_unit: p.weight_unit,
             color: p.color,
             pattern: p.pattern,
           }))
@@ -351,7 +354,7 @@ export default function MaterialSelectionDialog({
         material_id: material.id,
         material_name: material.name,
         material_type: material.type,
-        quantity_per_sqm: 0,
+        quantity_per_sqm: 0, // Will be set by user in the requirements table
         unit: material.unit,
       });
     }
@@ -482,7 +485,7 @@ export default function MaterialSelectionDialog({
                 {material.weight && (
                   <div className="min-w-0">
                     <p className="text-gray-500">Weight</p>
-                    <p className="font-medium text-gray-900 truncate">{material.weight}</p>
+                    <p className="font-medium text-gray-900 truncate">{material.weight} {material.weight_unit || ''}</p>
                   </div>
                 )}
                 {material.color && material.color !== 'N/A' && (
@@ -564,53 +567,46 @@ export default function MaterialSelectionDialog({
           </div>
         </DialogHeader>
 
-        {/* Tabs - Fixed */}
-        <div className="px-6 pt-4 flex-shrink-0">
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="raw_materials" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">
-                <Layers className="w-4 h-4 mr-2" />
-                Raw Materials
-              </TabsTrigger>
-              <TabsTrigger value="products" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
-                <Package className="w-4 h-4 mr-2" />
-                Products
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        {/* Tabs and View Toggle - Fixed */}
+        <div className="px-6 pt-2 flex-shrink-0">
+          <div className="flex items-center justify-between gap-4">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="raw_materials" className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-700">
+                  <Layers className="w-4 h-4 mr-2" />
+                  Raw Materials
+                </TabsTrigger>
+                <TabsTrigger value="products" className="data-[state=active]:bg-green-100 data-[state=active]:text-green-700">
+                  <Package className="w-4 h-4 mr-2" />
+                  Products
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-        {/* Current Section Indicator */}
-        <div className="px-6 pt-3 flex-shrink-0">
-          <div className={`px-4 py-2 rounded-lg border-l-4 ${
-            activeTab === 'raw_materials'
-              ? 'bg-blue-50 border-blue-500'
-              : 'bg-green-50 border-green-500'
-          }`}>
-            <div className="flex items-center gap-2">
-              {activeTab === 'raw_materials' ? (
-                <>
-                  <Layers className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900">Currently Viewing: Raw Materials</p>
-                    <p className="text-xs text-blue-700">Select raw materials like yarn, thread, backing, etc.</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Package className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="text-sm font-semibold text-green-900">Currently Viewing: Products</p>
-                    <p className="text-xs text-green-700">Select finished products to use as materials in production</p>
-                  </div>
-                </>
-              )}
+            {/* View Mode Toggle */}
+            <div className="hidden lg:flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}
+              >
+                <Grid3x3 className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('table')}
+                className={`h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
+              >
+                <List className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Filters - Fixed */}
-        <div className="px-6 pt-3 pb-3 flex-shrink-0 border-b border-gray-200">
+        <div className="px-6 pt-2 pb-3 flex-shrink-0 border-b border-gray-200">
           {activeTab === 'raw_materials' ? (
             // RAW MATERIALS: Only 4 filters - Category, Material Type, Color, Supplier
             <>
@@ -752,7 +748,7 @@ export default function MaterialSelectionDialog({
         </div>
 
         {/* Content Area - Scrollable with fixed min-height */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 min-h-[400px] max-h-full">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 min-h-0 max-h-full">
           {loading ? (
             <div className="flex items-center justify-center h-full min-h-[400px]">
               <div className="text-center">
@@ -769,11 +765,135 @@ export default function MaterialSelectionDialog({
                 <p className="text-sm text-gray-500 mt-1">Try adjusting your filters</p>
               </div>
             </div>
-          ) : (
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
               {currentMaterials.map((material) => (
                 <MaterialCard key={material.id} material={material} />
               ))}
+            </div>
+          ) : (
+            <div className="py-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-y border-gray-200">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
+                      {activeTab === 'raw_materials' ? (
+                        <>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supplier</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
+                        </>
+                      ) : (
+                        <>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dimensions</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color/Pattern</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
+                        </>
+                      )}
+                      <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Select</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {currentMaterials.map((material) => {
+                      const isSelected = selectedMaterials.has(material.id);
+
+                      return (
+                        <tr key={material.id} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50' : ''}`}>
+                          <td className="px-3 py-3">
+                            <p className="font-medium text-gray-900 truncate max-w-[200px]">{material.name}</p>
+                          </td>
+                          <td className="px-3 py-3">
+                            <p className="text-gray-700 truncate max-w-[150px]" title={material.category || '-'}>{material.category || '-'}</p>
+                            {material.subcategory && <p className="text-xs text-gray-500 truncate max-w-[150px]" title={material.subcategory}>{material.subcategory}</p>}
+                            {material.material_type && <p className="text-xs text-gray-500 truncate max-w-[150px]" title={material.material_type}>{material.material_type}</p>}
+                          </td>
+                          <td className="px-3 py-3">
+                            {activeTab === 'raw_materials' ? (
+                              <span className="font-medium text-gray-900">{material.current_stock} {material.unit}</span>
+                            ) : (
+                              <>
+                                {material.length && material.width && (() => {
+                                  const length = parseFloat(material.length);
+                                  const width = parseFloat(material.width);
+                                  const sqm = calculateSQM(length, width, material.length_unit || 'm', material.width_unit || 'm');
+                                  const totalSqm = sqm * material.current_stock;
+                                  return (
+                                    <>
+                                      <span className="font-medium text-gray-900">
+                                        {material.current_stock} {material.current_stock === 1 ? 'roll' : 'rolls'}
+                                      </span>
+                                      {totalSqm > 0 && (
+                                        <p className="text-xs text-gray-500 mt-0.5">({totalSqm.toFixed(2)} SQM)</p>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            )}
+                          </td>
+                          {activeTab === 'raw_materials' ? (
+                            <>
+                              <td className="px-3 py-3">
+                                <p className="text-gray-700 truncate max-w-[150px]" title={material.supplier || '-'}>{material.supplier || '-'}</p>
+                              </td>
+                              <td className="px-3 py-3">
+                                <p className="text-gray-700">{material.cost ? `₹${material.cost}/${material.unit}` : '-'}</p>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-3 py-3">
+                                <p className="text-gray-700">
+                                  {material.length && material.width
+                                    ? `${material.length}${material.length_unit} × ${material.width}${material.width_unit}`
+                                    : '-'}
+                                </p>
+                                {material.length && material.width && (() => {
+                                  const length = parseFloat(material.length);
+                                  const width = parseFloat(material.width);
+                                  const sqm = calculateSQM(length, width, material.length_unit || 'm', material.width_unit || 'm');
+                                  return sqm > 0 ? (
+                                    <p className="text-xs text-gray-500 mt-0.5">({sqm.toFixed(2)} SQM)</p>
+                                  ) : null;
+                                })()}
+                              </td>
+                              <td className="px-3 py-3">
+                                <p className="text-gray-700 truncate max-w-[120px]" title={material.color || '-'}>{material.color || '-'}</p>
+                                {material.pattern && <p className="text-xs text-gray-500 truncate max-w-[120px]" title={material.pattern}>{material.pattern}</p>}
+                              </td>
+                              <td className="px-3 py-3">
+                                <p className="text-gray-700">{material.weight ? `${material.weight} ${material.weight_unit || ''}`.trim() : '-'}</p>
+                              </td>
+                            </>
+                          )}
+                          <td className="px-3 py-3 text-center">
+                            <Button
+                              variant={isSelected ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => handleSelectMaterial(material)}
+                              className={isSelected ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <Check className="w-4 h-4 mr-1" />
+                                  Selected
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-4 h-4 mr-1" />
+                                  Select
+                                </>
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -818,7 +938,7 @@ export default function MaterialSelectionDialog({
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleConfirm} disabled={selectedMaterials.size === 0}>
+            <Button onClick={handleConfirm} disabled={selectedMaterials.size === 0} className="text-white">
               <Plus className="w-4 h-4 mr-2" />
               Add Selected ({selectedMaterials.size})
             </Button>

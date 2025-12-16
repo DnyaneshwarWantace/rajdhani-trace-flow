@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,22 @@ export default function MaterialRequirementsTable({
   onSelectIndividualProducts,
   recipeBased = false,
 }: MaterialRequirementsTableProps) {
+  // Local state to track input values as strings (allows typing "0", "0.", "0.3")
+  const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
+
+  // Initialize input values from materials (only for new materials)
+  useEffect(() => {
+    setQuantityInputs(prev => {
+      const updated = { ...prev };
+      materials.forEach((material) => {
+        // Only initialize if not already in state (preserves user typing)
+        if (!(material.material_id in updated)) {
+          updated[material.material_id] = material.quantity_per_sqm === 0 ? '' : material.quantity_per_sqm.toString();
+        }
+      });
+      return updated;
+    });
+  }, [materials.map(m => m.material_id).join(',')]); // Update when material IDs change
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'available':
@@ -79,7 +96,7 @@ export default function MaterialRequirementsTable({
             )}
           </div>
           {onAddMaterial && (
-            <Button onClick={onAddMaterial} size="sm">
+            <Button onClick={onAddMaterial} size="sm" className="text-white">
               <Plus className="w-4 h-4 mr-2" />
               Select Materials & Products
             </Button>
@@ -221,24 +238,68 @@ export default function MaterialRequirementsTable({
                     <div className="grid grid-cols-1 gap-3">
                       <div>
                         <label className="text-xs font-medium text-gray-700 block mb-2">
-                          Adjust Quantity Per SQM (Base Quantity)
+                          Adjust Quantity Per SQM (Base Quantity) *
                         </label>
                         <div className="flex items-center gap-2">
                           <Input
-                            type="number"
+                            type="text"
+                            inputMode="decimal"
                             step="0.01"
-                            value={material.quantity_per_sqm}
-                            onChange={(e) =>
-                              onUpdateQuantity &&
-                              onUpdateQuantity(material.material_id, parseFloat(e.target.value) || 0)
-                            }
+                            value={quantityInputs[material.material_id] ?? (material.quantity_per_sqm === 0 ? '' : material.quantity_per_sqm.toString())}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Allow empty string, numbers, and decimal points while typing
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                // Update local state immediately for responsive typing
+                                setQuantityInputs(prev => ({
+                                  ...prev,
+                                  [material.material_id]: value
+                                }));
+                                
+                                // Update parent only when we have a valid number
+                                if (value === '') {
+                                  onUpdateQuantity && onUpdateQuantity(material.material_id, 0);
+                                } else {
+                                  const numValue = parseFloat(value);
+                                  if (!isNaN(numValue) && numValue >= 0) {
+                                    onUpdateQuantity && onUpdateQuantity(material.material_id, numValue);
+                                  }
+                                }
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // On blur, ensure we have a valid number or set to 0
+                              const value = e.target.value;
+                              if (value === '' || value === '.') {
+                                setQuantityInputs(prev => ({
+                                  ...prev,
+                                  [material.material_id]: ''
+                                }));
+                                onUpdateQuantity && onUpdateQuantity(material.material_id, 0);
+                              } else {
+                                const numValue = parseFloat(value);
+                                if (!isNaN(numValue) && numValue >= 0) {
+                                  setQuantityInputs(prev => ({
+                                    ...prev,
+                                    [material.material_id]: numValue.toString()
+                                  }));
+                                }
+                              }
+                            }}
+                            placeholder="Enter quantity"
                             className="text-sm max-w-[200px]"
+                            required
                           />
                           <span className="text-sm text-gray-600">{material.unit} per SQM</span>
                           <span className="text-xs text-gray-400 ml-2">
                             (Changing this will auto-recalculate all quantities above)
                           </span>
                         </div>
+                        {material.quantity_per_sqm === 0 && (
+                          <p className="text-xs text-red-600 mt-1">
+                            Please enter a quantity greater than 0
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

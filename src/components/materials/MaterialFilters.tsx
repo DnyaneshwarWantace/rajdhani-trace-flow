@@ -18,7 +18,7 @@ interface MaterialFiltersProps {
   viewMode: 'grid' | 'table';
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
-  onStatusChange: (value: string) => void;
+  onStatusChange: (values: string[]) => void;
   onTypeChange?: (values: string[]) => void;
   onColorChange?: (values: string[]) => void;
   onSupplierChange?: (values: string[]) => void;
@@ -101,29 +101,29 @@ export default function MaterialFilters({
           />
         </div>
 
-        {/* Status Filter */}
+        {/* Status Filter - Multi-select */}
         <div className="lg:col-span-3">
-          <Select value={filters.status || 'all'} onValueChange={(value) => onStatusChange(value === 'all' ? '' : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="in-stock">In Stock</SelectItem>
-              <SelectItem value="low-stock">Low Stock</SelectItem>
-              <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={[
+              { label: 'In Stock', value: 'in-stock' },
+              { label: 'Low Stock', value: 'low-stock' },
+              { label: 'Out of Stock', value: 'out-of-stock' },
+              { label: 'Overstock', value: 'overstock' },
+            ]}
+            selected={Array.isArray(filters.status) ? filters.status : (filters.status ? [filters.status] : [])}
+            onChange={onStatusChange}
+            placeholder="All Status"
+          />
         </div>
 
-        {/* View Mode Toggle */}
+        {/* View Mode Toggle - Only Grid on mobile, both options on desktop */}
         <div className="lg:col-span-2 flex items-center gap-2">
           <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
+
+          {/* Desktop: Show both Table and Grid */}
           <button
             onClick={() => onViewModeChange('table')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               viewMode === 'table'
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-gray-600 hover:bg-gray-100'

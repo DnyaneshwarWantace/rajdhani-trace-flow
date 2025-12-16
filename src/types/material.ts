@@ -58,7 +58,7 @@ export interface MaterialStats {
 export interface MaterialFilters {
   search?: string;
   category?: string | string[];
-  status?: string;
+  status?: string | string[];
   type?: string | string[];
   color?: string | string[];
   supplier?: string | string[];
