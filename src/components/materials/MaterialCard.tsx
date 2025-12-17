@@ -95,8 +95,9 @@ export default function MaterialCard({
       <div className="p-3">
         {/* Header Section */}
         <div className="mb-2">
-          <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight">
-            {material.name}
+          <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight" title={material.name}>
+            {material.name.split(' ').slice(0, 4).join(' ')}
+            {material.name.split(' ').length > 4 && '...'}
           </h3>
           <p className="text-[10px] text-gray-500 mb-1 line-clamp-1">{material.type || material.category}</p>
           <div className="flex items-center gap-1">

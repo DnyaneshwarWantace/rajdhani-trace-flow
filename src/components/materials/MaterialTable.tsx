@@ -77,8 +77,8 @@ export default function MaterialTable({
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-gray-900 truncate" title={material.name}>
-                        {material.name.split(' ').slice(0, 10).join(' ')}
-                        {material.name.split(' ').length > 10 && '...'}
+                        {material.name.split(' ').slice(0, 4).join(' ')}
+                        {material.name.split(' ').length > 4 && '...'}
                       </p>
                       <p className="text-sm text-gray-500 truncate">{material.id}</p>
                     </div>

@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Factory, Settings, User } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
+import { AuthService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 
 interface Machine {
@@ -55,6 +56,7 @@ export default function MachineSelectionDialog({
   useEffect(() => {
     if (isOpen) {
       loadMachines();
+      loadCurrentUser();
       // Set selected machine if provided
       if (selectedMachineId) {
         setSelectedMachineIdState(selectedMachineId);
@@ -65,6 +67,17 @@ export default function MachineSelectionDialog({
       setInspectorName('');
     }
   }, [isOpen, selectedMachineId]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await AuthService.getCurrentUser();
+      if (user) {
+        setInspectorName(user.full_name || user.email || '');
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const loadMachines = async () => {
     setLoading(true);
@@ -132,11 +145,12 @@ export default function MachineSelectionDialog({
               Inspector Name *
             </Label>
             <Input
-              value={inspectorName}
-              onChange={(e) => setInspectorName(e.target.value)}
-              placeholder="Enter inspector name"
-              className="w-full"
+              value={inspectorName || 'Current User'}
+              readOnly
+              disabled
+              className="w-full bg-gray-50 cursor-not-allowed"
             />
+            <p className="text-xs text-gray-500">Auto-filled with current logged-in user</p>
           </div>
           
           {/* Machine Selection */}
@@ -170,20 +184,19 @@ export default function MachineSelectionDialog({
           </div>
         </div>
         
-        <DialogFooter className="space-y-2 pt-4 border-t border-gray-100">
-          <Button 
+        <DialogFooter className="flex flex-col gap-2 pt-4 border-t border-gray-100">
+          <Button
             onClick={handleConfirm}
             disabled={!selectedMachineIdState || !inspectorName.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
           >
             <Factory className="w-4 h-4 mr-2" />
             Start Production with Selected Machine
           </Button>
-          
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             onClick={onClose}
-            size="sm"
             className="w-full"
           >
             Cancel

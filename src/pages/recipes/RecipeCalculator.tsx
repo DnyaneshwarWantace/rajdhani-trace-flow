@@ -129,19 +129,24 @@ export default function RecipeCalculator() {
   };
 
   const updateCalculationItem = (index: number, field: keyof RecipeCalculationItem, value: any) => {
-    const updated = [...calculationItems];
-    if (field === 'productId') {
-      const product = products.find((p) => p.id === value);
-      updated[index] = {
-        ...updated[index],
-        productId: value,
-        productName: product?.name || '',
-        unit: product?.unit || 'piece',
-      };
-    } else {
-      updated[index] = { ...updated[index], [field]: value };
-    }
-    setCalculationItems(updated);
+    console.log('updateCalculationItem called:', { index, field, value, currentItems: calculationItems });
+    setCalculationItems((prev) => {
+      const updated = [...prev];
+      if (field === 'productId') {
+        const product = products.find((p) => p.id === value);
+        console.log('Found product in products array:', product);
+        updated[index] = {
+          ...updated[index],
+          productId: value,
+          productName: product?.name || updated[index].productName || '',
+          unit: product?.unit || updated[index].unit || 'piece',
+        };
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
+      }
+      console.log('Updated item:', updated[index]);
+      return updated;
+    });
   };
 
   const removeCalculationItem = (index: number) => {

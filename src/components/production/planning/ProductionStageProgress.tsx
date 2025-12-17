@@ -17,19 +17,19 @@ export default function ProductionStageProgress({ currentStage }: ProductionStag
       id: 'planning',
       name: 'Material Selection',
       icon: Package,
-      status: currentStage === 'planning' ? 'active' : 'pending',
+      status: currentStage === 'planning' ? 'active' : currentStage === 'machine' || currentStage === 'wastage' || currentStage === 'individual' ? 'completed' : 'pending',
     },
     {
       id: 'machine',
       name: 'Machine Operations',
       icon: Factory,
-      status: currentStage === 'machine' ? 'active' : currentStage === 'planning' ? 'pending' : 'completed',
+      status: currentStage === 'machine' ? 'active' : currentStage === 'planning' ? 'pending' : currentStage === 'wastage' || currentStage === 'individual' ? 'completed' : 'pending',
     },
     {
       id: 'wastage',
       name: 'Waste Generation',
       icon: Trash2,
-      status: currentStage === 'wastage' ? 'active' : currentStage === 'planning' || currentStage === 'machine' ? 'pending' : 'completed',
+      status: currentStage === 'wastage' ? 'active' : currentStage === 'planning' || currentStage === 'machine' ? 'pending' : currentStage === 'individual' ? 'completed' : 'pending',
     },
     {
       id: 'individual',
@@ -101,10 +101,21 @@ export default function ProductionStageProgress({ currentStage }: ProductionStag
 
       {/* Overall Progress */}
       <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600 mb-2">
-          Overall Progress: <span className="font-semibold">0% Complete</span>
-        </p>
-        <p className="text-xs text-gray-500">Current: Material Selection</p>
+        {(() => {
+          const completedCount = stages.filter(s => s.status === 'completed').length;
+          const activeCount = stages.filter(s => s.status === 'active').length;
+          const progress = ((completedCount + (activeCount * 0.5)) / stages.length) * 100;
+          const currentStageName = stages.find(s => s.status === 'active')?.name || 'Material Selection';
+          
+          return (
+            <>
+              <p className="text-sm text-gray-600 mb-2">
+                Overall Progress: <span className="font-semibold">{Math.round(progress)}% Complete</span>
+              </p>
+              <p className="text-xs text-gray-500">Current: {currentStageName}</p>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

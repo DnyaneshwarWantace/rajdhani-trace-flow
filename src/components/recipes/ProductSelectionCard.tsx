@@ -36,10 +36,30 @@ export default function ProductSelectionCard({
   const [openDialogIndex, setOpenDialogIndex] = useState<number | null>(null);
 
   const handleProductSelect = (index: number, product: Product) => {
-    onUpdateItem(index, 'productId', product.id);
-    onUpdateItem(index, 'productName', product.name);
-    onUpdateItem(index, 'unit', product.unit || 'piece');
-    setOpenDialogIndex(null);
+    try {
+      console.log('handleProductSelect called with:', { index, productId: product.id, productName: product.name, product });
+      
+      // Update all fields separately to ensure they all get set
+      // The updateCalculationItem function will handle productId and set name/unit automatically
+      onUpdateItem(index, 'productId', product.id);
+      
+      // Also explicitly set the name and unit to ensure they're set even if product lookup fails
+      onUpdateItem(index, 'productName', product.name);
+      onUpdateItem(index, 'unit', product.unit || 'piece');
+      
+      console.log('All state updates called, waiting before closing dialog');
+      
+      // Close dialog after ensuring state update completes
+      // Use requestAnimationFrame to ensure React has processed the update
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          console.log('Closing dialog in ProductSelectionCard');
+          setOpenDialogIndex(null);
+        }, 200);
+      });
+    } catch (error) {
+      console.error('Error selecting product:', error);
+    }
   };
 
   const getSelectedProduct = (productId: string) => {

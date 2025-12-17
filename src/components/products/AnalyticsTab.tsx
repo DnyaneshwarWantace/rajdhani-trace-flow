@@ -4,7 +4,6 @@ import type { Product, ProductStats } from '@/types/product';
 import StatCard from './analytics/StatCard';
 import StatusDistributionChart from './analytics/StatusDistributionChart';
 import CategoryDistributionChart from './analytics/CategoryDistributionChart';
-import StockLevelChart from './analytics/StockLevelChart';
 import { Package, TrendingUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 
 interface AnalyticsTabProps {
@@ -72,16 +71,6 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
   const categoryData = Array.from(categoryMap.entries())
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
-
-  // Stock levels overview - use all products, show more products
-  const productsByStock = allProducts
-    .sort((a, b) => b.current_stock - a.current_stock)
-    .map((product) => ({
-      name: product.name.length > 20 ? product.name.substring(0, 20) + '...' : product.name,
-      current: product.current_stock,
-      min: product.min_stock_level,
-      max: product.max_stock_level,
-    }));
 
   if (loading) {
     return (
@@ -153,13 +142,6 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
         {/* Category Distribution */}
         {categoryData.length > 0 && <CategoryDistributionChart data={categoryData} />}
       </div>
-
-      {/* Stock Levels Chart */}
-      {productsByStock.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:gap-6">
-          <StockLevelChart data={productsByStock} />
-        </div>
-      )}
 
       {/* Additional Stats */}
       {stats.available_individual_products !== undefined && (

@@ -29,7 +29,8 @@ import ProductionList from '@/pages/production/ProductionList';
 import ProductionDetail from '@/pages/production/ProductionDetail';
 import ProductionCreate from '@/pages/production/ProductionCreate';
 import PlanningStage from '@/pages/production/PlanningStage';
-import ProductionMachine from '@/pages/production/ProductionMachine';
+import MachineStage from '@/pages/production/MachineStage';
+import ProductionWastage from '@/pages/production/ProductionWastage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -162,10 +163,26 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/production/:id/planning"
+        element={
+          <PrivateRoute>
+            <PlanningStage />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/production/:id/machine"
         element={
           <PrivateRoute>
-            <ProductionMachine />
+            <MachineStage />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/production/:id/wastage"
+        element={
+          <PrivateRoute>
+            <ProductionWastage />
           </PrivateRoute>
         }
       />

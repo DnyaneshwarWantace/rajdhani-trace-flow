@@ -109,7 +109,7 @@ export interface IndividualProduct {
   serial_number?: string;
 
   // Status
-  status: 'available' | 'sold' | 'damaged' | 'returned' | 'in_production' | 'quality_check' | 'reserved';
+  status: 'available' | 'sold' | 'damaged' | 'returned' | 'in_production' | 'quality_check' | 'reserved' | 'used';
 
   // Dimensions
   final_length?: string;
@@ -152,7 +152,12 @@ export interface IndividualProductFormData {
 
 export interface StockStats {
   available: number;
+  in_production: number;
+  used: number;
+  quality_check: number;
+  reserved: number;
   sold: number;
   damaged: number;
+  returned: number;
   total: number;
 }

@@ -41,7 +41,7 @@ export default function EditIndividualProductDialog({
     inspector: '',
     location: '',
     notes: '',
-    status: 'available' as 'available' | 'sold' | 'damaged' | 'returned',
+    status: 'available' as 'available' | 'sold' | 'damaged' | 'returned' | 'in_production' | 'quality_check' | 'reserved' | 'used',
   });
   const [saving, setSaving] = useState(false);
 
@@ -55,7 +55,7 @@ export default function EditIndividualProductDialog({
         inspector: individualProduct.inspector || '',
         location: individualProduct.location || '',
         notes: individualProduct.notes || '',
-        status: (individualProduct.status || 'available') as 'available' | 'sold' | 'damaged' | 'returned',
+        status: (individualProduct.status || 'available') as 'available' | 'sold' | 'damaged' | 'returned' | 'in_production' | 'quality_check' | 'reserved' | 'used',
       });
     }
   }, [individualProduct, open]);
@@ -159,7 +159,7 @@ export default function EditIndividualProductDialog({
             <Label htmlFor="status">Status</Label>
             <Select
               value={formData.status}
-              onValueChange={(value: 'available' | 'sold' | 'damaged' | 'returned') =>
+              onValueChange={(value: 'available' | 'sold' | 'damaged' | 'returned' | 'in_production' | 'quality_check' | 'reserved' | 'used') =>
                 setFormData({ ...formData, status: value })
               }
             >
@@ -168,6 +168,10 @@ export default function EditIndividualProductDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="in_production">In Production</SelectItem>
+                <SelectItem value="used">Used</SelectItem>
+                <SelectItem value="quality_check">Quality Check</SelectItem>
+                <SelectItem value="reserved">Reserved</SelectItem>
                 <SelectItem value="sold">Sold</SelectItem>
                 <SelectItem value="damaged">Damaged</SelectItem>
                 <SelectItem value="returned">Returned</SelectItem>

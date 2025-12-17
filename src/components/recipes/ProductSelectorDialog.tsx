@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,7 @@ export default function ProductSelectorDialog({
   const [weights, setWeights] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,6 +71,7 @@ export default function ProductSelectorDialog({
       setSelectedWeights([]);
       setExpandedGroups(new Set());
       setCurrentPage(1);
+      setIsSelecting(false);
     }
   }, [isOpen]);
 
@@ -212,9 +214,41 @@ export default function ProductSelectorDialog({
     });
   };
 
-  const handleSelect = (product: Product) => {
-    onSelect(product);
-    onClose();
+  const handleSelect = (product: Product, event?: React.MouseEvent) => {
+    // Prevent any default behavior
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    
+    if (!product || !product.id) {
+      console.error('Invalid product selected:', product);
+      return;
+    }
+    
+    console.log('Selecting product:', product.id, product.name);
+    
+    // Set selecting flag to prevent dialog from closing prematurely
+    setIsSelecting(true);
+    
+    try {
+      // Call onSelect to update parent state first - this must complete before closing
+      console.log('Calling onSelect callback');
+      onSelect(product);
+      console.log('onSelect callback completed');
+      
+      // Close the dialog after ensuring state update completes
+      // Use a small timeout to ensure React has processed the state update
+      setTimeout(() => {
+        console.log('Closing dialog');
+        setIsSelecting(false);
+        onClose();
+      }, 100);
+    } catch (error) {
+      console.error('Error in handleSelect:', error);
+      setIsSelecting(false);
+      // Don't close dialog if there's an error
+    }
   };
 
   // Get filtered products count for pagination
@@ -258,8 +292,19 @@ export default function ProductSelectorDialog({
     return bHasRecipe ? 1 : -1;
   });
 
+  const handleDialogClose = (open: boolean) => {
+    // Prevent closing if we're in the middle of selecting
+    if (isSelecting) {
+      return;
+    }
+    // Only close if explicitly requested
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogClose} modal={true}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Select Product</DialogTitle>
@@ -385,10 +430,9 @@ export default function ProductSelectorDialog({
                     const firstProduct = groupProducts[0];
 
                     return (
-                      <>
+                      <React.Fragment key={groupKey}>
                         {/* Group Header Row */}
                         <tr
-                          key={groupKey}
                           className="bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                           onClick={() => toggleGroup(groupKey)}
                         >
@@ -420,6 +464,10 @@ export default function ProductSelectorDialog({
                               className={`bg-white hover:bg-gray-50 transition-colors ${
                                 selectedProductId === product.id ? 'bg-blue-50' : ''
                               }`}
+                              onClick={(e) => {
+                                // Prevent row click from interfering with button clicks
+                                e.stopPropagation();
+                              }}
                             >
                               <td className="px-3 py-3">
                                 <div className="flex items-center gap-2">
@@ -478,11 +526,14 @@ export default function ProductSelectorDialog({
                               </td>
                               <td className="px-3 py-3 text-center">
                                 <Button
+                                  type="button"
                                   size="sm"
                                   variant={selectedProductId === product.id ? 'default' : 'outline'}
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
-                                    handleSelect(product);
+                                    e.nativeEvent.stopImmediatePropagation();
+                                    handleSelect(product, e);
                                   }}
                                   className="h-8"
                                 >
@@ -498,7 +549,7 @@ export default function ProductSelectorDialog({
                               </td>
                             </tr>
                           ))}
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -586,7 +637,11 @@ export default function ProductSelectorDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onClose();
+          }}>
             Cancel
           </Button>
         </DialogFooter>

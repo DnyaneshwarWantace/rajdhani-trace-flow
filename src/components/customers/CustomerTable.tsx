@@ -59,7 +59,7 @@ export default function CustomerTable({
                 onClick={() => onView(customer)}
               >
                 <td className="px-4 py-4">
-                  <div className="line-clamp-2 text-sm font-medium text-gray-900" title={customer.name}>
+                  <div className="line-clamp-2 text-sm font-medium text-gray-900 uppercase" title={customer.name}>
                     {customer.name}
                   </div>
                 </td>

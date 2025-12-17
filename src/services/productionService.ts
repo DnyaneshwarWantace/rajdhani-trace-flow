@@ -352,5 +352,132 @@ export class ProductionService {
       throw error;
     }
   }
+
+  // Production Flow Step methods
+  static async getProductionFlowSteps(flowId: string): Promise<{ data: any[] | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/flows/${flowId}/steps`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to fetch production flow steps' };
+      }
+
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error in getProductionFlowSteps:', error);
+      return { data: null, error: 'Failed to fetch production flow steps' };
+    }
+  }
+
+  static async updateProductionFlowStep(stepId: string, updates: any): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/flows/steps/${stepId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to update production flow step' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in updateProductionFlowStep:', error);
+      return { data: null, error: 'Failed to update production flow step' };
+    }
+  }
+
+  // Material Consumption methods
+  static async createMaterialConsumption(consumptionData: {
+    production_batch_id: string;
+    material_id: string;
+    material_name: string;
+    material_type: 'product' | 'raw_material';
+    quantity_used: number;
+    unit: string;
+    quantity_per_sqm?: number;
+    individual_product_ids?: string[];
+    notes?: string;
+  }): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/material-consumption`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(consumptionData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to create material consumption' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in createMaterialConsumption:', error);
+      return { data: null, error: 'Failed to create material consumption' };
+    }
+  }
+
+  // Production Flow methods
+  static async createProductionFlow(flowData: {
+    production_batch_id: string;
+    flow_name: string;
+    description?: string;
+  }): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/flows`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(flowData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to create production flow' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in createProductionFlow:', error);
+      return { data: null, error: 'Failed to create production flow' };
+    }
+  }
+
+  static async createProductionFlowStep(stepData: {
+    production_flow_id: string;
+    step_number: number;
+    step_name: string;
+    step_type: string;
+    machine_id?: string;
+    machine_name?: string;
+    description?: string;
+    inspector?: string;
+  }): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/flow-steps`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(stepData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to create production flow step' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in createProductionFlowStep:', error);
+      return { data: null, error: 'Failed to create production flow step' };
+    }
+  }
 }
 

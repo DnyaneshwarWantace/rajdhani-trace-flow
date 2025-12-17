@@ -7,6 +7,7 @@ import { ProductionService } from '@/services/productionService';
 import { RecipeService } from '@/services/recipeService';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
+import { AuthService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types/product';
 import type { Recipe } from '@/types/recipe';
@@ -112,7 +113,57 @@ export default function PlanningStage() {
         completion_date: batch.completion_date || '',
         notes: batch.notes || '',
       });
-      loadRecipeAndCalculate(product, batch.planned_quantity);
+
+      // If batch is already in production, load consumed materials instead of recipe
+      if (batch.status === 'in_production' || batch.status === 'in_progress') {
+        // Load consumed materials from MaterialConsumption
+        const { data: materialConsumption } = await ProductionService.getMaterialConsumption(batchId);
+        if (materialConsumption && materialConsumption.length > 0) {
+          // Convert material consumption to consumed materials format
+          const consumed = materialConsumption.map((mc: any) => ({
+            material_id: mc.material_id,
+            material_name: mc.material_name,
+            material_type: mc.material_type,
+            quantity_per_sqm: mc.quantity_per_sqm || 0,
+            required_quantity: mc.quantity_used || mc.required_quantity || 0,
+            actual_consumed_quantity: mc.actual_consumed_quantity || mc.quantity_used || 0,
+            whole_product_count: mc.whole_product_count || mc.quantity_used || 0,
+            unit: mc.unit,
+            individual_product_ids: mc.individual_product_ids || [],
+            status: 'available' as const,
+            available_quantity: 0,
+            shortage: 0,
+          }));
+          setConsumedMaterials(consumed);
+          
+          // Load individual products for consumed materials
+          const individualProductsMap: Record<string, any[]> = {};
+          for (const material of consumed) {
+            if (material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0) {
+              try {
+                const { IndividualProductService } = await import('@/services/individualProductService');
+                const individualProducts = await Promise.all(
+                  material.individual_product_ids.map((id: string) =>
+                    IndividualProductService.getIndividualProductById(id)
+                  )
+                );
+                individualProductsMap[material.material_id] = individualProducts
+                  .filter((ip: any) => ip.data)
+                  .map((ip: any) => ip.data);
+              } catch (error) {
+                console.error(`Error loading individual products for ${material.material_name}:`, error);
+              }
+            }
+          }
+          setConsumedIndividualProducts(individualProductsMap);
+          
+          // Clear materials (recipe) since we're showing consumed materials
+          setMaterials([]);
+        }
+      } else {
+        // Batch is still in planning, load recipe
+        loadRecipeAndCalculate(product, batch.planned_quantity);
+      }
     } catch (error) {
       console.error('Error loading batch:', error);
       toast({ title: 'Error', description: 'Failed to load batch', variant: 'destructive' });
@@ -779,7 +830,21 @@ export default function PlanningStage() {
           <div className="flex justify-end">
             <Button
               onClick={handleAddToProduction}
-              disabled={submitting || formData.planned_quantity <= 0 || materials.length === 0}
+              disabled={
+                submitting ||
+                formData.planned_quantity <= 0 ||
+                materials.length === 0 ||
+                materials.some(m => {
+                  // For product-type materials: check if sufficient individual products are selected
+                  if (m.material_type === 'product') {
+                    const selectedProducts = selectedIndividualProducts[m.material_id] || [];
+                    const requiredCount = Math.ceil(m.required_quantity);
+                    return selectedProducts.length < requiredCount;
+                  }
+                  // For raw materials: check if available quantity meets required quantity
+                  return m.available_quantity < m.required_quantity;
+                })
+              }
               className="bg-primary-600 hover:bg-primary-700"
               size="lg"
             >
@@ -1042,49 +1107,177 @@ export default function PlanningStage() {
 
           setSelectedMachine(machine);
           setShowMachineDialog(false);
-          
-          // After machine selection, create the batch
+
+          // After machine selection, create the batch and set up production flow
           if (!selectedProduct) return;
 
           setSubmitting(true);
+          let batch: any = null;
+          
           try {
+            // Step 1: Create the batch - MUST SUCCEED
             const batchData = {
               product_id: selectedProduct.id,
               planned_quantity: formData.planned_quantity,
               priority: formData.priority,
               completion_date: formData.completion_date || undefined,
               notes: formData.notes,
-              machine_id: machine.id, // Machine is required now
+              machine_id: machine.id,
             };
 
-            const { data: batch, error } = await ProductionService.createBatch(batchData);
+            const { data: createdBatch, error: batchError } = await ProductionService.createBatch(batchData);
 
-            if (error || !batch) {
+            if (batchError || !createdBatch) {
               toast({
                 title: 'Error',
-                description: error || 'Failed to create batch',
+                description: batchError || 'Failed to create batch. Cannot start production.',
                 variant: 'destructive',
               });
-              return;
+              setSubmitting(false);
+              return; // STOP - Don't continue if batch creation fails
             }
 
+            batch = createdBatch;
+
+            // Step 2: Save all consumed materials to MaterialConsumption - MUST SUCCEED
+            if (consumedMaterials.length > 0) {
+              const materialErrors: string[] = [];
+              for (const material of consumedMaterials) {
+                try {
+                  const { error: consumptionError } = await ProductionService.createMaterialConsumption({
+                    production_batch_id: batch.id,
+                    material_id: material.material_id,
+                    material_name: material.material_name,
+                    material_type: material.material_type,
+                    quantity_used: material.actual_consumed_quantity || material.required_quantity,
+                    unit: material.unit,
+                    quantity_per_sqm: material.quantity_per_sqm,
+                    individual_product_ids: material.individual_product_ids || [],
+                  });
+                  
+                  if (consumptionError) {
+                    materialErrors.push(`${material.material_name}: ${consumptionError}`);
+                  }
+                } catch (err) {
+                  const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+                  materialErrors.push(`${material.material_name}: ${errorMsg}`);
+                }
+              }
+              
+              // If ANY material consumption failed, show error and STOP
+              if (materialErrors.length > 0) {
+                toast({
+                  title: 'Error',
+                  description: `Failed to save materials: ${materialErrors.join(', ')}. Production not started.`,
+                  variant: 'destructive',
+                });
+                setSubmitting(false);
+                return; // STOP - Don't continue if material consumption fails
+              }
+            }
+
+            // Step 3: Create production flow - MUST SUCCEED
+            const { data: flow, error: flowError } = await ProductionService.createProductionFlow({
+              production_batch_id: batch.id,
+              flow_name: `Production Flow for ${selectedProduct.name}`,
+              description: `Batch ${batch.batch_number}`,
+            });
+
+            if (flowError || !flow) {
+              toast({
+                title: 'Error',
+                description: flowError || 'Failed to create production flow. Production not started.',
+                variant: 'destructive',
+              });
+              setSubmitting(false);
+              return; // STOP - Don't continue if flow creation fails
+            }
+
+            // Step 4: Create initial machine step - MUST SUCCEED
+            try {
+              const user = await AuthService.getCurrentUser();
+              const { error: stepError } = await ProductionService.createProductionFlowStep({
+                production_flow_id: flow.id,
+                step_number: 1,
+                step_name: 'Machine Operation',
+                step_type: 'machine_operation',
+                machine_id: machine.id,
+                machine_name: machine.machine_name,
+                description: `Production on ${machine.machine_name}`,
+                inspector: user?.full_name || user?.email || 'Unknown',
+              });
+
+              if (stepError) {
+                toast({
+                  title: 'Error',
+                  description: stepError || 'Failed to create machine step. Production not started.',
+                  variant: 'destructive',
+                });
+                setSubmitting(false);
+                return; // STOP - Don't continue if step creation fails
+              }
+            } catch (err) {
+              const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+              toast({
+                title: 'Error',
+                description: `Failed to create machine step: ${errorMsg}. Production not started.`,
+                variant: 'destructive',
+              });
+              setSubmitting(false);
+              return; // STOP - Don't continue if step creation fails
+            }
+
+            // Step 5: Update batch status to 'in_production' - CRITICAL: Must succeed before navigation
+            const { data: updatedBatch, error: statusError } = await ProductionService.updateBatch(batch.id, {
+              status: 'in_production',
+            });
+
+            if (statusError || !updatedBatch) {
+              toast({
+                title: 'Error',
+                description: statusError || 'Failed to update batch status. Production not started. Cannot navigate to machine stage.',
+                variant: 'destructive',
+              });
+              console.error('Batch status update failed:', statusError);
+              setSubmitting(false);
+              return; // STOP - Don't navigate if status update failed
+            }
+
+            // Verify the status was actually updated
+            if (updatedBatch.status !== 'in_production' && updatedBatch.status !== 'in_progress') {
+              toast({
+                title: 'Error',
+                description: `Batch status was not updated correctly. Expected 'in_production', got '${updatedBatch.status}'. Cannot navigate to machine stage.`,
+                variant: 'destructive',
+              });
+              console.error('Batch status mismatch. Expected in_production, got:', updatedBatch.status);
+              setSubmitting(false);
+              return; // STOP - Don't navigate if status is wrong
+            }
+
+            // ALL STEPS SUCCEEDED - Now safe to proceed
             toast({
               title: 'Success',
-              description: `Production batch created with machine: ${machine.machine_name}`,
+              description: `Production started with machine: ${machine.machine_name}`,
             });
 
             // Delete draft state after successful batch creation
             if (selectedProduct) {
-              await ProductionService.deleteDraftPlanningState(selectedProduct.id);
+              try {
+                await ProductionService.deleteDraftPlanningState(selectedProduct.id);
+              } catch (err) {
+                console.warn('Failed to delete draft state (non-critical):', err);
+              }
             }
 
-            // Navigate to machine stage
+            // Navigate to machine stage ONLY if ALL steps succeeded
             navigate(`/production/${batch.id}/machine`);
           } catch (error) {
             console.error('Error creating batch:', error);
+            const errorMsg = error instanceof Error ? error.message : 'Unknown error';
             toast({
               title: 'Error',
-              description: 'Failed to create production batch',
+              description: `Failed to start production: ${errorMsg}. Cannot navigate to machine stage.`,
               variant: 'destructive',
             });
           } finally {

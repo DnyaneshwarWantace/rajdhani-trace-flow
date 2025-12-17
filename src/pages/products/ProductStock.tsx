@@ -26,6 +26,7 @@ export default function ProductStock() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
+  const [allIndividualProducts, setAllIndividualProducts] = useState<IndividualProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -52,6 +53,7 @@ export default function ProductStock() {
   useEffect(() => {
     if (productId) {
       loadProduct();
+      loadAllIndividualProducts(); // Load all for stats
     }
   }, [productId]);
 
@@ -69,6 +71,20 @@ export default function ProductStock() {
       setProduct(productData);
     } catch (err) {
       console.error('Error loading product:', err);
+    }
+  };
+
+  const loadAllIndividualProducts = async () => {
+    if (!productId) return;
+
+    try {
+      // Load all products without pagination for stats
+      const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
+        limit: 10000, // High limit to get all products
+      });
+      setAllIndividualProducts(result.products);
+    } catch (err) {
+      console.error('Error loading all individual products:', err);
     }
   };
 
@@ -105,12 +121,16 @@ export default function ProductStock() {
   };
 
   // Calculate stats from all products (not just current page)
-  // Note: This would ideally come from a separate stats endpoint
   const stats: StockStats = {
-    available: individualProducts.filter((p) => p.status === 'available').length,
-    sold: individualProducts.filter((p) => p.status === 'sold').length,
-    damaged: individualProducts.filter((p) => p.status === 'damaged').length,
-    total: totalProducts,
+    available: allIndividualProducts.filter((p) => p.status === 'available').length,
+    in_production: allIndividualProducts.filter((p) => p.status === 'in_production').length,
+    used: allIndividualProducts.filter((p) => p.status === 'used').length,
+    quality_check: allIndividualProducts.filter((p) => p.status === 'quality_check').length,
+    reserved: allIndividualProducts.filter((p) => p.status === 'reserved').length,
+    sold: allIndividualProducts.filter((p) => p.status === 'sold').length,
+    damaged: allIndividualProducts.filter((p) => p.status === 'damaged').length,
+    returned: allIndividualProducts.filter((p) => p.status === 'returned').length,
+    total: allIndividualProducts.length,
   };
 
   const handlePageChange = (page: number) => {
@@ -140,9 +160,10 @@ export default function ProductStock() {
   const handleSaveEdit = async (id: string, data: Partial<IndividualProductFormData>) => {
     try {
       await IndividualProductService.updateIndividualProduct(id, data);
-      
+
       // Reload data to ensure consistency
       await loadIndividualProducts();
+      await loadAllIndividualProducts(); // Reload for updated stats
     } catch (error) {
       console.error('Error updating individual product:', error);
       throw error;
