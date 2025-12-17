@@ -19,6 +19,8 @@ interface ProductTableProps {
   canDelete?: boolean;
 }
 
+
+
 export default function ProductTable({ products, onEdit, onDuplicate, onView, onStock, onProduction, onQRCode, onDelete, canDelete = false }: ProductTableProps) {
   const getStatusColor = (status: string) => {
     switch (status) {

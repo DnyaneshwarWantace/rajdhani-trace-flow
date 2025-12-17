@@ -224,7 +224,8 @@ export default function PlanningStage() {
             status = availableQuantity === 0 ? 'unavailable' : 'low';
           }
 
-          return {
+          // For products: calculate actual_consumed_quantity and whole_product_count
+          const materialData: any = {
             material_id: recipeMaterial.material_id,
             material_name: materialName,
             material_type: recipeMaterial.material_type,
@@ -235,6 +236,21 @@ export default function PlanningStage() {
             status,
             shortage,
           };
+
+          if (recipeMaterial.material_type === 'product') {
+            // For products: actual_consumed_quantity = required_quantity (fractional)
+            // whole_product_count = Math.ceil(required_quantity) (whole products needed)
+            materialData.actual_consumed_quantity = requiredQuantity;
+            materialData.whole_product_count = Math.ceil(requiredQuantity);
+            materialData.individual_product_ids = []; // Will be populated when user selects individual products
+          } else {
+            // For raw materials: actual_consumed_quantity = required_quantity
+            materialData.actual_consumed_quantity = requiredQuantity;
+            materialData.whole_product_count = 0; // Not applicable
+            materialData.individual_product_ids = [];
+          }
+
+          return materialData;
         })
       );
 
@@ -409,7 +425,7 @@ export default function PlanningStage() {
           status = availableQuantity === 0 ? 'unavailable' : 'low';
         }
 
-        return {
+        const materialData: any = {
           ...m,
           quantity_per_sqm: quantityPerSqm,
           unit,
@@ -418,6 +434,22 @@ export default function PlanningStage() {
           status,
           shortage,
         };
+
+        // For products: calculate actual_consumed_quantity and whole_product_count
+        if (m.material_type === 'product') {
+          // For products: actual_consumed_quantity = required_quantity (fractional)
+          // whole_product_count = Math.ceil(required_quantity) (whole products needed)
+          materialData.actual_consumed_quantity = requiredQuantity;
+          materialData.whole_product_count = Math.ceil(requiredQuantity);
+          materialData.individual_product_ids = m.individual_product_ids || []; // Preserve if already selected
+        } else {
+          // For raw materials: actual_consumed_quantity = required_quantity
+          materialData.actual_consumed_quantity = requiredQuantity;
+          materialData.whole_product_count = 0; // Not applicable
+          materialData.individual_product_ids = [];
+        }
+
+        return materialData;
       })
     );
 
@@ -522,8 +554,34 @@ export default function PlanningStage() {
       const existingMaterialIds = new Set(consumedMaterials.map((m) => m.material_id));
       const newMaterialsToAdd = materials.filter((m) => !existingMaterialIds.has(m.material_id));
       
-      if (newMaterialsToAdd.length > 0) {
-        setConsumedMaterials([...consumedMaterials, ...newMaterialsToAdd]);
+      // For products: calculate actual_consumed_quantity and whole_product_count
+      const materialsWithProductDetails = newMaterialsToAdd.map((m) => {
+        if (m.material_type === 'product') {
+          // For products: 
+          // - actual_consumed_quantity = required_quantity (fractional, e.g., 0.8)
+          // - whole_product_count = Math.ceil(required_quantity) (e.g., 1)
+          const actualConsumed = m.required_quantity || 0;
+          const wholeProductCount = Math.ceil(actualConsumed);
+          
+          return {
+            ...m,
+            actual_consumed_quantity: actualConsumed,
+            whole_product_count: wholeProductCount,
+            individual_product_ids: m.individual_product_ids || [], // Will be populated when user selects individual products
+          };
+        } else {
+          // For raw materials: actual_consumed_quantity = required_quantity
+          return {
+            ...m,
+            actual_consumed_quantity: m.required_quantity || 0,
+            whole_product_count: 0, // Not applicable for raw materials
+            individual_product_ids: [],
+          };
+        }
+      });
+      
+      if (materialsWithProductDetails.length > 0) {
+        setConsumedMaterials([...consumedMaterials, ...materialsWithProductDetails]);
         
         // 4. Clear ALL materials from requirements section that are now in production
         // This includes both newly added materials AND materials that were already in production
