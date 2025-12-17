@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -167,6 +168,18 @@ export default function MachineStage() {
           productionFlow={productionFlow}
           onStepUpdate={handleRefresh}
         />
+
+        {/* Wastage Button at Bottom */}
+        <div className="flex justify-end mt-6">
+          <Button
+            onClick={() => navigate(`/production/${id}/wastage`)}
+            className="bg-orange-600 hover:bg-orange-700 text-white"
+            size="lg"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Wastage Stage
+          </Button>
+        </div>
       </div>
     </Layout>
   );

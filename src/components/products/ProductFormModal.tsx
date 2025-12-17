@@ -41,6 +41,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<ProductFormData>({
@@ -265,6 +266,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    // Only proceed if this is an intentional submit (user clicked the submit button)
+    if (!isSubmitting) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -545,6 +552,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       setError(err instanceof Error ? err.message : 'Failed to save product');
     } finally {
       setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -745,12 +753,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               type="submit"
               disabled={loading}
               className="bg-primary-600 hover:bg-primary-700"
               onClick={(e) => {
-                // Ensure this is the only way to submit
+                // Set flag to indicate intentional submit
+                setIsSubmitting(true);
                 e.stopPropagation();
               }}
             >

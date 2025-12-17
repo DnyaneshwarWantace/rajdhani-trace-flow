@@ -374,7 +374,7 @@ export class ProductionService {
 
   static async updateProductionFlowStep(stepId: string, updates: any): Promise<{ data: any | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/production/flows/steps/${stepId}`, {
+      const response = await fetch(`${API_URL}/production/flow-steps/${stepId}`, {
         method: 'PUT',
         headers: this.getHeaders(),
         body: JSON.stringify(updates),

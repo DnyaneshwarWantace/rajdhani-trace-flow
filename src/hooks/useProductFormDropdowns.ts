@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { DropdownService } from '@/services/dropdownService';
+import { useToast } from '@/hooks/use-toast';
 
 export function useProductFormDropdowns() {
+  const { toast } = useToast();
   const [categories, setCategories] = useState<string[]>([]);
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
@@ -124,16 +126,27 @@ export function useProductFormDropdowns() {
       }
 
       if (!option) {
-        alert(`Option "${value}" not found in ${category}`);
+        toast({
+          title: 'Error',
+          description: `Option "${value}" not found in ${category}`,
+          variant: 'destructive',
+        });
         return;
       }
 
       await DropdownService.deleteDropdown(option._id || option.id);
       await loadDropdowns();
-      alert(`"${value}" deleted successfully`);
+      toast({
+        title: 'Success',
+        description: `"${value}" deleted successfully`,
+      });
     } catch (err) {
       console.error('Error deleting dropdown option:', err);
-      alert('Failed to delete option');
+      toast({
+        title: 'Error',
+        description: 'Failed to delete option',
+        variant: 'destructive',
+      });
     }
   };
 

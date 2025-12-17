@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProductDropdownFieldProps {
   label: string;
@@ -41,6 +42,7 @@ export default function ProductDropdownField({
   onAdd,
   reloadDropdowns,
 }: ProductDropdownFieldProps) {
+  const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [newInput, setNewInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,9 +80,19 @@ export default function ProductDropdownField({
       onValueChange(newInput.trim());
       setNewInput('');
       setShowAdd(false);
+
+      // Show success toast
+      toast({
+        title: 'Success',
+        description: `New ${label.toLowerCase()} "${newInput.trim()}" added successfully`,
+      });
     } catch (err) {
       console.error(`Failed to add ${category}:`, err);
-      alert(`Failed to add ${category}`);
+      toast({
+        title: 'Error',
+        description: `Failed to add ${label.toLowerCase()}`,
+        variant: 'destructive',
+      });
     }
   };
 

@@ -349,7 +349,11 @@ export default function ValueUnitDropdownField({
             <div className="flex gap-2">
               <Input
                 value={newUnitName}
-                onChange={(e) => setNewUnitName(e.target.value)}
+                onChange={(e) => {
+                  // Only allow letters and spaces
+                  const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                  setNewUnitName(value);
+                }}
                 placeholder="Enter new unit (e.g., feet, m, cm)"
                 className="flex-1"
               />

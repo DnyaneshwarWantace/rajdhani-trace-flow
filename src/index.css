@@ -210,3 +210,37 @@ aside > div {
   overflow-y: auto !important;
   overflow-x: visible !important;
 }
+
+/* Global Title Case - Capitalize first letter of every word */
+/* This automatically capitalizes all text in the UI */
+* {
+  text-transform: capitalize !important;
+}
+
+/* Exceptions - keep these in normal case */
+input,
+input *,
+textarea,
+textarea *,
+button,
+button *,
+select,
+select *,
+option,
+option *,
+[role="button"],
+[role="button"] *,
+[type="email"],
+[type="tel"],
+[type="url"],
+[type="number"],
+[type="date"],
+[type="time"],
+[type="password"],
+code,
+pre,
+svg,
+svg * {
+  text-transform: none !important;
+}
+

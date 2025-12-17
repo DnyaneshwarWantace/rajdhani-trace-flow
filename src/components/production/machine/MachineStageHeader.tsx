@@ -40,7 +40,8 @@ export default function MachineStageHeader({
         </Button>
         <Button
           onClick={onWastage}
-          className="bg-orange-600 hover:bg-orange-700 flex items-center gap-2"
+          size="lg"
+          className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
         >
           <Trash2 className="w-4 h-4" />
           Wastage Stage

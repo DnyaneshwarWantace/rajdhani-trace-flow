@@ -41,7 +41,9 @@ export default function MachineStepCard({
     }
   };
 
-  const handleStart = async () => {
+  const handleStart = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsUpdating(true);
     try {
       await onUpdate({
@@ -53,7 +55,9 @@ export default function MachineStepCard({
     }
   };
 
-  const handlePause = async () => {
+  const handlePause = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsUpdating(true);
     try {
       await onUpdate({
@@ -64,7 +68,9 @@ export default function MachineStepCard({
     }
   };
 
-  const handleComplete = async () => {
+  const handleComplete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsUpdating(true);
     try {
       await onUpdate({
@@ -82,10 +88,11 @@ export default function MachineStepCard({
       <div className="flex items-center gap-2">
         {step.status === 'pending' && (
           <Button
+            type="button"
             size="sm"
             onClick={handleStart}
             disabled={isUpdating}
-            className="flex items-center gap-1 h-7 text-xs"
+            className="flex items-center gap-1 h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Play className="w-3 h-3" />
             Start
@@ -94,6 +101,7 @@ export default function MachineStepCard({
         {step.status === 'in_progress' && (
           <>
             <Button
+              type="button"
               size="sm"
               variant="outline"
               onClick={handlePause}
@@ -104,10 +112,11 @@ export default function MachineStepCard({
               Pause
             </Button>
             <Button
+              type="button"
               size="sm"
               onClick={handleComplete}
               disabled={isUpdating}
-              className="flex items-center gap-1 h-7 text-xs bg-green-600 hover:bg-green-700"
+              className="flex items-center gap-1 h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
             >
               <CheckCircle className="w-3 h-3" />
               Complete
@@ -173,10 +182,11 @@ export default function MachineStepCard({
         <div className="flex items-center gap-2">
           {step.status === 'pending' && (
             <Button
+              type="button"
               size="sm"
               onClick={handleStart}
               disabled={isUpdating}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Play className="w-4 h-4" />
               Start
@@ -185,6 +195,7 @@ export default function MachineStepCard({
           {step.status === 'in_progress' && (
             <>
               <Button
+                type="button"
                 size="sm"
                 variant="outline"
                 onClick={handlePause}
@@ -195,10 +206,11 @@ export default function MachineStepCard({
                 Pause
               </Button>
               <Button
+                type="button"
                 size="sm"
                 onClick={handleComplete}
                 disabled={isUpdating}
-                className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
               >
                 <CheckCircle className="w-4 h-4" />
                 Complete
