@@ -127,6 +127,7 @@ export interface IndividualProduct {
   // Dates
   production_date?: string;
   completion_date?: string;
+  batch_number?: string;
 
   // Timestamps
   created_at: string;

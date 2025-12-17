@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { TruncatedText } from '@/components/ui/TruncatedText';
-import { Recycle, Package, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Recycle, Package, Loader2, RefreshCw, AlertCircle, LayoutGrid, Table2 } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { ProductionService } from '@/services/productionService';
 import { useToast } from '@/hooks/use-toast';
 import ProductWasteCard from './wastage/ProductWasteCard';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { IndividualProduct } from '@/types/product';
 
 interface ExtendedWasteItem extends WasteItem {
@@ -22,6 +22,7 @@ export default function ProductWastageTab() {
   const [wasteData, setWasteData] = useState<ExtendedWasteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [returningIds, setReturningIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   useEffect(() => {
     loadWasteData();
@@ -82,24 +83,9 @@ export default function ProductWastageTab() {
         const individualProductsResults = await Promise.all(individualProductsPromises);
         const individualProducts = individualProductsResults.filter(p => p !== null) as IndividualProduct[];
         
-        // Also try to fetch by product_id and batch_number if batchInfo has batch_number
-        let additionalProducts: IndividualProduct[] = [];
-        if (productId && batchInfo?.batch_number) {
-          try {
-            const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
-              batch_number: batchInfo.batch_number,
-              limit: 100
-            });
-            additionalProducts = result.products || [];
-          } catch (e) {
-            // Ignore errors
-          }
-        }
-        
         // Combine and deduplicate individual products
-        const allIndividualProducts = [...individualProducts, ...additionalProducts];
         const uniqueProducts = Array.from(
-          new Map(allIndividualProducts.map(p => [p.id, p])).values()
+          new Map(individualProducts.map(p => [p.id, p])).values()
         );
         
         return {
@@ -129,7 +115,18 @@ export default function ProductWastageTab() {
       });
       
       const mappedWaste = await Promise.all(mappedWastePromises);
-      setWasteData(mappedWaste);
+      
+      // Filter out fake data: items with 0.00 used in production (no material consumption)
+      const validWaste = mappedWaste.filter((item) => {
+        const productConsumption = item.materialConsumption?.filter(
+          (cons: any) => cons.material_type === 'product' && cons.material_id === item.product_id
+        ) || [];
+        const totalUsed = productConsumption.reduce((sum: number, cons: any) => sum + (cons.quantity_used || 0), 0);
+        // Only show items that have actual consumption records (totalUsed > 0)
+        return totalUsed > 0;
+      });
+      
+      setWasteData(validWaste);
     } catch (error) {
       console.error('Error loading product waste data:', error);
       toast({
@@ -261,7 +258,7 @@ export default function ProductWastageTab() {
         </Card>
       </div>
 
-      {/* Header with Refresh */}
+      {/* Header with Refresh and View Toggle */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">Product Wastage</h2>
@@ -269,16 +266,37 @@ export default function ProductWastageTab() {
             Track and manage product waste from production
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadWasteData}
-          disabled={loading}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('card')}
+              className="h-8 px-3"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8 px-3"
+            >
+              <Table2 className="w-4 h-4" />
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadWasteData}
+            disabled={loading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Waste Items Grid */}
