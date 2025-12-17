@@ -18,6 +18,7 @@ import ExpectedProductDetails from '@/components/production/planning/ExpectedPro
 import MaterialRequirementsTable from '@/components/production/planning/MaterialRequirementsTable';
 import MaterialSelectionDialog from '@/components/production/planning/MaterialSelectionDialog';
 import MachineSelectionDialog from '@/components/production/planning/MachineSelectionDialog';
+import IndividualProductSelectionDialog from '@/components/production/planning/IndividualProductSelectionDialog';
 
 export default function PlanningStage() {
   const navigate = useNavigate();
@@ -29,6 +30,8 @@ export default function PlanningStage() {
   const [submitting, setSubmitting] = useState(false);
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [showMachineDialog, setShowMachineDialog] = useState(false);
+  const [showIndividualProductDialog, setShowIndividualProductDialog] = useState(false);
+  const [selectedMaterialForIndividual, setSelectedMaterialForIndividual] = useState<{id: string, name: string, required: number} | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
   const [formData, setFormData] = useState({
     planned_quantity: 0,
@@ -38,6 +41,8 @@ export default function PlanningStage() {
   });
   const [materials, setMaterials] = useState<any[]>([]); // Recipe materials (top section)
   const [consumedMaterials, setConsumedMaterials] = useState<any[]>([]); // Confirmed materials (bottom section)
+  const [selectedIndividualProducts, setSelectedIndividualProducts] = useState<Record<string, any[]>>({}); // Store selected individual products per material (top section)
+  const [consumedIndividualProducts, setConsumedIndividualProducts] = useState<Record<string, any[]>>({}); // Store individual products for consumed materials (bottom section)
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [recipeModified, setRecipeModified] = useState(false);
   const [draftSaveTimeout, setDraftSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -136,6 +141,30 @@ export default function PlanningStage() {
       }
       if (draft?.consumed_materials) {
         setConsumedMaterials(draft.consumed_materials);
+
+        // Load individual products for consumed materials
+        const individualProductsMap: Record<string, any[]> = {};
+        for (const material of draft.consumed_materials) {
+          if (material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0) {
+            try {
+              const { IndividualProductService } = await import('@/services/individualProductService');
+              const allProducts: any[] = [];
+              // Fetch each individual product by ID
+              for (const productId of material.individual_product_ids) {
+                try {
+                  const product = await IndividualProductService.getIndividualProductById(productId);
+                  allProducts.push(product);
+                } catch (err) {
+                  console.error(`Error loading individual product ${productId}:`, err);
+                }
+              }
+              individualProductsMap[material.material_id] = allProducts;
+            } catch (error) {
+              console.error(`Error loading individual products for material ${material.material_id}:`, error);
+            }
+          }
+        }
+        setConsumedIndividualProducts(individualProductsMap);
       }
 
       const recipeData = await RecipeService.getRecipeByProductId(product.id);
@@ -207,10 +236,18 @@ export default function PlanningStage() {
               // So required quantity is quantity_per_sqm * totalSQM of parent
               requiredQuantity = recipeMaterial.quantity_per_sqm * totalSQM;
 
-              // Available quantity is the count of products
-              availableQuantity = materialProduct.individual_stock_tracking
-                ? materialProduct.current_stock || materialProduct.individual_products_count || 0
-                : materialProduct.base_quantity || materialProduct.current_stock || 0;
+              // Get available individual products count (only status='available')
+              if (materialProduct.individual_stock_tracking) {
+                const { IndividualProductService } = await import('@/services/individualProductService');
+                const { total: availableCount } = await IndividualProductService.getIndividualProductsByProductId(
+                  recipeMaterial.material_id,
+                  { status: 'available' }
+                );
+                availableQuantity = availableCount || 0;
+              } else {
+                availableQuantity = materialProduct.current_stock || 0;
+              }
+
               materialName = materialProduct.name;
             }
           } catch (error) {
@@ -394,10 +431,17 @@ export default function PlanningStage() {
               quantityPerSqm = childSqm > 0 ? 1 / childSqm : 1;
             }
 
-            // Get available quantity for product
-            availableQuantity = childProduct.individual_stock_tracking
-              ? childProduct.current_stock || childProduct.individual_products_count || 0
-              : childProduct.base_quantity || childProduct.current_stock || 0;
+            // Get available quantity for product (only available individual products)
+            if (childProduct.individual_stock_tracking) {
+              const { IndividualProductService } = await import('@/services/individualProductService');
+              const { total: availableCount } = await IndividualProductService.getIndividualProductsByProductId(
+                m.material_id,
+                { status: 'available' }
+              );
+              availableQuantity = availableCount || 0;
+            } else {
+              availableQuantity = childProduct.current_stock || 0;
+            }
           } catch (error) {
             console.error('Error fetching product details for auto-calc:', error);
             if (!quantityPerSqm || quantityPerSqm === 0) {
@@ -557,17 +601,21 @@ export default function PlanningStage() {
       // For products: calculate actual_consumed_quantity and whole_product_count
       const materialsWithProductDetails = newMaterialsToAdd.map((m) => {
         if (m.material_type === 'product') {
-          // For products: 
+          // For products:
           // - actual_consumed_quantity = required_quantity (fractional, e.g., 0.8)
           // - whole_product_count = Math.ceil(required_quantity) (e.g., 1)
           const actualConsumed = m.required_quantity || 0;
           const wholeProductCount = Math.ceil(actualConsumed);
-          
+
+          // Get selected individual product IDs from state
+          const selectedProducts = selectedIndividualProducts[m.material_id] || [];
+          const productIds = selectedProducts.map(p => p.id);
+
           return {
             ...m,
             actual_consumed_quantity: actualConsumed,
             whole_product_count: wholeProductCount,
-            individual_product_ids: m.individual_product_ids || [], // Will be populated when user selects individual products
+            individual_product_ids: productIds,
           };
         } else {
           // For raw materials: actual_consumed_quantity = required_quantity
@@ -581,8 +629,34 @@ export default function PlanningStage() {
       });
       
       if (materialsWithProductDetails.length > 0) {
+        // Update individual product statuses to 'in_production'
+        for (const material of materialsWithProductDetails) {
+          if (material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0) {
+            try {
+              const { IndividualProductService } = await import('@/services/individualProductService');
+              for (const productId of material.individual_product_ids) {
+                try {
+                  await IndividualProductService.updateIndividualProduct(productId, {
+                    status: 'in_production'
+                  });
+                } catch (err) {
+                  console.error(`Error updating status for product ${productId}:`, err);
+                }
+              }
+              // Add the loaded products to consumedIndividualProducts state
+              const products = selectedIndividualProducts[material.material_id] || [];
+              setConsumedIndividualProducts(prev => ({
+                ...prev,
+                [material.material_id]: products
+              }));
+            } catch (error) {
+              console.error(`Error updating product statuses for material ${material.material_id}:`, error);
+            }
+          }
+        }
+
         setConsumedMaterials([...consumedMaterials, ...materialsWithProductDetails]);
-        
+
         // 4. Clear ALL materials from requirements section that are now in production
         // This includes both newly added materials AND materials that were already in production
         // (to prevent confusion where same material appears in both sections)
@@ -684,14 +758,20 @@ export default function PlanningStage() {
             targetQuantity={formData.planned_quantity}
             totalSQM={totalSQM}
             recipeBased={recipe ? true : false}
+            selectedIndividualProducts={selectedIndividualProducts}
             onAddMaterial={() => setShowMaterialDialog(true)}
             onRemoveMaterial={handleRemoveMaterial}
             onUpdateQuantity={handleUpdateQuantity}
-             onSelectIndividualProducts={() => {
-              toast({
-                title: 'Coming Soon',
-                description: 'Individual product selection will be available soon',
-              });
+            onSelectIndividualProducts={(materialId: string) => {
+              const material = materials.find(m => m.material_id === materialId);
+              if (material) {
+                setSelectedMaterialForIndividual({
+                  id: materialId,
+                  name: material.material_name,
+                  required: material.required_quantity
+                });
+                setShowIndividualProductDialog(true);
+              }
             }}
           />
 
@@ -730,11 +810,48 @@ export default function PlanningStage() {
                 targetQuantity={formData.planned_quantity}
                 totalSQM={totalSQM}
                 recipeBased={false}
+                selectedIndividualProducts={consumedIndividualProducts}
+                onSelectIndividualProducts={(materialId: string) => {
+                  const material = consumedMaterials.find(m => m.material_id === materialId);
+                  if (material) {
+                    setSelectedMaterialForIndividual({
+                      id: materialId,
+                      name: material.material_name,
+                      required: material.required_quantity
+                    });
+                    setShowIndividualProductDialog(true);
+                  }
+                }}
                 onRemoveMaterial={async (materialId) => {
                   const materialToRemove = consumedMaterials.find((m) => m.material_id === materialId);
+
+                  // Update individual product statuses back to 'available' if removed
+                  if (materialToRemove?.material_type === 'product' && materialToRemove.individual_product_ids && materialToRemove.individual_product_ids.length > 0) {
+                    try {
+                      const { IndividualProductService } = await import('@/services/individualProductService');
+                      for (const productId of materialToRemove.individual_product_ids) {
+                        try {
+                          await IndividualProductService.updateIndividualProduct(productId, {
+                            status: 'available'
+                          });
+                        } catch (err) {
+                          console.error(`Error updating status for product ${productId}:`, err);
+                        }
+                      }
+                      // Remove from consumedIndividualProducts state
+                      setConsumedIndividualProducts(prev => {
+                        const updated = { ...prev };
+                        delete updated[materialId];
+                        return updated;
+                      });
+                    } catch (error) {
+                      console.error(`Error updating product statuses:`, error);
+                    }
+                  }
+
                   const updatedConsumed = consumedMaterials.filter((m) => m.material_id !== materialId);
                   setConsumedMaterials(updatedConsumed);
-                  
+
                   // Also update recipe to remove this material
                   if (materialToRemove && selectedProduct) {
                     try {
@@ -856,6 +973,55 @@ export default function PlanningStage() {
           unit: m.unit,
         }))}
       />
+
+      {/* Individual Product Selection Dialog */}
+      {selectedMaterialForIndividual && (
+        <IndividualProductSelectionDialog
+          isOpen={showIndividualProductDialog}
+          onClose={() => {
+            setShowIndividualProductDialog(false);
+            setSelectedMaterialForIndividual(null);
+          }}
+          materialId={selectedMaterialForIndividual.id}
+          materialName={selectedMaterialForIndividual.name}
+          requiredQuantity={selectedMaterialForIndividual.required}
+          preSelectedProductIds={
+            (selectedIndividualProducts[selectedMaterialForIndividual.id]?.map(p => p.id) || []).length > 0
+              ? selectedIndividualProducts[selectedMaterialForIndividual.id]?.map(p => p.id) || []
+              : consumedIndividualProducts[selectedMaterialForIndividual.id]?.map(p => p.id) || []
+          }
+          onSelect={(selectedProducts) => {
+            // Check if this is from consumed materials section
+            const isConsumed = consumedMaterials.some(m => m.material_id === selectedMaterialForIndividual.id);
+
+            if (isConsumed) {
+              // Update consumed individual products and consumed materials
+              setConsumedIndividualProducts(prev => ({
+                ...prev,
+                [selectedMaterialForIndividual.id]: selectedProducts
+              }));
+
+              // Update individual_product_ids in consumed materials
+              setConsumedMaterials(prev => prev.map(m =>
+                m.material_id === selectedMaterialForIndividual.id
+                  ? { ...m, individual_product_ids: selectedProducts.map(p => p.id) }
+                  : m
+              ));
+            } else {
+              // Update for planning section
+              setSelectedIndividualProducts(prev => ({
+                ...prev,
+                [selectedMaterialForIndividual.id]: selectedProducts
+              }));
+            }
+
+            toast({
+              title: 'Products Selected',
+              description: `${selectedProducts.length} individual products selected`,
+            });
+          }}
+        />
+      )}
 
       {/* Machine Selection Dialog */}
       <MachineSelectionDialog

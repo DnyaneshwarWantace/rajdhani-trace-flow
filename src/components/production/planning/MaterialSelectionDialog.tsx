@@ -315,25 +315,47 @@ export default function MaterialSelectionDialog({
           productsData = productsData.slice(startIdx, endIdx);
         }
 
-        setProducts(
-          productsData.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            current_stock: p.current_stock || p.base_quantity || 0,
-            unit: p.unit || 'pcs',
-            type: 'product' as const,
-            category: p.category,
-            subcategory: p.subcategory,
-            length: p.length,
-            width: p.width,
-            length_unit: p.length_unit,
-            width_unit: p.width_unit,
-            weight: p.weight,
-            weight_unit: p.weight_unit,
-            color: p.color,
-            pattern: p.pattern,
-          }))
+        // Fetch available stock for products with individual tracking
+        const productsWithStock = await Promise.all(
+          productsData.map(async (p: any) => {
+            let availableStock = p.current_stock || 0;
+
+            // For products with individual stock tracking, get count of available individual products
+            if (p.individual_stock_tracking) {
+              try {
+                const { IndividualProductService } = await import('@/services/individualProductService');
+                const { total: availableCount } = await IndividualProductService.getIndividualProductsByProductId(
+                  p.id,
+                  { status: 'available' }
+                );
+                availableStock = availableCount || 0;
+              } catch (error) {
+                console.error(`Error fetching individual products for ${p.id}:`, error);
+                availableStock = 0;
+              }
+            }
+
+            return {
+              id: p.id,
+              name: p.name,
+              current_stock: availableStock,
+              unit: p.unit || 'pcs',
+              type: 'product' as const,
+              category: p.category,
+              subcategory: p.subcategory,
+              length: p.length,
+              width: p.width,
+              length_unit: p.length_unit,
+              width_unit: p.width_unit,
+              weight: p.weight,
+              weight_unit: p.weight_unit,
+              color: p.color,
+              pattern: p.pattern,
+            };
+          })
         );
+
+        setProducts(productsWithStock);
 
         setTotalPages(Math.ceil((categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
       }
@@ -440,7 +462,13 @@ export default function MaterialSelectionDialog({
             <div>
               <p className="text-gray-500">Stock Available</p>
               <p className="font-medium text-gray-900">
-                {material.current_stock} {material.unit}
+                {material.type === 'product' ? (
+                  <>
+                    {material.current_stock} {material.current_stock === 1 ? 'roll' : 'rolls'}
+                  </>
+                ) : (
+                  <>{material.current_stock} {material.unit}</>
+                )}
               </p>
             </div>
             <div className="flex items-start justify-end">

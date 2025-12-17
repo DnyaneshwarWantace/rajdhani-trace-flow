@@ -25,6 +25,7 @@ interface MaterialRequirementsTableProps {
   onRemoveMaterial?: (materialId: string) => void;
   onUpdateQuantity?: (materialId: string, quantityPerSqm: number) => void;
   onSelectIndividualProducts?: (materialId: string) => void;
+  selectedIndividualProducts?: Record<string, any[]>;
   recipeBased?: boolean;
 }
 
@@ -36,6 +37,7 @@ export default function MaterialRequirementsTable({
   onRemoveMaterial,
   onUpdateQuantity,
   onSelectIndividualProducts,
+  selectedIndividualProducts = {},
   recipeBased = false,
 }: MaterialRequirementsTableProps) {
   // Local state to track input values as strings (allows typing "0", "0.", "0.3")
@@ -186,6 +188,38 @@ export default function MaterialRequirementsTable({
                       </div>
                     </div>
 
+                    {/* Selected Individual Products */}
+                    {material.material_type === 'product' && selectedIndividualProducts[material.material_id] && selectedIndividualProducts[material.material_id].length > 0 && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                        <h5 className="text-xs font-semibold text-green-900 mb-2">
+                          Selected Individual Products ({selectedIndividualProducts[material.material_id].length} rolls)
+                        </h5>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {selectedIndividualProducts[material.material_id].map((product: any) => (
+                            <div key={product.id} className="bg-white rounded p-2 text-xs">
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 truncate">{product.id}</p>
+                                  {product.serial_number && (
+                                    <p className="text-gray-600 truncate">SN: {product.serial_number}</p>
+                                  )}
+                                </div>
+                                {product.qr_code && (
+                                  <p className="text-gray-500 text-[10px] ml-2">{product.qr_code}</p>
+                                )}
+                              </div>
+                              {(product.batch_number || product.quality_grade) && (
+                                <div className="flex gap-3 mt-1 text-[10px] text-gray-600">
+                                  {product.batch_number && <span>Batch: {product.batch_number}</span>}
+                                  {product.quality_grade && <span>Grade: {product.quality_grade}</span>}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Detailed breakdown */}
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                       <h5 className="text-xs font-semibold text-blue-900 mb-2">Quantity Breakdown</h5>
@@ -195,11 +229,11 @@ export default function MaterialRequirementsTable({
                             {material.material_type === 'product' ? 'Per 1 SQM of Parent' : 'Per 1 SQM'}
                           </p>
                           <p className="font-semibold text-gray-900">
-                            {material.quantity_per_sqm} {material.unit}
+                            {material.quantity_per_sqm.toFixed(5)} {material.unit}
                           </p>
                           {material.material_type === 'product' && (
                             <p className="text-blue-600 text-xs font-medium mt-1">
-                              ({material.quantity_per_sqm} {material.unit} needed)
+                              ({material.quantity_per_sqm.toFixed(5)} {material.unit} needed)
                             </p>
                           )}
                         </div>
@@ -248,14 +282,14 @@ export default function MaterialRequirementsTable({
                             value={quantityInputs[material.material_id] ?? (material.quantity_per_sqm === 0 ? '' : material.quantity_per_sqm.toString())}
                             onChange={(e) => {
                               const value = e.target.value;
-                              // Allow empty string, numbers, and decimal points while typing
-                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                              // Allow empty string, numbers, and decimal points (max 5 decimal places)
+                              if (value === '' || /^\d*\.?\d{0,5}$/.test(value)) {
                                 // Update local state immediately for responsive typing
                                 setQuantityInputs(prev => ({
                                   ...prev,
                                   [material.material_id]: value
                                 }));
-                                
+
                                 // Update parent only when we have a valid number
                                 if (value === '') {
                                   onUpdateQuantity && onUpdateQuantity(material.material_id, 0);
@@ -279,10 +313,13 @@ export default function MaterialRequirementsTable({
                               } else {
                                 const numValue = parseFloat(value);
                                 if (!isNaN(numValue) && numValue >= 0) {
+                                  // Round to 5 decimal places
+                                  const roundedValue = Math.round(numValue * 100000) / 100000;
                                   setQuantityInputs(prev => ({
                                     ...prev,
-                                    [material.material_id]: numValue.toString()
+                                    [material.material_id]: roundedValue.toString()
                                   }));
+                                  onUpdateQuantity && onUpdateQuantity(material.material_id, roundedValue);
                                 }
                               }
                             }}
