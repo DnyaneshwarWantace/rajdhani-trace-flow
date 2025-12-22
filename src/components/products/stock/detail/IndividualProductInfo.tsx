@@ -27,25 +27,25 @@ export default function IndividualProductInfo({ individualProduct }: IndividualP
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-        {individualProduct.inspector && (
-          <div className="flex items-start gap-3">
-            <User className="w-4 h-4 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-gray-600">Inspector</p>
-              <p className="font-medium text-gray-900">{individualProduct.inspector}</p>
-            </div>
+        <div className="flex items-start gap-3">
+          <User className="w-4 h-4 text-gray-400 mt-0.5" />
+          <div>
+            <p className="text-gray-600">Inspector</p>
+            <p className="font-medium text-gray-900">
+              {individualProduct.inspector || 'Not Assigned'}
+            </p>
           </div>
-        )}
+        </div>
 
-        {individualProduct.location && (
-          <div className="flex items-start gap-3">
-            <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-gray-600">Location</p>
-              <p className="font-medium text-gray-900">{individualProduct.location}</p>
-            </div>
+        <div className="flex items-start gap-3">
+          <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+          <div>
+            <p className="text-gray-600">Location</p>
+            <p className="font-medium text-gray-900">
+              {individualProduct.location || 'Warehouse A - General Storage'}
+            </p>
           </div>
-        )}
+        </div>
 
         {individualProduct.production_date && (
           <div className="flex items-start gap-3">

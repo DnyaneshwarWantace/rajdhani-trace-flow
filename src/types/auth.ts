@@ -9,6 +9,12 @@ export interface User {
   department?: string;
   avatar?: string;
   last_login?: string;
+  created_by?: string;
+  created_by_user?: {
+    id: string;
+    full_name: string;
+    email: string;
+  };
 }
 
 export interface LoginCredentials {

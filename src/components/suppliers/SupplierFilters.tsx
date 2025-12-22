@@ -1,6 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 
 interface SupplierFiltersProps {
   searchTerm: string;
@@ -15,15 +14,15 @@ export default function SupplierFilters({
     <Card className="mb-6">
       <CardContent className="p-4">
         <div className="flex flex-col lg:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
+          <DebouncedSearchInput
+            value={searchTerm}
+            onChange={onSearchChange}
+            placeholder="Search suppliers (min 3 characters)..."
+            minCharacters={3}
+            debounceMs={500}
+            className="flex-1"
+            showCounter={true}
+          />
         </div>
       </CardContent>
     </Card>

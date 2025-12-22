@@ -30,6 +30,22 @@ export interface ProductionBatch {
   weight_unit?: string;
   color?: string;
   pattern?: string;
+  // Stage tracking
+  wastage_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+    has_wastage?: boolean;
+  };
+  final_stage?: {
+    status?: 'not_started' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+  };
 }
 
 export interface CreateProductionBatchData {
@@ -48,6 +64,21 @@ export interface CreateProductionBatchData {
 export interface UpdateProductionBatchData extends Partial<CreateProductionBatchData> {
   status?: 'planned' | 'in_progress' | 'in_production' | 'completed';
   actual_quantity?: number;
+  wastage_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+    has_wastage?: boolean;
+  };
+  final_stage?: {
+    status?: 'not_started' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+  };
 }
 
 export class ProductionService {
@@ -221,6 +252,35 @@ export class ProductionService {
     }
   }
 
+  static async getRawMaterialConsumptionHistory(materialId: string, filters?: {
+    status?: 'reserved' | 'in_production' | 'used' | 'sold';
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+  }): Promise<{ data: any[] | null; summary: any; error: string | null }> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (filters?.status) queryParams.append('status', filters.status);
+      if (filters?.start_date) queryParams.append('start_date', filters.start_date);
+      if (filters?.end_date) queryParams.append('end_date', filters.end_date);
+      if (filters?.limit) queryParams.append('limit', filters.limit.toString());
+
+      const response = await fetch(`${API_URL}/material-consumption/raw-material/${materialId}/history?${queryParams}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, summary: null, error: result.error || 'Failed to fetch consumption history' };
+      }
+
+      return { data: result.data || [], summary: result.summary || {}, error: null };
+    } catch (error) {
+      console.error('Error in getRawMaterialConsumptionHistory:', error);
+      return { data: null, summary: null, error: 'Failed to fetch consumption history' };
+    }
+  }
+
   // Planning Draft State methods
   static async saveDraftPlanningState(
     productId: string,
@@ -229,6 +289,7 @@ export class ProductionService {
       recipeData?: any;
       materials?: any[];
       consumedMaterials?: any[];
+      productionBatchId?: string;
     }
   ): Promise<{ data: any | null; error: string | null }> {
     try {
@@ -237,6 +298,7 @@ export class ProductionService {
         headers: this.getHeaders(),
         body: JSON.stringify({
           product_id: productId,
+          production_batch_id: draftState.productionBatchId,
           form_data: draftState.formData,
           recipe_data: draftState.recipeData,
           materials: draftState.materials,
@@ -399,9 +461,11 @@ export class ProductionService {
     material_name: string;
     material_type: 'product' | 'raw_material';
     quantity_used: number;
+    actual_consumed_quantity?: number;
     unit: string;
     quantity_per_sqm?: number;
     individual_product_ids?: string[];
+    deduct_now?: boolean;
     notes?: string;
   }): Promise<{ data: any | null; error: string | null }> {
     try {
@@ -459,6 +523,9 @@ export class ProductionService {
     machine_name?: string;
     description?: string;
     inspector?: string;
+    shift?: 'day' | 'night';
+    start_time?: string;
+    status?: 'pending' | 'in_progress' | 'completed' | 'skipped';
   }): Promise<{ data: any | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/production/flow-steps`, {

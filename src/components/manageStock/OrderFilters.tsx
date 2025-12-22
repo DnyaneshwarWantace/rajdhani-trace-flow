@@ -1,5 +1,3 @@
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -7,6 +5,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import type { OrderFilters } from '@/types/manageStock';
 
 interface OrderFiltersProps {
@@ -24,15 +23,15 @@ export default function OrderFilters({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search materials or suppliers..."
-            value={filters.search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <DebouncedSearchInput
+          value={filters.search}
+          onChange={onSearchChange}
+          placeholder="Search materials or suppliers (min 3 characters)..."
+          minCharacters={3}
+          debounceMs={500}
+          className="flex-1"
+          showCounter={true}
+        />
 
         {/* Status Filter */}
         <Select

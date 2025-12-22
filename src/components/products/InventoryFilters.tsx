@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { ProductService } from '@/services/productService';
 import type { ProductFilters } from '@/types/product';
 
@@ -117,23 +118,15 @@ export default function InventoryFilters({
       {/* First Row: Search, Category, Status, View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
         {/* Search */}
-        <div className="relative lg:col-span-4">
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={filters.search || ''}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors"
-          />
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
+        <DebouncedSearchInput
+          value={filters.search || ''}
+          onChange={onSearchChange}
+          placeholder="Search products (min 3 characters)..."
+          minCharacters={3}
+          debounceMs={500}
+          className="lg:col-span-4"
+          showCounter={true}
+        />
 
         {/* Category Filter - Multi-select */}
         <div className="lg:col-span-3">

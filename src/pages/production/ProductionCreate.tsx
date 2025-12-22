@@ -105,11 +105,11 @@ export default function ProductionCreate() {
       <div className="min-h-screen bg-gray-50">
         <ProductionCreateHeader onBack={() => navigate('/production')} />
 
-        <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-6">
+        <div className="px-2 sm:px-3 lg:px-4 py-6">
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Product Selection */}
-              <div className="lg:col-span-7 space-y-4">
+              <div className="space-y-4">
                 <ProductSearchSection
                   onSelect={handleProductSelect}
                   selectedProductId={selectedProduct?.id || null}
@@ -121,7 +121,7 @@ export default function ProductionCreate() {
               </div>
 
               {/* Right Column - Batch Details */}
-              <div className="lg:col-span-5 space-y-4">
+              <div className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Batch Details</CardTitle>

@@ -14,7 +14,11 @@ if (typeof window !== 'undefined' && window.innerWidth < 1024) {
     touchStartTarget = e.target;
     
     // Allow selection in input fields, textareas, and contenteditable
-    const target = e.target as HTMLElement;
+    const target = e.target;
+    if (!target || !(target instanceof HTMLElement)) {
+      return;
+    }
+    
     if (
       target.tagName === 'INPUT' ||
       target.tagName === 'TEXTAREA' ||
@@ -38,7 +42,11 @@ if (typeof window !== 'undefined' && window.innerWidth < 1024) {
 
   document.addEventListener('touchend', (e) => {
     const touchDuration = Date.now() - touchStartTime;
-    const target = e.target as HTMLElement;
+    const target = e.target;
+    
+    if (!target || !(target instanceof HTMLElement)) {
+      return;
+    }
 
     // If tap was less than 300ms, prevent selection (single tap)
     // If longer than 300ms, allow selection (long press)
@@ -80,7 +88,12 @@ if (typeof window !== 'undefined' && window.innerWidth < 1024) {
 
   // Also prevent selection on mouse events for mobile devices
   document.addEventListener('selectstart', (e) => {
-    const target = e.target as HTMLElement;
+    const target = e.target;
+    
+    // Check if target is an HTMLElement
+    if (!target || !(target instanceof HTMLElement)) {
+      return;
+    }
     
     // Allow in input fields
     if (

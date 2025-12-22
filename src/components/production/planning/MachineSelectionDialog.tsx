@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Factory, Settings, User } from 'lucide-react';
+import { Factory, Settings, User, Clock } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import { AuthService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
@@ -32,12 +32,13 @@ interface Machine {
   department?: string;
   capacity_per_hour?: number;
   current_operator?: string;
+  shift?: 'day' | 'night';
 }
 
 interface MachineSelectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (machine: Machine | null) => void;
+  onSelect: (machine: Machine | null, shift?: 'day' | 'night') => void;
   selectedMachineId?: string | null;
 }
 
@@ -52,6 +53,7 @@ export default function MachineSelectionDialog({
   const [loading, setLoading] = useState(false);
   const [selectedMachineIdState, setSelectedMachineIdState] = useState<string>('');
   const [inspectorName, setInspectorName] = useState('');
+  const [selectedShift, setSelectedShift] = useState<'day' | 'night'>('day');
 
   useEffect(() => {
     if (isOpen) {
@@ -65,6 +67,7 @@ export default function MachineSelectionDialog({
       // Reset state when dialog closes
       setSelectedMachineIdState('');
       setInspectorName('');
+      setSelectedShift('day');
     }
   }, [isOpen, selectedMachineId]);
 
@@ -119,7 +122,9 @@ export default function MachineSelectionDialog({
       return;
     }
 
-    onSelect(selectedMachine);
+    // Add shift to machine object
+    const machineWithShift = { ...selectedMachine, shift: selectedShift };
+    onSelect(machineWithShift, selectedShift);
     onClose();
   };
 
@@ -182,12 +187,33 @@ export default function MachineSelectionDialog({
               </Select>
             )}
           </div>
+
+          {/* Shift Selection */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Select Shift *
+            </Label>
+            <Select 
+              value={selectedShift} 
+              onValueChange={(value) => setSelectedShift(value as 'day' | 'night')}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose shift..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day Shift</SelectItem>
+                <SelectItem value="night">Night Shift</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">Select the shift for this machine operation</p>
+          </div>
         </div>
         
         <DialogFooter className="flex flex-col gap-2 pt-4 border-t border-gray-100">
           <Button
             onClick={handleConfirm}
-            disabled={!selectedMachineIdState || !inspectorName.trim()}
+            disabled={!selectedMachineIdState || !inspectorName.trim() || !selectedShift}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
           >
             <Factory className="w-4 h-4 mr-2" />

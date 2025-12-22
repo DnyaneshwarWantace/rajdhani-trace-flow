@@ -18,6 +18,8 @@ export interface WasteItem {
   batch_id?: string;
   product_id?: string;
   product_name?: string;
+  individual_product_ids?: string[]; // Individual product IDs that are marked as waste (for product type materials)
+  individual_products?: any[]; // Full individual product details with dimensions, weight, color, pattern, etc.
   status: 'generated' | 'disposed' | 'reused' | 'added_to_inventory' | 'available_for_reuse'; // 'available_for_reuse' is frontend display only
   generation_date?: string;
   created_at?: string;

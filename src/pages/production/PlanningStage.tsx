@@ -47,6 +47,7 @@ export default function PlanningStage() {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [recipeModified, setRecipeModified] = useState(false);
   const [draftSaveTimeout, setDraftSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [currentBatchId, setCurrentBatchId] = useState<string | null>(null); // Track current batch ID
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function PlanningStage() {
       }
 
       setSelectedProduct(product);
+      setCurrentBatchId(batch.id); // Store the batch ID
       setFormData({
         planned_quantity: batch.planned_quantity,
         priority: batch.priority as 'low' | 'medium' | 'high' | 'urgent',
@@ -181,7 +183,7 @@ export default function PlanningStage() {
 
       if (draft?.form_data) {
         setFormData({
-          planned_quantity: draft.form_data.planned_quantity || 0,
+          planned_quantity: quantity || draft.form_data.planned_quantity || 0, // Use batch quantity parameter, not draft
           priority: draft.form_data.priority || 'medium',
           completion_date: draft.form_data.completion_date || '',
           notes: draft.form_data.notes || '',
@@ -280,8 +282,8 @@ export default function PlanningStage() {
             } else if (recipeMaterial.material_type === 'product') {
               const materialProduct = await ProductService.getProductById(recipeMaterial.material_id);
 
-              // For products: always count in rolls, not SQM
-              unit = 'rolls';
+              // For products: use count_unit (e.g., "rolls") for counting, not unit (e.g., "sqm")
+              unit = materialProduct.count_unit || 'rolls';
 
               // For products: quantity_per_sqm represents pieces needed per SQM of parent
               // So required quantity is quantity_per_sqm * totalSQM of parent
@@ -358,6 +360,7 @@ export default function PlanningStage() {
         formData,
         materials,
         consumedMaterials,
+        productionBatchId: currentBatchId ?? undefined,
       });
     } catch (error) {
       console.error('Error saving draft state to backend:', error);
@@ -413,17 +416,28 @@ export default function PlanningStage() {
           }),
         };
       } else {
-        // Recipe doesn't exist - create it
-        updatedRecipe = await RecipeService.createRecipe(selectedProduct.id, {
-          materials: materialsPayload,
-          description: `Recipe for ${selectedProduct.name}`,
-          created_by: 'system',
-        });
+        // Recipe doesn't exist in state - check if it exists in database first
+        const existingRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
 
-        // Reload the recipe to get full data with materials
-        const loadedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
-        if (loadedRecipe) {
-          updatedRecipe = loadedRecipe;
+        if (existingRecipe) {
+          // Recipe exists in database, update it
+          updatedRecipe = await RecipeService.updateRecipe(existingRecipe.id, {
+            materials: materialsPayload,
+          });
+          setRecipe(existingRecipe); // Update state with existing recipe
+        } else {
+          // Recipe truly doesn't exist - create it
+          updatedRecipe = await RecipeService.createRecipe(selectedProduct.id, {
+            materials: materialsPayload,
+            description: `Recipe for ${selectedProduct.name}`,
+            created_by: 'system',
+          });
+
+          // Reload the recipe to get full data with materials
+          const loadedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
+          if (loadedRecipe) {
+            updatedRecipe = loadedRecipe;
+          }
         }
       }
 
@@ -793,7 +807,7 @@ export default function PlanningStage() {
           {/* Production Overview Stats */}
           <ProductionOverviewStats
             targetQuantity={formData.planned_quantity}
-            unit={selectedProduct.unit || 'SQM'}
+            unit={selectedProduct.count_unit || 'rolls'}
             materialsUsed={materials.length}
             expectedLength={productLength}
             expectedWidth={productWidth}
@@ -833,17 +847,7 @@ export default function PlanningStage() {
               disabled={
                 submitting ||
                 formData.planned_quantity <= 0 ||
-                materials.length === 0 ||
-                materials.some(m => {
-                  // For product-type materials: check if sufficient individual products are selected
-                  if (m.material_type === 'product') {
-                    const selectedProducts = selectedIndividualProducts[m.material_id] || [];
-                    const requiredCount = Math.ceil(m.required_quantity);
-                    return selectedProducts.length < requiredCount;
-                  }
-                  // For raw materials: check if available quantity meets required quantity
-                  return m.available_quantity < m.required_quantity;
-                })
+                materials.length === 0
               }
               className="bg-primary-600 hover:bg-primary-700"
               size="lg"
@@ -986,11 +990,11 @@ export default function PlanningStage() {
 
               {/* Start Production Flow Button */}
               <div className="flex justify-end gap-4">
-                {consumedMaterials.some((m) => m.status === 'low' || m.status === 'unavailable') && (
-                  <div className="flex items-center gap-2 text-red-600">
+                {!recipe && (
+                  <div className="flex items-center gap-2 text-amber-600">
                     <AlertCircle className="w-5 h-5" />
                     <span className="text-sm font-medium">
-                      Cannot start production - insufficient materials
+                      Please set the recipe first before starting production
                     </span>
                   </div>
                 )}
@@ -1002,7 +1006,7 @@ export default function PlanningStage() {
                   disabled={
                     submitting ||
                     consumedMaterials.length === 0 ||
-                    consumedMaterials.some((m) => m.status === 'low' || m.status === 'unavailable')
+                    !recipe
                   }
                   className="bg-green-600 hover:bg-green-700"
                   size="lg"
@@ -1095,7 +1099,7 @@ export default function PlanningStage() {
           // Allow closing the dialog (cancel/X button)
           setShowMachineDialog(false);
         }}
-        onSelect={async (machine) => {
+        onSelect={async (machine, shift) => {
           if (!machine) {
             toast({
               title: 'Machine Required',
@@ -1105,7 +1109,9 @@ export default function PlanningStage() {
             return;
           }
 
-          setSelectedMachine(machine);
+          // Add shift to machine object
+          const machineWithShift = { ...machine, shift: shift || 'day' };
+          setSelectedMachine(machineWithShift);
           setShowMachineDialog(false);
 
           // After machine selection, create the batch and set up production flow
@@ -1115,57 +1121,187 @@ export default function PlanningStage() {
           let batch: any = null;
           
           try {
-            // Step 1: Create the batch - MUST SUCCEED
-            const batchData = {
-              product_id: selectedProduct.id,
-              planned_quantity: formData.planned_quantity,
-              priority: formData.priority,
-              completion_date: formData.completion_date || undefined,
-              notes: formData.notes,
-              machine_id: machine.id,
-            };
+            // Step 1: Check if batch already exists (from URL params or previous creation)
+            // If batch exists, use it; otherwise create a new one
+            if (currentBatchId) {
+              // Batch already exists - load it and update with machine
+              const { data: existingBatch, error: batchError } = await ProductionService.getBatchById(currentBatchId);
+              
+              if (batchError || !existingBatch) {
+                toast({
+                  title: 'Error',
+                  description: batchError || 'Failed to load existing batch. Cannot start production.',
+                  variant: 'destructive',
+                });
+                setSubmitting(false);
+                return;
+              }
 
-            const { data: createdBatch, error: batchError } = await ProductionService.createBatch(batchData);
+              // Update batch with machine_id if not already set
+              const existingMachineId = (existingBatch as any).machine_id;
+              if (!existingMachineId || existingMachineId !== machine.id) {
+                const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(currentBatchId, {
+                  machine_id: machine.id,
+                } as any);
 
-            if (batchError || !createdBatch) {
+                if (updateError || !updatedBatch) {
+                  toast({
+                    title: 'Error',
+                    description: updateError || 'Failed to update batch with machine. Cannot start production.',
+                    variant: 'destructive',
+                  });
+                  setSubmitting(false);
+                  return;
+                }
+
+                batch = updatedBatch;
+              } else {
+                batch = existingBatch;
+              }
+            } else {
+              // No existing batch - create a new one
+              const batchData = {
+                product_id: selectedProduct.id,
+                planned_quantity: formData.planned_quantity,
+                priority: formData.priority,
+                completion_date: formData.completion_date || undefined,
+                notes: formData.notes,
+                machine_id: machine.id,
+              };
+
+              const { data: createdBatch, error: batchError } = await ProductionService.createBatch(batchData);
+
+              if (batchError || !createdBatch) {
+                toast({
+                  title: 'Error',
+                  description: batchError || 'Failed to create batch. Cannot start production.',
+                  variant: 'destructive',
+                });
+                setSubmitting(false);
+                return; // STOP - Don't continue if batch creation fails
+              }
+
+              batch = createdBatch;
+              setCurrentBatchId(batch.id); // Store the new batch ID
+            }
+
+            // Step 2: ALWAYS ensure MaterialConsumption records exist and match consumedMaterials
+            // This is CRITICAL - all data must be saved before proceeding
+            console.log('📦 Starting material consumption save process...');
+            console.log('📦 Consumed materials to save:', consumedMaterials.length);
+            console.log('📦 Consumed materials data:', consumedMaterials.map(m => ({
+              name: m.material_name,
+              type: m.material_type,
+              individual_product_ids: m.individual_product_ids?.length || 0,
+              whole_product_count: m.whole_product_count,
+              actual_consumed_quantity: m.actual_consumed_quantity,
+            })));
+
+            if (consumedMaterials.length === 0) {
               toast({
                 title: 'Error',
-                description: batchError || 'Failed to create batch. Cannot start production.',
+                description: 'No materials added to production. Cannot start production without materials.',
                 variant: 'destructive',
               });
               setSubmitting(false);
-              return; // STOP - Don't continue if batch creation fails
+              return; // STOP - No materials means no production
             }
 
-            batch = createdBatch;
+            // Check existing consumption records
+            const { data: existingConsumption } = await ProductionService.getMaterialConsumption(batch.id);
+            console.log('📦 Existing consumption records:', existingConsumption?.length || 0);
+            const existingMaterialIds = new Set((existingConsumption || []).map((m: any) => m.material_id));
+            
+            // Validate that ALL consumed materials are saved
+            const materialsToSave = consumedMaterials.filter(m => !existingMaterialIds.has(m.material_id));
+            console.log('📦 Materials to save:', materialsToSave.length, materialsToSave.map(m => m.material_name));
 
-            // Step 2: Save all consumed materials to MaterialConsumption - MUST SUCCEED
-            if (consumedMaterials.length > 0) {
+            if (materialsToSave.length > 0) {
+              // Create/update MaterialConsumption records for ALL consumed materials
               const materialErrors: string[] = [];
-              for (const material of consumedMaterials) {
+              const savedMaterials: string[] = [];
+
+              for (const material of materialsToSave) {
                 try {
-                  const { error: consumptionError } = await ProductionService.createMaterialConsumption({
+                  console.log(`💾 Saving material: ${material.material_name}`, {
+                    material_id: material.material_id,
+                    material_type: material.material_type,
+                    individual_product_ids: material.individual_product_ids?.length || 0,
+                    whole_product_count: material.whole_product_count,
+                    actual_consumed_quantity: material.actual_consumed_quantity,
+                  });
+
+                  // For products: quantity_used = whole_product_count, actual_consumed_quantity = actual fractional consumption
+                  const quantityUsed = material.material_type === 'product' 
+                    ? (material.whole_product_count || Math.ceil(material.actual_consumed_quantity || material.required_quantity || 0))
+                    : (material.actual_consumed_quantity || material.required_quantity || 0);
+                  
+                  const actualConsumedQty = material.material_type === 'product'
+                    ? (material.actual_consumed_quantity || material.required_quantity || 0)
+                    : (material.actual_consumed_quantity || material.required_quantity || 0);
+
+                  // For products, individual_product_ids are optional (can be empty for bulk products)
+                  // Only validate if whole_product_count > 0 (meaning individual products are expected)
+                  if (material.material_type === 'product' && material.whole_product_count > 0) {
+                    if (!material.individual_product_ids || material.individual_product_ids.length === 0) {
+                      console.warn(`⚠️ Product ${material.material_name} has whole_product_count=${material.whole_product_count} but no individual_product_ids`);
+                      // Don't block - allow saving but log warning
+                    }
+                  }
+
+                  const consumptionPayload = {
                     production_batch_id: batch.id,
                     material_id: material.material_id,
                     material_name: material.material_name,
                     material_type: material.material_type,
-                    quantity_used: material.actual_consumed_quantity || material.required_quantity,
+                    quantity_used: quantityUsed,
+                    actual_consumed_quantity: actualConsumedQty,
                     unit: material.unit,
                     quantity_per_sqm: material.quantity_per_sqm,
                     individual_product_ids: material.individual_product_ids || [],
+                    // For raw materials: set consumption_status to 'in_production' (will change to 'used' when wastage completes)
+                    // For products: don't deduct (tracked via individual products)
+                    consumption_status: material.material_type === 'raw_material' ? 'in_production' : undefined,
+                    deduct_now: false, // Don't deduct immediately - will deduct when status changes to 'used'
+                  };
+
+                  console.log(`💾 Payload for ${material.material_name}:`, {
+                    ...consumptionPayload,
+                    individual_product_ids_count: consumptionPayload.individual_product_ids.length,
                   });
+
+                  const { error: consumptionError, data: savedData } = await ProductionService.createMaterialConsumption(consumptionPayload);
                   
                   if (consumptionError) {
+                    console.error(`❌ Error saving ${material.material_name}:`, consumptionError);
                     materialErrors.push(`${material.material_name}: ${consumptionError}`);
+                  } else {
+                    console.log(`✅ Saved ${material.material_name}:`, {
+                      id: savedData?.id,
+                      individual_product_ids_count: savedData?.individual_product_ids?.length || 0,
+                      individual_product_ids: savedData?.individual_product_ids || [],
+                    });
+                    savedMaterials.push(material.material_name);
+                    
+                    // Verify individual_product_ids were actually saved
+                    if (material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0) {
+                      if (!savedData?.individual_product_ids || savedData.individual_product_ids.length === 0) {
+                        console.error(`❌ WARNING: Individual products not saved in response for ${material.material_name}`);
+                        console.error(`   Expected: ${material.individual_product_ids.length} products`);
+                        console.error(`   Got: ${savedData?.individual_product_ids?.length || 0} products`);
+                      }
+                    }
                   }
                 } catch (err) {
                   const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+                  console.error(`❌ Exception saving ${material.material_name}:`, err);
                   materialErrors.push(`${material.material_name}: ${errorMsg}`);
                 }
               }
               
               // If ANY material consumption failed, show error and STOP
               if (materialErrors.length > 0) {
+                console.error('❌ Material consumption errors:', materialErrors);
                 toast({
                   title: 'Error',
                   description: `Failed to save materials: ${materialErrors.join(', ')}. Production not started.`,
@@ -1174,53 +1310,168 @@ export default function PlanningStage() {
                 setSubmitting(false);
                 return; // STOP - Don't continue if material consumption fails
               }
+            } else {
+              console.log('✅ All materials already saved, skipping creation');
             }
 
-            // Step 3: Create production flow - MUST SUCCEED
-            const { data: flow, error: flowError } = await ProductionService.createProductionFlow({
-              production_batch_id: batch.id,
-              flow_name: `Production Flow for ${selectedProduct.name}`,
-              description: `Batch ${batch.batch_number}`,
-            });
+            // Step 2.5: VERIFY all materials are saved - CRITICAL CHECK
+            // Wait a bit to ensure database has updated
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            console.log('🔍 Verifying all materials are saved...');
+            const { data: verifyConsumption } = await ProductionService.getMaterialConsumption(batch.id);
+            console.log('🔍 Verified consumption records:', verifyConsumption?.length || 0);
+            console.log('🔍 Verified records:', verifyConsumption?.map((m: any) => ({
+              id: m.id,
+              name: m.material_name,
+              type: m.material_type,
+              material_id: m.material_id,
+              individual_product_ids: m.individual_product_ids?.length || 0,
+              individual_product_ids_array: m.individual_product_ids || [],
+            })));
 
-            if (flowError || !flow) {
+            const verifiedMaterialIds = new Set((verifyConsumption || []).map((m: any) => m.material_id));
+            const allMaterialsSaved = consumedMaterials.every(m => verifiedMaterialIds.has(m.material_id));
+
+            if (!allMaterialsSaved) {
+              const missingIds = consumedMaterials
+                .filter(m => !verifiedMaterialIds.has(m.material_id))
+                .map(m => m.material_name);
+              
+              console.error('❌ Missing materials in verification:', missingIds);
               toast({
                 title: 'Error',
-                description: flowError || 'Failed to create production flow. Production not started.',
+                description: `Failed to verify material consumption. Missing: ${missingIds.join(', ')}. Cannot proceed to machine stage.`,
                 variant: 'destructive',
               });
               setSubmitting(false);
-              return; // STOP - Don't continue if flow creation fails
+              return; // STOP - Don't continue if verification fails
             }
 
-            // Step 4: Create initial machine step - MUST SUCCEED
-            try {
-              const user = await AuthService.getCurrentUser();
-              const { error: stepError } = await ProductionService.createProductionFlowStep({
-                production_flow_id: flow.id,
-                step_number: 1,
-                step_name: 'Machine Operation',
-                step_type: 'machine_operation',
-                machine_id: machine.id,
-                machine_name: machine.machine_name,
-                description: `Production on ${machine.machine_name}`,
-                inspector: user?.full_name || user?.email || 'Unknown',
+            // Verify individual_product_ids are saved for products (only if they were provided)
+            const productMaterials = consumedMaterials.filter(m => m.material_type === 'product');
+            console.log('🔍 Verifying product materials:', productMaterials.length);
+            
+            for (const material of productMaterials) {
+              const savedRecord = verifyConsumption?.find((m: any) => m.material_id === material.material_id);
+              console.log(`🔍 Checking ${material.material_name}:`, {
+                savedRecord: !!savedRecord,
+                savedRecordId: savedRecord?.id,
+                original_individual_ids: material.individual_product_ids?.length || 0,
+                original_individual_ids_array: material.individual_product_ids || [],
+                saved_individual_ids: savedRecord?.individual_product_ids?.length || 0,
+                saved_individual_ids_array: savedRecord?.individual_product_ids || [],
               });
 
-              if (stepError) {
+              // Only require individual_product_ids if they were provided in consumedMaterials
+              if (material.individual_product_ids && material.individual_product_ids.length > 0) {
+                if (!savedRecord) {
+                  console.error(`❌ Material consumption record not found for ${material.material_name}`);
+                  toast({
+                    title: 'Error',
+                    description: `Material consumption record not found for ${material.material_name}. Cannot proceed to machine stage.`,
+                    variant: 'destructive',
+                  });
+                  setSubmitting(false);
+                  return;
+                }
+                
+                if (!savedRecord.individual_product_ids || savedRecord.individual_product_ids.length === 0) {
+                  console.error(`❌ Individual products not saved for ${material.material_name}`);
+                  console.error(`   Expected: ${material.individual_product_ids.length} products`);
+                  console.error(`   Expected IDs: ${material.individual_product_ids.join(', ')}`);
+                  console.error(`   Got: ${savedRecord.individual_product_ids?.length || 0} products`);
+                  console.error(`   Saved record:`, savedRecord);
+                  
+                  toast({
+                    title: 'Error',
+                    description: `Individual products not saved for ${material.material_name}. Please check console for details. Cannot proceed to machine stage.`,
+                    variant: 'destructive',
+                  });
+                  setSubmitting(false);
+                  return; // STOP - Individual products must be saved if they were provided
+                } else if (savedRecord.individual_product_ids.length !== material.individual_product_ids.length) {
+                  console.warn(`⚠️ Individual products count mismatch for ${material.material_name}`);
+                  console.warn(`   Expected: ${material.individual_product_ids.length} products`);
+                  console.warn(`   Got: ${savedRecord.individual_product_ids.length} products`);
+                  // Don't block - just warn
+                } else {
+                  console.log(`✅ Individual products saved for ${material.material_name}: ${savedRecord.individual_product_ids.length} products`);
+                }
+              } else {
+                console.log(`ℹ️ No individual products required for ${material.material_name} (bulk product or not selected)`);
+              }
+            }
+
+            console.log('✅ All materials verified and saved to MaterialConsumption');
+
+            // Step 3: Check if production flow already exists, if not create it
+            let flow: any = null;
+            const { data: existingFlow } = await ProductionService.getProductionFlowByBatchId(batch.id);
+            
+            if (existingFlow) {
+              flow = existingFlow;
+              console.log('✅ Production flow already exists, using existing flow');
+            } else {
+              // Create new flow if it doesn't exist
+              const { data: createdFlow, error: flowError } = await ProductionService.createProductionFlow({
+                production_batch_id: batch.id,
+                flow_name: `Production Flow for ${selectedProduct.name}`,
+                description: `Batch ${batch.batch_number}`,
+              });
+
+              if (flowError || !createdFlow) {
                 toast({
                   title: 'Error',
-                  description: stepError || 'Failed to create machine step. Production not started.',
+                  description: flowError || 'Failed to create production flow. Production not started.',
                   variant: 'destructive',
                 });
                 setSubmitting(false);
-                return; // STOP - Don't continue if step creation fails
+                return; // STOP - Don't continue if flow creation fails
+              }
+              flow = createdFlow;
+            }
+
+            // Step 4: Check if machine step already exists, if not create it
+            try {
+              const { data: existingSteps } = await ProductionService.getProductionFlowSteps(flow.id);
+              const hasMachineStep = existingSteps && existingSteps.some((step: any) => step.step_type === 'machine_operation');
+              
+              if (!hasMachineStep) {
+                // Only create step if it doesn't exist
+                const user = await AuthService.getCurrentUser();
+                const now = new Date().toISOString();
+                const { error: stepError } = await ProductionService.createProductionFlowStep({
+                  production_flow_id: flow.id,
+                  step_number: 1,
+                  step_name: 'Machine Operation',
+                  step_type: 'machine_operation',
+                  machine_id: machine.id,
+                  machine_name: machine.machine_name,
+                  description: `Production on ${machine.machine_name} - ${machine.shift || 'day'} shift`,
+                  inspector: user?.full_name || user?.email || 'Unknown',
+                  shift: machine.shift || 'day',
+                  start_time: now, // Mark when we transition from planning to machine stage
+                  status: 'in_progress', // Machine stage starts immediately
+                });
+
+                if (stepError) {
+                  toast({
+                    title: 'Error',
+                    description: stepError || 'Failed to create machine step. Production not started.',
+                    variant: 'destructive',
+                  });
+                  setSubmitting(false);
+                  return; // STOP - Don't continue if step creation fails
+                }
+              } else {
+                console.log('✅ Machine step already exists, skipping creation');
               }
             } catch (err) {
               const errorMsg = err instanceof Error ? err.message : 'Unknown error';
               toast({
                 title: 'Error',
-                description: `Failed to create machine step: ${errorMsg}. Production not started.`,
+                description: `Failed to check/create machine step: ${errorMsg}. Production not started.`,
                 variant: 'destructive',
               });
               setSubmitting(false);

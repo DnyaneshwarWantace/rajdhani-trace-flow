@@ -1,0 +1,69 @@
+import { Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface OrderFiltersProps {
+  filters: {
+    search: string;
+    status: string;
+    customer_id: string;
+  };
+  onSearchChange: (value: string) => void;
+  onStatusChange: (value: string) => void;
+  onCustomerChange: (value: string) => void;
+}
+
+export default function OrderFilters({
+  filters,
+  onSearchChange,
+  onStatusChange,
+  onCustomerChange,
+}: OrderFiltersProps) {
+  return (
+    <div className="flex flex-col sm:flex-row gap-3 flex-1">
+      {/* Search */}
+      <div className="flex-1">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search orders..."
+            value={filters.search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Status Filter */}
+      <Select value={filters.status} onValueChange={onStatusChange}>
+        <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectValue placeholder="All Status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Status</SelectItem>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="accepted">Accepted</SelectItem>
+          <SelectItem value="in_production">In Production</SelectItem>
+          <SelectItem value="ready">Ready</SelectItem>
+          <SelectItem value="dispatched">Dispatched</SelectItem>
+          <SelectItem value="delivered">Delivered</SelectItem>
+          <SelectItem value="cancelled">Cancelled</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* Customer Filter - TODO: Load from API */}
+      <Select value={filters.customer_id} onValueChange={onCustomerChange}>
+        <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectValue placeholder="All Customers" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Customers</SelectItem>
+          {/* TODO: Map customers here */}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+

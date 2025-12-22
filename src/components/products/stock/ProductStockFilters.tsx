@@ -1,4 +1,4 @@
-import { Search, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 
 interface ProductStockFiltersProps {
   searchTerm: string;
@@ -39,18 +40,15 @@ export default function ProductStockFilters({
         {/* First Row: Search and Filters */}
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Search */}
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="w-5 h-5 text-gray-400" />
-            </div>
-            <Input
-              type="text"
-              placeholder="Search by QR code, ID, or inspector..."
-              value={searchTerm}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <DebouncedSearchInput
+            value={searchTerm}
+            onChange={onSearchChange}
+            placeholder="Search by QR code, ID, or inspector (min 3 characters)..."
+            minCharacters={3}
+            debounceMs={500}
+            className="flex-1"
+            showCounter={true}
+          />
 
           {/* Status Filter */}
           <Select value={statusFilter} onValueChange={onStatusChange}>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, Filter, Grid3x3, Table } from 'lucide-react';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
+import { Filter, Grid3x3, Table } from 'lucide-react';
 import RecipeCard from './RecipeCard';
 import RecipeTable from './RecipeTable';
 import type { Recipe } from '@/types/recipe';
@@ -21,9 +21,9 @@ export default function RecipeList({ recipes, loading, onRecipeClick, onEdit, on
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
 
   const filteredRecipes = recipes.filter(recipe => {
-    const matchesSearch = recipe.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = searchTerm.length < 3 || recipe.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recipe.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || 
+    const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'active' && recipe.is_active) ||
       (statusFilter === 'inactive' && !recipe.is_active);
     return matchesSearch && matchesStatus;
@@ -58,15 +58,15 @@ export default function RecipeList({ recipes, loading, onRecipeClick, onEdit, on
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
           {/* Search */}
-          <div className="relative flex-1 w-full lg:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search recipes..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-full"
-            />
-          </div>
+          <DebouncedSearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search recipes (min 3 characters)..."
+            minCharacters={3}
+            debounceMs={500}
+            className="flex-1 w-full lg:w-auto"
+            showCounter={true}
+          />
 
           {/* Status Filter */}
           <div className="w-full lg:w-48">

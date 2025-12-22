@@ -25,6 +25,12 @@ export interface RawMaterial {
   createdAt: string;
   updatedAt: string;
   created_at?: string;
+  // Stock breakdown (optional - populated from consumption data)
+  available_stock?: number; // Available = current_stock - in_production - reserved
+  in_production?: number; // Quantity in production
+  reserved?: number; // Quantity reserved for orders
+  sold?: number; // Quantity sold/dispatched
+  used?: number; // Quantity used (already deducted)
 }
 
 export interface RawMaterialFormData {

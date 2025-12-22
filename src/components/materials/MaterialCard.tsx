@@ -113,9 +113,46 @@ export default function MaterialCard({
           <div className="flex justify-between gap-2">
             <span className="text-gray-600 flex-shrink-0">Stock:</span>
             <span className="font-medium text-gray-900 truncate">
-              {formatIndianNumberWithDecimals(Number(material.current_stock || 0), 2)} {material.unit}
+              {formatIndianNumberWithDecimals(Number(material.available_stock ?? material.current_stock ?? 0), 2)} {material.unit}
             </span>
           </div>
+          {/* Stock Breakdown */}
+          {((material.in_production ?? 0) > 0 || (material.reserved ?? 0) > 0 || (material.sold ?? 0) > 0 || (material.used ?? 0) > 0) && (
+            <div className="pl-2 border-l-2 border-gray-200 space-y-0.5 mt-1">
+              {material.available_stock !== undefined && material.available_stock > 0 && (
+                <div className="flex justify-between gap-2 text-[9px]">
+                  <span className="text-gray-500">In Stock:</span>
+                  <span className="text-gray-700 font-medium">
+                    {formatIndianNumberWithDecimals(Number(material.available_stock), 2)} {material.unit}
+                  </span>
+                </div>
+              )}
+              {(material.in_production ?? 0) > 0 && (
+                <div className="flex justify-between gap-2 text-[9px]">
+                  <span className="text-blue-600">In Production:</span>
+                  <span className="text-blue-700 font-medium">
+                    {formatIndianNumberWithDecimals(Number(material.in_production ?? 0), 2)} {material.unit}
+                  </span>
+                </div>
+              )}
+              {(material.reserved ?? 0) > 0 && (
+                <div className="flex justify-between gap-2 text-[9px]">
+                  <span className="text-yellow-600">Reserved:</span>
+                  <span className="text-yellow-700 font-medium">
+                    {formatIndianNumberWithDecimals(Number(material.reserved ?? 0), 2)} {material.unit}
+                  </span>
+                </div>
+              )}
+              {(material.sold ?? 0) > 0 && (
+                <div className="flex justify-between gap-2 text-[9px]">
+                  <span className="text-purple-600">Customer:</span>
+                  <span className="text-purple-700 font-medium">
+                    {formatIndianNumberWithDecimals(Number(material.sold ?? 0), 2)} {material.unit}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex justify-between items-start gap-2 min-w-0">
             <span className="text-gray-600 flex-shrink-0">Category:</span>
             <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.category}</span>

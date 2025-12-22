@@ -17,7 +17,8 @@ export interface Product {
   // Specifications
   color?: string;
   pattern?: string;
-  unit: string;
+  unit: string; // Measuring unit (e.g., "sqm")
+  count_unit?: string; // Counting unit for whole products (e.g., "rolls")
 
   // Stock
   current_stock: number;
@@ -148,6 +149,7 @@ export interface IndividualProductFormData {
   notes?: string;
   production_date?: string;
   completion_date?: string;
+  batch_number?: string;
 }
 
 export interface StockStats {

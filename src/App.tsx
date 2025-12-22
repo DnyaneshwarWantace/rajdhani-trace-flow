@@ -31,6 +31,10 @@ import ProductionCreate from '@/pages/production/ProductionCreate';
 import PlanningStage from '@/pages/production/PlanningStage';
 import MachineStage from '@/pages/production/MachineStage';
 import ProductionWastage from '@/pages/production/ProductionWastage';
+import ProductionIndividualProducts from '@/pages/production/ProductionIndividualProducts';
+import OrderList from '@/pages/orders/OrderList';
+import NewOrder from '@/pages/orders/NewOrder';
+import OrderDetails from '@/pages/orders/OrderDetails';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -187,6 +191,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/production/:id/individual-products"
+        element={
+          <PrivateRoute>
+            <ProductionIndividualProducts />
+          </PrivateRoute>
+        }
+      />
+      <Route
         path="/production/:id"
         element={
           <PrivateRoute>
@@ -295,6 +307,30 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <ProductionNotifications />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/orders"
+        element={
+          <PrivateRoute>
+            <OrderList />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/orders/new"
+        element={
+          <PrivateRoute>
+            <NewOrder />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/orders/:id"
+        element={
+          <PrivateRoute>
+            <OrderDetails />
           </PrivateRoute>
         }
       />

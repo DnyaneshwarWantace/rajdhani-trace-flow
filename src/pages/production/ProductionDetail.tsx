@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import ProductionDetailHeader from '@/components/production/detail/ProductionDetailHeader';
 import ProductionDetailInfo from '@/components/production/detail/ProductionDetailInfo';
 import ProductionDetailStats from '@/components/production/detail/ProductionDetailStats';
+import ProductionStagesDetailed from '@/components/production/detail/ProductionStagesDetailed';
+import ProductionIndividualProducts from '@/components/production/detail/ProductionIndividualProducts';
 import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 import type { CreateProductionBatchData} from '@/services/productionService';
 
@@ -169,6 +171,14 @@ export default function ProductionDetail() {
         <ProductionDetailStats batch={batch} />
 
         <ProductionDetailInfo batch={batch} />
+
+        {/* Production Stages - Planning, Machine, Wastage, Final Products */}
+        <ProductionStagesDetailed batch={batch} />
+
+        {/* Individual Products Created in This Batch */}
+        {batch.status === 'completed' && (
+          <ProductionIndividualProducts batch={batch} />
+        )}
 
         <ProductionFormDialog
           isOpen={isEditOpen}

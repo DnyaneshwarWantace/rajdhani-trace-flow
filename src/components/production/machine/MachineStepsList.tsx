@@ -72,13 +72,28 @@ export default function MachineStepsList({
         return;
       }
 
+      // Update local state immediately instead of reloading
+      setSteps(prevSteps => 
+        prevSteps.map(step => 
+          step.id === stepId 
+            ? { ...step, ...updates }
+            : step
+        )
+      );
+
       toast({
         title: 'Success',
         description: 'Step updated successfully',
       });
 
+      // Only reload steps to get latest data, but don't trigger full page refresh
       await loadSteps();
-      onStepUpdate();
+      
+      // Only call onStepUpdate if step was completed (to check machine completion status)
+      // Don't call it for every update to avoid full page refresh
+      if (updates.status === 'completed') {
+        onStepUpdate();
+      }
     } catch (error) {
       console.error('Error updating step:', error);
       toast({
@@ -183,6 +198,7 @@ export default function MachineStepsList({
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Step Name</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Machine ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Shift</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Inspector</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
               </tr>
@@ -206,6 +222,19 @@ export default function MachineStepsList({
                   </td>
                   <td className="px-4 py-3 text-sm font-mono text-gray-700">
                     {step.machine_id || '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {step.shift ? (
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        step.shift === 'day' 
+                          ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
+                          : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                      }`}>
+                        {step.shift === 'day' ? '☀️ Day' : '🌙 Night'}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {step.inspector_name || '-'}

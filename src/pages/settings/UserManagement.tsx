@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX } from 'lucide-react';
+import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX, Info, AlertCircle } from 'lucide-react';
 import { UserService } from '@/services/userService';
 import type { CreateUserData, UpdateUserData } from '@/services/userService';
 import type { User } from '@/types/auth';
@@ -237,6 +237,40 @@ export default function UserManagement() {
     }
   };
 
+  // Check if current user can delete a specific user based on hierarchical rules
+  const canDeleteUser = (user: User): boolean => {
+    if (!currentUser) return false;
+    
+    // Cannot delete yourself
+    if (user.id === currentUser.id) return false;
+    
+    // Rule 1: Cannot delete your creator (hierarchical protection)
+    if (user.id === currentUser.created_by) return false;
+    
+    // Rule 2: Admins can delete any user they created (including other admins, but must demote first)
+    if (currentUser.role === 'admin' && user.created_by === currentUser.id) {
+      return true; // Show delete button, but will show warning if admin
+    }
+    
+    // Rule 3: Admins can delete any non-admin user (even if they didn't create them)
+    if (currentUser.role === 'admin' && user.role !== 'admin') {
+      return true;
+    }
+    
+    // Rule 4: Non-admin users can only delete users they created (and they must not be admin)
+    if (user.created_by === currentUser.id && user.role !== 'admin') {
+      return true;
+    }
+    
+    return false;
+  };
+
+  // Check if user needs to be demoted before deletion
+  const needsDemotionBeforeDelete = (user: User): boolean => {
+    if (!currentUser) return false;
+    return user.role === 'admin' && currentUser.role === 'admin' && user.created_by === currentUser.id;
+  };
+
   const filteredUsers = users.filter((user) =>
     user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.full_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -244,6 +278,24 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Info Alert about Hierarchical Rules */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-semibold text-blue-900 mb-2">User Deletion Rules</h4>
+              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                <li>You cannot delete your own account or the user who created your account</li>
+                <li>Admins can delete any non-admin user, even if they didn't create them</li>
+                <li>To delete an admin user you created: First change their role to "user", then delete them</li>
+                <li>Regular users can only delete users they created (and they must not be admins)</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -290,6 +342,7 @@ export default function UserManagement() {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Created By</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -298,7 +351,7 @@ export default function UserManagement() {
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="font-mono text-sm">{user.email}</TableCell>
                       <TableCell>
                         <Badge className={getRoleBadgeColor(user.role)}>
                           {user.role}
@@ -308,6 +361,18 @@ export default function UserManagement() {
                         <Badge className={getStatusBadgeColor(user.status)}>
                           {user.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.created_by_user ? (
+                          <div className="text-sm">
+                            <div className="font-medium">{user.created_by_user.full_name}</div>
+                            <div className="text-xs text-gray-500 font-mono">{user.created_by_user.email}</div>
+                          </div>
+                        ) : user.created_by === 'system' ? (
+                          <span className="text-sm text-gray-500">System</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">Unknown</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {new Date(user.created_at).toLocaleDateString()}
@@ -348,7 +413,7 @@ export default function UserManagement() {
                               <UserCheck className="w-4 h-4 text-green-600" />
                             </Button>
                           )}
-                          {user.id !== currentUser?.id && (
+                          {canDeleteUser(user) && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -356,8 +421,9 @@ export default function UserManagement() {
                                 setSelectedUser(user);
                                 setShowDeleteDialog(true);
                               }}
+                              title={needsDemotionBeforeDelete(user) ? 'Delete (requires demotion first)' : 'Delete user'}
                             >
-                              <Trash2 className="w-4 h-4 text-red-600" />
+                              <Trash2 className={`w-4 h-4 ${needsDemotionBeforeDelete(user) ? 'text-orange-600' : 'text-red-600'}`} />
                             </Button>
                           )}
                         </div>
@@ -539,12 +605,52 @@ export default function UserManagement() {
               Are you sure you want to delete {selectedUser?.full_name}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="font-medium text-red-900">{selectedUser.full_name}</p>
+                <p className="text-sm text-red-700 font-mono">{selectedUser.email}</p>
+                <p className="text-sm mt-2">
+                  <Badge className={getRoleBadgeColor(selectedUser.role)}>
+                    {selectedUser.role}
+                  </Badge>
+                </p>
+              </div>
+              
+              {needsDemotionBeforeDelete(selectedUser) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-yellow-800 mb-2">
+                        ⚠️ Admin User - Demotion Required
+                      </p>
+                      <p className="text-xs text-yellow-700 mb-2">
+                        You cannot delete an admin user directly. Follow these steps:
+                      </p>
+                      <ol className="text-xs text-yellow-700 list-decimal list-inside space-y-1">
+                        <li>Click "Cancel" to close this dialog</li>
+                        <li>Click the "Edit" button for this user</li>
+                        <li>Change their role from "admin" to "user"</li>
+                        <li>Save the changes</li>
+                        <li>Then return here and delete the user</li>
+                      </ol>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteUser}>
-              Delete
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteUser}
+              disabled={selectedUser ? needsDemotionBeforeDelete(selectedUser) : false}
+            >
+              {selectedUser && needsDemotionBeforeDelete(selectedUser) ? 'Demote First' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

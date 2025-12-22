@@ -20,7 +20,7 @@ import {
   PaginationNext,
   PaginationPrevious,
   PaginationEllipsis,
-} from '@/components/ui/pagination';
+} from '@/components/ui/pagination-primitives';
 
 interface ProductSelectorDialogProps {
   isOpen: boolean;

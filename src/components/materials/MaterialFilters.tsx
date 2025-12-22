@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
-import { DropdownService } from '@/services/dropdownService';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { MaterialService } from '@/services/materialService';
 import type { MaterialFilters } from '@/types/material';
 
@@ -22,14 +20,12 @@ export default function MaterialFilters({
   filters,
   viewMode,
   onSearchChange,
-  onCategoryChange,
   onStatusChange,
   onTypeChange,
   onColorChange,
   onSupplierChange,
   onViewModeChange,
 }: MaterialFiltersProps) {
-  const [categories, setCategories] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [suppliers, setSuppliers] = useState<string[]>([]);
@@ -40,11 +36,7 @@ export default function MaterialFilters({
 
   const loadFilterOptions = async () => {
     try {
-      // Load categories from dropdown service
-      const categoryOptions = await DropdownService.getDropdownsByCategory('material_category');
-      setCategories(categoryOptions.map((opt) => opt.value).filter(Boolean));
-
-      // Load other filter options from materials
+      // Load filter options from materials
       const { materials } = await MaterialService.getMaterials({ limit: 1000 });
 
       // Extract unique types
@@ -70,32 +62,21 @@ export default function MaterialFilters({
   };
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      {/* First Row: Search, Category, Status, View */}
+      {/* First Row: Search, Status, View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
         {/* Search */}
-        <div className="relative lg:col-span-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search materials..."
-            value={filters.search || ''}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2"
-          />
-        </div>
-
-        {/* Category Filter - Multi-select */}
-        <div className="lg:col-span-3">
-          <MultiSelect
-            options={categories.map(cat => ({ label: cat, value: cat }))}
-            selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
-            onChange={onCategoryChange}
-            placeholder="All Categories"
-          />
-        </div>
+        <DebouncedSearchInput
+          value={filters.search || ''}
+          onChange={onSearchChange}
+          placeholder="Search materials (min 3 characters)..."
+          minCharacters={3}
+          debounceMs={500}
+          className="lg:col-span-6"
+          showCounter={true}
+        />
 
         {/* Status Filter - Multi-select */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-4">
           <MultiSelect
             options={[
               { label: 'In Stock', value: 'in-stock' },

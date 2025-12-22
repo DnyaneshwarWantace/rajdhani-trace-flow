@@ -14,6 +14,18 @@ interface ConsumedMaterial {
   whole_product_count?: number;
   unit: string;
   individual_product_ids?: string[];
+  individual_products?: Array<{
+    id: string;
+    qr_code: string;
+    serial_number: string;
+    product_name: string;
+    status: string;
+    length?: string;
+    width?: string;
+    weight?: string;
+    color?: string;
+    pattern?: string;
+  }>;
 }
 
 interface ConsumedMaterialsDisplayProps {
@@ -132,17 +144,42 @@ export default function ConsumedMaterialsDisplay({
                 </div>
 
                 {/* Selected Individual Products - Read Only */}
-                {material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0 && (
+                {material.material_type === 'product' && material.individual_products && material.individual_products.length > 0 && (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
                     <h5 className="text-xs font-semibold text-green-900 mb-2">
-                      Selected Individual Products ({material.individual_product_ids.length} {material.unit})
+                      Selected Individual Products ({material.individual_products.length} {material.unit})
                     </h5>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {material.individual_product_ids.map((productId: string) => (
-                        <div key={productId} className="bg-white rounded p-2 text-xs">
-                          <p className="font-medium text-gray-900 truncate">{productId}</p>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead className="bg-green-100 sticky top-0">
+                          <tr>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">#</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Product ID</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">QR Code</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Serial Number</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Size (L × W)</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Weight</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Color</th>
+                            <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Pattern</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white">
+                          {material.individual_products.map((product, idx) => (
+                            <tr key={product.id} className="hover:bg-gray-50">
+                              <td className="border border-gray-200 px-2 py-2 text-gray-600">{idx + 1}</td>
+                              <td className="border border-gray-200 px-2 py-2 font-medium text-gray-900">{product.id}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.qr_code}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.serial_number}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900">
+                                {product.length && product.width ? `${product.length} × ${product.width}` : '—'}
+                              </td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.weight || '—'}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.color || '—'}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.pattern || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}

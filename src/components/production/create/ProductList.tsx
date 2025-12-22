@@ -90,7 +90,7 @@ export default function ProductList({
 
   const formatStock = (product: Product) => {
     const stock = product.current_stock || 0;
-    const unit = product.unit || 'units';
+    const unit = product.count_unit || 'units';
     return `${stock} ${unit}`;
   };
 

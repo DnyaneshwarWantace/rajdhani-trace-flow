@@ -30,7 +30,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from '@/components/ui/pagination';
+} from '@/components/ui/pagination-primitives';
 
 export default function ProductionList() {
   const { toast } = useToast();

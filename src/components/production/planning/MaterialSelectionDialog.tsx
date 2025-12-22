@@ -7,10 +7,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { Search, Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List } from 'lucide-react';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
+import { Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ interface Material {
   name: string;
   current_stock: number;
   unit: string;
+  count_unit?: string; // Counting unit for products (e.g., "rolls")
   type: 'raw_material' | 'product';
   category?: string;
   subcategory?: string;
@@ -464,7 +465,7 @@ export default function MaterialSelectionDialog({
               <p className="font-medium text-gray-900">
                 {material.type === 'product' ? (
                   <>
-                    {material.current_stock} {material.current_stock === 1 ? 'roll' : 'rolls'}
+                    {material.current_stock} {material.count_unit || 'rolls'}
                   </>
                 ) : (
                   <>{material.current_stock} {material.unit}</>
@@ -641,18 +642,17 @@ export default function MaterialSelectionDialog({
               {/* First Row: Search, Category, Material Type */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by name..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="pl-10"
-                  />
-                </div>
+                <DebouncedSearchInput
+                  value={searchQuery}
+                  onChange={(value) => {
+                    setSearchQuery(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search materials (min 3 characters)..."
+                  minCharacters={3}
+                  debounceMs={500}
+                  showCounter={true}
+                />
 
                 {/* Category Filter - Multi-select */}
                 <MultiSelect
@@ -696,18 +696,17 @@ export default function MaterialSelectionDialog({
               {/* First Row: Search, Category, Subcategory */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by name..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="pl-10"
-                  />
-                </div>
+                <DebouncedSearchInput
+                  value={searchQuery}
+                  onChange={(value) => {
+                    setSearchQuery(value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search products (min 3 characters)..."
+                  minCharacters={3}
+                  debounceMs={500}
+                  showCounter={true}
+                />
 
                 {/* Category Filter - Multi-select */}
                 <MultiSelect
@@ -850,7 +849,7 @@ export default function MaterialSelectionDialog({
                                   return (
                                     <>
                                       <span className="font-medium text-gray-900">
-                                        {material.current_stock} {material.current_stock === 1 ? 'roll' : 'rolls'}
+                                        {material.current_stock} {material.count_unit || 'rolls'}
                                       </span>
                                       {totalSqm > 0 && (
                                         <p className="text-xs text-gray-500 mt-0.5">({totalSqm.toFixed(2)} SQM)</p>
