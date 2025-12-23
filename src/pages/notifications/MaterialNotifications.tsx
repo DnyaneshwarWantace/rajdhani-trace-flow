@@ -22,6 +22,13 @@ export default function MaterialNotifications() {
 
   useEffect(() => {
     loadData();
+
+    // Auto-refresh every 10 seconds to catch new notifications
+    const refreshInterval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const loadData = async () => {
@@ -100,6 +107,8 @@ export default function MaterialNotifications() {
           title="Material Notifications"
           description="View all material and purchase order related notifications and logs"
           icon={<Factory className="w-8 h-8 text-indigo-600" />}
+          onRefresh={loadData}
+          isRefreshing={loading}
         />
 
         <SectionTabs

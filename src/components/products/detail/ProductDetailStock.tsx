@@ -8,8 +8,17 @@ interface ProductDetailStockProps {
 }
 
 export default function ProductDetailStock({ product }: ProductDetailStockProps) {
+  // Get real-time available stock from individual_product_stats
+  const availableStock = product.individual_stock_tracking && product.individual_product_stats
+    ? product.individual_product_stats.available
+    : product.current_stock;
+
+  const totalStock = product.individual_stock_tracking && product.individual_product_stats
+    ? product.individual_product_stats.total
+    : product.current_stock;
+
   const stockPercentage = product.max_stock_level > 0
-    ? Math.min((product.current_stock / product.max_stock_level) * 100, 100)
+    ? Math.min((availableStock / product.max_stock_level) * 100, 100)
     : 0;
 
   return (
@@ -24,9 +33,9 @@ export default function ProductDetailStock({ product }: ProductDetailStockProps)
         {/* Stock Level Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Stock Level</span>
+            <span className="text-gray-600">Available Stock</span>
             <span className="font-medium text-gray-900">
-              {formatStockRolls(product.current_stock)} / {product.max_stock_level} rolls
+              {formatStockRolls(availableStock)} {product.individual_stock_tracking && totalStock > 0 && `/ ${totalStock}`} / {product.max_stock_level} rolls
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5">
@@ -60,7 +69,40 @@ export default function ProductDetailStock({ product }: ProductDetailStockProps)
         </div>
 
         {/* Individual Tracking */}
-        {product.individual_stock_tracking && (
+        {product.individual_stock_tracking && product.individual_product_stats && (
+          <div className="pt-2 border-t border-gray-200 space-y-2">
+            <p className="text-xs text-gray-600 mb-1 font-medium">Individual Items Breakdown</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Available:</span>
+                <span className="font-medium text-green-600">{product.individual_product_stats.available}</span>
+              </div>
+              {product.individual_product_stats.in_production > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">In Production:</span>
+                  <span className="font-medium text-blue-600">{product.individual_product_stats.in_production}</span>
+                </div>
+              )}
+              {product.individual_product_stats.sold > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Sold:</span>
+                  <span className="font-medium text-purple-600">{product.individual_product_stats.sold}</span>
+                </div>
+              )}
+              {product.individual_product_stats.damaged > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Damaged:</span>
+                  <span className="font-medium text-red-600">{product.individual_product_stats.damaged}</span>
+                </div>
+              )}
+              <div className="flex justify-between col-span-2 pt-1 border-t">
+                <span className="text-gray-600 font-medium">Total:</span>
+                <span className="font-medium text-gray-900">{product.individual_product_stats.total}</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {product.individual_stock_tracking && !product.individual_product_stats && (
           <div className="pt-2 border-t border-gray-200">
             <p className="text-xs text-gray-600 mb-1">Individual Items</p>
             <p className="text-sm font-medium text-gray-900">

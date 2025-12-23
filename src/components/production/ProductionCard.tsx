@@ -2,19 +2,18 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, ClipboardList, Factory } from 'lucide-react';
+import { Trash2, Eye, ClipboardList, Factory } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface ProductionCardProps {
   batch: ProductionBatch;
-  onEdit: (batch: ProductionBatch) => void;
   onDelete: (batch: ProductionBatch) => void;
   canDelete: boolean;
 }
 
-export default function ProductionCard({ batch, onEdit, onDelete, canDelete }: ProductionCardProps) {
+export default function ProductionCard({ batch, onDelete, canDelete }: ProductionCardProps) {
   const navigate = useNavigate();
 
   const handleView = () => {
@@ -202,12 +201,15 @@ export default function ProductionCard({ batch, onEdit, onDelete, canDelete }: P
               <Eye className="w-3 h-3 mr-1" />
               View
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 text-xs py-1 h-7" onClick={() => onEdit(batch)}>
-              <Edit className="w-3 h-3 mr-1" />
-              Edit
-            </Button>
-            {canDelete && (
-              <Button variant="outline" size="sm" className="text-xs py-1 h-7 px-2" onClick={() => onDelete(batch)}>
+            {/* Only show Cancel button for planned stage */}
+            {batch.status === 'planned' && canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs py-1 h-7 px-2 text-red-600 hover:text-red-900 hover:bg-red-50 border-red-300"
+                onClick={() => onDelete(batch)}
+                title="Cancel Production"
+              >
                 <Trash2 className="w-3 h-3" />
               </Button>
             )}

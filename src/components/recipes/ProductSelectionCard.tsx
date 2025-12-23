@@ -162,16 +162,21 @@ export default function ProductSelectionCard({
                 </div>
               )}
 
-              {/* Remove Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onRemoveItem(index)}
-                className="text-red-600 hover:bg-red-50 w-full md:w-auto mt-2 md:mt-0"
-              >
-                <Minus className="w-4 h-4" />
-                <span className="ml-2 md:hidden">Remove</span>
-              </Button>
+              {/* Remove Button - Aligned with input fields */}
+              <div className="w-full md:w-auto flex flex-col">
+                <Label className="text-sm font-medium opacity-0 pointer-events-none">
+                  Action
+                </Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onRemoveItem(index)}
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700 w-full md:w-auto mt-1 h-10"
+                >
+                  <Minus className="w-4 h-4" />
+                  <span className="ml-2 md:hidden">Remove</span>
+                </Button>
+              </div>
             </div>
           );
         })}

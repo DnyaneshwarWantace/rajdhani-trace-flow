@@ -39,6 +39,13 @@ export default function StatusDistributionChart({ data, title = 'Status Distribu
       itemGap: 12,
       itemWidth: 12,
       itemHeight: 12,
+      formatter: (name: string) => {
+        const item = data.find(d => d.name === name);
+        if (!item) return name;
+        const total = data.reduce((sum, d) => sum + d.value, 0);
+        const percentage = total > 0 ? ((item.value / total) * 100).toFixed(2) : '0.00';
+        return `${name}: ${item.value} (${percentage}%)`;
+      },
     },
     series: [
       {

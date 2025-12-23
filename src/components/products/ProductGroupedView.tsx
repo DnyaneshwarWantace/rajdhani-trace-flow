@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
 
 interface ProductGroupedViewProps {
   products: Product[];
@@ -35,8 +36,9 @@ export default function ProductGroupedView({
   canDelete = false,
 }: ProductGroupedViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
 
-  // Group products by name
+  // Group products by name - products are already sorted by backend
   const groupedProducts: GroupedProducts = products.reduce((acc, product) => {
     const key = product.name.trim().toLowerCase();
     if (!acc[key]) {
@@ -46,7 +48,17 @@ export default function ProductGroupedView({
     return acc;
   }, {} as GroupedProducts);
 
-  const sortedGroupKeys = Object.keys(groupedProducts).sort();
+  // Preserve the order from backend - just get the keys in order they appear
+  const sortedGroupKeys: string[] = [];
+  const seenKeys = new Set<string>();
+
+  products.forEach(product => {
+    const key = product.name.trim().toLowerCase();
+    if (!seenKeys.has(key)) {
+      sortedGroupKeys.push(key);
+      seenKeys.add(key);
+    }
+  });
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => {
@@ -121,7 +133,8 @@ export default function ProductGroupedView({
                           <img
                             src={product.image_url}
                             alt={product.name}
-                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                            onClick={() => setSelectedImage({ url: product.image_url!, alt: product.name })}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -211,7 +224,7 @@ export default function ProductGroupedView({
                         </p>
                         {product.individual_stock_tracking && (
                           <p className="text-xs text-gray-500">
-                            {product.individual_products_count} items
+                            {product.individual_products_count || product.current_stock} items
                           </p>
                         )}
                       </div>
@@ -326,7 +339,8 @@ export default function ProductGroupedView({
                               <img
                                 src={product.image_url}
                                 alt={product.name}
-                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                                onClick={() => setSelectedImage({ url: product.image_url!, alt: product.name })}
+                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                               />
                             ) : (
                               <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -410,7 +424,7 @@ export default function ProductGroupedView({
                             </p>
                             {product.individual_stock_tracking && (
                               <p className="text-xs text-gray-500">
-                                {product.individual_products_count} items
+                                {product.individual_products_count || product.current_stock} items
                               </p>
                             )}
                           </div>
@@ -490,6 +504,16 @@ export default function ProductGroupedView({
           </tbody>
         </table>
       </div>
+
+      {/* Image View Dialog */}
+      {selectedImage && (
+        <ImageViewDialog
+          isOpen={!!selectedImage}
+          onClose={() => setSelectedImage(null)}
+          imageUrl={selectedImage.url}
+          alt={selectedImage.alt}
+        />
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
-import { ProductionService, type ProductionBatch, type CreateProductionBatchData } from '@/services/productionService';
+import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +13,6 @@ import ProductionFilters from '@/components/production/ProductionFilters';
 import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
-import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import {
   Select,
@@ -47,11 +46,9 @@ export default function ProductionList() {
   const [limit, setLimit] = useState(50);
   const [totalBatches, setTotalBatches] = useState(0);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<ProductionBatch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
 
   const [stats, setStats] = useState({
@@ -221,11 +218,6 @@ export default function ProductionList() {
     navigate('/production/create');
   };
 
-  const handleEdit = (batch: ProductionBatch) => {
-    setSelectedBatch(batch);
-    setIsDialogOpen(true);
-  };
-
   const handleView = (batch: ProductionBatch) => {
     navigate(`/production/${batch.id}`);
   };
@@ -233,30 +225,6 @@ export default function ProductionList() {
   const handleDelete = (batch: ProductionBatch) => {
     setSelectedBatch(batch);
     setIsDeleteDialogOpen(true);
-  };
-
-  const handleSubmit = async (data: CreateProductionBatchData) => {
-    if (!selectedBatch) return;
-    
-    try {
-      setSubmitting(true);
-      const { data: updatedBatch, error } = await ProductionService.updateBatch(selectedBatch.id, data);
-      if (error) {
-        toast({ title: 'Error', description: error, variant: 'destructive' });
-        return;
-      }
-      if (updatedBatch) {
-        toast({ title: 'Success', description: 'Production batch updated successfully' });
-        setIsDialogOpen(false);
-        setSelectedBatch(null);
-        loadBatches();
-      }
-    } catch (error) {
-      console.error('Error updating batch:', error);
-      toast({ title: 'Error', description: 'Failed to update batch', variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleConfirmDelete = async () => {
@@ -352,14 +320,12 @@ export default function ProductionList() {
           <ProductionTable
             batches={filteredBatches}
             onView={handleView}
-            onEdit={handleEdit}
             onDelete={handleDelete}
             canDelete={user?.role === 'admin' || false}
           />
         ) : (
           <ProductionGrid
             batches={filteredBatches}
-            onEdit={handleEdit}
             onDelete={handleDelete}
             canDelete={user?.role === 'admin' || false}
           />
@@ -463,14 +429,6 @@ export default function ProductionList() {
             </div>
           );
         })()}
-
-        <ProductionFormDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
-          onSubmit={handleSubmit}
-          selectedBatch={selectedBatch}
-          submitting={submitting}
-        />
 
         <ProductionDeleteDialog
           isOpen={isDeleteDialogOpen}

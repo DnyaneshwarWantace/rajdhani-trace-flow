@@ -4,14 +4,12 @@ import type { ProductionBatch } from '@/services/productionService';
 
 interface ProductionGridProps {
   batches: ProductionBatch[];
-  onEdit: (batch: ProductionBatch) => void;
   onDelete: (batch: ProductionBatch) => void;
   canDelete: boolean;
 }
 
 export default function ProductionGrid({
   batches,
-  onEdit,
   onDelete,
   canDelete,
 }: ProductionGridProps) {
@@ -31,7 +29,6 @@ export default function ProductionGrid({
         <div key={batch.id} className="mb-4">
           <ProductionCard
             batch={batch}
-            onEdit={onEdit}
             onDelete={onDelete}
             canDelete={canDelete}
           />

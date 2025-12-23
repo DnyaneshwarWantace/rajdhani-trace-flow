@@ -148,7 +148,27 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading stage details...</div>;
+    return (
+      <div className="space-y-6">
+        {/* Skeleton loaders for stages */}
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                  <div>
+                    <div className="h-5 w-32 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-3 w-48 bg-gray-100 rounded"></div>
+                  </div>
+                </div>
+                <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
+              </div>
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+    );
   }
 
   // Calculate stage data based on actual records and flow steps
@@ -222,15 +242,16 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
     has_wastage: hasWastage
   };
 
-  // Final Stage:
-  // - Use explicit stage status from batch if available
-  // - Only mark as completed when production batch status is 'completed', not just when final step exists
-  const finalStartDate = batch.final_stage?.started_at || finalStep?.created_at || finalStep?.createdAt || finalStep?.start_time || finalStep?.started_at || null;
+  // Final Stage (Individual Details):
+  // - Start when wastage is completed
+  // - Mark as in_progress when wastage is completed but batch is not completed
+  // - Only mark as completed when production batch status is 'completed'
+  const finalStartDate = batch.final_stage?.started_at || (wastageIsCompleted ? wastageCompletionDate : null) || finalStep?.created_at || finalStep?.createdAt || finalStep?.start_time || finalStep?.started_at || null;
   const finalCompletionDate = batch.status === 'completed' 
     ? (batch.final_stage?.completed_at || batch.completion_date || null)
     : null;
   const finalIsCompleted = batch.status === 'completed'; // Only completed when batch status is 'completed'
-  const finalIsInProgress = (!!finalStep && !finalIsCompleted && batch.status !== 'completed');
+  const finalIsInProgress = wastageIsCompleted && !finalIsCompleted; // In progress when wastage is completed but batch is not
 
   const finalStage = {
     status: (finalIsCompleted ? 'completed' : (finalIsInProgress ? 'in_progress' : 'not_started')) as 'completed' | 'in_progress' | 'not_started',
@@ -244,14 +265,14 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   // Determine which stages to show based on progress
   // Always show planning stage
   // Show machine stage only if planning is completed
-  // Show wastage stage if machine is completed OR if wastage records exist OR if wastage_stage is in_progress/completed
-  // Show final stage only if wastage is completed
+  // Show wastage stage if machine is completed OR if wastage records exist OR if wastage_stage is in_progress (but NOT if completed)
+  // Show final stage (individual products) only if wastage is completed
   const showMachineStage = planningStage.status === 'completed';
-  const showWastageStage = machineStage.status === 'completed' || 
+  const showWastageStage = (machineStage.status === 'completed' || 
                           wastageRecords.length > 0 || 
-                          batch.wastage_stage?.status === 'in_progress' || 
-                          batch.wastage_stage?.status === 'completed';
-  const showFinalStage = wastageStage.status === 'completed';
+                          batch.wastage_stage?.status === 'in_progress') &&
+                          wastageStage.status !== 'completed'; // Don't show wastage if it's completed
+  const showFinalStage = wastageStage.status === 'completed'; // Show individual products stage when wastage is completed
 
   return (
     <div className="space-y-6">
@@ -546,8 +567,8 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       </Card>
       )}
 
-      {/* Wastage Stage - Only show if machine is completed */}
-      {showWastageStage && (
+      {/* Wastage Stage - Only show if machine is completed AND wastage is NOT completed */}
+      {showWastageStage && wastageStage.status !== 'completed' && (
       <Card>
         <CardHeader
           className="cursor-pointer hover:bg-gray-50"
@@ -742,15 +763,20 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                 <Package className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <CardTitle>Final Products</CardTitle>
+                <CardTitle>Individual Details</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
                   Individual products produced in this batch
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant="default">
-                {finalStage.products_count || 0} products
+              <Badge variant={
+                finalStage.status === 'completed' ? 'default' :
+                finalStage.status === 'in_progress' ? 'default' : 'secondary'
+              }>
+                {finalStage.status === 'in_progress' ? 'Active' : 
+                 finalStage.status === 'completed' ? 'Completed' : 
+                 'Not Started'}
               </Badge>
               {expandedSections.products ? (
                 <ChevronUp className="w-5 h-5 text-gray-400" />

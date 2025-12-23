@@ -115,7 +115,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   useEffect(() => {
     if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
         setFormData({
-          name: mode === 'duplicate' ? `${product.name} (Copy)` : product.name,
+          name: product.name,
           category: product.category,
           subcategory: product.subcategory || '',
           color: product.color || '',

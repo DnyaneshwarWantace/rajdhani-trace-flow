@@ -44,7 +44,62 @@ export default function ProductionIndividualProducts() {
       const { data: batchData } = await ProductionService.getBatchById(id!);
       if (batchData) {
         console.log('✅ Batch loaded:', batchData.batch_number);
-        
+
+        // CRITICAL FIX: Fix stage statuses if we're on individual products page
+        const planningStageStatus = batchData.planning_stage?.status;
+        const machineStageStatus = batchData.machine_stage?.status;
+        const wastageStageStatus = batchData.wastage_stage?.status;
+        const finalStageStatus = batchData.final_stage?.status;
+
+        let needsUpdate = false;
+        const updateData: any = {};
+
+        // Fix planning_stage
+        if (planningStageStatus !== 'completed' && (finalStageStatus === 'in_progress' || finalStageStatus === 'completed')) {
+          console.log('⚠️ Planning stage is not marked as completed. Fixing...');
+          updateData.planning_stage = {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            completed_by: 'System',
+          };
+          needsUpdate = true;
+        }
+
+        // Fix machine_stage
+        if (machineStageStatus !== 'completed' && (finalStageStatus === 'in_progress' || finalStageStatus === 'completed')) {
+          console.log('⚠️ Machine stage is not marked as completed. Fixing...');
+          updateData.machine_stage = {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            completed_by: 'System',
+          };
+          needsUpdate = true;
+        }
+
+        // Fix wastage_stage
+        if (wastageStageStatus !== 'completed' && (finalStageStatus === 'in_progress' || finalStageStatus === 'completed')) {
+          console.log('⚠️ Wastage stage is not marked as completed. Fixing...');
+          updateData.wastage_stage = {
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            completed_by: 'System',
+          };
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          try {
+            await ProductionService.updateBatch(id!, updateData);
+            console.log('✅ Stage statuses fixed');
+            const { data: updatedBatchData } = await ProductionService.getBatchById(id!);
+            if (updatedBatchData) {
+              Object.assign(batchData, updatedBatchData);
+            }
+          } catch (error) {
+            console.error('❌ Error fixing stage statuses:', error);
+          }
+        }
+
         // Fetch product details
         let enrichedBatch = { ...batchData };
         if (batchData.product_id) {
@@ -56,7 +111,7 @@ export default function ProductionIndividualProducts() {
             console.error('Error fetching product:', error);
           }
         }
-        
+
         setBatch(enrichedBatch);
         
         // Load individual products by batch_number (which should be the batch ID)
@@ -83,17 +138,46 @@ export default function ProductionIndividualProducts() {
         // Load material consumption
         const { data: consumptionData } = await ProductionService.getMaterialConsumption(id!);
         if (consumptionData && consumptionData.length > 0) {
-          const consumed = consumptionData.map((m: any) => ({
-            material_id: m.material_id,
-            material_name: m.material_name,
-            material_type: m.material_type,
-            quantity_per_sqm: m.quantity_per_sqm || 0,
-            required_quantity: m.quantity_used || m.required_quantity || 0,
-            actual_consumed_quantity: m.actual_consumed_quantity || m.quantity_used || 0,
-            whole_product_count: m.whole_product_count || m.quantity_used || 0,
-            unit: m.unit,
-            individual_product_ids: m.individual_product_ids || [],
-          }));
+          // Load individual products for each material that has individual_product_ids
+          const consumed = await Promise.all(
+            consumptionData.map(async (m: any) => {
+              const materialData: any = {
+                material_id: m.material_id,
+                material_name: m.material_name,
+                material_type: m.material_type,
+                quantity_per_sqm: m.quantity_per_sqm || 0,
+                required_quantity: m.quantity_used || m.required_quantity || 0,
+                actual_consumed_quantity: m.actual_consumed_quantity || m.quantity_used || 0,
+                whole_product_count: m.whole_product_count || m.quantity_used || 0,
+                unit: m.unit,
+                individual_product_ids: m.individual_product_ids || [],
+                individual_products: [],
+              };
+
+              // Load individual products if they exist
+              if (m.material_type === 'product' && m.individual_product_ids && m.individual_product_ids.length > 0) {
+                try {
+                  const individualProducts = await Promise.all(
+                    m.individual_product_ids.map(async (productId: string) => {
+                      try {
+                        const product = await IndividualProductService.getIndividualProductById(productId);
+                        return product;
+                      } catch (error) {
+                        console.error(`Error loading individual product ${productId}:`, error);
+                        return null;
+                      }
+                    })
+                  );
+                  materialData.individual_products = individualProducts.filter(p => p !== null);
+                  console.log(`✅ Loaded ${materialData.individual_products.length} individual products for material ${m.material_name}`);
+                } catch (error) {
+                  console.error(`Error loading individual products for material ${m.material_name}:`, error);
+                }
+              }
+
+              return materialData;
+            })
+          );
           setConsumedMaterials(consumed);
         }
 
@@ -213,7 +297,7 @@ export default function ProductionIndividualProducts() {
       <div className="space-y-6">
         <IndividualProductsStageHeader
           batch={batch}
-          onBack={() => navigate(`/production/${id}/wastage`)}
+          onBack={() => navigate('/production')}
           onComplete={handleComplete}
           onRefresh={handleRefresh}
           canComplete={canComplete}

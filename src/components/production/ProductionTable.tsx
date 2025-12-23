@@ -1,17 +1,14 @@
 import type { ProductionBatch } from '@/services/productionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, ClipboardList, Factory, Trash, Package, CheckCircle } from 'lucide-react';
+import { Trash2, Eye, ClipboardList, Factory, Trash, Package, CheckCircle } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { ProductionService } from '@/services/productionService';
 
 interface ProductionTableProps {
   batches: ProductionBatch[];
   onView: (batch: ProductionBatch) => void;
-  onEdit: (batch: ProductionBatch) => void;
   onDelete: (batch: ProductionBatch) => void;
   canDelete: boolean;
 }
@@ -19,82 +16,64 @@ interface ProductionTableProps {
 export default function ProductionTable({
   batches,
   onView,
-  onEdit,
   onDelete,
   canDelete,
 }: ProductionTableProps) {
   const navigate = useNavigate();
-  const [batchStages, setBatchStages] = useState<Record<string, string>>({});
 
-  // Check for wastage data to determine if batch is in wastage or individual products stage
-  useEffect(() => {
-    const checkBatchStages = async () => {
-      const stages: Record<string, string> = {};
+  // Determine current stage based on batch stage fields (fast, no API calls)
+  const getCurrentStage = (batch: ProductionBatch) => {
+    // If batch is completed, show completed
+    if (batch.status === 'completed') {
+      return 'completed';
+    }
 
-      for (const batch of batches) {
-        if (batch.status === 'planned') {
-          stages[batch.id] = 'planning';
-        } else if (batch.status === 'in_progress' || batch.status === 'in_production') {
-          // Check production flow and wastage to determine stage
-          try {
-            const flowData = await ProductionService.getProductionFlowByBatchId(batch.id);
-            if (flowData?.data) {
-              const flowSteps = await ProductionService.getProductionFlowSteps(flowData.data.id);
-              const machineSteps = (flowSteps?.data || []).filter((s: any) =>
-                s.step_type === 'machine_operation' || s.step_name?.toLowerCase().includes('machine')
-              );
+    // If batch is planned, show planning
+    if (batch.status === 'planned') {
+      return 'planning';
+    }
 
-              // Check if all machine steps are completed
-              const allMachineStepsCompleted = machineSteps.length > 0 &&
-                machineSteps.every((s: any) => s.status === 'completed');
+    // For in_progress/in_production batches, check stage fields from most advanced to least
+    if (batch.status === 'in_progress' || batch.status === 'in_production') {
+      // Check final stage first (most advanced)
+      if (batch.final_stage?.status === 'in_progress' || batch.final_stage?.status === 'completed') {
+        return 'individual_products';
+      }
 
-              if (allMachineStepsCompleted) {
-                // Machine completed, check if wastage exists
-                try {
-                  const wasteResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/production/waste?batch_id=${batch.id}`, {
-                    headers: {
-                      'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-                    }
-                  });
-                  const wasteData = await wasteResponse.json();
-
-                  // If wastage exists, move to individual products stage
-                  if (wasteData.success && wasteData.data && wasteData.data.length > 0) {
-                    stages[batch.id] = 'individual_products';
-                  } else {
-                    // No wastage yet, show wastage stage
-                    stages[batch.id] = 'wastage';
-                  }
-                } catch (error) {
-                  // If error checking wastage, assume wastage stage
-                  stages[batch.id] = 'wastage';
-                }
-              } else {
-                stages[batch.id] = 'machine';
-              }
-            } else {
-              stages[batch.id] = 'machine';
-            }
-          } catch (error) {
-            stages[batch.id] = 'machine';
-          }
-        } else if (batch.status === 'completed') {
-          stages[batch.id] = 'completed';
-        } else {
-          stages[batch.id] = 'planning';
+      // Check wastage stage
+      if (batch.wastage_stage?.status === 'completed') {
+        return 'individual_products';
+      }
+      if (batch.wastage_stage?.status === 'in_progress' || batch.wastage_stage?.status === 'not_started') {
+        // If wastage stage exists (even if not_started) and machine is completed, show wastage
+        if (batch.machine_stage?.status === 'completed') {
+          return 'wastage';
         }
       }
 
-      setBatchStages(stages);
-    };
+      // Check machine stage
+      if (batch.machine_stage?.status === 'completed') {
+        // Machine completed but no wastage stage info - show wastage
+        return 'wastage';
+      }
+      if (batch.machine_stage?.status === 'in_progress' || batch.machine_stage?.status === 'not_started') {
+        // If machine stage exists and planning is completed, show machine
+        if (batch.planning_stage?.status === 'completed') {
+          return 'machine';
+        }
+      }
 
-    if (batches.length > 0) {
-      checkBatchStages();
+      // Check planning stage
+      if (batch.planning_stage?.status === 'completed') {
+        return 'machine';
+      }
+
+      // If batch is in_production but no stage info, default to machine
+      return 'machine';
     }
-  }, [batches]);
 
-  const getCurrentStage = (batch: ProductionBatch) => {
-    return batchStages[batch.id] || 'planning';
+    // Default fallback
+    return 'planning';
   };
 
   const handleStageClick = (e: React.MouseEvent, batch: ProductionBatch) => {
@@ -275,20 +254,14 @@ export default function ProductionTable({
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(batch)}
-                      className="text-primary-600 hover:text-primary-900 hover:bg-primary-50"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    {canDelete && (
+                    {/* Only show Cancel button for planned stage */}
+                    {batch.status === 'planned' && canDelete && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onDelete(batch)}
                         className="text-red-600 hover:text-red-900 hover:bg-red-50"
+                        title="Cancel Production"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

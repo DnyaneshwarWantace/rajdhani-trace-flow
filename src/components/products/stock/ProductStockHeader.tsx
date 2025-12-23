@@ -15,7 +15,7 @@ export default function ProductStockHeader({ product, productId }: ProductStockH
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
           <button
-            onClick={() => navigate(`/products/${productId}`)}
+            onClick={() => navigate('/products')}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />

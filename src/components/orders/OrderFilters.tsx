@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CustomerService, type Customer } from '@/services/customerService';
 
 interface OrderFiltersProps {
   filters: {
@@ -19,6 +21,19 @@ export default function OrderFilters({
   onStatusChange,
   onCustomerChange,
 }: OrderFiltersProps) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    const { data } = await CustomerService.getCustomers();
+    if (data) {
+      setCustomers(data);
+    }
+  };
+
   return (
     <div className="flex flex-col sm:flex-row gap-3 flex-1">
       {/* Search */}
@@ -52,14 +67,29 @@ export default function OrderFilters({
         </SelectContent>
       </Select>
 
-      {/* Customer Filter - TODO: Load from API */}
+      {/* Customer Filter */}
       <Select value={filters.customer_id} onValueChange={onCustomerChange}>
-        <SelectTrigger className="w-full sm:w-[180px]">
+        <SelectTrigger className="w-full sm:w-[240px]">
           <SelectValue placeholder="All Customers" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Customers</SelectItem>
-          {/* TODO: Map customers here */}
+          {customers.map((customer) => (
+            <SelectItem key={customer.id} value={customer.id}>
+              <div className="flex flex-col py-1">
+                <div className="font-medium text-gray-900">{customer.name}</div>
+                {customer.phone && (
+                  <div className="text-xs text-gray-600">Phone: {customer.phone}</div>
+                )}
+                {customer.email && (
+                  <div className="text-xs text-gray-600">Email: {customer.email}</div>
+                )}
+                {customer.gst_number && (
+                  <div className="text-xs text-gray-600">GST: {customer.gst_number}</div>
+                )}
+              </div>
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

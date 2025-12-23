@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
 
 interface ProductCardProps {
   product: Product;
@@ -36,6 +38,8 @@ export default function ProductCard({
   isSelected = false,
   onClick,
 }: ProductCardProps) {
+  const [isImageViewOpen, setIsImageViewOpen] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -69,7 +73,11 @@ export default function ProductCard({
           <img
             src={product.image_url}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsImageViewOpen(true);
+            }}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
@@ -144,7 +152,14 @@ export default function ProductCard({
           {/* Stock */}
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-gray-500">Stock</span>
-            <span className="font-bold text-primary-600">{formatStockRolls(product.current_stock)}</span>
+            <span className="font-bold text-primary-600">
+              {product.individual_stock_tracking && product.individual_product_stats
+                ? `${formatStockRolls(product.individual_product_stats.available)} / ${product.individual_product_stats.total}`
+                : formatStockRolls(product.current_stock)}
+              {product.individual_stock_tracking && !product.individual_product_stats && (
+                <span className="text-gray-400 ml-1">/ {product.individual_products_count || 0}</span>
+              )}
+            </span>
           </div>
 
           {/* Dimensions with SQM */}
@@ -248,6 +263,16 @@ export default function ProductCard({
           </div>
         )}
       </div>
+
+      {/* Image View Dialog */}
+      {product.image_url && (
+        <ImageViewDialog
+          isOpen={isImageViewOpen}
+          onClose={() => setIsImageViewOpen(false)}
+          imageUrl={product.image_url}
+          alt={product.name}
+        />
+      )}
     </div>
   );
 }

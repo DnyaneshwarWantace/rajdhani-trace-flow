@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, X, ArrowRight, RefreshCw, Clock, Factory, AlertCircle, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bell, CheckCircle, X, ArrowRight, RefreshCw, Clock, Factory, AlertCircle, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,25 +39,170 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      // Load production notifications (these are production requests for products)
+      
+      // Load ALL low_stock notifications directly (more efficient than loading all notifications)
+      // Production planning low stock alerts can have module: 'materials' or 'products'
+      // but they have batch_id and product_id in related_data
+      const { data: allLowStockNotifications } = await NotificationService.getNotifications({
+        type: 'low_stock',
+        limit: 1000, // Get a large number to ensure we get all
+        offset: 0
+      });
+      
+      console.log('🔍 Total low_stock notifications found:', allLowStockNotifications?.length || 0);
+      
+      // Also load from all modules to ensure we don't miss any
       const productionNotifications = await NotificationService.getNotificationsByModule('production');
-      
-      // Load product notifications (low stock, out of stock, etc.)
       const productNotifications = await NotificationService.getNotificationsByModule('products');
+      const materialNotifications = await NotificationService.getNotificationsByModule('materials');
       
-      // Filter for unread notifications
-      const unreadProductionNotifications = (productionNotifications || []).filter(n => n.status === 'unread');
-      const unreadProductNotifications = (productNotifications || []).filter(n => n.status === 'unread');
+      console.log('🔍 Raw production notifications:', productionNotifications?.length || 0);
+      console.log('🔍 Raw product notifications:', productNotifications?.length || 0);
+      console.log('🔍 Raw material notifications:', materialNotifications?.length || 0);
       
-      // Combine both types of notifications (both are product-related)
-      // Production notifications are production requests for products
-      // Product notifications are stock alerts for products
-      const combinedNotifications = [...unreadProductionNotifications, ...unreadProductNotifications];
+      // Combine all notifications to check for production planning alerts
+      // Use the low_stock filtered list as primary, but also check module-based results
+      const allNotifications = [
+        ...(allLowStockNotifications || []),
+        ...(productionNotifications || []), 
+        ...(productNotifications || []),
+        ...(materialNotifications || [])
+      ];
       
-      setNotifications(combinedNotifications);
-      console.log('📢 Loaded notifications:', combinedNotifications.length);
-      console.log('📢 Production notifications:', unreadProductionNotifications.length);
-      console.log('📢 Product notifications:', unreadProductNotifications.length);
+      // Remove duplicates by id
+      const uniqueNotifications = Array.from(
+        new Map(allNotifications.map(n => [n.id, n])).values()
+      );
+      
+      console.log('🔍 Total unique notifications before filtering:', uniqueNotifications.length);
+      
+      // Filter notifications: ONLY show low stock notifications from production planning
+      // Production planning notifications have:
+      // - type === 'low_stock'
+      // - title includes "Production Planning" (this is the key indicator from PlanningStage.tsx)
+      // OR has batch_id in related_data (from production planning)
+      
+      // Debug: Log all low_stock notifications to see what we have
+      const lowStockNotifications = uniqueNotifications.filter(n => {
+        if (n.related_data?.activity_log_id) return false;
+        return n.type === 'low_stock';
+      });
+      
+      console.log('🔍 Found low_stock notifications (after removing activity logs):', lowStockNotifications.length);
+      if (lowStockNotifications.length > 0) {
+        console.log('🔍 Sample low_stock notifications:', lowStockNotifications.slice(0, 10).map(n => ({
+          title: n.title,
+          type: n.type,
+          module: n.module,
+          status: n.status,
+          has_batch_id: !!n.related_data?.batch_id,
+          has_product_id: !!n.related_data?.product_id,
+          has_batch_number: !!n.related_data?.batch_number,
+          title_lower: (n.title || '').toLowerCase()
+        })));
+      }
+      
+      // Filter notifications: Show ONLY product-related notifications
+      // Use the same logic as ProductNotifications page
+      const filteredNotifications = uniqueNotifications.filter(n => {
+        // Exclude activity logs
+        if (n.related_data?.activity_log_id) {
+          return false;
+        }
+        
+        // Check if it's product-related (same logic as ProductNotifications page)
+        const isProductRelated = 
+          n.module === 'products' || 
+          n.related_data?.action_category === 'PRODUCT' ||
+          n.related_data?.action?.includes('PRODUCT_');
+        
+        // Check if it's a production-related notification (production module or production_request type)
+        const isProductionRelated = 
+          n.module === 'production' ||
+          n.type === 'production_request';
+        
+        // Check if it's a low stock notification from production planning
+        // Only show if it's about a PRODUCT shortage, not a MATERIAL shortage
+        const isProductLowStockFromProductionPlanning = () => {
+          if (n.type !== 'low_stock') {
+            return false;
+          }
+          
+          const title = (n.title || '').toLowerCase();
+          const hasProductionPlanningInTitle = title.includes('production planning');
+          
+          // Check material_type in related_data
+          // If material_type === 'raw_material', it's a material shortage (exclude)
+          // If material_type === 'product', it's a product shortage (include)
+          const materialType = n.related_data?.material_type;
+          
+          // Exclude material-related low stock notifications
+          if (materialType === 'raw_material') {
+            return false;
+          }
+          
+          // Show if:
+          // 1. Title includes "Production Planning" AND material_type is 'product' (product shortage)
+          // 2. Has batch_id/batch_number (from production) AND material_type is 'product'
+          const hasBatchId = !!n.related_data?.batch_id;
+          const hasBatchNumber = !!n.related_data?.batch_number;
+          const isProductMaterial = materialType === 'product';
+          
+          return (hasProductionPlanningInTitle && isProductMaterial) || 
+                 ((hasBatchId || hasBatchNumber) && isProductMaterial);
+        };
+        
+        // Include if:
+        // 1. It's product-related (module === 'products' or action_category === 'PRODUCT')
+        // 2. It's production-related (module === 'production' or type === 'production_request')
+        // 3. It's a product low stock notification from production planning
+        const shouldInclude = isProductRelated || isProductionRelated || isProductLowStockFromProductionPlanning();
+        
+        if (shouldInclude) {
+          console.log('✅ Included notification:', {
+            title: n.title,
+            type: n.type,
+            status: n.status,
+            module: n.module,
+            material_type: n.related_data?.material_type,
+            isProductRelated,
+            isProductionRelated,
+            isProductLowStock: isProductLowStockFromProductionPlanning()
+          });
+        } else {
+          console.log('❌ Filtered out:', {
+            title: n.title,
+            type: n.type,
+            module: n.module,
+            material_type: n.related_data?.material_type
+          });
+        }
+        
+        return shouldInclude;
+      });
+      
+      // Log what we found
+      console.log('✅ Production and stock notifications:', filteredNotifications.length);
+      if (filteredNotifications.length > 0) {
+        console.log('✅ Sample notification:', {
+          id: filteredNotifications[0].id,
+          title: filteredNotifications[0].title,
+          type: filteredNotifications[0].type,
+          status: filteredNotifications[0].status,
+          has_batch_id: !!filteredNotifications[0].related_data?.batch_id,
+          has_product_id: !!filteredNotifications[0].related_data?.product_id
+        });
+      }
+      
+      console.log('✅ Filtered notifications count:', filteredNotifications.length);
+      
+      // Sort by created_at descending (newest first)
+      filteredNotifications.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      setNotifications(filteredNotifications);
+      console.log('📢 Loaded production and stock notifications:', filteredNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
       toast({
@@ -73,7 +218,10 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await NotificationService.updateNotificationStatus(notificationId, 'read');
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Update the notification status to 'read' instead of removing it
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, status: 'read' as const } : n)
+      );
       toast({
         title: 'Success',
         description: 'Notification marked as read',
@@ -202,9 +350,12 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
+      <Card>
+        <CardContent className="p-8 text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -220,7 +371,10 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
               </div>
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Product Notifications</h2>
-                <p className="text-xs sm:text-sm text-gray-500">{notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs sm:text-sm text-gray-500">
+                  {notifications.length} notification{notifications.length !== 1 ? 's' : ''} 
+                  ({notifications.filter(n => n.status === 'unread').length} unread)
+                </p>
               </div>
             </div>
             <Button
@@ -239,7 +393,11 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
               const isExpanded = expandedNotifications.has(notification.id);
 
               return (
-                <Card key={notification.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
+                <Card key={notification.id} className={`border transition-colors ${
+                  notification.status === 'unread' 
+                    ? 'border-gray-200 hover:border-gray-300 bg-white' 
+                    : 'border-gray-100 hover:border-gray-200 bg-gray-50'
+                }`}>
                   <CardContent className="p-3 sm:p-4">
                     {/* Header - Always visible */}
                     <div
@@ -287,28 +445,99 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                         {/* Related Data */}
                         {notification.related_data && (
                           <div className="bg-gray-50 rounded-lg p-2 sm:p-3 mb-3 space-y-1.5 overflow-hidden">
-                            {notification.related_data.productName && (
-                              <div className="flex items-start gap-2 text-xs">
-                                <span className="text-gray-500 font-medium flex-shrink-0">Product:</span>
-                                <span className="text-gray-900 break-words">{notification.related_data.productName}</span>
+                            {/* Production Batch Details */}
+                            {(notification.related_data.batch_number || notification.related_data.batch_id) && (
+                              <div className="border-b border-gray-200 pb-2 mb-2">
+                                <p className="text-xs font-semibold text-gray-700 mb-1.5">Production Batch Details</p>
+                                {notification.related_data.batch_number && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-gray-500 font-medium">Batch Number:</span>
+                                    <span className="text-gray-900 font-mono">{notification.related_data.batch_number}</span>
+                                  </div>
+                                )}
+                                {notification.related_data.product_name && (
+                                  <div className="flex items-start gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium flex-shrink-0">For Product:</span>
+                                    <div className="flex-1">
+                                      <span className="text-gray-900 break-words">{notification.related_data.product_name}</span>
+                                      {notification.related_data.product_id && (
+                                        <span className="text-gray-500 ml-1">({notification.related_data.product_id})</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {(notification.related_data.product_category || notification.related_data.product_subcategory) && (
+                                  <div className="flex items-center gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium">Category:</span>
+                                    <span className="text-gray-900">
+                                      {notification.related_data.product_category || ''}
+                                      {notification.related_data.product_subcategory ? ` > ${notification.related_data.product_subcategory}` : ''}
+                                    </span>
+                                  </div>
+                                )}
+                                {notification.related_data.planned_quantity && (
+                                  <div className="flex items-center gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium">Planned Quantity:</span>
+                                    <span className="text-gray-900">{notification.related_data.planned_quantity} units</span>
+                                  </div>
+                                )}
+                                {notification.related_data.product_image && (
+                                  <div className="mt-2">
+                                    <img 
+                                      src={notification.related_data.product_image} 
+                                      alt={notification.related_data.product_name || 'Product'} 
+                                      className="w-16 h-16 object-cover rounded border border-gray-200"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             )}
-                            {notification.related_data.requiredQuantity && (
+
+                            {/* Product/Material Details */}
+                            {(notification.related_data.productName || notification.related_data.material_name) && (
+                              <div className="flex items-start gap-2 text-xs">
+                                <span className="text-gray-500 font-medium flex-shrink-0">
+                                  {notification.related_data.material_name ? 'Material' : 'Product'}:
+                                </span>
+                                <span className="text-gray-900 break-words">
+                                  {notification.related_data.productName || notification.related_data.material_name}
+                                </span>
+                              </div>
+                            )}
+                            {(notification.related_data.requiredQuantity || notification.related_data.required_quantity !== undefined) && (
                               <div className="flex items-start gap-2 text-xs">
                                 <span className="text-gray-500 font-medium flex-shrink-0">Required:</span>
-                                <span className="text-gray-900">{notification.related_data.requiredQuantity} products</span>
+                                <span className="text-gray-900 font-semibold">
+                                  {notification.related_data.requiredQuantity 
+                                    ? `${notification.related_data.requiredQuantity} products`
+                                    : `${notification.related_data.required_quantity?.toFixed(2)} ${notification.related_data.unit || ''}`
+                                  }
+                                </span>
                               </div>
                             )}
-                            {notification.related_data.availableStock !== undefined && (
+                            {(notification.related_data.availableStock !== undefined || notification.related_data.available_quantity !== undefined) && (
                               <div className="flex items-start gap-2 text-xs">
                                 <span className="text-gray-500 font-medium flex-shrink-0">Available:</span>
-                                <span className="text-gray-900">{notification.related_data.availableStock} products</span>
+                                <span className="text-gray-900">
+                                  {notification.related_data.availableStock !== undefined
+                                    ? `${notification.related_data.availableStock} products`
+                                    : `${notification.related_data.available_quantity} ${notification.related_data.unit || ''}`
+                                  }
+                                </span>
                               </div>
                             )}
-                            {notification.related_data.shortfall && (
+                            {(notification.related_data.shortfall || notification.related_data.shortage !== undefined) && (
                               <div className="flex items-start gap-2 text-xs">
-                                <span className="text-gray-500 font-medium flex-shrink-0">Shortfall:</span>
-                                <span className="text-red-600 font-semibold">{notification.related_data.shortfall} products</span>
+                                <span className="text-gray-500 font-medium flex-shrink-0">Shortage:</span>
+                                <span className="text-red-600 font-semibold">
+                                  {notification.related_data.shortfall 
+                                    ? `${notification.related_data.shortfall} products`
+                                    : `${notification.related_data.shortage?.toFixed(2)} ${notification.related_data.unit || ''}`
+                                  }
+                                </span>
                               </div>
                             )}
                             {notification.related_data.threshold && (

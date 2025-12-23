@@ -333,7 +333,10 @@ export default function WastageManagement({
                                       <span className="text-xs ml-2">({wholeCount - Math.floor(consumed)} whole {normalizedMaterial.unit})</span>
                                     </span>
                                   ) : (
-                                    <span className="font-semibold text-green-700">No wastage detected</span>
+                                    <div className="flex items-center gap-2">
+                                      <CheckCircle className="w-4 h-4 text-green-600" />
+                                      <span className="font-semibold text-green-700">No wastage detected - Automatically handled</span>
+                                    </div>
                                   )}
                                 </td>
                               </tr>

@@ -8,6 +8,7 @@ import { RecipeService } from '@/services/recipeService';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { AuthService } from '@/services/authService';
+import { NotificationService } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types/product';
 import type { Recipe } from '@/types/recipe';
@@ -89,6 +90,89 @@ export default function PlanningStage() {
       if (timeout) clearTimeout(timeout);
     };
   }, [materials, consumedMaterials, formData, selectedProduct]);
+
+  // Send low stock notification to backend for material section
+  const sendLowStockNotification = async (material: any) => {
+    try {
+      console.log(`📨 Sending low stock notification for ${material.material_name}...`);
+
+      // Get batch details if available
+      let batchNumber = 'New Batch';
+      let batchId = currentBatchId;
+      if (currentBatchId) {
+        try {
+          const { data: batch } = await ProductionService.getBatchById(currentBatchId);
+          if (batch) {
+            batchNumber = batch.batch_number || batch.id || 'New Batch';
+            batchId = batch.id;
+          }
+        } catch (error) {
+          console.error('Error fetching batch details:', error);
+        }
+      }
+
+      const productName = selectedProduct?.name || 'Unknown Product';
+      const productId = selectedProduct?.id || '';
+      const plannedQty = formData.planned_quantity || 0;
+      const productCategory = selectedProduct?.category || '';
+      const productSubcategory = selectedProduct?.subcategory || '';
+      const productImage = selectedProduct?.image_url || '';
+
+      // Enhanced message with complete production details
+      const message = `Production Batch: ${batchNumber}\n` +
+        `Product: ${productName}${productId ? ` (${productId})` : ''}\n` +
+        `Category: ${productCategory}${productSubcategory ? ` > ${productSubcategory}` : ''}\n` +
+        `Planned Quantity: ${plannedQty} units\n\n` +
+        `Material Required: ${material.material_name}\n` +
+        `Required: ${material.required_quantity.toFixed(2)} ${material.unit}\n` +
+        `Available: ${material.available_quantity} ${material.unit}\n` +
+        `Shortage: ${material.shortage?.toFixed(2)} ${material.unit}`;
+
+      // Determine module based on material type
+      const module = material.material_type === 'product' ? 'products' : 'materials';
+
+      const notification = await NotificationService.createNotification({
+        type: 'low_stock',
+        title: `Low Stock Alert - Production Planning: ${material.material_name}`,
+        message: message,
+        priority: 'high',
+        status: 'unread',
+        module: module,
+        related_id: material.material_id,
+        related_data: {
+          material_id: material.material_id,
+          material_name: material.material_name,
+          material_type: material.material_type,
+          required_quantity: material.required_quantity,
+          available_quantity: material.available_quantity,
+          shortage: material.shortage,
+          unit: material.unit,
+          // Production batch details
+          batch_id: batchId,
+          batch_number: batchNumber,
+          product_id: productId,
+          product_name: productName,
+          product_category: productCategory,
+          product_subcategory: productSubcategory,
+          product_image: productImage,
+          planned_quantity: plannedQty,
+        },
+      });
+
+      if (notification) {
+        console.log(`✅ Low stock notification created successfully:`, {
+          id: notification.id,
+          module: notification.module,
+          status: notification.status,
+          type: notification.type
+        });
+      } else {
+        console.error(`❌ Notification creation returned null for ${material.material_name}`);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to send low stock notification for ${material.material_name}:`, error);
+    }
+  };
 
   const loadBatchAndProduct = async (batchId: string) => {
     setLoading(true);
@@ -276,7 +360,7 @@ export default function PlanningStage() {
           try {
             if (recipeMaterial.material_type === 'raw_material') {
               const material = await MaterialService.getMaterialById(recipeMaterial.material_id);
-              availableQuantity = material.current_stock || 0;
+              availableQuantity = material.available_stock ?? (material.current_stock || 0);
               materialName = material.name;
               unit = material.unit || recipeMaterial.unit;
             } else if (recipeMaterial.material_type === 'product') {
@@ -298,7 +382,8 @@ export default function PlanningStage() {
                 );
                 availableQuantity = availableCount || 0;
               } else {
-                availableQuantity = materialProduct.current_stock || 0;
+                // Use available stock from individual_product_stats if available
+                availableQuantity = materialProduct.individual_product_stats?.available ?? (materialProduct.current_stock || 0);
               }
 
               materialName = materialProduct.name;
@@ -505,7 +590,8 @@ export default function PlanningStage() {
               );
               availableQuantity = availableCount || 0;
             } else {
-              availableQuantity = childProduct.current_stock || 0;
+              // Use available stock from individual_product_stats if available
+              availableQuantity = childProduct.individual_product_stats?.available ?? (childProduct.current_stock || 0);
             }
           } catch (error) {
             console.error('Error fetching product details for auto-calc:', error);
@@ -518,7 +604,7 @@ export default function PlanningStage() {
         } else if (m.material_type === 'raw_material') {
           try {
             const material = await MaterialService.getMaterialById(m.material_id);
-            availableQuantity = material.current_stock || 0;
+            availableQuantity = material.available_stock ?? (material.current_stock || 0);
             unit = material.unit || m.unit;
           } catch (error) {
             console.error('Error fetching material details:', error);
@@ -639,26 +725,51 @@ export default function PlanningStage() {
         setRecipeModified(false);
       }
 
-      // 2. Check for insufficient materials and send notifications
+      // 2. Check for insufficient materials and SEND NOTIFICATION (but DON'T block)
+      console.log('🔍 Checking materials for insufficient stock...');
+      console.log('📊 Materials to check:', materials.map(m => ({
+        name: m.material_name,
+        required: m.required_quantity,
+        available: m.available_quantity,
+        shortage: m.shortage,
+        status: m.status
+      })));
+
       const insufficientMaterials = materials.filter(
         (m) => m.status === 'low' || m.status === 'unavailable'
       );
 
+      console.log('⚠️ Insufficient materials found:', insufficientMaterials.length);
+
       if (insufficientMaterials.length > 0) {
+        // Send notification for EACH insufficient material to material section
         insufficientMaterials.forEach((material) => {
+          // Send notification to backend for material section
+          sendLowStockNotification(material);
+
+          // Also show toast to user
           toast({
-            title: 'Insufficient Stock',
+            title: 'Low Stock Warning',
             description: `${material.material_name}: Required ${material.required_quantity.toFixed(
               2
             )} ${material.unit}, Available ${material.available_quantity} ${
               material.unit
-            }. Shortage: ${material.shortage?.toFixed(2)} ${material.unit}`,
+            }. Shortage: ${material.shortage?.toFixed(2)} ${material.unit}. Notification sent to material section.`,
             variant: 'destructive',
+            duration: 10000, // Show for 10 seconds
           });
+        });
+
+        // Show warning but ALLOW adding to production
+        toast({
+          title: 'Low Stock Materials Added',
+          description: `${insufficientMaterials.length} material(s) with insufficient stock added to production. Notifications sent to material section. Note: You cannot start production flow until stock is replenished.`,
+          variant: 'destructive',
+          duration: 10000, // Show for 10 seconds
         });
       }
 
-      // 3. Move ALL materials (including insufficient ones) to consumed section
+      // 3. Move ALL materials to consumed section (including low stock materials)
       // Prevent duplicates by checking if material already exists
       const existingMaterialIds = new Set(consumedMaterials.map((m) => m.material_id));
       const newMaterialsToAdd = materials.filter((m) => !existingMaterialIds.has(m.material_id));
@@ -694,29 +805,17 @@ export default function PlanningStage() {
       });
       
       if (materialsWithProductDetails.length > 0) {
-        // Update individual product statuses to 'in_production'
+        // REMOVED: Individual product status updates now happen in backend when MaterialConsumption is created
+        // This prevents duplicate status updates and ensures parent product counts stay in sync
+
+        // Just store the individual products in state for display
         for (const material of materialsWithProductDetails) {
           if (material.material_type === 'product' && material.individual_product_ids && material.individual_product_ids.length > 0) {
-            try {
-              const { IndividualProductService } = await import('@/services/individualProductService');
-              for (const productId of material.individual_product_ids) {
-                try {
-                  await IndividualProductService.updateIndividualProduct(productId, {
-                    status: 'in_production'
-                  });
-                } catch (err) {
-                  console.error(`Error updating status for product ${productId}:`, err);
-                }
-              }
-              // Add the loaded products to consumedIndividualProducts state
-              const products = selectedIndividualProducts[material.material_id] || [];
-              setConsumedIndividualProducts(prev => ({
-                ...prev,
-                [material.material_id]: products
-              }));
-            } catch (error) {
-              console.error(`Error updating product statuses for material ${material.material_id}:`, error);
-            }
+            const products = selectedIndividualProducts[material.material_id] || [];
+            setConsumedIndividualProducts(prev => ({
+              ...prev,
+              [material.material_id]: products
+            }));
           }
         }
 
@@ -998,6 +1097,35 @@ export default function PlanningStage() {
                     </span>
                   </div>
                 )}
+                {/* Show warning if low stock materials exist */}
+                {(() => {
+                  const lowStockMaterials = consumedMaterials.filter(
+                    (m) => m.status === 'low' || m.status === 'unavailable'
+                  );
+                  return lowStockMaterials.length > 0 ? (
+                    <div className="flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="text-sm font-medium">
+                        Cannot start: {lowStockMaterials.length} material(s) have insufficient stock
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
+                {/* Show warning if individual products are not selected for product materials */}
+                {(() => {
+                  const productMaterials = consumedMaterials.filter((m) => m.material_type === 'product');
+                  const materialsWithoutIndividualProducts = productMaterials.filter(
+                    (m) => !m.individual_product_ids || m.individual_product_ids.length === 0
+                  );
+                  return materialsWithoutIndividualProducts.length > 0 ? (
+                    <div className="flex items-center gap-2 text-red-600">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="text-sm font-medium">
+                        Cannot start: Please select individual products for {materialsWithoutIndividualProducts.length} product material(s)
+                      </span>
+                    </div>
+                  ) : null;
+                })()}
                 <Button
                   onClick={() => {
                     // Open machine selection dialog first
@@ -1006,7 +1134,13 @@ export default function PlanningStage() {
                   disabled={
                     submitting ||
                     consumedMaterials.length === 0 ||
-                    !recipe
+                    !recipe ||
+                    consumedMaterials.some((m) => m.status === 'low' || m.status === 'unavailable') ||
+                    // Disable if product-type materials don't have individual products selected
+                    consumedMaterials.some((m) => 
+                      m.material_type === 'product' && 
+                      (!m.individual_product_ids || m.individual_product_ids.length === 0)
+                    )
                   }
                   className="bg-green-600 hover:bg-green-700"
                   size="lg"
@@ -1117,9 +1251,66 @@ export default function PlanningStage() {
           // After machine selection, create the batch and set up production flow
           if (!selectedProduct) return;
 
+          // CRITICAL: Check for low stock materials in consumed materials BEFORE starting production
+          const lowStockMaterials = consumedMaterials.filter(
+            (m) => m.status === 'low' || m.status === 'unavailable'
+          );
+
+          if (lowStockMaterials.length > 0) {
+            // Show error for each low stock material
+            lowStockMaterials.forEach((material) => {
+              toast({
+                title: 'Insufficient Stock - Cannot Start Production',
+                description: `${material.material_name}: Required ${material.required_quantity.toFixed(
+                  2
+                )} ${material.unit}, Available ${material.available_quantity} ${
+                  material.unit
+                }. Shortage: ${material.shortage?.toFixed(2)} ${material.unit}`,
+                variant: 'destructive',
+              });
+            });
+
+            // BLOCK production flow
+            toast({
+              title: 'Cannot Start Production',
+              description: `Cannot start production flow due to insufficient stock for ${lowStockMaterials.length} material(s). Please ensure all materials have sufficient quantity before proceeding.`,
+              variant: 'destructive',
+            });
+
+            return; // STOP - Don't start production if materials are insufficient
+          }
+
+          // CRITICAL: Check if individual products are selected for product-type materials
+          const productMaterials = consumedMaterials.filter((m) => m.material_type === 'product');
+          const materialsWithoutIndividualProducts = productMaterials.filter(
+            (m) => !m.individual_product_ids || m.individual_product_ids.length === 0
+          );
+
+          if (materialsWithoutIndividualProducts.length > 0) {
+            // Show error for each material missing individual products
+            materialsWithoutIndividualProducts.forEach((material) => {
+              toast({
+                title: 'Individual Products Required',
+                description: `Please select individual products for "${material.material_name}" before starting production.`,
+                variant: 'destructive',
+              });
+            });
+
+            // BLOCK production flow
+            toast({
+              title: 'Cannot Start Production',
+              description: `Please select individual products for ${materialsWithoutIndividualProducts.length} product material(s) before starting production. Click on the material to select individual products.`,
+              variant: 'destructive',
+              duration: 8000,
+            });
+
+            setSubmitting(false);
+            return; // STOP - Don't start production if individual products are not selected
+          }
+
           setSubmitting(true);
           let batch: any = null;
-          
+
           try {
             // Step 1: Check if batch already exists (from URL params or previous creation)
             // If batch exists, use it; otherwise create a new one
@@ -1478,9 +1669,19 @@ export default function PlanningStage() {
               return; // STOP - Don't continue if step creation fails
             }
 
-            // Step 5: Update batch status to 'in_production' - CRITICAL: Must succeed before navigation
+            // Step 5: Update batch status to 'in_production' and update stage statuses - CRITICAL: Must succeed before navigation
             const { data: updatedBatch, error: statusError } = await ProductionService.updateBatch(batch.id, {
               status: 'in_production',
+              planning_stage: {
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+                completed_by: 'User', // You can get this from auth context
+              },
+              machine_stage: {
+                status: 'in_progress',
+                started_at: new Date().toISOString(),
+                started_by: 'User', // You can get this from auth context
+              },
             });
 
             if (statusError || !updatedBatch) {

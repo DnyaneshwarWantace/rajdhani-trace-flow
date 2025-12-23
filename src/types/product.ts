@@ -30,6 +30,16 @@ export interface Product {
   // Individual products
   individual_stock_tracking: boolean;
   individual_products_count: number;
+  individual_product_stats?: {
+    available: number;
+    sold: number;
+    damaged: number;
+    returned: number;
+    in_production: number;
+    quality_check: number;
+    reserved: number;
+    total: number;
+  };
 
   // Additional
   notes?: string;
@@ -80,6 +90,9 @@ export interface ProductStats {
   out_of_stock_products: number;
   total_stock_value?: number;
   available_individual_products?: number;
+  in_production_individual_products?: number;
+  consumed_individual_products?: number;
+  used_individual_products?: number;
   total_individual_products?: number;
   sold_individual_products?: number;
   damaged_individual_products?: number;

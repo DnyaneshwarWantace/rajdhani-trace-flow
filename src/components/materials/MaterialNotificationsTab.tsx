@@ -8,39 +8,30 @@ import { Bell, CheckCircle, Loader2, Clock, AlertTriangle, AlertCircle, Info, X,
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 
-export default function MaterialNotificationsTab() {
+interface MaterialNotificationsTabProps {
+  notifications: Notification[];
+  loading?: boolean;
+}
+
+export default function MaterialNotificationsTab({ notifications: propNotifications, loading: propLoading = false }: MaterialNotificationsTabProps) {
   const { toast } = useToast();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>(propNotifications);
+  const [loading, setLoading] = useState(propLoading);
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
 
-  // Load only when component mounts (tab is active)
+  // Update local state when props change
   useEffect(() => {
-    loadNotifications();
-  }, []);
-
-  const loadNotifications = async () => {
-    try {
-      setLoading(true);
-      const materialNotifications = await NotificationService.getNotificationsByModule('materials');
-      const unreadNotifications = (materialNotifications || []).filter(n => n.status === 'unread');
-      setNotifications(unreadNotifications);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load notifications',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setNotifications(propNotifications);
+    setLoading(propLoading);
+  }, [propNotifications, propLoading]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await NotificationService.updateNotificationStatus(notificationId, 'read');
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Update status locally instead of removing
+      setNotifications(prev => prev.map(n =>
+        n.id === notificationId ? { ...n, status: 'read' as const } : n
+      ));
       toast({
         title: 'Success',
         description: 'Notification marked as read',
@@ -141,7 +132,9 @@ export default function MaterialNotificationsTab() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Material Notifications</h2>
-                <p className="text-sm text-gray-500">{notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}</p>
+                <p className="text-sm text-gray-500">
+                  {notifications.filter(n => n.status === 'unread').length} unread, {notifications.filter(n => n.status === 'read').length} read
+                </p>
               </div>
             </div>
             <Button
@@ -161,14 +154,23 @@ export default function MaterialNotificationsTab() {
               const hasDetails = notification.related_data && (
                 (notification.related_data.materialName && notification.related_data.materialName.trim()) ||
                 notification.related_data.currentStock !== undefined ||
+                notification.related_data.available_quantity !== undefined ||
                 (notification.related_data.minThreshold && notification.related_data.minThreshold > 0) ||
-                (notification.related_data.category && notification.related_data.category.trim())
+                (notification.related_data.category && notification.related_data.category.trim()) ||
+                notification.related_data.batch_number ||
+                notification.related_data.product_name ||
+                notification.related_data.required_quantity !== undefined ||
+                notification.related_data.shortage !== undefined
               );
 
               return (
                 <Card
                   key={notification.id}
-                  className={`border-0 shadow-sm hover:shadow-md transition-shadow bg-white ${hasDetails ? 'cursor-pointer' : ''}`}
+                  className={`border-0 shadow-sm hover:shadow-md transition-shadow ${
+                    notification.status === 'unread'
+                      ? 'bg-blue-50'
+                      : 'bg-white'
+                  } ${hasDetails ? 'cursor-pointer' : ''}`}
                   onClick={() => hasDetails && setExpandedNotificationId(isExpanded ? null : notification.id)}
                 >
                   <CardContent className="p-4">
@@ -220,6 +222,58 @@ export default function MaterialNotificationsTab() {
                         {/* Related Data - Collapsible */}
                         {isExpanded && hasDetails && (
                           <div className="bg-gray-50 rounded-lg p-3 my-2 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                            {/* Production Batch Details */}
+                            {(notification.related_data.batch_number || notification.related_data.batch_id) && (
+                              <div className="border-b border-gray-200 pb-2 mb-2">
+                                <p className="text-xs font-semibold text-gray-700 mb-1.5">Production Batch Details</p>
+                                {notification.related_data.batch_number && (
+                                  <div className="flex items-center gap-2 text-xs">
+                                    <span className="text-gray-500 font-medium">Batch Number:</span>
+                                    <span className="text-gray-900 font-mono">{notification.related_data.batch_number}</span>
+                                  </div>
+                                )}
+                                {notification.related_data.product_name && (
+                                  <div className="flex items-start gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium flex-shrink-0">Product:</span>
+                                    <div className="flex-1">
+                                      <span className="text-gray-900 break-words">{notification.related_data.product_name}</span>
+                                      {notification.related_data.product_id && (
+                                        <span className="text-gray-500 ml-1">({notification.related_data.product_id})</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {(notification.related_data.product_category || notification.related_data.product_subcategory) && (
+                                  <div className="flex items-center gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium">Category:</span>
+                                    <span className="text-gray-900">
+                                      {notification.related_data.product_category || ''}
+                                      {notification.related_data.product_subcategory ? ` > ${notification.related_data.product_subcategory}` : ''}
+                                    </span>
+                                  </div>
+                                )}
+                                {notification.related_data.planned_quantity && (
+                                  <div className="flex items-center gap-2 text-xs mt-1">
+                                    <span className="text-gray-500 font-medium">Planned Quantity:</span>
+                                    <span className="text-gray-900">{notification.related_data.planned_quantity} units</span>
+                                  </div>
+                                )}
+                                {notification.related_data.product_image && (
+                                  <div className="mt-2">
+                                    <img 
+                                      src={notification.related_data.product_image} 
+                                      alt={notification.related_data.product_name || 'Product'} 
+                                      className="w-16 h-16 object-cover rounded border border-gray-200"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Material Details */}
                             {notification.related_data.materialName && notification.related_data.materialName.trim() && (
                               <div className="flex items-start gap-2 text-xs min-w-0">
                                 <span className="text-gray-500 font-medium flex-shrink-0">Material:</span>
@@ -228,10 +282,27 @@ export default function MaterialNotificationsTab() {
                                 </span>
                               </div>
                             )}
-                            {notification.related_data.currentStock !== undefined && notification.related_data.currentStock !== null && (
+                            {notification.related_data.required_quantity !== undefined && (
                               <div className="flex items-center gap-2 text-xs">
-                                <span className="text-gray-500 font-medium">Current Stock:</span>
-                                <span className="text-gray-900">{notification.related_data.currentStock} {notification.related_data.unit || ''}</span>
+                                <span className="text-gray-500 font-medium">Required:</span>
+                                <span className="text-gray-900 font-semibold">{notification.related_data.required_quantity.toFixed(2)} {notification.related_data.unit || ''}</span>
+                              </div>
+                            )}
+                            {(notification.related_data.available_quantity !== undefined || notification.related_data.currentStock !== undefined) && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Available:</span>
+                                <span className="text-gray-900">
+                                  {notification.related_data.available_quantity !== undefined 
+                                    ? `${notification.related_data.available_quantity} ${notification.related_data.unit || ''}`
+                                    : `${notification.related_data.currentStock} ${notification.related_data.unit || ''}`
+                                  }
+                                </span>
+                              </div>
+                            )}
+                            {notification.related_data.shortage !== undefined && notification.related_data.shortage > 0 && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-gray-500 font-medium">Shortage:</span>
+                                <span className="text-red-600 font-semibold">{notification.related_data.shortage.toFixed(2)} {notification.related_data.unit || ''}</span>
                               </div>
                             )}
                             {notification.related_data.minThreshold && notification.related_data.minThreshold > 0 && (
@@ -240,7 +311,7 @@ export default function MaterialNotificationsTab() {
                                 <span className="text-gray-900">{notification.related_data.minThreshold} {notification.related_data.unit || ''}</span>
                               </div>
                             )}
-                            {notification.related_data.category && notification.related_data.category.trim() && (
+                            {notification.related_data.category && notification.related_data.category.trim() && !notification.related_data.product_category && (
                               <div className="flex items-center gap-2 text-xs">
                                 <span className="text-gray-500 font-medium">Category:</span>
                                 <span className="text-gray-900">{notification.related_data.category}</span>
@@ -281,17 +352,19 @@ export default function MaterialNotificationsTab() {
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-8 text-xs text-gray-600 hover:text-gray-900"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkAsRead(notification.id);
-                              }}
-                            >
-                              Mark Read
-                            </Button>
+                            {notification.status === 'unread' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs text-blue-600 hover:text-blue-900"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMarkAsRead(notification.id);
+                                }}
+                              >
+                                Mark Read
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"

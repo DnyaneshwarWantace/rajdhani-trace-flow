@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
@@ -6,6 +7,7 @@ import { QrCode, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
 
 interface ProductTableProps {
   products: Product[];
@@ -22,6 +24,8 @@ interface ProductTableProps {
 
 
 export default function ProductTable({ products, onEdit, onDuplicate, onView, onStock, onProduction, onQRCode, onDelete, canDelete = false }: ProductTableProps) {
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -76,7 +80,8 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                       <img
                         src={product.image_url}
                         alt={product.name}
-                        className="w-10 h-10 rounded-lg object-cover"
+                        onClick={() => setSelectedImage({ url: product.image_url!, alt: product.name })}
+                        className="w-10 h-10 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity"
                       />
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -164,11 +169,15 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                 <td className="px-4 py-4">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {formatStockRolls(product.current_stock)}
+                      {product.individual_stock_tracking && product.individual_product_stats
+                        ? `${formatStockRolls(product.individual_product_stats.available)} / ${product.individual_product_stats.total}`
+                        : formatStockRolls(product.current_stock)}
                     </p>
                     {product.individual_stock_tracking && (
                       <p className="text-xs text-gray-500">
-                        {product.individual_products_count} items
+                        {product.individual_product_stats
+                          ? `${product.individual_product_stats.available} available`
+                          : `${product.individual_products_count || product.current_stock} items`}
                       </p>
                     )}
                   </div>
@@ -249,6 +258,16 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
           </tbody>
         </table>
       </div>
+
+      {/* Image View Dialog */}
+      {selectedImage && (
+        <ImageViewDialog
+          isOpen={!!selectedImage}
+          onClose={() => setSelectedImage(null)}
+          imageUrl={selectedImage.url}
+          alt={selectedImage.alt}
+        />
+      )}
     </div>
   );
 }

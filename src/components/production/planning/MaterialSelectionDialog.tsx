@@ -21,6 +21,8 @@ interface Material {
   id: string;
   name: string;
   current_stock: number;
+  available_stock?: number;
+  in_production?: number;
   unit: string;
   count_unit?: string; // Counting unit for products (e.g., "rolls")
   type: 'raw_material' | 'product';
@@ -246,6 +248,8 @@ export default function MaterialSelectionDialog({
             id: m.id,
             name: m.name,
             current_stock: m.current_stock || 0,
+            available_stock: m.available_stock,
+            in_production: m.in_production,
             unit: m.unit || 'kg',
             type: 'raw_material' as const,
             category: m.category,
@@ -465,15 +469,20 @@ export default function MaterialSelectionDialog({
               <p className="font-medium text-gray-900">
                 {material.type === 'product' ? (
                   <>
-                    {material.current_stock} {material.count_unit || 'rolls'}
+                    {material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.count_unit || 'rolls'}
                   </>
                 ) : (
-                  <>{material.current_stock} {material.unit}</>
+                  <>{material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.unit}</>
                 )}
               </p>
+              {material.in_production && material.in_production > 0 && (
+                <p className="text-xs text-orange-600 mt-1">
+                  ({material.in_production} {material.type === 'product' ? (material.count_unit || 'rolls') : material.unit} in production)
+                </p>
+              )}
             </div>
             <div className="flex items-start justify-end">
-              {getStockStatusBadge(material.current_stock)}
+              {getStockStatusBadge(material.available_stock !== undefined ? material.available_stock : material.current_stock)}
             </div>
           </div>
 
@@ -838,18 +847,26 @@ export default function MaterialSelectionDialog({
                           </td>
                           <td className="px-3 py-3">
                             {activeTab === 'raw_materials' ? (
-                              <span className="font-medium text-gray-900">{material.current_stock} {material.unit}</span>
+                              <div>
+                                <span className="font-medium text-gray-900">
+                                  {material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.unit}
+                                </span>
+                                {material.in_production && material.in_production > 0 && (
+                                  <p className="text-xs text-orange-600">({material.in_production} {material.unit} in production)</p>
+                                )}
+                              </div>
                             ) : (
                               <>
                                 {material.length && material.width && (() => {
                                   const length = parseFloat(material.length);
                                   const width = parseFloat(material.width);
                                   const sqm = calculateSQM(length, width, material.length_unit || 'm', material.width_unit || 'm');
-                                  const totalSqm = sqm * material.current_stock;
+                                  const availStock = material.available_stock !== undefined ? material.available_stock : material.current_stock;
+                                  const totalSqm = sqm * availStock;
                                   return (
                                     <>
                                       <span className="font-medium text-gray-900">
-                                        {material.current_stock} {material.count_unit || 'rolls'}
+                                        {availStock} {material.count_unit || 'rolls'}
                                       </span>
                                       {totalSqm > 0 && (
                                         <p className="text-xs text-gray-500 mt-0.5">({totalSqm.toFixed(2)} SQM)</p>

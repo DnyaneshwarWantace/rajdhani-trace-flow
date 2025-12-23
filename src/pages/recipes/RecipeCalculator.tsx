@@ -77,7 +77,9 @@ export default function RecipeCalculator() {
   const loadProducts = async () => {
     try {
       const result = await ProductService.getProducts({ limit: 1000 });
-      setProducts(result.products || []);
+      // Filter to only show products that have recipes
+      const productsWithRecipes = (result.products || []).filter(p => p.has_recipe);
+      setProducts(productsWithRecipes);
     } catch (error) {
       console.error('Error loading products:', error);
       toast({
@@ -239,11 +241,10 @@ export default function RecipeCalculator() {
       // Get product stock info
       const product = products.find((p) => p.id === productId);
 
-      // For products with individual stock tracking, use current_stock or individual_products_count
-      // For bulk products, use base_quantity
-      const productStock = product?.individual_stock_tracking
-        ? product?.current_stock || product?.individual_products_count || 0
-        : product?.base_quantity || product?.current_stock || 0;
+      // Use real-time available stock from individual_product_stats if available
+      const productStock = product?.individual_stock_tracking && product?.individual_product_stats
+        ? product.individual_product_stats.available
+        : product?.current_stock || 0;
 
       const step: ProductionStep = {
         step: stepNumber,
@@ -275,13 +276,15 @@ export default function RecipeCalculator() {
         const rawMaterial = rawMaterials.find((rm) => rm.id === recipeMaterial.material_id);
 
         if (rawMaterial) {
-          // It's a raw material
+          // It's a raw material - use available_stock instead of current_stock
+          const materialAvailableStock = rawMaterial.available_stock ?? rawMaterial.current_stock;
+
           step.materials_needed.push({
             material_id: recipeMaterial.material_id,
             material_name: recipeMaterial.material_name,
             quantity: requiredQuantity,
             unit: recipeMaterial.unit,
-            current_stock: rawMaterial.current_stock,
+            current_stock: materialAvailableStock,
           });
 
           // Add to final breakdown
@@ -299,9 +302,9 @@ export default function RecipeCalculator() {
               material_name: recipeMaterial.material_name,
               total_quantity: requiredQuantity,
               unit: recipeMaterial.unit,
-              available_stock: rawMaterial.current_stock,
-              shortage: Math.max(0, requiredQuantity - rawMaterial.current_stock),
-              is_available: rawMaterial.current_stock >= requiredQuantity,
+              available_stock: materialAvailableStock,
+              shortage: Math.max(0, requiredQuantity - materialAvailableStock),
+              is_available: materialAvailableStock >= requiredQuantity,
               sources: [
                 {
                   product_name: productName,
@@ -330,10 +333,10 @@ export default function RecipeCalculator() {
           console.log(`   ${recipeMaterial.material_name} area per unit: ${nestedProductAreaPerUnit} sqm`);
           console.log(`   → Need ${nestedProductQuantity} units of ${recipeMaterial.material_name}`);
 
-          // Calculate stock for nested product (same logic as main product)
-          const nestedProductStock = nestedProduct?.individual_stock_tracking
-            ? nestedProduct?.current_stock || nestedProduct?.individual_products_count || 0
-            : nestedProduct?.base_quantity || nestedProduct?.current_stock || 0;
+          // Calculate stock for nested product - use real-time available stock
+          const nestedProductStock = nestedProduct?.individual_stock_tracking && nestedProduct?.individual_product_stats
+            ? nestedProduct.individual_product_stats.available
+            : nestedProduct?.current_stock || 0;
 
           step.products_needed.push({
             product_id: recipeMaterial.material_id,

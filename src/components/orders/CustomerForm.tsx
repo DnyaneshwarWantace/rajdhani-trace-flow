@@ -137,77 +137,80 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
         <CardTitle>Add New Customer</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Customer Type *</Label>
-            <Select
-              value={newCustomer.customerType}
-              onValueChange={(value: 'individual' | 'business') =>
-                setNewCustomer({ ...newCustomer, customerType: value })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="business">Business</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>GST Number</Label>
-            <Input
-              value={newCustomer.gstNumber}
-              onChange={e => handleGSTNumberChange(e.target.value)}
-              placeholder="Enter GST number"
-              maxLength={15}
-            />
-            {isFetchingGST && <p className="text-xs text-gray-500">Fetching GST details...</p>}
-            {gstAutoFilled && <p className="text-xs text-green-600">✓ GST details auto-filled</p>}
-          </div>
+        {/* 1. Customer Type */}
+        <div className="space-y-2">
+          <Label>Customer Type *</Label>
+          <Select
+            value={newCustomer.customerType}
+            onValueChange={(value: 'individual' | 'business') =>
+              setNewCustomer({ ...newCustomer, customerType: value })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="business">Business</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Full Name *</Label>
-            <Input
-              value={newCustomer.name}
-              onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-              placeholder="Enter customer name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Email Address *</Label>
-            <Input
-              type="email"
-              value={newCustomer.email}
-              onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
-              placeholder="Enter email"
-            />
-          </div>
+        {/* 2. Full Name */}
+        <div className="space-y-2">
+          <Label>Full Name *</Label>
+          <Input
+            value={newCustomer.name}
+            onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+            placeholder="Enter customer name"
+          />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* 3. Phone Number */}
+        <div className="space-y-2">
+          <Label>Phone Number *</Label>
+          <Input
+            value={newCustomer.phone}
+            onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+            placeholder="Enter phone"
+          />
+        </div>
+
+        {/* 4. Email Address */}
+        <div className="space-y-2">
+          <Label>Email Address *</Label>
+          <Input
+            type="email"
+            value={newCustomer.email}
+            onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
+            placeholder="Enter email"
+          />
+        </div>
+
+        {/* 5. GST Number */}
+        <div className="space-y-2">
+          <Label>GST Number</Label>
+          <Input
+            value={newCustomer.gstNumber}
+            onChange={e => handleGSTNumberChange(e.target.value)}
+            placeholder="Enter GST number"
+            maxLength={15}
+          />
+          {isFetchingGST && <p className="text-xs text-gray-500">Fetching GST details...</p>}
+          {gstAutoFilled && <p className="text-xs text-green-600">✓ GST details auto-filled</p>}
+        </div>
+
+        {/* Company Name - Only for business */}
+        {newCustomer.customerType === 'business' && (
           <div className="space-y-2">
-            <Label>Phone Number *</Label>
+            <Label>Company Name</Label>
             <Input
-              value={newCustomer.phone}
-              onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-              placeholder="Enter phone"
+              value={newCustomer.companyName}
+              onChange={e => setNewCustomer({ ...newCustomer, companyName: e.target.value })}
+              placeholder="Enter company name"
             />
           </div>
-          {newCustomer.customerType === 'business' && (
-            <div className="space-y-2">
-              <Label>Company Name</Label>
-              <Input
-                value={newCustomer.companyName}
-                onChange={e => setNewCustomer({ ...newCustomer, companyName: e.target.value })}
-                placeholder="Enter company name"
-              />
-            </div>
-          )}
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label>Address</Label>

@@ -1,9 +1,16 @@
 import { useState, useEffect } from 'react';
 import { ProductService } from '@/services/productService';
+import { AnalyticsService } from '@/services/analyticsService';
 import type { Product, ProductStats } from '@/types/product';
+import type { MonthlyDemand, ProducedProduct, MonthlySales, MonthlyProduction } from '@/services/analyticsService';
 import StatCard from './analytics/StatCard';
 import StatusDistributionChart from './analytics/StatusDistributionChart';
 import CategoryDistributionChart from './analytics/CategoryDistributionChart';
+import MostProducedChart from './analytics/MostProducedChart';
+import MonthlySalesChart from './analytics/MonthlySalesChart';
+import MonthlyProductionChart from './analytics/MonthlyProductionChart';
+import TopDemandChart from './analytics/TopDemandChart';
+import TopProductsTable from './analytics/TopProductsTable';
 import { Package, TrendingUp, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 
 interface AnalyticsTabProps {
@@ -13,6 +20,10 @@ interface AnalyticsTabProps {
 export default function AnalyticsTab({ products: _products }: AnalyticsTabProps) {
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [monthlyDemand, setMonthlyDemand] = useState<MonthlyDemand[]>([]);
+  const [mostProduced, setMostProduced] = useState<ProducedProduct[]>([]);
+  const [monthlySales, setMonthlySales] = useState<MonthlySales[]>([]);
+  const [monthlyProduction, setMonthlyProduction] = useState<MonthlyProduction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,15 +35,30 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
     try {
       setLoading(true);
       setError(null);
-      
-      // Fetch stats and all products in parallel
-      const [statsData, productsData] = await Promise.all([
+
+      // Fetch all analytics data in parallel
+      const [
+        statsData,
+        productsData,
+        demandData,
+        producedData,
+        salesData,
+        productionData
+      ] = await Promise.all([
         ProductService.getProductStats(),
-        ProductService.getProducts({ limit: 10000 }) // Fetch all products for analytics
+        ProductService.getProducts({ limit: 10000 }),
+        AnalyticsService.getProductDemandByMonth(6),
+        AnalyticsService.getMostProducedProducts(10),
+        AnalyticsService.getMonthlySalesAnalytics(12),
+        AnalyticsService.getMonthlyProductionAnalytics(12)
       ]);
-      
+
       setStats(statsData);
       setAllProducts(productsData.products || []);
+      setMonthlyDemand(demandData);
+      setMostProduced(producedData);
+      setMonthlySales(salesData);
+      setMonthlyProduction(productionData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
       console.error('Error loading analytics:', err);
@@ -143,21 +169,53 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
         {categoryData.length > 0 && <CategoryDistributionChart data={categoryData} />}
       </div>
 
-      {/* Additional Stats */}
+      {/* Individual Product Status Analytics */}
       {stats.available_individual_products !== undefined && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatCard
-            title="Individual Products Available"
-            value={stats.available_individual_products || 0}
-            icon={<TrendingUp className="w-5 h-5" />}
-          />
-          {stats.total_individual_products !== undefined && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Individual Product Status</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
-              title="Total Individual Products"
-              value={stats.total_individual_products || 0}
+              title="Available"
+              value={stats.available_individual_products || 0}
+              icon={<CheckCircle className="w-5 h-5" />}
+            />
+            <StatCard
+              title="In Production"
+              value={stats.in_production_individual_products || 0}
               icon={<Package className="w-5 h-5" />}
             />
-          )}
+            <StatCard
+              title="Consumed"
+              value={stats.consumed_individual_products || 0}
+              icon={<Package className="w-5 h-5" />}
+            />
+            <StatCard
+              title="Used"
+              value={stats.used_individual_products || 0}
+              icon={<Package className="w-5 h-5" />}
+            />
+            <StatCard
+              title="Sold"
+              value={stats.sold_individual_products || 0}
+              icon={<TrendingUp className="w-5 h-5" />}
+            />
+            <StatCard
+              title="Damaged"
+              value={stats.damaged_individual_products || 0}
+              icon={<AlertTriangle className="w-5 h-5" />}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Additional Stats */}
+      {stats.total_individual_products !== undefined && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard
+            title="Total Individual Products"
+            value={stats.total_individual_products || 0}
+            icon={<Package className="w-5 h-5" />}
+          />
           {stats.individual_tracking_products !== undefined && (
             <StatCard
               title="Products with Individual Tracking"
@@ -167,6 +225,29 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
           )}
         </div>
       )}
+
+      {/* Top Products Table */}
+      {(mostProduced.length > 0 || monthlyDemand.length > 0) && (
+        <TopProductsTable demandData={monthlyDemand} producedData={mostProduced} />
+      )}
+
+      {/* Demand & Production Analytics */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Demand & Production Analytics</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          {/* Monthly Sales Trend */}
+          {monthlySales.length > 0 && <MonthlySalesChart data={monthlySales} />}
+
+          {/* Monthly Production Trend */}
+          {monthlyProduction.length > 0 && <MonthlyProductionChart data={monthlyProduction} />}
+
+          {/* Top Products by Demand */}
+          {monthlyDemand.length > 0 && <TopDemandChart data={monthlyDemand} />}
+
+          {/* Most Produced Products */}
+          {mostProduced.length > 0 && <MostProducedChart data={mostProduced} />}
+        </div>
+      </div>
     </div>
   );
 }

@@ -114,6 +114,13 @@ export default function MaterialList() {
       loadNotifications(); // For unread count badge - non-blocking
       setHasLoadedInitial(true);
     }
+
+    // Auto-refresh notifications every 10 seconds
+    const notificationRefreshInterval = setInterval(() => {
+      loadNotifications();
+    }, 10000);
+
+    return () => clearInterval(notificationRefreshInterval);
   }, []);
 
   // Load stats AFTER materials are loaded (in background)
@@ -712,9 +719,41 @@ export default function MaterialList() {
     try {
       notificationsLoadingRef.current = true;
       const { NotificationService } = await import('@/services/notificationService');
-      const materialNotifications = await NotificationService.getNotificationsByModule('materials');
-      const unreadNotifications = (materialNotifications || []).filter(n => n.status === 'unread');
-      setNotifications(unreadNotifications);
+
+      console.log('🔔 Loading material notifications...');
+      const materialNotifications = await NotificationService.getNotifications({
+        module: 'materials',
+        limit: 1000  // Get ALL notifications, not just 50
+      });
+      console.log('📥 Received notifications:', materialNotifications.data?.length || 0);
+      console.log('📋 All material notifications:', materialNotifications.data);
+
+      // Search for our specific notification
+      const ammoniaNot = materialNotifications.data?.find(n => n.id === 'NOTIF-251222-006');
+      if (ammoniaNot) {
+        console.log('✅ Found Ammonia notification:', ammoniaNot);
+      } else {
+        console.log('❌ Ammonia notification NOTIF-251222-006 NOT FOUND in results');
+      }
+
+      const allNotifs = materialNotifications.data || [];
+
+      // Filter out activity logs - only show real notifications (both read and unread)
+      const realNotifications = allNotifs.filter(n => {
+        // Exclude activity logs (they have activity_log_id in related_data)
+        if (n.related_data?.activity_log_id) return false;
+
+        // Only include notification types, not info/success logs
+        const notificationTypes = ['low_stock', 'restock_request', 'order_alert', 'warning', 'error'];
+        return notificationTypes.includes(n.type);
+      });
+
+      console.log('📋 All real notifications (read + unread):', realNotifications.length);
+      const unreadCount = realNotifications.filter(n => n.status === 'unread').length;
+      console.log('✉️ Unread:', unreadCount, 'Read:', realNotifications.length - unreadCount);
+
+      // Show ALL notifications (both read and unread)
+      setNotifications(realNotifications);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -824,7 +863,10 @@ export default function MaterialList() {
 
         {/* Notifications Tab Content */}
         {activeTab === 'notifications' && (
-          <MaterialNotificationsTab />
+          <MaterialNotificationsTab
+            notifications={notifications}
+            loading={loading}
+          />
         )}
                         </div>
 

@@ -31,6 +31,22 @@ export interface ProductionBatch {
   color?: string;
   pattern?: string;
   // Stage tracking
+  planning_stage?: {
+    status?: 'draft' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+    materials_draft?: any[];
+    materials_consumed?: any[];
+  };
+  machine_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+  };
   wastage_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';
     started_at?: string;
@@ -40,7 +56,7 @@ export interface ProductionBatch {
     has_wastage?: boolean;
   };
   final_stage?: {
-    status?: 'not_started' | 'completed';
+    status?: 'not_started' | 'in_progress' | 'completed';
     started_at?: string;
     started_by?: string;
     completed_at?: string;
@@ -64,6 +80,22 @@ export interface CreateProductionBatchData {
 export interface UpdateProductionBatchData extends Partial<CreateProductionBatchData> {
   status?: 'planned' | 'in_progress' | 'in_production' | 'completed';
   actual_quantity?: number;
+  planning_stage?: {
+    status?: 'draft' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+    materials_draft?: any[];
+    materials_consumed?: any[];
+  };
+  machine_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+  };
   wastage_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';
     started_at?: string;
@@ -73,7 +105,7 @@ export interface UpdateProductionBatchData extends Partial<CreateProductionBatch
     has_wastage?: boolean;
   };
   final_stage?: {
-    status?: 'not_started' | 'completed';
+    status?: 'not_started' | 'in_progress' | 'completed';
     started_at?: string;
     started_by?: string;
     completed_at?: string;
@@ -412,6 +444,38 @@ export class ProductionService {
     } catch (error) {
       console.error('Error fetching machine:', error);
       throw error;
+    }
+  }
+
+  static async createMachine(machineData: {
+    machine_name: string;
+    machine_type: string;
+    model_number?: string;
+    status?: string;
+    location?: string;
+    department?: string;
+    capacity_per_hour?: number;
+  }): Promise<{ data: any | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/machines`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          status: 'active',
+          ...machineData,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to create machine' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error creating machine:', error);
+      return { data: null, error: 'Failed to create machine' };
     }
   }
 

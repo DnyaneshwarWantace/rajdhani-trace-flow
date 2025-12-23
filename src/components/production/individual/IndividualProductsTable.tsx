@@ -590,11 +590,31 @@ export default function IndividualProductsTable({
                     {editingCell?.row === index && editingCell?.col === 'notes' ? (
                       <Input
                         value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+
+                          // HARD LIMIT: 10 words max
+                          if (words.length > 10) {
+                            const allowed = words.slice(0, 10).join(' ');
+                            setEditValue(allowed);
+                            return;
+                          }
+
+                          // HARD LIMIT: 15 chars per word
+                          const hasLongWord = words.some(w => w.length > 15);
+                          if (hasLongWord) {
+                            const trimmedWords = words.map(w => w.slice(0, 15));
+                            setEditValue(trimmedWords.join(' '));
+                            return;
+                          }
+
+                          setEditValue(value);
+                        }}
                         onBlur={handleCellSave}
                         onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                         autoFocus
-                        placeholder="Additional notes"
+                        placeholder="Max 10 words, 15 chars/word"
                         disabled={saving === productItem.id}
                       />
                     ) : (

@@ -9,8 +9,11 @@ interface MaterialDetailStockProps {
 }
 
 export default function MaterialDetailStock({ material }: MaterialDetailStockProps) {
-  const stockPercentage = material.max_capacity > 0 
-    ? (material.current_stock / material.max_capacity) * 100 
+  // Use available_stock if available, otherwise fall back to current_stock
+  const availableStock = material.available_stock ?? material.current_stock;
+
+  const stockPercentage = material.max_capacity > 0
+    ? (availableStock / material.max_capacity) * 100
     : 0;
 
   // const reorderPercentage = material.max_capacity > 0
@@ -18,7 +21,7 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
   //   : 0;
 
   const getStockStatus = () => {
-    if (material.current_stock === 0) {
+    if (availableStock === 0) {
       return {
         icon: AlertTriangle,
         message: 'Out of stock - Immediate action required',
@@ -26,7 +29,7 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
         bgColor: 'bg-red-50 border-red-200',
       };
     }
-    if (material.current_stock < material.min_threshold) {
+    if (availableStock < material.min_threshold) {
       return {
         icon: AlertTriangle,
         message: 'Low stock - Reorder soon',
@@ -34,7 +37,7 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
         bgColor: 'bg-orange-50 border-orange-200',
       };
     }
-    if (material.current_stock >= material.reorder_point && material.current_stock < material.max_capacity) {
+    if (availableStock >= material.reorder_point && availableStock < material.max_capacity) {
       return {
         icon: CheckCircle,
         message: 'Stock level is healthy',
@@ -42,7 +45,7 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
         bgColor: 'bg-green-50 border-green-200',
       };
     }
-    if (material.current_stock >= material.max_capacity) {
+    if (availableStock >= material.max_capacity) {
       return {
         icon: Info,
         message: 'Overstock - Above maximum capacity',
@@ -82,9 +85,9 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
         {/* Stock Progress Bar */}
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Current Stock</span>
+            <span className="text-gray-600">Available Stock</span>
             <span className="font-semibold text-gray-900">
-              {formatIndianNumberWithDecimals(material.current_stock, 2)} {material.unit}
+              {formatIndianNumberWithDecimals(availableStock, 2)} {material.unit}
             </span>
           </div>
           <Progress value={stockPercentage} className="h-3" />
@@ -93,6 +96,47 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
             <span>{formatIndianNumberWithDecimals(material.max_capacity, 2)} {material.unit}</span>
           </div>
         </div>
+
+        {/* Stock Breakdown (if status tracking exists) */}
+        {((material.in_production ?? 0) > 0 || (material.reserved ?? 0) > 0 || (material.used ?? 0) > 0 || (material.sold ?? 0) > 0) && (
+          <div className="pt-4 border-t border-gray-200">
+            <p className="text-xs text-gray-600 mb-3 font-medium">Stock Breakdown</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Stock:</span>
+                <span className="font-medium text-gray-900">{formatIndianNumberWithDecimals(material.current_stock, 2)} {material.unit}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Available:</span>
+                <span className="font-medium text-green-600">{formatIndianNumberWithDecimals(availableStock, 2)} {material.unit}</span>
+              </div>
+              {(material.in_production ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">In Production:</span>
+                  <span className="font-medium text-orange-600">{formatIndianNumberWithDecimals(material.in_production!, 2)} {material.unit}</span>
+                </div>
+              )}
+              {(material.reserved ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Reserved:</span>
+                  <span className="font-medium text-yellow-600">{formatIndianNumberWithDecimals(material.reserved!, 2)} {material.unit}</span>
+                </div>
+              )}
+              {(material.used ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Used:</span>
+                  <span className="font-medium text-gray-500">{formatIndianNumberWithDecimals(material.used!, 2)} {material.unit}</span>
+                </div>
+              )}
+              {(material.sold ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Sold:</span>
+                  <span className="font-medium text-purple-600">{formatIndianNumberWithDecimals(material.sold!, 2)} {material.unit}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Stock Levels Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200">

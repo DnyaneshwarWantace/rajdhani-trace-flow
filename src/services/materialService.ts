@@ -51,6 +51,7 @@ export class MaterialService {
 
     queryParams.append('limit', limit.toString());
     queryParams.append('offset', offset.toString());
+    queryParams.append('include_consumption', 'true'); // Include stock breakdown
 
     const response = await fetch(`${API_URL}/raw-materials?${queryParams}`, {
       headers: this.getHeaders(),
@@ -69,7 +70,7 @@ export class MaterialService {
 
   static async getMaterialById(id: string): Promise<RawMaterial> {
     const encodedId = encodeURIComponent(id);
-    const response = await fetch(`${API_URL}/raw-materials/${encodedId}`, {
+    const response = await fetch(`${API_URL}/raw-materials/${encodedId}?include_consumption=true`, {
       headers: this.getHeaders(),
     });
 

@@ -129,7 +129,7 @@ export default function ProductList() {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Backend expects 'status' parameter with values: 'in-stock', 'low-stock', 'out-of-stock'
       // Only send status if it's not empty
       const statusParam = filters.status && filters.status !== 'all' ? filters.status : undefined;
@@ -138,6 +138,8 @@ export default function ProductList() {
         ...filters,
         status: statusParam,
       });
+
+      // Backend handles sorting - no need to sort on frontend
       setProducts(data);
       setTotalProducts(total);
     } catch (err) {
@@ -154,26 +156,80 @@ export default function ProductList() {
 
   const loadNotifications = async () => {
     try {
-      // Load production notifications (these are production requests for products)
+      // Load notifications from all modules to find production planning low stock alerts
       const { NotificationService } = await import('@/services/notificationService');
       const productionNotifications = await NotificationService.getNotificationsByModule('production');
-      
-      // Load product notifications (low stock, out of stock, etc.)
       const productNotifications = await NotificationService.getNotificationsByModule('products');
+      const materialNotifications = await NotificationService.getNotificationsByModule('materials');
       
-      // Filter for unread notifications
-      const unreadProductionNotifications = (productionNotifications || []).filter(n => n.status === 'unread');
-      const unreadProductNotifications = (productNotifications || []).filter(n => n.status === 'unread');
+      // Combine all notifications to check for production planning alerts
+      const allNotifications = [
+        ...(productionNotifications || []), 
+        ...(productNotifications || []),
+        ...(materialNotifications || [])
+      ];
       
-      // Combine both types of notifications (both are product-related)
-      // Production notifications are production requests for products
-      // Product notifications are stock alerts for products
-      const combinedNotifications = [...unreadProductionNotifications, ...unreadProductNotifications];
+      // Filter notifications: Show:
+      // 1. Low stock notifications from production planning
+      // 2. Production-related notifications (production_request, production module, etc.)
+      const filteredNotifications = allNotifications.filter(n => {
+        // Exclude activity logs
+        if (n.related_data?.activity_log_id) {
+          return false;
+        }
+        
+        // Check if it's a production-related notification
+        const isProductionRelated = 
+          n.module === 'production' ||
+          n.type === 'production_request' ||
+          (n.title || '').toLowerCase().includes('production');
+        
+        // Check if it's a low stock notification from production planning
+        // Only show if it's about a PRODUCT shortage, not a MATERIAL shortage
+        const isProductLowStockFromProductionPlanning = () => {
+          if (n.type !== 'low_stock') {
+            return false;
+          }
+          
+          const title = (n.title || '').toLowerCase();
+          const hasProductionPlanningInTitle = title.includes('production planning');
+          
+          // Check material_type in related_data
+          // If material_type === 'raw_material', it's a material shortage (exclude)
+          // If material_type === 'product', it's a product shortage (include)
+          const materialType = n.related_data?.material_type;
+          
+          // Exclude material-related low stock notifications
+          if (materialType === 'raw_material') {
+            return false;
+          }
+          
+          // Show if:
+          // 1. Title includes "Production Planning" AND material_type is 'product' (product shortage)
+          // 2. Has batch_id/batch_number (from production) AND material_type is 'product'
+          const hasBatchId = !!n.related_data?.batch_id;
+          const hasBatchNumber = !!n.related_data?.batch_number;
+          const isProductMaterial = materialType === 'product';
+          
+          return (hasProductionPlanningInTitle && isProductMaterial) || 
+                 ((hasBatchId || hasBatchNumber) && isProductMaterial);
+        };
+        
+        // Check if it's product-related (same logic as ProductNotifications page)
+        const isProductRelated = 
+          n.module === 'products' || 
+          n.related_data?.action_category === 'PRODUCT' ||
+          n.related_data?.action?.includes('PRODUCT_');
+        
+        // Include if:
+        // 1. It's product-related (module === 'products' or action_category === 'PRODUCT')
+        // 2. It's production-related (module === 'production' or type === 'production_request')
+        // 3. It's a product low stock notification from production planning
+        return isProductRelated || isProductionRelated || isProductLowStockFromProductionPlanning();
+      });
       
-      setNotifications(combinedNotifications);
-      console.log('📢 Loaded notifications:', combinedNotifications.length);
-      console.log('📢 Production notifications:', unreadProductionNotifications.length);
-      console.log('📢 Product notifications:', unreadProductNotifications.length);
+      setNotifications(filteredNotifications);
+      console.log('📢 Loaded production and stock notifications:', filteredNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
     }

@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Factory, Settings, User, Clock } from 'lucide-react';
+import { Factory, Settings, User, Clock, Plus } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import { AuthService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
@@ -51,9 +51,14 @@ export default function MachineSelectionDialog({
   const { toast } = useToast();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [selectedMachineIdState, setSelectedMachineIdState] = useState<string>('');
   const [inspectorName, setInspectorName] = useState('');
   const [selectedShift, setSelectedShift] = useState<'day' | 'night'>('day');
+  const [showAddMachine, setShowAddMachine] = useState(false);
+  const [newMachineName, setNewMachineName] = useState('');
+  const [newMachineType, setNewMachineType] = useState('');
+  const [newMachineModel, setNewMachineModel] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -68,6 +73,10 @@ export default function MachineSelectionDialog({
       setSelectedMachineIdState('');
       setInspectorName('');
       setSelectedShift('day');
+      setShowAddMachine(false);
+      setNewMachineName('');
+      setNewMachineType('');
+      setNewMachineModel('');
     }
   }, [isOpen, selectedMachineId]);
 
@@ -128,6 +137,57 @@ export default function MachineSelectionDialog({
     onClose();
   };
 
+  const handleCreateMachine = async () => {
+    if (!newMachineName.trim() || !newMachineType.trim()) {
+      toast({
+        title: 'Missing details',
+        description: 'Machine name and type are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const { data, error } = await ProductionService.createMachine({
+        machine_name: newMachineName.trim(),
+        machine_type: newMachineType.trim(),
+        model_number: newMachineModel.trim() || undefined,
+        status: 'active',
+      });
+
+      if (error || !data) {
+        toast({
+          title: 'Error',
+          description: error || 'Failed to create machine',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      await loadMachines();
+      setSelectedMachineIdState(data.id);
+      setShowAddMachine(false);
+      setNewMachineName('');
+      setNewMachineType('');
+      setNewMachineModel('');
+
+      toast({
+        title: 'Machine added',
+        description: `${data.machine_name} created and selected`,
+      });
+    } catch (error) {
+      console.error('Error creating machine:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create machine',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal={true}>
@@ -170,23 +230,81 @@ export default function MachineSelectionDialog({
                 <p className="mt-2 text-sm text-gray-600">Loading machines...</p>
               </div>
             ) : (
-              <Select 
-                value={selectedMachineIdState} 
-                onValueChange={setSelectedMachineIdState}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose a machine..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {machines.map((machine) => (
-                    <SelectItem key={machine.id} value={machine.id}>
-                      {machine.machine_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-2">
+                <Select 
+                  value={selectedMachineIdState} 
+                  onValueChange={setSelectedMachineIdState}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a machine..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {machines.map((machine) => (
+                      <SelectItem key={machine.id} value={machine.id}>
+                        {machine.machine_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2 text-blue-600 hover:text-blue-700 w-full justify-start"
+                  onClick={() => setShowAddMachine(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Add new machine
+                </Button>
+              </div>
             )}
           </div>
+
+          {/* Add Machine Inline Form */}
+          {showAddMachine && (
+            <div className="p-3 border rounded-lg bg-blue-50 border-blue-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-gray-800">Add New Machine</Label>
+                <Button variant="ghost" size="sm" onClick={() => setShowAddMachine(false)} className="text-gray-500">
+                  Cancel
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Machine Name *</Label>
+                  <Input
+                    value={newMachineName}
+                    onChange={(e) => setNewMachineName(e.target.value)}
+                    placeholder="e.g., Loom 01"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-gray-700">Machine Type *</Label>
+                  <Input
+                    value={newMachineType}
+                    onChange={(e) => setNewMachineType(e.target.value)}
+                    placeholder="e.g., Loom"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="text-sm font-medium text-gray-700">Model (optional)</Label>
+                  <Input
+                    value={newMachineModel}
+                    onChange={(e) => setNewMachineModel(e.target.value)}
+                    placeholder="e.g., Model X200"
+                  />
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={handleCreateMachine}
+                disabled={creating}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+              >
+                {creating ? 'Saving...' : 'Save and Select'}
+              </Button>
+            </div>
+          )}
 
           {/* Shift Selection */}
           <div className="space-y-3">

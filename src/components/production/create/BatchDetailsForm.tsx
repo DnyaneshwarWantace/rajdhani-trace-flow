@@ -24,6 +24,33 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct }
     onChange({ ...formData, [field]: value });
   };
 
+  const handleNotesChange = (value: string) => {
+    // Split by whitespace to count words
+    const words = value.trim().split(/\s+/).filter(word => word.length > 0);
+
+    // HARD LIMIT: Stop at 15 words
+    if (words.length > 15) {
+      // Keep only first 15 words
+      const allowed = words.slice(0, 15).join(' ');
+      handleChange('notes', allowed);
+      return;
+    }
+
+    // Check if any word is being typed and exceeds 15 chars - stop it
+    const hasLongWord = words.some(word => word.length > 15);
+    if (hasLongWord) {
+      // Trim each word to max 15 chars
+      const trimmedWords = words.map(word => word.slice(0, 15));
+      handleChange('notes', trimmedWords.join(' '));
+      return;
+    }
+
+    // All good, update
+    handleChange('notes', value);
+  };
+
+  const wordsCount = (formData.notes || '').trim().split(/\s+/).filter(w => w.length > 0).length;
+
   return (
     <div className="space-y-4">
       {/* Product Details Section */}
@@ -144,11 +171,16 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct }
         <Textarea
           id="notes"
           value={formData.notes || ''}
-          onChange={(e) => handleChange('notes', e.target.value)}
-          placeholder="Additional notes..."
+          onChange={(e) => handleNotesChange(e.target.value)}
+          placeholder="Additional notes (max 15 words, 15 chars per word)..."
           rows={4}
           className="mt-1"
         />
+        <div className="flex items-center justify-between mt-1">
+          <p className={`text-xs ${wordsCount >= 15 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+            {wordsCount}/15 words
+          </p>
+        </div>
       </div>
     </div>
   );

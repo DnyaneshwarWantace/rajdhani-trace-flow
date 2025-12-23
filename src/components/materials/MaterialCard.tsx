@@ -27,6 +27,33 @@ export default function MaterialCard({
 }: MaterialCardProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  
+  // Calculate available stock for raw materials
+  // For raw materials in recipe selector, always show available stock (not total current_stock)
+  const getAvailableStock = () => {
+    // If available_stock is explicitly provided, use it
+    if (material.available_stock !== undefined) {
+      return material.available_stock;
+    }
+    
+    // Otherwise, calculate from breakdown if available
+    const inProduction = material.in_production ?? 0;
+    const reserved = material.reserved ?? 0;
+    const sold = material.sold ?? 0;
+    const used = material.used ?? 0;
+    const currentStock = material.current_stock ?? 0;
+    
+    // If we have breakdown data, calculate available = current - (in_production + reserved + sold + used)
+    if (inProduction > 0 || reserved > 0 || sold > 0 || used > 0) {
+      return Math.max(0, currentStock - (inProduction + reserved + sold + used));
+    }
+    
+    // If no breakdown data, assume all current_stock is available
+    return currentStock;
+  };
+  
+  const availableStock = getAvailableStock();
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -113,17 +140,17 @@ export default function MaterialCard({
           <div className="flex justify-between gap-2">
             <span className="text-gray-600 flex-shrink-0">Stock:</span>
             <span className="font-medium text-gray-900 truncate">
-              {formatIndianNumberWithDecimals(Number(material.available_stock ?? material.current_stock ?? 0), 2)} {material.unit}
+              {formatIndianNumberWithDecimals(Number(availableStock), 2)} {material.unit}
             </span>
           </div>
           {/* Stock Breakdown */}
           {((material.in_production ?? 0) > 0 || (material.reserved ?? 0) > 0 || (material.sold ?? 0) > 0 || (material.used ?? 0) > 0) && (
             <div className="pl-2 border-l-2 border-gray-200 space-y-0.5 mt-1">
-              {material.available_stock !== undefined && material.available_stock > 0 && (
+              {availableStock > 0 && (
                 <div className="flex justify-between gap-2 text-[9px]">
-                  <span className="text-gray-500">In Stock:</span>
+                  <span className="text-gray-500">Available:</span>
                   <span className="text-gray-700 font-medium">
-                    {formatIndianNumberWithDecimals(Number(material.available_stock), 2)} {material.unit}
+                    {formatIndianNumberWithDecimals(Number(availableStock), 2)} {material.unit}
                   </span>
                 </div>
               )}

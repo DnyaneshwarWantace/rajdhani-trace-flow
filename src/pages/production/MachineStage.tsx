@@ -40,6 +40,31 @@ export default function MachineStage() {
       // Load batch
       const { data: batchData } = await ProductionService.getBatchById(id!);
       if (batchData) {
+        // CRITICAL FIX: If we're on machine page but planning_stage is not completed, fix it
+        const planningStageStatus = batchData.planning_stage?.status;
+        const machineStageStatus = batchData.machine_stage?.status;
+
+        if (planningStageStatus !== 'completed' && (machineStageStatus === 'in_progress' || machineStageStatus === 'completed' || batchData.status === 'in_production')) {
+          console.log('⚠️ Planning stage is not marked as completed, but machine stage is active. Fixing planning_stage status...');
+          try {
+            await ProductionService.updateBatch(id!, {
+              planning_stage: {
+                status: 'completed',
+                completed_at: new Date().toISOString(),
+                completed_by: 'System',
+              },
+            });
+            console.log('✅ Planning stage status fixed to "completed"');
+            // Reload the batch to get updated data
+            const { data: updatedBatchData } = await ProductionService.getBatchById(id!);
+            if (updatedBatchData) {
+              batchData.planning_stage = updatedBatchData.planning_stage;
+            }
+          } catch (error) {
+            console.error('❌ Error fixing planning_stage status:', error);
+          }
+        }
+
         // Fetch product details
         let enrichedBatch = { ...batchData };
         if (batchData.product_id) {
@@ -51,7 +76,7 @@ export default function MachineStage() {
             console.error('Error fetching product:', error);
           }
         }
-        
+
         setBatch(enrichedBatch);
         
         // Load production flow
@@ -277,7 +302,41 @@ export default function MachineStage() {
       return;
     }
 
-    // Validation passed - navigate to wastage stage
+    // Validation passed - mark machine stage as completed and start wastage stage
+    try {
+      const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(id!, {
+        machine_stage: {
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          completed_by: 'User', // You can get this from auth context
+        },
+        wastage_stage: {
+          status: 'in_progress',
+          started_at: new Date().toISOString(),
+          started_by: 'User', // You can get this from auth context
+        },
+      });
+
+      if (updateError || !updatedBatch) {
+        console.error('❌ Error updating machine stage:', updateError);
+        toast({
+          title: 'Warning',
+          description: 'Machine stage completion may not have been saved. Proceeding to wastage stage.',
+          variant: 'destructive',
+        });
+      } else {
+        console.log('✅ Machine stage marked as completed successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error updating machine stage:', error);
+      toast({
+        title: 'Warning',
+        description: 'Failed to update machine stage status. Proceeding to wastage stage.',
+        variant: 'destructive',
+      });
+    }
+
+    // Navigate to wastage stage
     navigate(`/production/${id}/wastage`);
   };
 
@@ -306,7 +365,7 @@ export default function MachineStage() {
       <div className="space-y-6">
         <MachineStageHeader
           batch={batch}
-          onBack={() => navigate(`/production/${id}/planning`)}
+          onBack={() => navigate('/production')}
           onWastage={handleNavigateToWastage}
           onRefresh={handleRefresh}
           shift={machineShift}

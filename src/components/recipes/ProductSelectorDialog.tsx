@@ -135,7 +135,10 @@ export default function ProductSelectorDialog({
       const result = await ProductService.getProducts(filters);
       const loadedProducts = result.products || [];
 
-      setAllProducts(loadedProducts);
+      // Filter to only show products that have recipes
+      const productsWithRecipes = loadedProducts.filter(p => p.has_recipe);
+
+      setAllProducts(productsWithRecipes);
 
       // Get unique filter options
       const uniqueCategories = Array.from(

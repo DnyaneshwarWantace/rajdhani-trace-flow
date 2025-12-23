@@ -95,9 +95,26 @@ export default function MaterialTable({
                 <td className="px-4 py-4">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {formatIndianNumberWithDecimals(Number(material.current_stock || 0), 2)} {material.unit}
+                      {formatIndianNumberWithDecimals(Number(material.available_stock ?? material.current_stock ?? 0), 2)} {material.unit}
                     </p>
-                    <p className="text-xs text-gray-500">Min: {formatIndianNumberWithDecimals(Number(material.min_threshold || 0), 2)}</p>
+                    {/* Show breakdown if any status quantities exist */}
+                    {((material.in_production ?? 0) > 0 || (material.reserved ?? 0) > 0) && (
+                      <div className="text-xs text-gray-500 space-y-0.5 mt-1">
+                        {(material.in_production ?? 0) > 0 && (
+                          <p className="text-orange-600">
+                            {formatIndianNumberWithDecimals(Number(material.in_production), 2)} {material.unit} in production
+                          </p>
+                        )}
+                        {(material.reserved ?? 0) > 0 && (
+                          <p className="text-yellow-600">
+                            {formatIndianNumberWithDecimals(Number(material.reserved), 2)} {material.unit} reserved
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {!((material.in_production ?? 0) > 0 || (material.reserved ?? 0) > 0) && (
+                      <p className="text-xs text-gray-500">Min: {formatIndianNumberWithDecimals(Number(material.min_threshold || 0), 2)}</p>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-4">
