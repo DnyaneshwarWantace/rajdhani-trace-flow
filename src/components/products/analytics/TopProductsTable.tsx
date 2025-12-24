@@ -18,6 +18,19 @@ interface TopProductsTableProps {
     };
     total_quantity: number;
     batch_count: number;
+    available?: number;
+    product_details?: {
+      category?: string;
+      subcategory?: string;
+      length?: string;
+      length_unit?: string;
+      width?: string;
+      width_unit?: string;
+      weight?: string;
+      weight_unit?: string;
+      color?: string;
+      pattern?: string;
+    };
   }[];
 }
 

@@ -105,19 +105,29 @@ export default function MachineStage() {
         // Load material consumption - MUST exist for machine stage
         const { data: consumptionData } = await ProductionService.getMaterialConsumption(id!);
         if (consumptionData && consumptionData.length > 0) {
+          console.log('📦 Raw consumption data from API:', consumptionData);
+
           // Convert to consumed materials format with all details
-          const consumed = consumptionData.map((m: any) => ({
-            material_id: m.material_id,
-            material_name: m.material_name,
-            material_type: m.material_type,
-            quantity_per_sqm: m.quantity_per_sqm || 0,
-            required_quantity: m.quantity_used || m.required_quantity || 0,
-            actual_consumed_quantity: m.actual_consumed_quantity || m.quantity_used || 0,
-            whole_product_count: m.whole_product_count || m.quantity_used || 0,
-            unit: m.unit,
-            individual_product_ids: m.individual_product_ids || [], // CRITICAL: Must have individual_product_ids for products
-            individual_products: m.individual_products || [], // CRITICAL: Full individual product details
-          }));
+          const consumed = consumptionData.map((m: any) => {
+            console.log(`🔍 Processing material: ${m.material_name}`, {
+              hasIndividualProducts: !!m.individual_products,
+              individualProductsCount: m.individual_products?.length || 0,
+              firstProductStatus: m.individual_products?.[0]?.status,
+            });
+
+            return {
+              material_id: m.material_id,
+              material_name: m.material_name,
+              material_type: m.material_type,
+              quantity_per_sqm: m.quantity_per_sqm || 0,
+              required_quantity: m.quantity_used || m.required_quantity || 0,
+              actual_consumed_quantity: m.actual_consumed_quantity || m.quantity_used || 0,
+              whole_product_count: m.whole_product_count || m.quantity_used || 0,
+              unit: m.unit,
+              individual_product_ids: m.individual_product_ids || [], // CRITICAL: Must have individual_product_ids for products
+              individual_products: m.individual_products || [], // CRITICAL: Full individual product details
+            };
+          });
           
           // Validate that products have individual_product_ids
           const productMaterials = consumed.filter(m => m.material_type === 'product');
@@ -151,7 +161,8 @@ export default function MachineStage() {
         }
 
         // Check machine completion status after loading all data
-        await checkMachineCompletion();
+        // Pass the batch data directly to avoid state timing issues
+        await checkMachineCompletion(enrichedBatch);
       }
     } catch (error) {
       console.error('Error loading machine stage data:', error);
@@ -165,12 +176,29 @@ export default function MachineStage() {
     }
   };
 
-  const checkMachineCompletion = async () => {
+  const checkMachineCompletion = async (batchData?: any) => {
     try {
+      // Use passed batch data or state batch
+      const currentBatch = batchData || batch;
+
+      console.log('🔍 Checking machine completion:', {
+        hasBatchData: !!currentBatch,
+        machineStageStatus: currentBatch?.machine_stage?.status,
+        wastageStageStatus: currentBatch?.wastage_stage?.status,
+      });
+
+      // Check if wastage stage is already in progress or completed (means machine is done)
+      if (currentBatch?.wastage_stage?.status === 'in_progress' || currentBatch?.wastage_stage?.status === 'completed') {
+        console.log('✅ Wastage stage is active, machine must be completed');
+        setIsMachineCompleted(true);
+        return;
+      }
+
       // Reload production flow to get latest step statuses
       const { data: latestFlowData } = await ProductionService.getProductionFlowByBatchId(id!);
 
       if (!latestFlowData) {
+        console.log('❌ No production flow data');
         setIsMachineCompleted(false);
         return;
       }
@@ -183,7 +211,13 @@ export default function MachineStage() {
         s.step_name?.toLowerCase().includes('machine')
       );
 
+      console.log('🔧 Machine steps found:', {
+        count: machineSteps.length,
+        statuses: machineSteps.map((s: any) => ({ name: s.step_name, status: s.status })),
+      });
+
       if (machineSteps.length === 0) {
+        console.log('❌ No machine steps found');
         setIsMachineCompleted(false);
         return;
       }
@@ -191,17 +225,24 @@ export default function MachineStage() {
       // Check if all machine steps are completed
       const allCompleted = machineSteps.every((s: any) => s.status === 'completed');
 
+      console.log('✅ All machine steps completed:', allCompleted);
+
       // Also check if consumed materials exist and products have individual IDs
       const productMaterials = consumedMaterials.filter(m => m.material_type === 'product');
-      const hasIndividualProducts = productMaterials.every(
+      const hasIndividualProducts = productMaterials.length === 0 || productMaterials.every(
         m => m.individual_product_ids && m.individual_product_ids.length > 0
       );
 
-      setIsMachineCompleted(
-        allCompleted &&
-        consumedMaterials.length > 0 &&
-        (productMaterials.length === 0 || hasIndividualProducts)
-      );
+      const isCompleted = allCompleted && consumedMaterials.length > 0 && hasIndividualProducts;
+
+      console.log('🎯 Machine completion result:', {
+        allStepsCompleted: allCompleted,
+        hasMaterials: consumedMaterials.length > 0,
+        hasIndividualProducts,
+        finalResult: isCompleted,
+      });
+
+      setIsMachineCompleted(isCompleted);
     } catch (error) {
       console.error('Error checking machine completion:', error);
       setIsMachineCompleted(false);

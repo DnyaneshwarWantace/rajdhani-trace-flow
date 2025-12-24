@@ -45,8 +45,8 @@ export default function ProductStockTable({
             <th className="text-left p-3 font-medium text-gray-600 hidden md:table-cell">
               Production Date
             </th>
-            <th className="text-left p-3 font-medium text-gray-600">Final Width</th>
             <th className="text-left p-3 font-medium text-gray-600">Final Length</th>
+            <th className="text-left p-3 font-medium text-gray-600">Final Width</th>
             <th className="text-left p-3 font-medium text-gray-600">Quality Grade</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">Inspector</th>
             <th className="text-left p-3 font-medium text-gray-600">Status</th>
@@ -92,17 +92,17 @@ export default function ProductStockTable({
                   : 'N/A'}
               </td>
               <td className="p-3 text-sm">
-                {item.final_width
-                  ? item.final_width.includes(' ')
-                    ? item.final_width
-                    : `${item.final_width} ${product.width_unit || 'feet'}`
-                  : 'N/A'}
-              </td>
-              <td className="p-3 text-sm">
                 {item.final_length
                   ? item.final_length.includes(' ')
                     ? item.final_length
                     : `${item.final_length} ${product.length_unit || 'feet'}`
+                  : 'N/A'}
+              </td>
+              <td className="p-3 text-sm">
+                {item.final_width
+                  ? item.final_width.includes(' ')
+                    ? item.final_width
+                    : `${item.final_width} ${product.width_unit || 'feet'}`
                   : 'N/A'}
               </td>
               <td className="p-3">

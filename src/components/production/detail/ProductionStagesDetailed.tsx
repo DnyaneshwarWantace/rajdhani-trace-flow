@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { TruncatedText } from '@/components/ui/TruncatedText';
 import {
   ClipboardList,
   Cog,
@@ -265,14 +266,14 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   // Determine which stages to show based on progress
   // Always show planning stage
   // Show machine stage only if planning is completed
-  // Show wastage stage if machine is completed OR if wastage records exist OR if wastage_stage is in_progress (but NOT if completed)
+  // Show wastage stage if machine is completed OR if wastage records exist OR if wastage_stage is in_progress OR completed
   // Show final stage (individual products) only if wastage is completed
   const showMachineStage = planningStage.status === 'completed';
-  const showWastageStage = (machineStage.status === 'completed' || 
+  const showWastageStage = machineStage.status === 'completed' || 
                           wastageRecords.length > 0 || 
-                          batch.wastage_stage?.status === 'in_progress') &&
-                          wastageStage.status !== 'completed'; // Don't show wastage if it's completed
-  const showFinalStage = wastageStage.status === 'completed'; // Show individual products stage when wastage is completed
+                          batch.wastage_stage?.status === 'in_progress' ||
+                          batch.wastage_stage?.status === 'completed'; // Show wastage even when completed
+  const showFinalStage = wastageStage.status === 'completed' || wastageStage.status === 'in_progress'; // Show individual products stage when wastage is completed or in progress
 
   return (
     <div className="space-y-6">
@@ -295,7 +296,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant={planningStage.status === 'completed' ? 'default' : 'secondary'}>
+              <Badge variant={planningStage.status === 'completed' ? 'default' : 'secondary'} className={planningStage.status === 'completed' ? 'text-white' : ''}>
                 {planningStage.status || 'draft'}
               </Badge>
               {expandedSections.planning ? (
@@ -342,7 +343,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                   <CheckCircle2 className="w-4 h-4" />
                   Status
                 </div>
-                <Badge variant={planningStage.status === 'completed' ? 'default' : 'secondary'} className="mt-1">
+                <Badge variant={planningStage.status === 'completed' ? 'default' : 'secondary'} className={`mt-1 ${planningStage.status === 'completed' ? 'text-white' : ''}`}>
                   {planningStage.status || 'Draft'}
                 </Badge>
               </div>
@@ -370,42 +371,108 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                     </tr>
                   ) : (
                     materialConsumption.map((material) => (
-                      <tr key={material.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-gray-900">{material.material_name}</div>
-                          <div className="text-sm text-gray-500 font-mono">{material.material_id}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={material.material_type === 'product' ? 'default' : 'secondary'}>
-                            {material.material_type?.replace('_', ' ')}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-medium">{material.quantity_used} {material.unit}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          {material.actual_consumed_quantity ? (
-                            <span>{material.actual_consumed_quantity.toFixed(2)} {material.unit}</span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {material.individual_products?.length > 0 ? (
-                            <div className="flex flex-col gap-1">
-                              <Badge variant="outline">{material.individual_products.length} products</Badge>
-                              <div className="text-xs text-gray-500 max-w-xs truncate">
-                                {material.individual_products.map((p: any) => p.serial_number || p.id).join(', ')}
-                              </div>
+                      <>
+                        <tr key={material.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-900">
+                              <TruncatedText text={material.material_name} maxLength={40} className="block" />
                             </div>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {formatDate(material.consumed_at)}
-                        </td>
-                      </tr>
+                            <div className="text-sm text-gray-500 font-mono">{material.material_id}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant={material.material_type === 'product' ? 'default' : 'secondary'} className={material.material_type === 'product' ? 'text-white' : ''}>
+                              {material.material_type?.replace('_', ' ')}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="font-medium">{material.quantity_used} {material.unit}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {material.actual_consumed_quantity ? (
+                              <span>{material.actual_consumed_quantity.toFixed(2)} {material.unit}</span>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {material.individual_products?.length > 0 ? (
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className="w-fit">{material.individual_products.length} products</Badge>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600">
+                            {formatDate(material.consumed_at)}
+                          </td>
+                        </tr>
+                        {/* Individual Products Detailed Table */}
+                        {material.material_type === 'product' && material.individual_products && material.individual_products.length > 0 && (
+                          <tr key={`${material.id}-products`}>
+                            <td colSpan={6} className="px-4 py-3 bg-blue-50">
+                              <div className="mt-2">
+                                <h5 className="text-sm font-semibold text-blue-900 mb-2">
+                                  Consumed Individual Products ({material.individual_products.length})
+                                </h5>
+                                <div className="overflow-x-auto max-h-60 overflow-y-auto border border-blue-200 rounded-lg">
+                                  <table className="w-full text-xs border-collapse">
+                                    <thead className="bg-blue-100 sticky top-0">
+                                      <tr>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">#</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Product ID</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">QR Code</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Serial Number</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Size (L × W)</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Weight</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Color</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Pattern</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Status</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="bg-white">
+                                      {material.individual_products.map((product: any, idx: number) => {
+                                        const statusColor = product.status === 'used' 
+                                          ? 'bg-green-100 text-green-800 border-green-300' 
+                                          : product.status === 'in_production'
+                                          ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                                          : 'bg-gray-100 text-gray-800 border-gray-300';
+                                        return (
+                                          <tr key={product.id || idx} className="hover:bg-gray-50">
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-600">{idx + 1}</td>
+                                            <td className="border border-gray-200 px-2 py-2 font-medium text-gray-900">{product.id || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.qr_code || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.serial_number || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900">
+                                              {product.length && product.width ? (
+                                                <>
+                                                  {product.length.includes(' ') ? product.length : `${product.length} ${product.length_unit || ''}`} × {product.width.includes(' ') ? product.width : `${product.width} ${product.width_unit || ''}`}
+                                                </>
+                                              ) : '—'}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900">
+                                              {product.weight ? (
+                                                product.weight.includes(' ') ? product.weight : `${product.weight} ${product.weight_unit || ''}`
+                                              ) : '—'}
+                                            </td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.color || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.pattern || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2">
+                                              <Badge className={`${statusColor} text-xs`}>
+                                                {product.status || 'unknown'}
+                                              </Badge>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))
                   )}
                 </tbody>
@@ -438,7 +505,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
               <Badge variant={
                 machineStage.status === 'completed' ? 'default' :
                 machineStage.status === 'in_progress' ? 'default' : 'secondary'
-              }>
+              } className={(machineStage.status === 'completed' || machineStage.status === 'in_progress') ? 'text-white' : ''}>
                 {machineStage.status || 'not started'}
               </Badge>
               {expandedSections.machine ? (
@@ -552,7 +619,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                           <Badge variant={
                             step.status === 'completed' ? 'default' :
                             step.status === 'in_progress' ? 'default' : 'secondary'
-                          }>
+                          } className={(step.status === 'completed' || step.status === 'in_progress') ? 'text-white' : ''}>
                             {step.status}
                           </Badge>
                         </td>
@@ -567,8 +634,8 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       </Card>
       )}
 
-      {/* Wastage Stage - Only show if machine is completed AND wastage is NOT completed */}
-      {showWastageStage && wastageStage.status !== 'completed' && (
+      {/* Wastage Stage - Show if machine is completed or wastage records exist */}
+      {showWastageStage && (
       <Card>
         <CardHeader
           className="cursor-pointer hover:bg-gray-50"
@@ -587,8 +654,11 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Badge variant={wastageStage.has_wastage ? 'destructive' : 'secondary'}>
-                {wastageStage.has_wastage ? 'Wastage Recorded' : 'No Wastage'}
+              <Badge variant={
+                wastageStage.status === 'completed' ? 'default' :
+                wastageStage.status === 'in_progress' ? 'default' : 'secondary'
+              } className={(wastageStage.status === 'completed' || wastageStage.status === 'in_progress') ? 'text-white' : ''}>
+                {wastageStage.status || 'not started'}
               </Badge>
               {expandedSections.wastage ? (
                 <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -634,7 +704,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                   <CheckCircle2 className="w-4 h-4" />
                   Status
                 </div>
-                <Badge variant={wastageStage.status === 'completed' ? 'default' : 'secondary'} className="mt-1">
+                <Badge variant={wastageStage.status === 'completed' ? 'default' : 'secondary'} className={`mt-1 ${wastageStage.status === 'completed' ? 'text-white' : ''}`}>
                   {wastageStage.status || 'Not Started'}
                 </Badge>
               </div>
@@ -659,11 +729,13 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                         <>
                           <tr key={waste.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">{waste.material_name || waste.product_name}</div>
+                              <div className="font-medium text-gray-900">
+                                <TruncatedText text={waste.material_name || waste.product_name || ''} maxLength={40} className="block" />
+                              </div>
                               <div className="text-sm text-gray-500 font-mono">{waste.material_id || waste.product_id}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <Badge variant={waste.material_type === 'product' ? 'default' : 'secondary'}>
+                              <Badge variant={waste.material_type === 'product' ? 'default' : 'secondary'} className={waste.material_type === 'product' ? 'text-white' : ''}>
                                 {waste.material_type?.replace('_', ' ') || 'raw_material'}
                               </Badge>
                             </td>
@@ -672,12 +744,12 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                               <span className="font-medium">{waste.quantity} {waste.unit}</span>
                             </td>
                             <td className="px-4 py-3">
-                              <Badge variant={waste.waste_category === 'reusable' ? 'default' : 'secondary'}>
+                              <Badge variant={waste.waste_category === 'reusable' ? 'default' : 'secondary'} className={waste.waste_category === 'reusable' ? 'text-white' : ''}>
                                 {waste.waste_category || 'disposable'}
                               </Badge>
                             </td>
                             <td className="px-4 py-3">
-                              <Badge variant={waste.status === 'generated' ? 'default' : 'secondary'}>
+                              <Badge variant={waste.status === 'generated' ? 'default' : 'secondary'} className={waste.status === 'generated' ? 'text-white' : ''}>
                                 {waste.status || 'generated'}
                               </Badge>
                             </td>
@@ -773,7 +845,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
               <Badge variant={
                 finalStage.status === 'completed' ? 'default' :
                 finalStage.status === 'in_progress' ? 'default' : 'secondary'
-              }>
+              } className={(finalStage.status === 'completed' || finalStage.status === 'in_progress') ? 'text-white' : ''}>
                 {finalStage.status === 'in_progress' ? 'Active' : 
                  finalStage.status === 'completed' ? 'Completed' : 
                  'Not Started'}

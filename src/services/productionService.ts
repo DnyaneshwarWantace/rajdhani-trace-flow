@@ -268,7 +268,8 @@ export class ProductionService {
 
   static async getMaterialConsumption(batchId: string): Promise<{ data: any[] | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/material-consumption?production_batch_id=${batchId}`, {
+      // Use batch summary endpoint which fetches real-time individual product statuses
+      const response = await fetch(`${API_URL}/material-consumption/batch/${batchId}/summary`, {
         headers: this.getHeaders(),
       });
       const result = await response.json();

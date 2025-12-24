@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
-import { Upload, Plus } from 'lucide-react';
+import { Upload, Plus, Download } from 'lucide-react';
 
 interface MaterialHeaderProps {
   onImportCSV?: () => void;
+  onExport?: () => void;
   onAddToInventory?: () => void;
   onAddMaterial?: () => void;
 }
 
 export default function MaterialHeader({
   onImportCSV,
+  onExport,
   onAddToInventory,
   onAddMaterial,
 }: MaterialHeaderProps) {
@@ -20,6 +22,17 @@ export default function MaterialHeader({
           <p className="text-gray-600 mt-1">Manage your material inventory</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {onExport && (
+            <Button
+              variant="outline"
+              onClick={onExport}
+              className="gap-2"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+              <span className="sm:hidden">Export</span>
+            </Button>
+          )}
           {onImportCSV && (
             <Button
               variant="outline"
@@ -56,4 +69,3 @@ export default function MaterialHeader({
     </div>
   );
 }
-

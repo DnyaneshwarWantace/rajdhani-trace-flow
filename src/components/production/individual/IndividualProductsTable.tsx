@@ -441,6 +441,45 @@ export default function IndividualProductsTable({
         </div>
       </CardHeader>
       <CardContent>
+        {/* Product Reference Details */}
+        {product && (product.length || product.width || product.weight) && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+              <span className="text-blue-600">📋</span>
+              Product Reference Details
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              {product.length && (
+                <div>
+                  <p className="text-gray-600 font-medium mb-1">Expected Length</p>
+                  <p className="text-gray-900 font-semibold">{product.length} {product.length_unit || ''}</p>
+                </div>
+              )}
+              {product.width && (
+                <div>
+                  <p className="text-gray-600 font-medium mb-1">Expected Width</p>
+                  <p className="text-gray-900 font-semibold">{product.width} {product.width_unit || ''}</p>
+                </div>
+              )}
+              {product.weight && (
+                <div>
+                  <p className="text-gray-600 font-medium mb-1">Expected Weight</p>
+                  <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
+                </div>
+              )}
+              {plannedQuantity > 0 && (
+                <div>
+                  <p className="text-gray-600 font-medium mb-1">Planned Quantity</p>
+                  <p className="text-gray-900 font-semibold">{plannedQuantity} units</p>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-blue-700 mt-3 italic">
+              Fill in the table below according to these reference values. Units are added automatically when you type numbers.
+            </p>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full border-collapse border border-gray-200">
             <thead>
@@ -448,8 +487,8 @@ export default function IndividualProductsTable({
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Quality Grade</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
@@ -489,28 +528,6 @@ export default function IndividualProductsTable({
                     )}
                   </td>
                   <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'final_width' ? (
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={editValue}
-                        onChange={(e) => handleNumberInput(e, 'final_width')}
-                        onBlur={handleCellSave}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                        autoFocus
-                        placeholder={`e.g., 1.83 (${product?.width_unit || 'm'} auto-added)`}
-                        disabled={saving === productItem.id}
-                      />
-                    ) : (
-                      <div
-                        className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
-                        onClick={() => handleCellClick(index, 'final_width')}
-                      >
-                        {productItem.final_width || <span className="text-gray-400">Click to edit</span>}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
                     {editingCell?.row === index && editingCell?.col === 'final_length' ? (
                       <Input
                         type="text"
@@ -529,6 +546,28 @@ export default function IndividualProductsTable({
                         onClick={() => handleCellClick(index, 'final_length')}
                       >
                         {productItem.final_length || <span className="text-gray-400">Click to edit</span>}
+                      </div>
+                    )}
+                  </td>
+                  <td className="border border-gray-200 p-2">
+                    {editingCell?.row === index && editingCell?.col === 'final_width' ? (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={editValue}
+                        onChange={(e) => handleNumberInput(e, 'final_width')}
+                        onBlur={handleCellSave}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                        autoFocus
+                        placeholder={`e.g., 1.83 (${product?.width_unit || 'm'} auto-added)`}
+                        disabled={saving === productItem.id}
+                      />
+                    ) : (
+                      <div
+                        className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
+                        onClick={() => handleCellClick(index, 'final_width')}
+                      >
+                        {productItem.final_width || <span className="text-gray-400">Click to edit</span>}
                       </div>
                     )}
                   </td>

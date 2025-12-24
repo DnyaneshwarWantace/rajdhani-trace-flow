@@ -98,14 +98,14 @@ export default function IndividualProductCard({
                 Dimensions
               </span>
               <span className="font-medium text-gray-900">
-                {individualProduct.final_width
-                  ? individualProduct.final_width.includes(' ')
-                    ? individualProduct.final_width
-                    : `${individualProduct.final_width} ${widthUnit || 'feet'}`
-                  : 'N/A'} × {individualProduct.final_length
+                {individualProduct.final_length
                   ? individualProduct.final_length.includes(' ')
                     ? individualProduct.final_length
                     : `${individualProduct.final_length} ${lengthUnit || 'feet'}`
+                  : 'N/A'} × {individualProduct.final_width
+                  ? individualProduct.final_width.includes(' ')
+                    ? individualProduct.final_width
+                    : `${individualProduct.final_width} ${widthUnit || 'feet'}`
                   : 'N/A'}
               </span>
             </div>

@@ -361,6 +361,29 @@ export default function ProductionWastage() {
       
       try {
         if (consumptionData && consumptionData.length > 0) {
+          // First, fetch the actual consumption records to get their IDs
+          // The summary doesn't include IDs, so we need to fetch the actual records
+          const API_URL = getApiUrl();
+          const token = localStorage.getItem('auth_token');
+          
+          // Fetch actual consumption records for this batch
+          const consumptionRecordsResponse = await fetch(
+            `${API_URL}/material-consumption?production_batch_id=${id}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+          
+          let actualConsumptionRecords: any[] = [];
+          if (consumptionRecordsResponse.ok) {
+            const recordsData = await consumptionRecordsResponse.json();
+            actualConsumptionRecords = recordsData.data || [];
+            console.log(`📦 Fetched ${actualConsumptionRecords.length} actual consumption records with IDs`);
+          }
+          
           // Update materials that:
           // 1. Have consumption_status === 'in_production' (raw materials), OR
           // 2. Are product-type materials with individual products in 'in_production' status
@@ -383,32 +406,52 @@ export default function ProductionWastage() {
           if (materialsToUpdate.length > 0) {
             console.log(`🔄 Updating ${materialsToUpdate.length} material consumption records to "used"...`);
             
-            const API_URL = getApiUrl();
-            const token = localStorage.getItem('auth_token');
-            
-            const updatePromises = materialsToUpdate.map(async (consumption: any) => {
+            const updatePromises = materialsToUpdate.map(async (material: any) => {
               try {
-                 const response = await fetch(`${API_URL}/material-consumption/${consumption.id}`, {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    consumption_status: 'used'
-                  }),
-                });
+                // Find the actual consumption record(s) for this material
+                const recordsToUpdate = actualConsumptionRecords.filter((record: any) => 
+                  record.material_id === material.material_id && 
+                  record.production_batch_id === id &&
+                  record.status === 'active'
+                );
                 
-                if (response.ok) {
-                  console.log(`✅ Updated ${consumption.material_name} (${consumption.material_type}) consumption status to "used"`);
-                  return true;
-                } else {
-                  const error = await response.json();
-                  console.error(`❌ Error updating ${consumption.material_name}:`, error);
+                if (recordsToUpdate.length === 0) {
+                  console.warn(`⚠️ No consumption records found for material ${material.material_name} (${material.material_id})`);
                   return false;
                 }
+                
+                // Update all records for this material
+                const recordUpdatePromises = recordsToUpdate.map(async (record: any) => {
+                  try {
+                    const response = await fetch(`${API_URL}/material-consumption/${record.id}`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                      },
+                      body: JSON.stringify({
+                        consumption_status: 'used'
+                      }),
+                    });
+                    
+                    if (response.ok) {
+                      console.log(`✅ Updated consumption record ${record.id} for ${material.material_name} (${material.material_type}) to "used"`);
+                      return true;
+                    } else {
+                      const error = await response.json();
+                      console.error(`❌ Error updating record ${record.id} for ${material.material_name}:`, error);
+                      return false;
+                    }
+                  } catch (error) {
+                    console.error(`❌ Error updating record for ${material.material_name}:`, error);
+                    return false;
+                  }
+                });
+                
+                const recordResults = await Promise.all(recordUpdatePromises);
+                return recordResults.some(r => r === true); // Return true if at least one record was updated
               } catch (error) {
-                console.error(`❌ Error updating ${consumption.material_name}:`, error);
+                console.error(`❌ Error updating ${material.material_name}:`, error);
                 return false;
               }
             });
@@ -697,6 +740,8 @@ export default function ProductionWastage() {
           batchId={id!}
           consumedMaterials={consumedMaterials}
           onRefresh={handleRefresh}
+          productId={batch?.product_id}
+          productName={batch?.product_name || product?.name}
         />
 
         {/* Product Materials Wastage Status */}

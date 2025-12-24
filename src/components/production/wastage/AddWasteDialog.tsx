@@ -28,6 +28,8 @@ interface AddWasteDialogProps {
   onSuccess: () => void;
   batchId: string;
   consumedMaterials: any[];
+  productId?: string;
+  productName?: string;
 }
 
 export default function AddWasteDialog({
@@ -36,6 +38,8 @@ export default function AddWasteDialog({
   onSuccess,
   batchId,
   consumedMaterials,
+  productId,
+  productName,
 }: AddWasteDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -136,6 +140,8 @@ export default function AddWasteDialog({
       const wasteData = {
         production_batch_id: batchId,
         batch_id: batchId,
+        product_id: productId || '', // Use batch's product_id for raw material wastage
+        product_name: productName || 'Unknown Product', // Use batch's product_name
         material_id: formData.material_id,
         material_name: formData.material_name,
         material_type: formData.material_type,
@@ -146,6 +152,9 @@ export default function AddWasteDialog({
         can_be_reused: formData.can_be_reused,
         notes: formData.notes,
         status: 'generated',
+        waste_percentage: 0, // Calculate if needed
+        reason: formData.notes || 'Waste generated during production',
+        generation_date: new Date().toISOString(),
       };
 
       const response = await fetch(`${API_URL}/production/waste`, {
@@ -315,7 +324,7 @@ export default function AddWasteDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="text-white">
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

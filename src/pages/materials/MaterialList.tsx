@@ -11,6 +11,8 @@ import MaterialAnalyticsTab from '@/components/materials/MaterialAnalyticsTab';
 import MaterialNotificationsTab from '@/components/materials/MaterialNotificationsTab';
 import AddMaterialDialog from '@/components/materials/AddMaterialDialog';
 import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
+import ImportCSVDialog from '@/components/materials/ImportCSVDialog';
+import ExportMaterialsDialog from '@/components/materials/ExportMaterialsDialog';
 import {
   Dialog,
   DialogContent,
@@ -79,6 +81,8 @@ export default function MaterialList() {
   // Dialog states
   const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
   const [isAddToInventoryOpen, setIsAddToInventoryOpen] = useState(false);
+  const [isImportCSVDialogOpen, setIsImportCSVDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<RawMaterial | null>(null);
   const [editMode, setEditMode] = useState<'create' | 'edit'>('create');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -681,13 +685,15 @@ export default function MaterialList() {
   };
 
   const handleImportCSV = () => {
-    console.log('Import CSV');
-    // TODO: Implement CSV import
-    alert('CSV import feature coming soon');
+    setIsImportCSVDialogOpen(true);
   };
 
   const handleAddToInventory = () => {
     setIsAddToInventoryOpen(true);
+  };
+
+  const handleExport = () => {
+    setIsExportDialogOpen(true);
   };
 
   const handleMaterialSuccess = async () => {
@@ -793,6 +799,7 @@ export default function MaterialList() {
         {/* Page Header */}
         <MaterialHeader
           onImportCSV={handleImportCSV}
+          onExport={handleExport}
           onAddToInventory={handleAddToInventory}
           onAddMaterial={handleCreate}
         />
@@ -882,6 +889,20 @@ export default function MaterialList() {
         isOpen={isAddToInventoryOpen}
         onClose={() => setIsAddToInventoryOpen(false)}
         onSuccess={handleMaterialSuccess}
+      />
+
+      {/* CSV Import Dialog */}
+      <ImportCSVDialog
+        open={isImportCSVDialogOpen}
+        onOpenChange={setIsImportCSVDialogOpen}
+        onSuccess={handleMaterialSuccess}
+      />
+
+      {/* Export Dialog */}
+      <ExportMaterialsDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        materials={materials}
       />
 
       {/* Delete Confirmation Dialog */}

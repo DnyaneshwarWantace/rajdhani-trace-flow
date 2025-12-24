@@ -13,12 +13,16 @@ interface WastageManagementProps {
   batchId: string;
   consumedMaterials: any[];
   onRefresh?: () => void;
+  productId?: string;
+  productName?: string;
 }
 
 export default function WastageManagement({
   batchId,
   consumedMaterials,
   onRefresh,
+  productId,
+  productName,
 }: WastageManagementProps) {
   const { toast } = useToast();
   const [wasteItems, setWasteItems] = useState<WasteItem[]>([]);
@@ -735,6 +739,8 @@ export default function WastageManagement({
       }}
       batchId={batchId}
       consumedMaterials={consumedMaterials}
+      productId={productId}
+      productName={productName}
     />
 
     {selectedMaterialForWastage && (
