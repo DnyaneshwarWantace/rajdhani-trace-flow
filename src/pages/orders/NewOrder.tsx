@@ -8,7 +8,6 @@ import { CustomerService, type Customer } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
-import { NotificationService } from '@/services/notificationService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { getSuggestedPricingUnit, type ProductDimensions } from '@/utils/unitConverter';
 import { formatCurrency } from '@/utils/formatHelpers';
@@ -17,7 +16,6 @@ import CustomerForm from '@/components/orders/CustomerForm';
 import OrderItemsList from '@/components/orders/OrderItemsList';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import OrderDetailsForm from '@/components/orders/OrderDetailsForm';
-import GSTSettings from '@/components/orders/GSTSettings';
 import DeliveryAddress from '@/components/orders/DeliveryAddress';
 import OrderSummary from '@/components/orders/OrderSummary';
 
@@ -51,10 +49,8 @@ export default function NewOrder() {
   // Pagination
   const [productPage, setProductPage] = useState(1);
   const [productItemsPerPage] = useState(50);
-  const [productTotalCount, setProductTotalCount] = useState(0);
   const [materialPage, setMaterialPage] = useState(1);
   const [materialItemsPerPage] = useState(50);
-  const [materialTotalCount, setMaterialTotalCount] = useState(0);
 
   // Order details
   const [orderDetails, setOrderDetails] = useState({
@@ -64,7 +60,7 @@ export default function NewOrder() {
   });
 
   // GST settings
-  const [gstSettings, setGstSettings] = useState({
+  const [gstSettings] = useState({
     rate: 18,
     isIncluded: true,
   });
@@ -118,7 +114,7 @@ export default function NewOrder() {
       if (productCategoryFilter !== 'all') filters.category = [productCategoryFilter];
       if (productColorFilter !== 'all') filters.color = [productColorFilter];
 
-      const { products: data, total } = await ProductService.getProducts(filters);
+      const { products: data } = await ProductService.getProducts(filters);
       
       // Debug: Log first product to see what backend returns
       if (data && data.length > 0) {
@@ -161,7 +157,6 @@ export default function NewOrder() {
         imageUrl: product.image_url || '',
       }));
       setRealProducts(mappedProducts);
-      setProductTotalCount(total || 0);
     } catch (error) {
       console.error('Error loading products:', error);
     }
@@ -191,7 +186,6 @@ export default function NewOrder() {
         location: 'Warehouse',
       }));
       setRawMaterials(mappedMaterials);
-      setMaterialTotalCount(result.total || 0);
     } catch (error) {
       console.error('Error loading materials:', error);
     }
@@ -356,7 +350,7 @@ export default function NewOrder() {
         delivery_address: orderDeliveryAddress || undefined,
       };
 
-      const { error: orderError, data: newOrder } = await OrderService.createOrder(orderData);
+      const { error: orderError } = await OrderService.createOrder(orderData);
 
       if (orderError) {
         toast({
@@ -504,8 +498,6 @@ export default function NewOrder() {
           onClose={() => {
             setShowProductSearch(false);
             setProductSearchTerm('');
-            setProductCategoryFilter('all');
-            setProductColorFilter('all');
             setProductPage(1);
             setMaterialPage(1);
           }}
@@ -513,16 +505,10 @@ export default function NewOrder() {
           products={realProducts}
           materials={rawMaterials}
           productSearchTerm={productSearchTerm}
-          productCategoryFilter={productCategoryFilter}
-          productColorFilter={productColorFilter}
           onSearchChange={setProductSearchTerm}
-          onCategoryFilterChange={setProductCategoryFilter}
-          onColorFilterChange={setProductColorFilter}
           onSelectProduct={handleProductSelected}
           productPage={productPage}
           materialPage={materialPage}
-          productTotalCount={productTotalCount}
-          materialTotalCount={materialTotalCount}
           productItemsPerPage={productItemsPerPage}
           materialItemsPerPage={materialItemsPerPage}
           onProductPageChange={setProductPage}

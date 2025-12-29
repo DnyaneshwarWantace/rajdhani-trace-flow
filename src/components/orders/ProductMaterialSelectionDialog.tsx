@@ -13,13 +13,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -37,16 +30,10 @@ interface ProductMaterialSelectionDialogProps {
   products: any[];
   materials: any[];
   productSearchTerm: string;
-  productCategoryFilter: string;
-  productColorFilter: string;
   onSearchChange: (value: string) => void;
-  onCategoryFilterChange: (value: string) => void;
-  onColorFilterChange: (value: string) => void;
   onSelectProduct: (productId: string) => void;
   productPage: number;
   materialPage: number;
-  productTotalCount: number;
-  materialTotalCount: number;
   productItemsPerPage: number;
   materialItemsPerPage: number;
   onProductPageChange: (page: number) => void;
@@ -60,16 +47,10 @@ export default function ProductMaterialSelectionDialog({
   products,
   materials,
   productSearchTerm,
-  productCategoryFilter,
-  productColorFilter,
   onSearchChange,
-  onCategoryFilterChange,
-  onColorFilterChange,
   onSelectProduct,
   productPage,
   materialPage,
-  productTotalCount,
-  materialTotalCount,
   productItemsPerPage,
   materialItemsPerPage,
   onProductPageChange,
