@@ -152,7 +152,7 @@ export default function OrderList() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Orders</h1>
             <p className="text-gray-600 mt-1">Manage customer orders and track fulfillment</p>
           </div>
-          <Button onClick={() => navigate('/orders/new')}>
+          <Button onClick={() => navigate('/orders/new')} className="text-white">
             <Plus className="w-4 h-4 mr-2" />
             New Order
           </Button>

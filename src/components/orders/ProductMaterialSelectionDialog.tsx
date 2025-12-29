@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Search, Package, Grid3x3, List, Check, AlertCircle } from 'lucide-react';
+import { Search, Package, Grid3x3, List, Check, AlertCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
@@ -63,17 +76,74 @@ export default function ProductMaterialSelectionDialog({
   onMaterialPageChange,
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  
-  const items = currentItem?.product_type === 'raw_material' ? materials : products;
-  const totalCount = currentItem?.product_type === 'raw_material' ? materialTotalCount : productTotalCount;
+
+  // Filter states
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
+  const [selectedStockFilters, setSelectedStockFilters] = useState<string[]>([]);
+
+  const allItems = currentItem?.product_type === 'raw_material' ? materials : products;
+
+  // Apply filters
+  const items = allItems.filter(item => {
+    // Category filter
+    if (selectedCategories.length > 0 && !selectedCategories.includes(item.category)) {
+      return false;
+    }
+    // Subcategory filter
+    if (selectedSubcategories.length > 0 && !selectedSubcategories.includes(item.subcategory)) {
+      return false;
+    }
+    // Color filter
+    if (selectedColors.length > 0 && !selectedColors.includes(item.color)) {
+      return false;
+    }
+    // Pattern filter
+    if (selectedPatterns.length > 0 && !selectedPatterns.includes(item.pattern)) {
+      return false;
+    }
+    // Stock filter
+    if (selectedStockFilters.length > 0) {
+      const stock = item.current_stock || item.stock || 0;
+      let matchesStock = false;
+
+      for (const filter of selectedStockFilters) {
+        if (filter === 'in_stock' && stock >= 10) matchesStock = true;
+        if (filter === 'low_stock' && stock > 0 && stock < 10) matchesStock = true;
+        if (filter === 'out_of_stock' && stock === 0) matchesStock = true;
+      }
+
+      if (!matchesStock) return false;
+    }
+
+    return true;
+  });
+
+  const totalCount = items.length;
   const perPage = currentItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage;
   const currentPage = currentItem?.product_type === 'raw_material' ? materialPage : productPage;
   const onPageChange = currentItem?.product_type === 'raw_material' ? onMaterialPageChange : onProductPageChange;
 
+  // Get unique values for filters
+  const categories = [...new Set(allItems.map(p => p.category).filter(Boolean))];
+  const subcategories = [...new Set(allItems.map(p => p.subcategory).filter(Boolean))];
+  const colors = [...new Set(allItems.map(p => p.color).filter(Boolean))];
+  const patterns = [...new Set(allItems.map(p => p.pattern).filter(Boolean))];
+
+  const clearAllFilters = () => {
+    setSelectedCategories([]);
+    setSelectedSubcategories([]);
+    setSelectedColors([]);
+    setSelectedPatterns([]);
+    setSelectedStockFilters([]);
+  };
+
   const getStockStatusBadge = (stock: number) => {
     if (stock === 0) {
       return (
-        <Badge variant="destructive" className="text-xs">
+        <Badge className="bg-red-100 text-red-700 border-red-300 text-xs">
           <AlertCircle className="w-3 h-3 mr-1" />
           Out of Stock
         </Badge>
@@ -102,7 +172,7 @@ export default function ProductMaterialSelectionDialog({
   const ProductCard = ({ item }: { item: any }) => {
     const isSelected = currentItem?.product_id === item.id;
     const isProduct = currentItem?.product_type !== 'raw_material';
-    
+
     const length = parseFloat(item.length || '0');
     const width = parseFloat(item.width || '0');
     const lengthUnit = item.length_unit || 'm';
@@ -250,7 +320,7 @@ export default function ProductMaterialSelectionDialog({
     const isProduct = currentItem?.product_type !== 'raw_material';
 
     return (
-      <div className="overflow-x-auto flex-1">
+      <div className="overflow-auto h-full w-full">
         <table className="w-full border-collapse">
           <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
             <tr>
@@ -295,8 +365,8 @@ export default function ProductMaterialSelectionDialog({
               return (
                 <tr
                   key={item.id}
-                  className={`hover:bg-gray-50 transition-colors ${
-                    isSelected ? 'bg-primary-50' : ''
+                  className={`transition-colors ${
+                    isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'
                   }`}
                 >
                   <td className="px-4 py-3">
@@ -442,10 +512,10 @@ export default function ProductMaterialSelectionDialog({
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 flex-1 overflow-hidden flex flex-col px-6 pt-4">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-4 flex-shrink-0">
-            <div className="flex-1 min-w-[200px]">
+        <div className="flex flex-col px-6 pt-4 gap-4" style={{ height: 'calc(90vh - 200px)' }}>
+          {/* Search */}
+          <div className="flex gap-2 flex-shrink-0">
+            <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
@@ -456,42 +526,226 @@ export default function ProductMaterialSelectionDialog({
                 />
               </div>
             </div>
-            {currentItem?.product_type !== 'raw_material' && (
-              <>
-                <Select value={productCategoryFilter} onValueChange={onCategoryFilterChange}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {[...new Set(products.map(p => p.category).filter(Boolean))].map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
+            {(selectedCategories.length + selectedSubcategories.length + selectedColors.length + selectedPatterns.length + selectedStockFilters.length) > 0 && (
+              <Button variant="outline" size="sm" onClick={clearAllFilters} className="flex items-center gap-2">
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          {/* Filters Row */}
+          <div className="flex flex-wrap gap-3 flex-shrink-0">
+            {/* Stock Filter */}
+            <div className="flex items-center gap-2">
+              <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Stock:</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
+                    {selectedStockFilters.length > 0 ? `${selectedStockFilters.length} selected` : 'All'}
+                    <Filter className="ml-2 h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-2" align="start">
+                  <div className="space-y-2">
+                    {[
+                      { value: 'in_stock', label: 'In Stock' },
+                      { value: 'low_stock', label: 'Low Stock' },
+                      { value: 'out_of_stock', label: 'Out of Stock' }
+                    ].map(option => (
+                      <div key={option.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`stock-${option.value}`}
+                          checked={selectedStockFilters.includes(option.value)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStockFilters([...selectedStockFilters, option.value]);
+                            } else {
+                              setSelectedStockFilters(selectedStockFilters.filter(s => s !== option.value));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`stock-${option.value}`} className="text-xs cursor-pointer flex-1">
+                          {option.label}
+                        </label>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Select value={productColorFilter} onValueChange={onColorFilterChange}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Color" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Colors</SelectItem>
-                    {[...new Set(products.map(p => p.color).filter(Boolean))].map(color => (
-                      <SelectItem key={color} value={color}>
-                        {color}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Category Filter */}
+            {categories.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Category:</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
+                      {selectedCategories.length > 0 ? `${selectedCategories.length} selected` : 'All'}
+                      <Filter className="ml-2 h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-2" align="start">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {categories.map(cat => (
+                        <div key={cat} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`cat-${cat}`}
+                            checked={selectedCategories.includes(cat)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCategories([...selectedCategories, cat]);
+                              } else {
+                                setSelectedCategories(selectedCategories.filter(c => c !== cat));
+                              }
+                            }}
+                          />
+                          <label htmlFor={`cat-${cat}`} className="text-xs cursor-pointer flex-1">
+                            {cat}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Subcategory Filter */}
+            {subcategories.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Subcategory:</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
+                      {selectedSubcategories.length > 0 ? `${selectedSubcategories.length} selected` : 'All'}
+                      <Filter className="ml-2 h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-2" align="start">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {subcategories.map(sub => (
+                        <div key={sub} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`sub-${sub}`}
+                            checked={selectedSubcategories.includes(sub)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedSubcategories([...selectedSubcategories, sub]);
+                              } else {
+                                setSelectedSubcategories(selectedSubcategories.filter(s => s !== sub));
+                              }
+                            }}
+                          />
+                          <label htmlFor={`sub-${sub}`} className="text-xs cursor-pointer flex-1">
+                            {sub}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Color Filter */}
+            {colors.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Color:</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
+                      {selectedColors.length > 0 ? `${selectedColors.length} selected` : 'All'}
+                      <Filter className="ml-2 h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-2" align="start">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {colors.map(color => (
+                        <div key={color} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`color-${color}`}
+                            checked={selectedColors.includes(color)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedColors([...selectedColors, color]);
+                              } else {
+                                setSelectedColors(selectedColors.filter(c => c !== color));
+                              }
+                            }}
+                          />
+                          <label htmlFor={`color-${color}`} className="text-xs cursor-pointer flex-1">
+                            {color}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Pattern Filter */}
+            {patterns.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Pattern:</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
+                      {selectedPatterns.length > 0 ? `${selectedPatterns.length} selected` : 'All'}
+                      <Filter className="ml-2 h-3 w-3" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-2" align="start">
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {patterns.map(pattern => (
+                        <div key={pattern} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`pattern-${pattern}`}
+                            checked={selectedPatterns.includes(pattern)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPatterns([...selectedPatterns, pattern]);
+                              } else {
+                                setSelectedPatterns(selectedPatterns.filter(p => p !== pattern));
+                              }
+                            }}
+                          />
+                          <label htmlFor={`pattern-${pattern}`} className="text-xs cursor-pointer flex-1">
+                            {pattern}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Clear Filters */}
+            {(selectedCategories.length > 0 || selectedSubcategories.length > 0 ||
+              selectedColors.length > 0 || selectedPatterns.length > 0 || selectedStockFilters.length > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedCategories([]);
+                  setSelectedSubcategories([]);
+                  setSelectedColors([]);
+                  setSelectedPatterns([]);
+                  setSelectedStockFilters([]);
+                }}
+                className="h-8 text-xs"
+              >
+                Clear Filters
+              </Button>
             )}
           </div>
 
           {/* Content Area */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto">
             {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto h-full pb-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4 pr-2 auto-rows-max">
                 {items.length === 0 ? (
                   <div className="col-span-full flex items-center justify-center py-12">
                     <div className="text-center">

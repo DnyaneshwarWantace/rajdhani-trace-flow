@@ -1,4 +1,4 @@
-import { ShoppingCart, User, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye } from 'lucide-react';
+import { ShoppingCart, User, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Order } from '@/services/orderService';
@@ -140,25 +140,51 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                             e.stopPropagation();
                             onStatusUpdate(order.id, 'accepted');
                           }}
-                          className="text-xs bg-blue-600 hover:bg-blue-700"
+                          className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Accept
                         </Button>
                       )}
-                      {order.status === 'accepted' && (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusUpdate(order.id, 'dispatched');
-                          }}
-                          className="text-xs bg-orange-600 hover:bg-orange-700"
-                        >
-                          <Package className="w-3 h-3 mr-1" />
-                          Dispatch
-                        </Button>
-                      )}
+                      {order.status === 'accepted' && (() => {
+                        // Check if order has products that need individual product selection
+                        const hasProductItems = order.items?.some(item => item.productType === 'product');
+                        const allProductsHaveIndividuals = order.items
+                          ?.filter(item => item.productType === 'product')
+                          .every(item => item.selectedProducts && item.selectedProducts.length > 0);
+
+                        // Show dispatch only if no product items OR all products have individual products selected
+                        if (!hasProductItems || allProductsHaveIndividuals) {
+                          return (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onStatusUpdate(order.id, 'dispatched');
+                              }}
+                              className="text-xs bg-orange-600 hover:bg-orange-700 text-white"
+                            >
+                              <Package className="w-3 h-3 mr-1" />
+                              Dispatch
+                            </Button>
+                          );
+                        } else {
+                          // Show "Select Individual Products" button instead
+                          return (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onViewDetails(order);
+                              }}
+                              className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Select Individual Products
+                            </Button>
+                          );
+                        }
+                      })()}
                       {order.status === 'dispatched' && (
                         <Button
                           size="sm"
@@ -166,7 +192,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                             e.stopPropagation();
                             onStatusUpdate(order.id, 'delivered');
                           }}
-                          className="text-xs bg-green-600 hover:bg-green-700"
+                          className="text-xs bg-green-600 hover:bg-green-700 text-white"
                         >
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Deliver

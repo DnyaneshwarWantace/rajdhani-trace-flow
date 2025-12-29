@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerService, type Customer } from '@/services/customerService';
 import { GSTApiService } from '@/services/gstApiService';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 interface CustomerFormProps {
   onCustomerCreated: (customer: Customer) => void;
@@ -68,10 +70,78 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
   };
 
   const handleSubmit = async () => {
-    if (!newCustomer.name.trim() || !newCustomer.email.trim() || !newCustomer.phone.trim()) {
+    // Validation
+    if (!newCustomer.name.trim()) {
       toast({
-        title: 'Error',
-        description: 'Please fill in required fields',
+        title: 'Validation Error',
+        description: 'Full name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newCustomer.name.trim().length < 3) {
+      toast({
+        title: 'Validation Error',
+        description: 'Full name must be at least 3 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newCustomer.name.trim().length > 100) {
+      toast({
+        title: 'Validation Error',
+        description: 'Full name must not exceed 100 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if name has at least one word (no single character names)
+    if (newCustomer.name.trim().split(/\s+/).some(word => word.length < 2)) {
+      toast({
+        title: 'Validation Error',
+        description: 'Each word in the name must be at least 2 characters',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!newCustomer.phone.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Phone number is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Phone validation - must be at least 10 digits
+    if (newCustomer.phone.replace(/\D/g, '').length < 10) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a valid phone number',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!newCustomer.email.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Email is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newCustomer.email.trim())) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a valid email address',
         variant: 'destructive',
       });
       return;
@@ -137,57 +207,60 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
         <CardTitle>Add New Customer</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* 1. Customer Type */}
-        <div className="space-y-2">
-          <Label>Customer Type *</Label>
-          <Select
-            value={newCustomer.customerType}
-            onValueChange={(value: 'individual' | 'business') =>
-              setNewCustomer({ ...newCustomer, customerType: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="individual">Individual</SelectItem>
-              <SelectItem value="business">Business</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Row 1: Customer Type & Full Name */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Customer Type *</Label>
+            <Select
+              value={newCustomer.customerType}
+              onValueChange={(value: 'individual' | 'business') =>
+                setNewCustomer({ ...newCustomer, customerType: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="business">Business</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Full Name *</Label>
+            <Input
+              value={newCustomer.name}
+              onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+              placeholder="Enter customer name"
+            />
+          </div>
         </div>
 
-        {/* 2. Full Name */}
-        <div className="space-y-2">
-          <Label>Full Name *</Label>
-          <Input
-            value={newCustomer.name}
-            onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
-            placeholder="Enter customer name"
-          />
+        {/* Row 2: Phone Number & Email */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Phone Number *</Label>
+            <PhoneInput
+              defaultCountry="in"
+              value={newCustomer.phone}
+              onChange={(value) => setNewCustomer({ ...newCustomer, phone: value })}
+              placeholder="Enter phone number"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Email Address *</Label>
+            <Input
+              type="email"
+              value={newCustomer.email}
+              onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
+              placeholder="Enter email"
+            />
+          </div>
         </div>
 
-        {/* 3. Phone Number */}
-        <div className="space-y-2">
-          <Label>Phone Number *</Label>
-          <Input
-            value={newCustomer.phone}
-            onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-            placeholder="Enter phone"
-          />
-        </div>
-
-        {/* 4. Email Address */}
-        <div className="space-y-2">
-          <Label>Email Address *</Label>
-          <Input
-            type="email"
-            value={newCustomer.email}
-            onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
-            placeholder="Enter email"
-          />
-        </div>
-
-        {/* 5. GST Number */}
+        {/* Row 3: GST Number */}
         <div className="space-y-2">
           <Label>GST Number</Label>
           <Input
@@ -199,18 +272,6 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
           {isFetchingGST && <p className="text-xs text-gray-500">Fetching GST details...</p>}
           {gstAutoFilled && <p className="text-xs text-green-600">✓ GST details auto-filled</p>}
         </div>
-
-        {/* Company Name - Only for business */}
-        {newCustomer.customerType === 'business' && (
-          <div className="space-y-2">
-            <Label>Company Name</Label>
-            <Input
-              value={newCustomer.companyName}
-              onChange={e => setNewCustomer({ ...newCustomer, companyName: e.target.value })}
-              placeholder="Enter company name"
-            />
-          </div>
-        )}
 
         <div className="space-y-2">
           <Label>Address</Label>

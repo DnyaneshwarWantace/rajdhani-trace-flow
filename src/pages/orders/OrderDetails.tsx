@@ -357,9 +357,9 @@ export default function OrderDetails() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="w-full max-w-full space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate('/orders')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -386,14 +386,14 @@ export default function OrderDetails() {
               });
 
               return allProductsSelected && (
-                <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700">
+                <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
                   <Package className="w-4 h-4 mr-2" />
                   Dispatch Order
                 </Button>
               );
             })()}
             {order.status === 'dispatched' && (
-              <Button onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700 text-white">
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Mark as Delivered
               </Button>
@@ -413,18 +413,18 @@ export default function OrderDetails() {
           workflowStep={order.workflowStep}
         />
 
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full">
           {/* Main Content - Left Side (2/3 width) */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 w-full">
             {/* Order Items */}
-            <Card>
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Package className="w-5 h-5" />
                   Order Items ({orderItems.length})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="w-full">
                 <div className="space-y-4">
                   {orderItems.map((item, index) => (
                     <EditableOrderItemCard
@@ -514,7 +514,7 @@ export default function OrderDetails() {
           </div>
 
           {/* Sidebar - Right Side (1/3 width) */}
-          <div className="space-y-6">
+          <div className="space-y-6 w-full">
             {/* Customer Information */}
             <Card>
               <CardHeader>
