@@ -39,17 +39,32 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      
-      // Load ALL low_stock notifications directly (more efficient than loading all notifications)
+
+      // Load ALL stock-related notifications (low_stock, production_request, restock_request)
       // Production planning low stock alerts can have module: 'materials' or 'products'
-      // but they have batch_id and product_id in related_data
+      // Order-related stock alerts have type: 'production_request' or 'restock_request'
       const { data: allLowStockNotifications } = await NotificationService.getNotifications({
         type: 'low_stock',
-        limit: 1000, // Get a large number to ensure we get all
+        limit: 1000,
         offset: 0
       });
-      
+
+      // Also fetch production_request and restock_request from orders
+      const { data: productionRequests } = await NotificationService.getNotifications({
+        type: 'production_request',
+        limit: 1000,
+        offset: 0
+      });
+
+      const { data: restockRequests } = await NotificationService.getNotifications({
+        type: 'restock_request',
+        limit: 1000,
+        offset: 0
+      });
+
       console.log('🔍 Total low_stock notifications found:', allLowStockNotifications?.length || 0);
+      console.log('🔍 Total production_request notifications found:', productionRequests?.length || 0);
+      console.log('🔍 Total restock_request notifications found:', restockRequests?.length || 0);
       
       // Also load from all modules to ensure we don't miss any
       const productionNotifications = await NotificationService.getNotificationsByModule('production');
@@ -60,11 +75,12 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
       console.log('🔍 Raw product notifications:', productNotifications?.length || 0);
       console.log('🔍 Raw material notifications:', materialNotifications?.length || 0);
       
-      // Combine all notifications to check for production planning alerts
-      // Use the low_stock filtered list as primary, but also check module-based results
+      // Combine all notifications: low_stock, production_request, restock_request, and module-based
       const allNotifications = [
         ...(allLowStockNotifications || []),
-        ...(productionNotifications || []), 
+        ...(productionRequests || []),
+        ...(restockRequests || []),
+        ...(productionNotifications || []),
         ...(productNotifications || []),
         ...(materialNotifications || [])
       ];
@@ -174,7 +190,11 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
             title: n.title,
             type: n.type,
             module: n.module,
-            material_type: n.related_data?.material_type
+            material_type: n.related_data?.material_type,
+            action_category: n.related_data?.action_category,
+            isProductRelated,
+            isProductionRelated,
+            reason: !isProductRelated && !isProductionRelated ? 'Not product or production related' : 'Other'
           });
         }
         
@@ -417,7 +437,14 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-[11px] sm:text-sm text-gray-900 line-clamp-1 break-all">{notification.title}</h4>
                             {!isExpanded && (
-                              <p className="text-[10px] sm:text-xs text-gray-600 line-clamp-1 break-all">{notification.message}</p>
+                              <>
+                                <p className="text-[10px] sm:text-xs text-gray-600 line-clamp-1 break-all">{notification.message}</p>
+                                {notification.related_data?.created_by_user && (
+                                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                                    By: <span className="font-semibold text-gray-700">{notification.related_data.created_by_user}</span>
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
@@ -445,6 +472,118 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                         {/* Related Data */}
                         {notification.related_data && (
                           <div className="bg-gray-50 rounded-lg p-2 sm:p-3 mb-3 space-y-1.5 overflow-hidden">
+                            {/* Order-Related Stock Alert Details */}
+                            {(notification.type === 'production_request' || notification.type === 'restock_request') && notification.related_data.order_number && (
+                              <div className="border-b border-gray-200 pb-2 mb-2">
+                                <p className="text-xs font-semibold text-gray-700 mb-1.5">Order Details</p>
+                                <div className="space-y-1">
+                                  {notification.related_data.order_number && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Order Number:</span>
+                                      <span className="text-gray-900 font-mono">{notification.related_data.order_number}</span>
+                                    </div>
+                                  )}
+                                  {notification.related_data.customer_name && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Customer:</span>
+                                      <span className="text-gray-900">{notification.related_data.customer_name}</span>
+                                    </div>
+                                  )}
+                                  {notification.related_data.expected_delivery && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Delivery:</span>
+                                      <span className="text-red-700 font-semibold">
+                                        {new Date(notification.related_data.expected_delivery).toLocaleDateString('en-IN')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-4 text-xs mt-2 pt-2 border-t border-gray-200">
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Required:</span>
+                                      <span className="text-blue-700 font-semibold ml-1">{notification.related_data.quantity_ordered} {notification.related_data.unit}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Available:</span>
+                                      <span className="text-green-700 font-semibold ml-1">{notification.related_data.available_stock} {notification.related_data.unit}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Need:</span>
+                                      <span className="text-red-700 font-semibold ml-1">{notification.related_data.shortfall} {notification.related_data.unit}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Product/Material Details */}
+                                  {(notification.related_data.product_details || notification.related_data.material_details) && (
+                                    <div className="mt-2 pt-2 border-t border-gray-200">
+                                      <p className="text-xs font-semibold text-gray-700 mb-1">Product Details</p>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {notification.related_data.product_details?.color && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Color:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.product_details.color}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.product_details?.pattern && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Pattern:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.product_details.pattern}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.product_details?.width && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Width:</span>
+                                            <span className="text-gray-900 ml-1">
+                                              {notification.related_data.product_details.width}{notification.related_data.product_details.width_unit || ''}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.product_details?.length && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Length:</span>
+                                            <span className="text-gray-900 ml-1">
+                                              {notification.related_data.product_details.length}{notification.related_data.product_details.length_unit || ''}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.product_details?.weight && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Weight/GSM:</span>
+                                            <span className="text-gray-900 ml-1">
+                                              {notification.related_data.product_details.weight}{notification.related_data.product_details.weight_unit || ''}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.product_details?.category && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Category:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.product_details.category}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.material_details?.color && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Color:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.color}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.material_details?.supplier && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Supplier:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.supplier}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.material_details?.category && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Category:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.category}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Production Batch Details */}
                             {(notification.related_data.batch_number || notification.related_data.batch_id) && (
                               <div className="border-b border-gray-200 pb-2 mb-2">
@@ -551,33 +690,98 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
                         {/* Footer */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
-                            <span className="truncate">{formatIndianDateTime(notification.created_at)}</span>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                              <span className="truncate">
+                                {notification.created_at
+                                  ? (formatIndianDateTime(notification.created_at) !== 'N/A'
+                                      ? formatIndianDateTime(notification.created_at)
+                                      : new Date(notification.created_at).toLocaleString('en-IN'))
+                                  : 'Just now'}
+                              </span>
+                            </div>
+                            {notification.related_data?.created_by_user && (
+                              <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                                <span className="font-medium">By:</span>
+                                <span className="text-gray-900 font-semibold">{notification.related_data.created_by_user}</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                            {notification.type === 'production_request' || notification.type === 'low_stock' || notification.type === 'order_alert' ? (
-                              notification.related_data && hasIndividualStock(notification.related_data.productId) ? (
-                                <Button
-                                  size="sm"
-                                  className="bg-primary-600 text-white hover:bg-primary-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleAddToProductionFromNotification(notification);
-                                  }}
-                                  disabled={isAddingToProduction === notification.related_data?.productId}
-                                >
-                                  {isAddingToProduction === notification.related_data?.productId ? (
-                                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                  ) : (
-                                    <ArrowRight className="w-3 h-3 mr-1" />
-                                  )}
-                                  <span className="truncate">{isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}</span>
-                                </Button>
-                              ) : (
-                                <span className="text-xs text-gray-500">Bulk Product</span>
-                              )
-                            ) : null}
+                            {/* Product Low Stock - Go to Production Button */}
+                            {notification.type === 'production_request' && notification.related_data?.product_id && (
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 text-white hover:bg-blue-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/production/new-batch', {
+                                    state: {
+                                      selectedProduct: {
+                                        id: notification.related_data.product_id,
+                                        name: notification.related_data.product_name,
+                                        ...notification.related_data.product_details
+                                      },
+                                      fromNotification: true,
+                                      requiredQuantity: notification.related_data.shortfall,
+                                      orderNumber: notification.related_data.order_number,
+                                      customerName: notification.related_data.customer_name,
+                                      expectedDelivery: notification.related_data.expected_delivery
+                                    }
+                                  });
+                                }}
+                              >
+                                <Factory className="w-3 h-3 mr-1" />
+                                <span className="truncate">Go to Production</span>
+                              </Button>
+                            )}
+
+                            {/* Material Low Stock - Order Material Button */}
+                            {notification.type === 'restock_request' && notification.related_data?.material_id && (
+                              <Button
+                                size="sm"
+                                className="bg-green-600 text-white hover:bg-green-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate('/materials/manage-stock', {
+                                    state: {
+                                      selectedMaterial: {
+                                        id: notification.related_data.material_id,
+                                        name: notification.related_data.material_name,
+                                        ...notification.related_data.material_details
+                                      },
+                                      fromNotification: true,
+                                      requiredQuantity: notification.related_data.shortfall,
+                                      orderNumber: notification.related_data.order_number
+                                    }
+                                  });
+                                }}
+                              >
+                                <ArrowRight className="w-3 h-3 mr-1" />
+                                <span className="truncate">Order Material</span>
+                              </Button>
+                            )}
+
+                            {/* Production Planning Low Stock - Original Add to Production */}
+                            {notification.type === 'low_stock' && notification.related_data && hasIndividualStock(notification.related_data.productId) && (
+                              <Button
+                                size="sm"
+                                className="bg-primary-600 text-white hover:bg-primary-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddToProductionFromNotification(notification);
+                                }}
+                                disabled={isAddingToProduction === notification.related_data?.productId}
+                              >
+                                {isAddingToProduction === notification.related_data?.productId ? (
+                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                ) : (
+                                  <ArrowRight className="w-3 h-3 mr-1" />
+                                )}
+                                <span className="truncate">{isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}</span>
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"

@@ -51,6 +51,8 @@ export interface OrderItem {
   width_unit?: string;
   weight?: string;
   weight_unit?: string;
+  color?: string;
+  pattern?: string;
 }
 
 export class OrderService {
@@ -183,6 +185,8 @@ export class OrderService {
       // Map order items with all fields needed for details page
       const mappedItems = items.map((item: any) => ({
         id: item.id,
+        product_id: item.product_id || null,
+        raw_material_id: item.raw_material_id || null,
         product_name: item.product_name || '',
         product_type: item.product_type || 'product',
         quantity: item.quantity || 0,
@@ -195,6 +199,7 @@ export class OrderService {
         total_price: item.total_price || '0.00',
         quality_grade: item.quality_grade,
         specifications: item.specifications,
+        selected_individual_products: item.selected_individual_products || [],
         product_details: item.product_details || null,
       }));
 
@@ -293,6 +298,129 @@ export class OrderService {
     } catch (error) {
       console.error('Error in createOrder:', error);
       return { data: null, error: 'Failed to create order' };
+    }
+  }
+
+  static async updateOrderStatus(orderId: string, status: string): Promise<{ data: Order | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ status }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return { data: null, error: result.error || 'Failed to update order status' };
+      }
+
+      // Map backend order to frontend format
+      const order = result.data;
+      const mappedOrder: Order = {
+        id: order.id,
+        orderNumber: order.order_number || order.id,
+        customerId: order.customer_id || null,
+        customerName: order.customer_name || '',
+        customerEmail: order.customer_email,
+        customerPhone: order.customer_phone,
+        orderDate: order.order_date || order.created_at || new Date().toISOString(),
+        expectedDelivery: order.expected_delivery,
+        subtotal: order.subtotal,
+        gstRate: order.gst_rate,
+        gstAmount: order.gst_amount,
+        discountAmount: order.discount_amount,
+        totalAmount: parseFloat(order.total_amount || '0'),
+        paidAmount: parseFloat(order.paid_amount || '0'),
+        outstandingAmount: parseFloat(order.outstanding_amount || '0'),
+        status: order.status || 'pending',
+        workflowStep: order.workflow_step,
+        acceptedAt: order.accepted_at,
+        dispatchedAt: order.dispatched_at,
+        deliveredAt: order.delivered_at,
+        delivery_address: order.delivery_address,
+        special_instructions: order.special_instructions,
+        items: (order.order_items || []).map((item: any) => ({
+          id: item.id,
+          productId: item.product_id,
+          productName: item.product_name || '',
+          productType: item.product_type || 'product',
+          quantity: item.quantity || 0,
+          count_unit: item.count_unit,
+          unit: item.unit,
+          unitPrice: parseFloat(item.unit_price || 0),
+          totalPrice: parseFloat(item.total_price || item.unit_price * item.quantity || 0),
+          qualityGrade: item.quality_grade,
+          specifications: item.specifications,
+          selectedProducts: item.selected_individual_products || [],
+          length: item.length,
+          width: item.width,
+          length_unit: item.length_unit,
+          width_unit: item.width_unit,
+          weight: item.weight,
+          weight_unit: item.weight_unit,
+          color: item.color,
+          pattern: item.pattern
+        })),
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      };
+
+      return { data: mappedOrder, error: null };
+    } catch (error) {
+      console.error('Error in updateOrderStatus:', error);
+      return { data: null, error: 'Failed to update order status' };
+    }
+  }
+
+  static async updateOrderPayment(orderId: string, paidAmount: number): Promise<{ data: Order | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/${orderId}/payment`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ paid_amount: paidAmount }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return { data: null, error: result.error || 'Failed to update payment' };
+      }
+
+      // Map backend order to frontend format
+      const order = result.data;
+      const mappedOrder: Order = {
+        id: order.id,
+        orderNumber: order.order_number || order.id,
+        customerId: order.customer_id || null,
+        customerName: order.customer_name || '',
+        customerEmail: order.customer_email,
+        customerPhone: order.customer_phone,
+        orderDate: order.order_date || order.created_at || new Date().toISOString(),
+        expectedDelivery: order.expected_delivery,
+        subtotal: order.subtotal,
+        gstRate: order.gst_rate,
+        gstAmount: order.gst_amount,
+        discountAmount: order.discount_amount,
+        totalAmount: parseFloat(order.total_amount || '0'),
+        paidAmount: parseFloat(order.paid_amount || '0'),
+        outstandingAmount: parseFloat(order.outstanding_amount || '0'),
+        status: order.status || 'pending',
+        workflowStep: order.workflow_step,
+        acceptedAt: order.accepted_at,
+        dispatchedAt: order.dispatched_at,
+        deliveredAt: order.delivered_at,
+        delivery_address: order.delivery_address,
+        special_instructions: order.special_instructions,
+        items: [],
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      };
+
+      return { data: mappedOrder, error: null };
+    } catch (error) {
+      console.error('Error in updateOrderPayment:', error);
+      return { data: null, error: 'Failed to update payment' };
     }
   }
 }

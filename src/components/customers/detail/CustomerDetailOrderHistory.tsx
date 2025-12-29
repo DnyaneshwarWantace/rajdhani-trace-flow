@@ -1,16 +1,25 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingBag, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ShoppingBag, Package, Edit, Check, X } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
+import { OrderService } from '@/services/orderService';
+import { useToast } from '@/hooks/use-toast';
 import type { Customer } from '@/services/customerService';
 import type { Order } from '@/services/orderService';
 
 interface CustomerDetailOrderHistoryProps {
   customer: Customer;
   orders: Order[];
+  onOrderUpdated?: () => void;
 }
 
-export default function CustomerDetailOrderHistory({ customer, orders }: CustomerDetailOrderHistoryProps) {
+export default function CustomerDetailOrderHistory({ customer, orders, onOrderUpdated }: CustomerDetailOrderHistoryProps) {
+  const { toast } = useToast();
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [editedPaidAmount, setEditedPaidAmount] = useState<number>(0);
   const getCustomerOrders = () => {
     const customerName = customer.name || '';
     return orders.filter(order => {
@@ -26,6 +35,48 @@ export default function CustomerDetailOrderHistory({ customer, orders }: Custome
   };
 
   const customerOrders = getCustomerOrders().sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+
+  const handleEditPayment = (order: Order) => {
+    setEditingOrderId(order.id);
+    setEditedPaidAmount(order.paidAmount || 0);
+  };
+
+  const handleSavePayment = async (orderId: string) => {
+    try {
+      const { error } = await OrderService.updateOrderPayment(orderId, editedPaidAmount);
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Payment updated successfully',
+      });
+
+      setEditingOrderId(null);
+      if (onOrderUpdated) {
+        onOrderUpdated();
+      }
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update payment',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingOrderId(null);
+    setEditedPaidAmount(0);
+  };
 
   return (
     <Card>
@@ -75,8 +126,34 @@ export default function CustomerDetailOrderHistory({ customer, orders }: Custome
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Paid</p>
-                    <p className="text-sm font-medium text-green-600">{formatCurrency(order.paidAmount || 0)}</p>
+                    <p className="text-xs text-gray-500 mb-1">Paid</p>
+                    {editingOrderId === order.id ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={editedPaidAmount}
+                          onChange={(e) => setEditedPaidAmount(parseFloat(e.target.value) || 0)}
+                          className="h-8 w-32"
+                          min="0"
+                          step="0.01"
+                        />
+                        <Button size="sm" onClick={() => handleSavePayment(order.id)} className="h-8 w-8 p-0">
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleCancelEdit} className="h-8 w-8 p-0">
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-green-600">{formatCurrency(order.paidAmount || 0)}</p>
+                        {(order.status === 'dispatched' || order.status === 'delivered') && (
+                          <Button size="sm" variant="ghost" onClick={() => handleEditPayment(order)} className="h-6 w-6 p-0">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Outstanding</p>
@@ -87,23 +164,69 @@ export default function CustomerDetailOrderHistory({ customer, orders }: Custome
                 {order.items.length > 0 && (
                   <div className="pt-4 border-t">
                     <p className="text-xs font-medium text-gray-700 mb-2">Order Items:</p>
-                    <div className="space-y-2">
+                    <div className="space-y-4">
                       {order.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{item.productName}</p>
-                            <p className="text-xs text-gray-600">
-                              {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • 
-                              Qty: {item.quantity} • 
-                              {formatCurrency(item.unitPrice)}/unit
-                            </p>
-                            {item.selectedProducts && item.selectedProducts.length > 0 && (
-                              <p className="text-xs text-blue-600 mt-1">
-                                Individual IDs: {item.selectedProducts.map((p: any) => p.qrCode || p.id).join(', ')}
+                        <div key={index} className="border rounded-lg p-3 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">{item.productName}</p>
+                              <p className="text-xs text-gray-600">
+                                {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} •
+                                Qty: {item.quantity} •
+                                {formatCurrency(item.unitPrice)}/unit
                               </p>
-                            )}
+                            </div>
+                            <p className="text-sm font-medium text-gray-900">{formatCurrency(item.totalPrice || 0)}</p>
                           </div>
-                          <p className="text-sm font-medium text-gray-900">{formatCurrency(item.totalPrice || 0)}</p>
+
+                          {item.selectedProducts && item.selectedProducts.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs font-medium text-gray-700 mb-2">
+                                Individual Products: {item.selectedProducts.length}
+                              </p>
+                              <div className="overflow-x-auto">
+                                <table className="w-full border-collapse border border-gray-300">
+                                  <thead className="bg-gray-100">
+                                    <tr>
+                                      <th className="border border-gray-300 p-2 text-left text-xs font-medium text-gray-700">#</th>
+                                      <th className="border border-gray-300 p-2 text-left text-xs font-medium text-gray-700">Product ID</th>
+                                      <th className="border border-gray-300 p-2 text-left text-xs font-medium text-gray-700">QR Code</th>
+                                      <th className="border border-gray-300 p-2 text-left text-xs font-medium text-gray-700">Serial Number</th>
+                                      <th className="border border-gray-300 p-2 text-left text-xs font-medium text-gray-700">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {item.selectedProducts.map((product: any, idx: number) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="border border-gray-300 p-2 text-xs text-gray-600">{idx + 1}</td>
+                                        <td className="border border-gray-300 p-2 text-xs font-mono text-gray-900">
+                                          {product.individual_product_id || product.id || '—'}
+                                        </td>
+                                        <td className="border border-gray-300 p-2 text-xs font-mono text-gray-900">
+                                          {product.qr_code || product.qrCode || '—'}
+                                        </td>
+                                        <td className="border border-gray-300 p-2 text-xs text-gray-900">
+                                          {product.serial_number || product.serialNumber || '—'}
+                                        </td>
+                                        <td className="border border-gray-300 p-2">
+                                          <Badge
+                                            variant="outline"
+                                            className={`text-xs ${
+                                              order.status === 'dispatched' || order.status === 'delivered'
+                                                ? 'bg-orange-50 text-orange-700 border-orange-300'
+                                                : 'bg-green-50 text-green-700 border-green-300'
+                                            }`}
+                                          >
+                                            {order.status === 'dispatched' || order.status === 'delivered' ? 'Dispatched' : 'Reserved'}
+                                          </Badge>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

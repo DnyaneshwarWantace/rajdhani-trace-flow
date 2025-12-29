@@ -192,6 +192,11 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
                                 <TruncatedText text={notification.message} maxLength={150} as="span" className="inline-block" />
                               </p>
                             )}
+                            {!isExpanded && notification.related_data?.created_by_user && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                By: <span className="font-semibold text-gray-700">{notification.related_data.created_by_user}</span>
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <Badge
@@ -222,6 +227,84 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
                         {/* Related Data - Collapsible */}
                         {isExpanded && hasDetails && (
                           <div className="bg-gray-50 rounded-lg p-3 my-2 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                            {/* Order-Related Stock Alert Details */}
+                            {notification.type === 'restock_request' && notification.related_data.order_number && (
+                              <div className="border-b border-gray-200 pb-2 mb-2">
+                                <p className="text-xs font-semibold text-gray-700 mb-1.5">Order Details</p>
+                                <div className="space-y-1">
+                                  {notification.related_data.order_number && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Order Number:</span>
+                                      <span className="text-gray-900 font-mono">{notification.related_data.order_number}</span>
+                                    </div>
+                                  )}
+                                  {notification.related_data.customer_name && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Customer:</span>
+                                      <span className="text-gray-900">{notification.related_data.customer_name}</span>
+                                    </div>
+                                  )}
+                                  {notification.related_data.expected_delivery && (
+                                    <div className="flex items-center gap-2 text-xs">
+                                      <span className="text-gray-500 font-medium">Delivery:</span>
+                                      <span className="text-red-700 font-semibold">
+                                        {new Date(notification.related_data.expected_delivery).toLocaleDateString('en-IN')}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-4 text-xs mt-2 pt-2 border-t border-gray-200">
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Required:</span>
+                                      <span className="text-blue-700 font-semibold ml-1">{notification.related_data.quantity_ordered} {notification.related_data.unit}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Available:</span>
+                                      <span className="text-green-700 font-semibold ml-1">{notification.related_data.available_stock} {notification.related_data.unit}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-500 font-medium">Need:</span>
+                                      <span className="text-red-700 font-semibold ml-1">{notification.related_data.shortfall} {notification.related_data.unit}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Material Details */}
+                                  {notification.related_data.material_details && (
+                                    <div className="mt-2 pt-2 border-t border-gray-200">
+                                      <p className="text-xs font-semibold text-gray-700 mb-1">Material Details</p>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {notification.related_data.material_details.color && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Color:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.color}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.material_details.supplier && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Supplier:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.supplier}</span>
+                                          </div>
+                                        )}
+                                        {notification.related_data.material_details.category && (
+                                          <div className="text-xs">
+                                            <span className="text-gray-500">Category:</span>
+                                            <span className="text-gray-900 ml-1">{notification.related_data.material_details.category}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Created By User */}
+                                  {notification.related_data.created_by_user && (
+                                    <div className="flex items-center gap-2 text-xs mt-2 pt-2 border-t border-gray-200">
+                                      <span className="text-gray-500 font-medium">Created by:</span>
+                                      <span className="text-gray-900 font-semibold">{notification.related_data.created_by_user}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Production Batch Details */}
                             {(notification.related_data.batch_number || notification.related_data.batch_id) && (
                               <div className="border-b border-gray-200 pb-2 mb-2">

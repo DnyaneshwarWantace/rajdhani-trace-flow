@@ -20,7 +20,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
-export default function OrderTable({ orders, onViewDetails }: OrderTableProps) {
+export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: OrderTableProps) {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -79,8 +79,35 @@ export default function OrderTable({ orders, onViewDetails }: OrderTableProps) {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.items?.length || 0} items
+                  <td className="px-4 py-4 text-sm text-gray-900">
+                    <div className="max-w-md">
+                      {order.items && order.items.length > 0 ? (
+                        <div className="space-y-1">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="text-xs">
+                              <div className="font-medium text-gray-900">{item.productName}</div>
+                              <div className="text-gray-600 flex flex-wrap gap-x-2 gap-y-0.5">
+                                <span>Qty: {item.quantity} {item.count_unit || item.unit || 'units'}</span>
+                                {item.length && item.width && (
+                                  <span>• Size: {item.length}{item.length_unit} × {item.width}{item.width_unit}</span>
+                                )}
+                                {item.weight && (
+                                  <span>• {item.weight}{item.weight_unit}</span>
+                                )}
+                                {item.color && (
+                                  <span>• {item.color}</span>
+                                )}
+                                {item.pattern && (
+                                  <span>• {item.pattern}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">No items</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">
@@ -106,10 +133,52 @@ export default function OrderTable({ orders, onViewDetails }: OrderTableProps) {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
+                      {order.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusUpdate(order.id, 'accepted');
+                          }}
+                          className="text-xs bg-blue-600 hover:bg-blue-700"
+                        >
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Accept
+                        </Button>
+                      )}
+                      {order.status === 'accepted' && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusUpdate(order.id, 'dispatched');
+                          }}
+                          className="text-xs bg-orange-600 hover:bg-orange-700"
+                        >
+                          <Package className="w-3 h-3 mr-1" />
+                          Dispatch
+                        </Button>
+                      )}
+                      {order.status === 'dispatched' && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusUpdate(order.id, 'delivered');
+                          }}
+                          className="text-xs bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Deliver
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => onViewDetails(order)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewDetails(order);
+                        }}
                         className="text-xs"
                       >
                         <Eye className="w-3 h-3 mr-1" />

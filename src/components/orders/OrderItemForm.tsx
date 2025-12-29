@@ -265,10 +265,11 @@ export default function OrderItemForm({
           <Label>Unit Price</Label>
           <Input
             type="number"
-            value={item.unit_price}
+            value={item.unit_price || ''}
             onChange={e => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
             min="0"
             step="0.01"
+            placeholder=""
           />
         </div>
 
@@ -298,10 +299,10 @@ export default function OrderItemForm({
         </div>
 
         <div className="space-y-2">
-          <Label>Subtotal</Label>
+          <Label>Subtotal (Before GST)</Label>
           <Input
             type="number"
-            value={(item.quantity * item.unit_price).toFixed(2)}
+            value={(item.total_price || 0).toFixed(2)}
             readOnly
             className="bg-gray-50"
           />
@@ -311,17 +312,17 @@ export default function OrderItemForm({
           <Label>GST Amount</Label>
           <Input
             type="number"
-            value={(item.gst_included ? (item.quantity * item.unit_price * (item.gst_rate || 18)) / 100 : 0).toFixed(2)}
+            value={(item.gst_included ? ((item.total_price || 0) * (item.gst_rate || 18)) / 100 : 0).toFixed(2)}
             readOnly
             className="bg-gray-50"
           />
         </div>
 
         <div className="space-y-2">
-          <Label>Total Price</Label>
+          <Label>Total Price (Inc. GST)</Label>
           <Input
             type="number"
-            value={(item.quantity * item.unit_price + (item.gst_included ? (item.quantity * item.unit_price * (item.gst_rate || 18)) / 100 : 0)).toFixed(2)}
+            value={((item.total_price || 0) + (item.gst_included ? ((item.total_price || 0) * (item.gst_rate || 18)) / 100 : 0)).toFixed(2)}
             readOnly
             className="bg-gray-50 font-semibold"
           />

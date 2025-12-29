@@ -66,28 +66,26 @@ export default function MaterialStockSection({
         </div>
       )}
       <div>
-        <Label htmlFor="minThreshold">Min Stock Threshold *</Label>
+        <Label htmlFor="minThreshold">Min Stock Threshold</Label>
         <Input
           id="minThreshold"
           type="text"
           value={minThreshold}
           onChange={handleMinThresholdChange}
-          placeholder="10"
-          required
+          placeholder="10 (auto-set if empty)"
         />
-        <p className="text-xs text-muted-foreground mt-1">Max 10 digits - Minimum quantity before alert</p>
+        <p className="text-xs text-muted-foreground mt-1">Max 10 digits - Minimum quantity before alert (default: 10)</p>
       </div>
       <div>
-        <Label htmlFor="maxCapacity">Max Stock Capacity *</Label>
+        <Label htmlFor="maxCapacity">Max Stock Capacity</Label>
         <Input
           id="maxCapacity"
           type="text"
           value={maxCapacity}
           onChange={(e) => handleNumericChange(e, onMaxCapacityChange)}
-          placeholder="1000"
-          required
+          placeholder="1000 (auto-set if empty)"
         />
-        <p className="text-xs text-muted-foreground mt-1">Maximum quantity the inventory can hold</p>
+        <p className="text-xs text-muted-foreground mt-1">Maximum quantity the inventory can hold (default: 1000)</p>
       </div>
     </div>
   );

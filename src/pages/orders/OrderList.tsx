@@ -97,13 +97,34 @@ export default function OrderList() {
     }
   };
 
-  const handleStatusUpdate = async (_orderId: string, newStatus: string) => {
-    // TODO: Implement status update
-    toast({
-      title: 'Status Updated',
-      description: `Order status updated to ${newStatus}`,
-    });
-    loadOrders();
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    try {
+      const { error } = await OrderService.updateOrderStatus(orderId, newStatus);
+
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Status Updated',
+        description: `Order status updated to ${newStatus}`,
+      });
+
+      loadOrders();
+      loadStats();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update order status',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleViewDetails = (order: Order) => {

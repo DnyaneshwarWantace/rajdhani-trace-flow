@@ -3,12 +3,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate, formatIndianDateTime, formatIndianDate, formatCurrency } from '@/utils/formatHelpers';
-import { 
-  Package, 
-  ShoppingCart, 
-  Factory, 
-  Settings, 
-  User, 
+import {
+  Package,
+  ShoppingCart,
+  Factory,
+  Settings,
+  User,
   Info,
   Plus,
   Edit,
@@ -18,7 +18,8 @@ import {
   Clock,
   Calendar,
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import type { Notification } from '@/services/notificationService';
 import { ManageStockService } from '@/services/manageStockService';
@@ -46,7 +47,7 @@ export default function ActivityNotificationCard({
   const activityData = notification.related_data;
   const action = activityData?.action || '';
   const actionCategory = activityData?.action_category || '';
-  const userName = activityData?.user_name || 'User';
+  const userName = activityData?.user_name || activityData?.created_by_user || notification.created_by || 'User';
   const metadata = activityData?.metadata || {};
   
   // Check if this is a purchase order notification
@@ -175,7 +176,11 @@ export default function ActivityNotificationCard({
       metadata?.quantity_generated ||
       metadata?.category ||
       (activityData?.changes && Object.keys(activityData.changes).length > 0) ||
-      activityData?.target_resource
+      activityData?.target_resource ||
+      notification.type === 'order_alert' ||
+      (notification.related_data?.order_number) ||
+      (notification.related_data?.product_details) ||
+      (notification.related_data?.material_details)
     );
   };
 
@@ -440,9 +445,440 @@ export default function ActivityNotificationCard({
                     </div>
                   </div>
                 )}
-                
+
+                {/* Production Request / Restock Request Details - For Order-related Stock Alerts */}
+                {(notification.type === 'production_request' || notification.type === 'restock_request') && notification.related_data && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-3">
+                    {/* Left: Order & Customer Info */}
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        <ShoppingCart className="w-4 h-4" />
+                        Order & Customer Details
+                      </h4>
+
+                      <div className="space-y-3">
+                        {notification.related_data.order_number && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-600 mb-1">Order Number</p>
+                            <p className="text-sm font-semibold text-gray-900">{notification.related_data.order_number}</p>
+                          </div>
+                        )}
+
+                        {notification.related_data.customer_name && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-600 mb-1">Customer</p>
+                            <p className="text-sm text-gray-900 font-semibold">{notification.related_data.customer_name}</p>
+                            {notification.related_data.customer_phone && (
+                              <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                                📞 {notification.related_data.customer_phone}
+                              </p>
+                            )}
+                            {notification.related_data.customer_email && (
+                              <p className="text-xs text-gray-500 mt-0.5 break-all flex items-center gap-1">
+                                ✉ {notification.related_data.customer_email}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-blue-200">
+                          {notification.related_data.order_date && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-600 mb-1">Order Date</p>
+                              <p className="text-xs text-gray-900 flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {formatIndianDate(notification.related_data.order_date)}
+                              </p>
+                            </div>
+                          )}
+                          {notification.related_data.expected_delivery && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-600 mb-1">Expected Delivery</p>
+                              <p className="text-xs text-red-700 font-semibold flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {formatIndianDate(notification.related_data.expected_delivery)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {notification.related_data.created_by_user && (
+                          <div className="pt-2 border-t border-blue-200">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Created By</p>
+                            <p className="text-xs text-gray-900 flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {notification.related_data.created_by_user}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: Stock & Production Requirements */}
+                    <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                        {notification.type === 'production_request' ? (
+                          <Factory className="w-4 h-4" />
+                        ) : (
+                          <Package className="w-4 h-4" />
+                        )}
+                        {notification.type === 'production_request' ? 'Production Requirements' : 'Restock Requirements'}
+                      </h4>
+
+                      <div className="space-y-3">
+                        {(notification.related_data.product_name || notification.related_data.material_name) && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-600 mb-1">
+                              {notification.type === 'production_request' ? 'Product' : 'Material'} Name
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900 break-words">
+                              {notification.related_data.product_name || notification.related_data.material_name}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Stock Information */}
+                        <div className="grid grid-cols-3 gap-2 p-3 bg-white rounded-lg border border-orange-200">
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500 mb-1">Required</p>
+                            <p className="text-sm font-bold text-blue-700">
+                              {notification.related_data.quantity_ordered || 0}
+                            </p>
+                            <p className="text-xs text-gray-500">{notification.related_data.unit || 'units'}</p>
+                          </div>
+                          <div className="text-center border-l border-r border-orange-200">
+                            <p className="text-xs text-gray-500 mb-1">Available</p>
+                            <p className="text-sm font-bold text-green-700">
+                              {notification.related_data.available_stock || 0}
+                            </p>
+                            <p className="text-xs text-gray-500">{notification.related_data.unit || 'units'}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-gray-500 mb-1">Need</p>
+                            <p className="text-sm font-bold text-red-700">
+                              {notification.related_data.shortfall || 0}
+                            </p>
+                            <p className="text-xs text-gray-500">{notification.related_data.unit || 'units'}</p>
+                          </div>
+                        </div>
+
+                        {/* Product/Material Details */}
+                        {(notification.related_data.product_details || notification.related_data.material_details) && (
+                          <div className="pt-2 border-t border-orange-200">
+                            <p className="text-xs font-medium text-gray-600 mb-2">Details</p>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {notification.related_data.product_details?.color && (
+                                <div>
+                                  <span className="text-gray-500">Color:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.product_details.color}</span>
+                                </div>
+                              )}
+                              {notification.related_data.product_details?.pattern && (
+                                <div>
+                                  <span className="text-gray-500">Pattern:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.product_details.pattern}</span>
+                                </div>
+                              )}
+                              {notification.related_data.product_details?.category && (
+                                <div>
+                                  <span className="text-gray-500">Category:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.product_details.category}</span>
+                                </div>
+                              )}
+                              {notification.related_data.material_details?.color && (
+                                <div>
+                                  <span className="text-gray-500">Color:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.material_details.color}</span>
+                                </div>
+                              )}
+                              {notification.related_data.material_details?.supplier && (
+                                <div>
+                                  <span className="text-gray-500">Supplier:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.material_details.supplier}</span>
+                                </div>
+                              )}
+                              {notification.related_data.material_details?.category && (
+                                <div>
+                                  <span className="text-gray-500">Category:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">{notification.related_data.material_details.category}</span>
+                                </div>
+                              )}
+                              {(notification.related_data.product_details?.width || notification.related_data.material_details?.width) && (
+                                <div>
+                                  <span className="text-gray-500">Width:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">
+                                    {notification.related_data.product_details?.width || notification.related_data.material_details?.width}
+                                    {notification.related_data.product_details?.width_unit || notification.related_data.material_details?.width_unit || ''}
+                                  </span>
+                                </div>
+                              )}
+                              {(notification.related_data.product_details?.length || notification.related_data.material_details?.length) && (
+                                <div>
+                                  <span className="text-gray-500">Length:</span>
+                                  <span className="ml-1 text-gray-900 font-medium">
+                                    {notification.related_data.product_details?.length || notification.related_data.material_details?.length}
+                                    {notification.related_data.product_details?.length_unit || notification.related_data.material_details?.length_unit || ''}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Action Required Alert */}
+                        <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded">
+                          <p className="text-xs font-semibold text-red-800 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" />
+                            {notification.type === 'production_request' ? 'Production Required' : 'Restock Required'}
+                          </p>
+                          <p className="text-xs text-red-700 mt-1">
+                            {notification.type === 'production_request'
+                              ? `Produce ${notification.related_data.shortfall || 0} ${notification.related_data.unit || 'units'} to fulfill this order`
+                              : `Restock ${notification.related_data.shortfall || 0} ${notification.related_data.unit || 'units'} to fulfill this order`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Regular Activity Details */}
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              {/* Production Batch Info */}
+              {(action.includes('PRODUCTION') || actionCategory === 'PRODUCTION') && metadata?.batch_number && (
+                <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <Factory className="w-4 h-4" />
+                    Production Batch Details
+                  </h4>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">Batch Number:</p>
+                      <p className="text-sm font-semibold text-gray-900">{metadata.batch_number}</p>
+                    </div>
+                    {metadata.product_name && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Product:</p>
+                        <p className="text-sm text-gray-900">{metadata.product_name}</p>
+                        {(metadata.product_color || metadata.product_pattern) && (
+                          <p className="text-xs text-gray-600">
+                            {[metadata.product_color, metadata.product_pattern].filter(Boolean).join(' • ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {metadata.planned_quantity && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Planned Quantity:</p>
+                        <p className="text-sm text-gray-900">{metadata.planned_quantity} units</p>
+                      </div>
+                    )}
+                    {metadata.priority && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Priority:</p>
+                        <Badge className={`text-xs ${
+                          metadata.priority === 'urgent' ? 'bg-red-100 text-red-700' :
+                          metadata.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {metadata.priority}
+                        </Badge>
+                      </div>
+                    )}
+                    {(metadata.operator || metadata.supervisor) && (
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200">
+                        {metadata.operator && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">Operator:</p>
+                            <p className="text-xs text-gray-900">{metadata.operator}</p>
+                          </div>
+                        )}
+                        {metadata.supervisor && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">Supervisor:</p>
+                            <p className="text-xs text-gray-900">{metadata.supervisor}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Recipe Update Details */}
+              {metadata?.added_materials && metadata.added_materials.length > 0 && (
+                <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Added Materials ({metadata.added_materials.length})</h4>
+                  <div className="space-y-1">
+                    {metadata.added_materials.slice(0, 3).map((mat: any, idx: number) => (
+                      <div key={idx} className="text-xs text-gray-900">
+                        • {mat.material_name} - {mat.quantity_required} {mat.unit}
+                      </div>
+                    ))}
+                    {metadata.added_materials.length > 3 && (
+                      <p className="text-xs text-gray-500 italic">and {metadata.added_materials.length - 3} more...</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {metadata?.removed_materials && metadata.removed_materials.length > 0 && (
+                <div className="mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Removed Materials ({metadata.removed_materials.length})</h4>
+                  <div className="space-y-1">
+                    {metadata.removed_materials.slice(0, 3).map((mat: any, idx: number) => (
+                      <div key={idx} className="text-xs text-gray-900">
+                        • {mat.material_name} - {mat.quantity_required} {mat.unit}
+                      </div>
+                    ))}
+                    {metadata.removed_materials.length > 3 && (
+                      <p className="text-xs text-gray-500 italic">and {metadata.removed_materials.length - 3} more...</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              {metadata?.changed_materials && metadata.changed_materials.length > 0 && (
+                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Changed Materials ({metadata.changed_materials.length})</h4>
+                  <div className="space-y-1">
+                    {metadata.changed_materials.slice(0, 3).map((mat: any, idx: number) => (
+                      <div key={idx} className="text-xs text-gray-900">
+                        • {mat.material_name}: {mat.old_quantity} → {mat.new_quantity} {mat.unit}
+                      </div>
+                    ))}
+                    {metadata.changed_materials.length > 3 && (
+                      <p className="text-xs text-gray-500 italic">and {metadata.changed_materials.length - 3} more...</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Products Selection */}
+              {metadata?.individual_products && metadata.individual_products.length > 0 && (
+                <div className="mb-3 p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                    Individual Products Selected ({metadata.individual_products.length})
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-indigo-300 text-xs">
+                      <thead className="bg-indigo-100">
+                        <tr>
+                          <th className="border border-indigo-300 p-1 text-left">#</th>
+                          <th className="border border-indigo-300 p-1 text-left">QR Code</th>
+                          <th className="border border-indigo-300 p-1 text-left">Serial Number</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metadata.individual_products.slice(0, 5).map((product: any, idx: number) => (
+                          <tr key={idx}>
+                            <td className="border border-indigo-300 p-1">{idx + 1}</td>
+                            <td className="border border-indigo-300 p-1 font-mono">{product.qr_code}</td>
+                            <td className="border border-indigo-300 p-1">{product.serial_number}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {metadata.individual_products.length > 5 && (
+                      <p className="text-xs text-gray-500 italic mt-1">and {metadata.individual_products.length - 5} more products...</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Material Selection */}
+              {metadata?.raw_materials && metadata.raw_materials.length > 0 && (
+                <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                    Raw Materials Used ({metadata.raw_materials.length})
+                  </h4>
+                  <div className="space-y-1">
+                    {metadata.raw_materials.slice(0, 3).map((mat: any, idx: number) => (
+                      <div key={idx} className="text-xs text-gray-900 flex justify-between">
+                        <span>• {mat.material_name}</span>
+                        <span className="font-medium">{mat.quantity_used} {mat.unit} {mat.batch_number && `(${mat.batch_number})`}</span>
+                      </div>
+                    ))}
+                    {metadata.raw_materials.length > 3 && (
+                      <p className="text-xs text-gray-500 italic">and {metadata.raw_materials.length - 3} more materials...</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Machine Assignment */}
+              {metadata?.machine_name && (
+                <div className="mb-3 p-3 bg-cyan-50 rounded-lg border border-cyan-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Machine Assignment</h4>
+                  <div className="space-y-1">
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">Machine:</p>
+                      <p className="text-sm text-gray-900">{metadata.machine_name}</p>
+                    </div>
+                    {metadata.machine_number && (
+                      <p className="text-xs text-gray-600">Number: {metadata.machine_number}</p>
+                    )}
+                    {metadata.stage && (
+                      <p className="text-xs text-gray-600">Stage: {metadata.stage}</p>
+                    )}
+                    {metadata.operator_name && (
+                      <p className="text-xs text-gray-600">Operator: {metadata.operator_name}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Wastage Details */}
+              {metadata?.waste_type && (
+                <div className="mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1">
+                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                    Wastage Added
+                  </h4>
+                  <div className="space-y-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Type:</p>
+                        <p className="text-sm text-gray-900 capitalize">{metadata.waste_type}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Quantity:</p>
+                        <p className="text-sm font-semibold text-red-700">{metadata.quantity} {metadata.unit}</p>
+                      </div>
+                    </div>
+                    {metadata.reason && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Reason:</p>
+                        <p className="text-xs text-gray-900">{metadata.reason}</p>
+                      </div>
+                    )}
+                    {metadata.stage && (
+                      <p className="text-xs text-gray-600">Stage: {metadata.stage}</p>
+                    )}
+                    {metadata.material_name && (
+                      <p className="text-xs text-gray-600">Material: {metadata.material_name}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Individual Product Detail Updates */}
+              {metadata?.field_updated && (
+                <div className="mb-3 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Product Detail Update</h4>
+                  <div className="space-y-1">
+                    {metadata.qr_code && (
+                      <p className="text-xs text-gray-600">QR: <span className="font-mono">{metadata.qr_code}</span></p>
+                    )}
+                    <div className="text-xs">
+                      <span className="font-medium text-gray-700 capitalize">{metadata.field_updated.replace(/_/g, ' ')}:</span>
+                      <span className="text-gray-600 ml-1">"{metadata.old_value || 'N/A'}"</span>
+                      <span className="text-gray-400 mx-1">→</span>
+                      <span className="text-gray-900 font-medium">"{metadata.new_value}"</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Product/Material Info */}
               {(metadata?.product_name || metadata?.material_name) && (
                 <div className="space-y-1 mb-2">

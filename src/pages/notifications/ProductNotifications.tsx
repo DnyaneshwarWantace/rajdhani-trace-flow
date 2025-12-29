@@ -22,24 +22,60 @@ export default function ProductNotifications() {
 
   useEffect(() => {
     loadData();
+
+    // Auto-refresh every 10 seconds to catch new notifications
+    const refreshInterval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
       const { data } = await NotificationService.getNotifications({ limit: 1000 });
-      
+
+      console.log('📦 Product Notifications - All notifications:', data.length);
+      console.log('📦 Sample notifications:', data.slice(0, 5).map(n => ({
+        type: n.type,
+        module: n.module,
+        title: n.title
+      })));
+
+      // Look for Arena Carpet notification specifically
+      const arenaNotif = data.find(n => n.title.includes('Arena Carpet'));
+      if (arenaNotif) {
+        console.log('🎯 FOUND Arena Carpet notification:', {
+          title: arenaNotif.title,
+          type: arenaNotif.type,
+          module: arenaNotif.module,
+          status: arenaNotif.status,
+          id: arenaNotif.id
+        });
+      } else {
+        console.log('❌ Arena Carpet notification NOT found in data');
+      }
+
       // Filter for product-related notifications
-      const productNotifications = data.filter(n => 
-        n.module === 'products' || 
+      const productNotifications = data.filter(n =>
+        n.module === 'products' ||
         n.related_data?.action_category === 'PRODUCT' ||
         n.related_data?.action?.includes('PRODUCT_')
       );
-      
+
+      console.log('📦 Product Notifications - Filtered:', productNotifications.length);
+
+      // Check if Arena is in filtered
+      const arenaInFiltered = productNotifications.find(n => n.title.includes('Arena Carpet'));
+      console.log('🎯 Arena Carpet in filtered?', !!arenaInFiltered);
+
       // Separate notifications and activity logs
       const regularNotifications = productNotifications.filter(n => !n.related_data?.activity_log_id);
       const logs = productNotifications.filter(n => n.related_data?.activity_log_id);
-      
+
+      console.log('📦 Product Notifications - Regular:', regularNotifications.length, 'Logs:', logs.length);
+
       setNotifications(regularNotifications);
       setActivityLogs(logs);
     } catch (error) {

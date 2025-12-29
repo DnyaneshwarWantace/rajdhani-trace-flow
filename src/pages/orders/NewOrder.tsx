@@ -8,6 +8,7 @@ import { CustomerService, type Customer } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
+import { NotificationService } from '@/services/notificationService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { getSuggestedPricingUnit, type ProductDimensions } from '@/utils/unitConverter';
 import { formatCurrency } from '@/utils/formatHelpers';
@@ -264,6 +265,8 @@ export default function NewOrder() {
               updated.pricing_unit = updated.product_type === 'product' ? 'unit' : getSuggestedPricingUnit(productDimensions);
 
               const calculation = pricingCalculator.calculateItemPrice(updated);
+              updated.subtotal = calculation.subtotal;
+              updated.gst_amount = calculation.gstAmount;
               updated.total_price = calculation.totalPrice;
               updated.unit_value = calculation.unitValue;
               updated.isValid = calculation.isValid;
@@ -271,8 +274,10 @@ export default function NewOrder() {
             }
           }
 
-          if (field === 'quantity' || field === 'unit_price' || field === 'pricing_unit' || field === 'product_dimensions') {
+          if (field === 'quantity' || field === 'unit_price' || field === 'pricing_unit' || field === 'product_dimensions' || field === 'gst_rate' || field === 'gst_included') {
             const calculation = pricingCalculator.calculateItemPrice(updated);
+            updated.subtotal = calculation.subtotal;
+            updated.gst_amount = calculation.gstAmount;
             updated.total_price = calculation.totalPrice;
             updated.unit_value = calculation.unitValue;
             updated.isValid = calculation.isValid;
@@ -314,10 +319,8 @@ export default function NewOrder() {
     }
 
     try {
-      const subtotal = calculateTotal();
-      const gstRate = gstSettings.rate;
-      const gstAmount = gstSettings.isIncluded ? (subtotal * gstRate) / 100 : 0;
-      const totalAmount = subtotal + gstAmount;
+      // Calculate total - each item already has GST included in total_price
+      const totalAmount = calculateTotal();
       const paidAmount = orderDetails.paidAmount || 0;
 
       const orderData = {
@@ -336,6 +339,8 @@ export default function NewOrder() {
           unit_price: item.unit_price,
           gst_rate: item.gst_rate || 18, // Per-item GST rate
           gst_included: item.gst_included !== false, // Per-item GST included flag
+          subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : (item.subtotal || 0),
+          gst_amount: typeof item.gst_amount === 'string' ? parseFloat(item.gst_amount) : (item.gst_amount || 0),
           total_price: typeof item.total_price === 'string' ? parseFloat(item.total_price) : item.total_price,
           pricing_unit: item.pricing_unit,
           unit_value: item.unit_value,
@@ -344,7 +349,6 @@ export default function NewOrder() {
           specifications: item.specifications || '',
           selected_individual_products: item.selectedIndividualProducts?.map((p: any) => p.id) || [],
         })),
-        gst_rate: gstRate,
         discount_amount: 0,
         paid_amount: paidAmount,
         priority: 'medium' as const,
@@ -352,7 +356,7 @@ export default function NewOrder() {
         delivery_address: orderDeliveryAddress || undefined,
       };
 
-      const { error: orderError } = await OrderService.createOrder(orderData);
+      const { error: orderError, data: newOrder } = await OrderService.createOrder(orderData);
 
       if (orderError) {
         toast({
@@ -362,6 +366,8 @@ export default function NewOrder() {
         });
         return;
       }
+
+      // Backend automatically creates stock notifications, no need to create from frontend
 
       toast({
         title: 'Success',
@@ -468,14 +474,6 @@ export default function NewOrder() {
           onExpectedDeliveryChange={value => setOrderDetails(prev => ({ ...prev, expectedDelivery: value }))}
           onPaidAmountChange={value => setOrderDetails(prev => ({ ...prev, paidAmount: value }))}
           onNotesChange={value => setOrderDetails(prev => ({ ...prev, notes: value }))}
-        />
-
-        {/* GST Settings */}
-        <GSTSettings
-          rate={gstSettings.rate}
-          isIncluded={gstSettings.isIncluded}
-          onRateChange={rate => setGstSettings(prev => ({ ...prev, rate }))}
-          onIncludeChange={included => setGstSettings(prev => ({ ...prev, isIncluded: included }))}
         />
 
         {/* Delivery Address */}

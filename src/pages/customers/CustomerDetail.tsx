@@ -238,7 +238,7 @@ export default function CustomerDetail() {
             <div className="lg:col-span-2 space-y-6">
               <CustomerDetailInfo customer={customer} />
               <CustomerDetailFinancial customer={customer} orders={orders} />
-              <CustomerDetailOrderHistory customer={customer} orders={orders} />
+              <CustomerDetailOrderHistory customer={customer} orders={orders} onOrderUpdated={loadOrders} />
             </div>
             
             <div className="space-y-6">

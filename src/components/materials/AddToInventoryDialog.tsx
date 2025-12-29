@@ -49,9 +49,9 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     category: '',
     unit: '',
     currentStock: '0',
-    minThreshold: '10',
-    maxCapacity: '1000',
-    reorderPoint: '50',
+    minThreshold: '', // Optional - will default to 10 if empty
+    maxCapacity: '', // Optional - will default to 1000 if empty
+    reorderPoint: '', // Optional - will default to 50 if empty
     supplier: '',
     costPerUnit: '',
     color: 'NA',
@@ -392,9 +392,9 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
         category: '',
         unit: '',
         currentStock: '0',
-        minThreshold: '10',
-        maxCapacity: '1000',
-        reorderPoint: '50',
+        minThreshold: '', // Optional - will default to 10 if empty
+        maxCapacity: '', // Optional - will default to 1000 if empty
+        reorderPoint: '', // Optional - will default to 50 if empty
         supplier: '',
         costPerUnit: '',
         color: 'NA',
@@ -549,7 +549,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
           {/* Reorder Point and Cost/Unit on same line */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="reorderPoint">Reorder Point *</Label>
+              <Label htmlFor="reorderPoint">Reorder Point</Label>
               <Input
                 id="reorderPoint"
                 type="text"
@@ -560,10 +560,9 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
                     setFormData({ ...formData, reorderPoint: value });
                   }
                 }}
-                placeholder="50"
-                required
+                placeholder="50 (auto-set if empty)"
               />
-              <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed</p>
+              <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed (default: 50)</p>
             </div>
 
             <MaterialCostSection

@@ -13,7 +13,9 @@ export interface PricingCalculation {
   quantity: number;
   unitValue: number;
   totalValue: number;
-  totalPrice: number;
+  subtotal: number; // Base price before GST
+  gstAmount: number; // GST amount
+  totalPrice: number; // Final price including GST
   pricingUnit: PricingUnit;
   isValid: boolean;
   errorMessage?: string;
@@ -63,16 +65,23 @@ export interface UsePricingCalculatorReturn {
 export function usePricingCalculator(): UsePricingCalculatorReturn {
   
   const calculateItemPrice = useCallback((item: ExtendedOrderItem): PricingCalculation => {
-    const { unit_price, quantity, pricing_unit, product_dimensions } = item;
-    
+    const { unit_price, quantity, pricing_unit, product_dimensions, gst_rate = 18, gst_included = true } = item;
+
     // For count_unit (unit): simple price * quantity
     if (pricing_unit === 'unit' || !pricing_unit) {
+      const basePrice = unit_price * quantity;
+      const gstAmount = gst_included ? (basePrice * gst_rate) / (100 + gst_rate) : (basePrice * gst_rate) / 100;
+      const subtotal = gst_included ? basePrice - gstAmount : basePrice;
+      const totalPrice = gst_included ? basePrice : basePrice + gstAmount;
+
       return {
         unitPrice: unit_price,
         quantity,
         unitValue: unit_price,
         totalValue: unit_price * quantity,
-        totalPrice: unit_price * quantity,
+        subtotal,
+        gstAmount,
+        totalPrice,
         pricingUnit: pricing_unit || 'unit' as PricingUnit,
         isValid: unit_price > 0 && quantity > 0,
         errorMessage: unit_price <= 0 ? 'Please enter a price' : ''
@@ -86,6 +95,8 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
         quantity,
         unitValue: unit_price,
         totalValue: unit_price * quantity,
+        subtotal: 0,
+        gstAmount: 0,
         totalPrice: unit_price * quantity,
         pricingUnit: pricing_unit,
         isValid: false,
@@ -129,8 +140,8 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       }
     }
     
-    // Calculate total price with unit conversion support
-    const totalPrice = calculateTotalPrice(
+    // Calculate base price with unit conversion support
+    const basePrice = calculateTotalPrice(
       unit_price,
       quantity,
       pricing_unit,
@@ -138,12 +149,19 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       lengthUnit,
       widthUnit
     );
-    
+
+    // Calculate GST
+    const gstAmount = gst_included ? (basePrice * gst_rate) / (100 + gst_rate) : (basePrice * gst_rate) / 100;
+    const subtotal = gst_included ? basePrice - gstAmount : basePrice;
+    const totalPrice = gst_included ? basePrice : basePrice + gstAmount;
+
     return {
       unitPrice: unit_price,
       quantity,
       unitValue,
       totalValue: unitValue * quantity,
+      subtotal,
+      gstAmount,
       totalPrice,
       pricingUnit: pricing_unit,
       isValid: unit_price > 0 && quantity > 0

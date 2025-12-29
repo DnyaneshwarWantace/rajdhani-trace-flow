@@ -39,7 +39,7 @@ export default function OrderDetailsForm({
           <Label>Advance Payment (Optional)</Label>
           <Input
             type="number"
-            value={paidAmount}
+            value={paidAmount || ''}
             onChange={e => onPaidAmountChange(parseFloat(e.target.value) || 0)}
             min="0"
             step="0.01"

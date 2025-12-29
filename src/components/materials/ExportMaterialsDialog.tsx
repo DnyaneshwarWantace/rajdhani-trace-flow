@@ -37,52 +37,35 @@ export default function ExportMaterialsDialog({
 
     setExporting('csv');
     try {
-      // Define CSV headers
+      // Define CSV headers - only basic material creation fields
       const headers = [
-        'ID',
         'Name',
         'Supplier',
         'Category',
-        'Type',
         'Unit',
         'Current Stock',
-        'Available Stock',
         'Min Threshold',
         'Max Capacity',
+        'Reorder Point',
         'Cost Per Unit',
+        'Type',
         'Color',
-        'Status',
-        'Created At',
-        'Updated At',
       ];
 
       // Convert materials to CSV rows
       const rows = materials.map((material) => {
-        // Calculate available stock
-        const availableStock = material.available_stock !== undefined
-          ? material.available_stock
-          : (material.current_stock || 0) -
-            ((material.in_production || 0) +
-             (material.reserved || 0) +
-             (material.sold || 0) +
-             (material.used || 0));
-
         return [
-          material.id || material._id || '',
           material.name || '',
           material.supplier_name || '',
           material.category || '',
-          material.type || '',
           material.unit || '',
           (material.current_stock || 0).toString(),
-          availableStock.toString(),
           (material.min_threshold || 0).toString(),
           (material.max_capacity || 0).toString(),
+          (material.reorder_point || 0).toString(),
           (material.cost_per_unit || 0).toString(),
+          material.type || '',
           material.color || '',
-          material.status || '',
-          material.created_at ? new Date(material.created_at).toLocaleString() : '',
-          material.updatedAt ? new Date(material.updatedAt).toLocaleString() : '',
         ];
       });
 
@@ -166,33 +149,20 @@ export default function ExportMaterialsDialog({
         return;
       }
 
-      // Prepare data for Excel
+      // Prepare data for Excel - only basic material creation fields
       const excelData = materials.map((material) => {
-        // Calculate available stock
-        const availableStock = material.available_stock !== undefined
-          ? material.available_stock
-          : (material.current_stock || 0) -
-            ((material.in_production || 0) +
-             (material.reserved || 0) +
-             (material.sold || 0) +
-             (material.used || 0));
-
         return {
-          'ID': material.id || material._id || '',
           'Name': material.name || '',
           'Supplier': material.supplier_name || '',
           'Category': material.category || '',
-          'Type': material.type || '',
           'Unit': material.unit || '',
           'Current Stock': material.current_stock || 0,
-          'Available Stock': availableStock,
           'Min Threshold': material.min_threshold || 0,
           'Max Capacity': material.max_capacity || 0,
+          'Reorder Point': material.reorder_point || 0,
           'Cost Per Unit': material.cost_per_unit || 0,
+          'Type': material.type || '',
           'Color': material.color || '',
-          'Status': material.status || '',
-          'Created At': material.created_at ? new Date(material.created_at).toLocaleString() : '',
-          'Updated At': material.updatedAt ? new Date(material.updatedAt).toLocaleString() : '',
         };
       });
 
@@ -203,21 +173,17 @@ export default function ExportMaterialsDialog({
 
       // Set column widths
       const columnWidths = [
-        { wch: 15 }, // ID
         { wch: 30 }, // Name
         { wch: 20 }, // Supplier
         { wch: 20 }, // Category
-        { wch: 15 }, // Type
         { wch: 10 }, // Unit
         { wch: 15 }, // Current Stock
-        { wch: 15 }, // Available Stock
         { wch: 15 }, // Min Threshold
         { wch: 15 }, // Max Capacity
+        { wch: 15 }, // Reorder Point
         { wch: 15 }, // Cost Per Unit
+        { wch: 15 }, // Type
         { wch: 15 }, // Color
-        { wch: 15 }, // Status
-        { wch: 20 }, // Created At
-        { wch: 20 }, // Updated At
       ];
       worksheet['!cols'] = columnWidths;
 
@@ -287,8 +253,15 @@ export default function ExportMaterialsDialog({
           </div>
 
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs font-semibold text-blue-900 mb-1">Exported Fields:</p>
+            <p className="text-xs text-blue-800 mb-1">
+              <strong>Required:</strong> Name, Supplier, Category, Unit, Cost Per Unit
+            </p>
             <p className="text-xs text-blue-800">
-              <strong>Exported fields:</strong> ID, Name, Supplier, Category, Type, Unit, Current Stock, Available Stock, Min Threshold, Max Capacity, Cost Per Unit, Color, Status, Location, Created At, Updated At
+              <strong>Optional:</strong> Type, Current Stock, Min Threshold, Max Capacity, Reorder Point, Color
+            </p>
+            <p className="text-xs text-blue-700 mt-2 italic">
+              Note: Optional fields can be skipped in import - defaults will be used (same as form).
             </p>
           </div>
         </div>

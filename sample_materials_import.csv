@@ -1,0 +1,16 @@
+Name,Supplier,Category,Unit,Current Stock,Min Threshold,Max Capacity,Reorder Point,Cost Per Unit,Type,Color
+Cotton Yarn,ABC Textiles,Fibre,kg,500,100,2000,200,150.50,Natural,White
+Polyester Fiber,XYZ Industries,Fibre,kg,,150,3000,300,120.75,Synthetic,
+Silk Thread,Premium Fabrics,Fibre,kg,200,,1000,100,450.00,,
+Wool Yarn,Sheep Co,Fibre,kg,300,100,,150,280.25,Natural,Brown
+Linen Fabric,Natural Textiles,Fibre,meters,150,50,800,,320.00,Natural,
+Dye Red,Color Chemicals,Chemical,L,50,10,200,25,85.50,,
+Dye Blue,Color Chemicals,Chemical,L,,,250,30,90.25,Chemical,Blue
+Starch Powder,Industrial Supplies,Chemical,kg,400,100,1500,200,45.00,Chemical,White
+Bleaching Agent,Chemical Works,Chemical,L,30,5,150,15,125.00,,
+Button Small,Accessories Co,Packaging,kg,5000,1000,20000,2000,2.50,Accessory,
+Button Large,Accessories Co,Packaging,kg,,500,15000,1000,5.00,,
+Zipper 12 inch,Hardware Supplies,Packaging,kg,200,50,1000,,25.75,Accessory,Silver
+Thread White,Thread Masters,Fibre,kg,1000,200,5000,500,12.50,,
+Thread Black,Thread Masters,Fibre,kg,,,4000,400,12.50,Accessory,
+Canvas Fabric,Heavy Duty Textiles,Fibre,meters,250,100,1000,200,180.00,,
