@@ -34,14 +34,65 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
     companyName: '',
   });
 
-  const handleGSTNumberChange = async (gstNumber: string) => {
-    setNewCustomer({ ...newCustomer, gstNumber });
+  // Handler for name validation (max 8 words, max 20 chars per word)
+  const handleNameChange = (value: string) => {
+    let inputValue = value;
+
+    // Split by spaces to get words
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to 8 words
+    if (words.length > 8) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 8) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to 20 characters
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > 20 ? part.slice(0, 20) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setNewCustomer({ ...newCustomer, name: inputValue });
+  };
+
+  const handleGSTNumberChange = async (value: string) => {
+    // Remove any non-alphanumeric characters
+    let gstValue = value.replace(/[^a-zA-Z0-9]/g, '');
+
+    // Convert to uppercase
+    gstValue = gstValue.toUpperCase();
+
+    // Limit to 15 characters
+    gstValue = gstValue.slice(0, 15);
+
+    setNewCustomer({ ...newCustomer, gstNumber: gstValue });
     setGstAutoFilled(false);
 
-    if (gstNumber.length === 15) {
+    if (gstValue.length === 15) {
       setIsFetchingGST(true);
       try {
-        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstNumber);
+        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
         if (error) {
           toast({
             title: 'Error',
@@ -75,34 +126,6 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
       toast({
         title: 'Validation Error',
         description: 'Full name is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newCustomer.name.trim().length < 3) {
-      toast({
-        title: 'Validation Error',
-        description: 'Full name must be at least 3 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newCustomer.name.trim().length > 100) {
-      toast({
-        title: 'Validation Error',
-        description: 'Full name must not exceed 100 characters',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Check if name has at least one word (no single character names)
-    if (newCustomer.name.trim().split(/\s+/).some(word => word.length < 2)) {
-      toast({
-        title: 'Validation Error',
-        description: 'Each word in the name must be at least 2 characters',
         variant: 'destructive',
       });
       return;
@@ -231,9 +254,10 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
             <Label>Full Name *</Label>
             <Input
               value={newCustomer.name}
-              onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })}
+              onChange={e => handleNameChange(e.target.value)}
               placeholder="Enter customer name"
             />
+            <p className="text-xs text-gray-500">Max 8 words, 20 characters per word</p>
           </div>
         </div>
 

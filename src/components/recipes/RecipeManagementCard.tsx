@@ -4,42 +4,70 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Package, Plus, Edit, Trash2, Save } from 'lucide-react';
 import { RecipeService } from '@/services/recipeService';
-import type { Product } from '@/types/product';
-import type { RawMaterial } from '@/types/material';
+import RecipeMaterialSelectionDialog from './RecipeMaterialSelectionDialog';
 import type { Recipe } from '@/types/recipe';
 
 interface RecipeManagementCardProps {
   recipes: Recipe[];
-  products: Product[];
-  rawMaterials: RawMaterial[];
   onRefresh: () => void;
 }
 
 export default function RecipeManagementCard({
   recipes,
-  products,
-  rawMaterials,
   onRefresh,
 }: RecipeManagementCardProps) {
   const { toast } = useToast();
   const [isMaterialDialogOpen, setIsMaterialDialogOpen] = useState(false);
+  const [isMaterialSelectorOpen, setIsMaterialSelectorOpen] = useState(false);
+  const [selectedMaterialType, setSelectedMaterialType] = useState<'raw_material' | 'product'>('raw_material');
+  const [currentRecipeId, setCurrentRecipeId] = useState<string>('');
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
 
   const handleAddMaterial = (recipe: Recipe) => {
-    setEditingMaterial({
-      recipe_id: recipe.id,
-      material_id: '',
-      material_name: '',
-      material_type: 'raw_material',
-      quantity_per_sqm: 1,
-      unit: 'kg',
-    });
+    setCurrentRecipeId(recipe.id);
+    setSelectedMaterialType('raw_material');
     setIsMaterialDialogOpen(true);
+  };
+
+  const handleMaterialTypeSelect = () => {
+    setIsMaterialDialogOpen(false);
+    setIsMaterialSelectorOpen(true);
+  };
+
+  const handleMaterialSelect = (materials: any[]) => {
+    // Set the first material or multiple materials for quantity entry
+    if (materials.length > 0) {
+      setEditingMaterial({
+        recipe_id: currentRecipeId,
+        materials: materials.map(m => {
+          // For products, auto-calculate quantity based on SQM
+          let quantityPerSqm = 1;
+          let unit = m.unit || 'kg';
+
+          if (selectedMaterialType === 'product') {
+            // For products, use count_unit (rolls, count, etc)
+            unit = m.count_unit || 'count';
+            // Auto-calculate: if product is X sqm, then you need 1/X products per sqm
+            if (m.sqm && m.sqm > 0) {
+              quantityPerSqm = 1 / m.sqm;
+            }
+          }
+
+          return {
+            material_id: m.id,
+            material_name: m.name,
+            material_type: selectedMaterialType,
+            quantity_per_sqm: quantityPerSqm,
+            unit: unit,
+          };
+        }),
+      });
+    }
+    setIsMaterialSelectorOpen(false);
   };
 
   const handleEditMaterial = (material: any, recipe: Recipe) => {
@@ -93,6 +121,32 @@ export default function RecipeManagementCard({
     try {
       if (!editingMaterial) return;
 
+      // Validate quantity for multiple materials
+      if (editingMaterial.materials) {
+        const invalidMaterials = editingMaterial.materials.filter((m: any) =>
+          !m.quantity_per_sqm || m.quantity_per_sqm <= 0
+        );
+        if (invalidMaterials.length > 0) {
+          toast({
+            title: 'Invalid Quantity',
+            description: 'Please enter a valid quantity greater than 0 for all materials',
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else {
+        // Validate quantity for single material
+        const quantity = editingMaterial.quantity_per_sqm || editingMaterial.quantity || 0;
+        if (!quantity || quantity <= 0) {
+          toast({
+            title: 'Invalid Quantity',
+            description: 'Please enter a valid quantity greater than 0',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       const recipe = recipes.find((r) => r.id === editingMaterial.recipe_id);
       if (!recipe || !recipe.materials) return;
 
@@ -104,8 +158,16 @@ export default function RecipeManagementCard({
         if (index !== -1) {
           updatedMaterials[index] = { ...updatedMaterials[index], ...editingMaterial };
         }
+      } else if (editingMaterial.materials) {
+        // Add multiple new materials
+        editingMaterial.materials.forEach((mat: any) => {
+          updatedMaterials.push({
+            id: `temp_${Date.now()}_${Math.random()}`,
+            ...mat,
+          });
+        });
       } else {
-        // Add new material
+        // Add single new material
         updatedMaterials.push({
           id: `temp_${Date.now()}`,
           ...editingMaterial,
@@ -125,10 +187,9 @@ export default function RecipeManagementCard({
 
       toast({
         title: 'Success',
-        description: editingMaterial.id ? 'Material updated' : 'Material added',
+        description: editingMaterial.id ? 'Material updated' : `${editingMaterial.materials?.length || 1} material(s) added`,
       });
 
-      setIsMaterialDialogOpen(false);
       setEditingMaterial(null);
       onRefresh();
     } catch (error) {
@@ -167,7 +228,7 @@ export default function RecipeManagementCard({
           ) : (
             <div className="space-y-4 md:space-y-6">
               {recipes.map((recipe) => (
-                <Card key={recipe.id} className="border-l-4 border-l-primary">
+                <Card key={recipe.id}>
                   <CardHeader>
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                       <div>
@@ -198,7 +259,7 @@ export default function RecipeManagementCard({
                               <div>
                                 <Badge
                                   variant={material.material_type === 'product' ? 'default' : 'secondary'}
-                                  className="text-xs"
+                                  className={`text-xs ${material.material_type === 'product' ? 'text-white' : ''}`}
                                 >
                                   {material.material_type === 'product' ? 'Product' : 'Raw Material'}
                                 </Badge>
@@ -256,15 +317,112 @@ export default function RecipeManagementCard({
         </CardContent>
       </Card>
 
-      {/* Edit Material Dialog */}
-      <Dialog open={isMaterialDialogOpen} onOpenChange={setIsMaterialDialogOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      {/* Material Type Selection Dialog */}
+      <Dialog open={isMaterialDialogOpen && !editingMaterial} onOpenChange={setIsMaterialDialogOpen}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingMaterial?.id ? 'Edit Material (for 1 sqm)' : 'Add Material (for 1 sqm)'}</DialogTitle>
+            <DialogTitle>Select Material Type</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card
+                className={`p-6 cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
+                  selectedMaterialType === 'raw_material' ? 'border-blue-500 bg-blue-50' : ''
+                }`}
+                onClick={() => setSelectedMaterialType('raw_material')}
+              >
+                <div className="text-center space-y-2">
+                  <Package className="w-8 h-8 mx-auto" />
+                  <div className="font-semibold">Raw Material</div>
+                  <div className="text-xs text-gray-600">Select from raw materials</div>
+                </div>
+              </Card>
+              <Card
+                className={`p-6 cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
+                  selectedMaterialType === 'product' ? 'border-blue-500 bg-blue-50' : ''
+                }`}
+                onClick={() => setSelectedMaterialType('product')}
+              >
+                <div className="text-center space-y-2">
+                  <Package className="w-8 h-8 mx-auto" />
+                  <div className="font-semibold">Product</div>
+                  <div className="text-xs text-gray-600">Select from products</div>
+                </div>
+              </Card>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMaterialDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleMaterialTypeSelect} className="text-white">
+              Next
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Material Selection Dialog */}
+      <RecipeMaterialSelectionDialog
+        isOpen={isMaterialSelectorOpen}
+        onClose={() => setIsMaterialSelectorOpen(false)}
+        materialType={selectedMaterialType}
+        onSelect={handleMaterialSelect}
+      />
+
+      {/* Quantity Entry Dialog (after material selected) */}
+      <Dialog open={!!editingMaterial} onOpenChange={() => setEditingMaterial(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {editingMaterial?.id ? 'Edit' : 'Add'} Material{editingMaterial?.materials?.length > 1 ? 's' : ''} (for 1 sqm)
+            </DialogTitle>
           </DialogHeader>
           {editingMaterial && (
-            <div className="space-y-4">
-              {editingMaterial.id ? (
+            <div className="space-y-4 flex-1 overflow-auto">
+              {editingMaterial.materials ? (
+                // Multiple materials
+                <div className="space-y-4">
+                  {editingMaterial.materials.map((material: any, index: number) => (
+                    <Card key={index} className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-semibold">{material.material_name}</div>
+                            <div className="text-xs text-gray-600 mt-1">
+                              {material.material_type === 'product' ? 'Product' : 'Raw Material'} • {material.unit}
+                            </div>
+                          </div>
+                          <Badge variant="secondary">{index + 1}</Badge>
+                        </div>
+                        <div>
+                          <Label htmlFor={`quantity-${index}`}>Quantity (for 1 sqm)</Label>
+                          <Input
+                            id={`quantity-${index}`}
+                            type="number"
+                            value={material.quantity_per_sqm ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const updated = [...editingMaterial.materials];
+                              updated[index] = {
+                                ...updated[index],
+                                quantity_per_sqm: value === '' ? '' : parseFloat(value),
+                              };
+                              setEditingMaterial({ ...editingMaterial, materials: updated });
+                            }}
+                            min="0"
+                            step="0.1"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                  <p className="text-xs text-muted-foreground">
+                    Amount needed for 1 square meter (sqm) - this recipe works for all products
+                  </p>
+                </div>
+              ) : (
+                // Single material (edit mode)
                 <>
                   <div>
                     <Label>Material Type</Label>
@@ -279,115 +437,47 @@ export default function RecipeManagementCard({
                       {editingMaterial.material_name}
                     </div>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <Label htmlFor="material-type">Material Type</Label>
-                    <Select
-                      value={editingMaterial.material_type}
-                      onValueChange={(value) => setEditingMaterial({ ...editingMaterial, material_type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="raw_material">Raw Material</SelectItem>
-                        <SelectItem value="product">Product</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
 
                   <div>
-                    <Label htmlFor="material-select">Material</Label>
-                    <Select
-                      value={editingMaterial.material_id}
-                      onValueChange={(value) => {
-                        const selected =
-                          editingMaterial.material_type === 'raw_material'
-                            ? rawMaterials.find((m) => m.id === value)
-                            : products.find((p) => p.id === value);
-                        if (selected) {
-                          setEditingMaterial({
-                            ...editingMaterial,
-                            material_id: value,
-                            material_name: selected.name,
-                            unit: selected.unit || 'kg',
-                          });
-                        }
+                    <Label htmlFor="quantity">Quantity (for 1 sqm)</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={editingMaterial.quantity_per_sqm ?? editingMaterial.quantity ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingMaterial({
+                          ...editingMaterial,
+                          quantity_per_sqm: value === '' ? '' : parseFloat(value),
+                        });
                       }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select material" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {editingMaterial.material_type === 'raw_material'
-                          ? rawMaterials.map((material) => (
-                              <SelectItem key={material.id} value={material.id}>
-                                {material.name} ({material.unit})
-                              </SelectItem>
-                            ))
-                          : products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.unit})
-                              </SelectItem>
-                            ))}
-                      </SelectContent>
-                    </Select>
+                      min="0"
+                      step="0.1"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Amount needed for 1 square meter (sqm) - this recipe works for all products
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Unit</Label>
+                    <div className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
+                      {editingMaterial.unit}
+                    </div>
                   </div>
                 </>
               )}
-
-              <div>
-                <Label htmlFor="quantity">Quantity (for 1 sqm)</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  value={editingMaterial.quantity_per_sqm || editingMaterial.quantity || 0}
-                  onChange={(e) =>
-                    setEditingMaterial({
-                      ...editingMaterial,
-                      quantity_per_sqm: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                  min="0"
-                  step="0.1"
-                  placeholder="e.g., 2.5"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Amount needed for 1 square meter (sqm) - this recipe works for all products
-                </p>
-              </div>
-
-              {editingMaterial.id ? (
-                <div>
-                  <Label>Unit</Label>
-                  <div className="mt-1 px-3 py-2 bg-muted rounded-md text-sm">
-                    {editingMaterial.unit}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <Label htmlFor="unit">Unit</Label>
-                  <Input
-                    id="unit"
-                    value={editingMaterial.unit}
-                    onChange={(e) => setEditingMaterial({ ...editingMaterial, unit: e.target.value })}
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsMaterialDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSaveMaterial}>
-                  <Save className="w-4 h-4 mr-2" />
-                  Save
-                </Button>
-              </div>
             </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMaterial(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveMaterial} className="text-white">
+              <Save className="w-4 h-4 mr-2" />
+              Save {editingMaterial?.materials?.length > 1 && `(${editingMaterial.materials.length})`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

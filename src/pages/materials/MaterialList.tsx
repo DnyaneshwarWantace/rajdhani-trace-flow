@@ -160,7 +160,7 @@ export default function MaterialList() {
         // Only reload if page was hidden for more than 30 seconds (likely went to another app)
         const timeSinceLastVisit = Date.now() - lastVisitRef.current;
         if (timeSinceLastVisit > 30000) {
-    loadMaterials();
+          loadMaterialsFast();
         }
       } else if (document.visibilityState === 'hidden') {
         lastVisitRef.current = Date.now();
@@ -182,23 +182,37 @@ export default function MaterialList() {
       loadingRef.current = true;
       setLoading(true);
       setError(null);
-      const { materials: data, total } = await MaterialService.getMaterials(filters);
-      setMaterials(data);
-      setTotalMaterials(total || data.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load materials');
-    } finally {
-      setLoading(false);
-      loadingRef.current = false;
-    }
-  };
 
-  // Full reload with stats (used after create/edit/delete)
-  const loadMaterials = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const { materials: data, total } = await MaterialService.getMaterials(filters);
+      // Build filters without search - handle search client-side for more fields
+      const apiFilters = {
+        ...filters,
+        search: undefined, // Don't send search to API
+        limit: filters.search ? 10000 : filters.limit, // Fetch all if searching
+      };
+
+      let { materials: data, total } = await MaterialService.getMaterials(apiFilters);
+
+      // Apply client-side search if search term exists
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        data = data.filter((m: any) =>
+          m.name?.toLowerCase().includes(searchLower) ||
+          m.id?.toLowerCase().includes(searchLower) ||
+          m.category?.toLowerCase().includes(searchLower) ||
+          m.type?.toLowerCase().includes(searchLower) ||
+          m.color?.toLowerCase().includes(searchLower) ||
+          m.supplier_name?.toLowerCase().includes(searchLower) ||
+          m.batch_number?.toLowerCase().includes(searchLower) ||
+          m.quality_grade?.toLowerCase().includes(searchLower)
+        );
+        // Apply pagination after client-side filtering
+        const page = filters.page || 1;
+        const limit = filters.limit || 50;
+        const startIdx = (page - 1) * limit;
+        const endIdx = startIdx + limit;
+        data = data.slice(startIdx, endIdx);
+      }
+
       setMaterials(data);
       setTotalMaterials(total || data.length);
       // Also refresh stats
@@ -706,7 +720,7 @@ export default function MaterialList() {
     } catch (err) {
       console.error('Error refreshing materials:', err);
       // Fallback to full reload if silent refresh fails
-      loadMaterials();
+      loadMaterialsFast();
     }
     setSelectedMaterial(null);
     setEditMode('create');

@@ -208,16 +208,32 @@ export default function MaterialSelectionDialog({
     try {
       if (activeTab === 'raw_materials') {
 
-        // Fetch filtered materials for display
-        // Fetch all materials if multiple categories or use single category
+        // Fetch all materials (no search sent to API - handled client-side for better flexibility)
         const response = await MaterialService.getMaterials({
-          search: searchQuery || undefined,
+          // Don't send search to API - handle search client-side for more fields
+          // search: searchQuery || undefined,
           category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
           page: currentPage,
-          limit: categoryFilter.length > 1 ? 1000 : itemsPerPage, // Fetch all if multiple categories
+          limit: categoryFilter.length > 1 || searchQuery ? 1000 : itemsPerPage, // Fetch all if search or multiple categories
         });
 
         let materialsData = response.materials || [];
+
+        // Apply search filter client-side (searches more fields than backend)
+        if (searchQuery) {
+          const searchLower = searchQuery.toLowerCase();
+          materialsData = materialsData.filter((m: any) =>
+            m.name?.toLowerCase().includes(searchLower) ||
+            m.id?.toLowerCase().includes(searchLower) ||
+            m.category?.toLowerCase().includes(searchLower) ||
+            m.type?.toLowerCase().includes(searchLower) ||
+            m.material_type?.toLowerCase().includes(searchLower) ||
+            m.color?.toLowerCase().includes(searchLower) ||
+            m.supplier_name?.toLowerCase().includes(searchLower) ||
+            m.batch_number?.toLowerCase().includes(searchLower) ||
+            m.quality_grade?.toLowerCase().includes(searchLower)
+          );
+        }
 
         // Apply multi-select category filter client-side if multiple selected
         if (categoryFilter.length > 0) {
@@ -235,9 +251,9 @@ export default function MaterialSelectionDialog({
           materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
         }
 
-        // Paginate client-side if multiple filters selected
+        // Paginate client-side if search or multiple filters selected
         const totalFilteredCount = materialsData.length;
-        if (categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1) {
+        if (searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1) {
           const startIdx = (currentPage - 1) * itemsPerPage;
           const endIdx = startIdx + itemsPerPage;
           materialsData = materialsData.slice(startIdx, endIdx);
@@ -260,7 +276,7 @@ export default function MaterialSelectionDialog({
           }))
         );
 
-        setTotalPages(Math.ceil((categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
+        setTotalPages(Math.ceil((searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
       } else {
         // Fetch filtered products for display
         const response = await ProductService.getProducts({

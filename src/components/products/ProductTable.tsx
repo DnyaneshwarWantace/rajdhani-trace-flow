@@ -164,6 +164,11 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                         SQM: {formatIndianNumberWithDecimals(product.sqm, 2)}
                       </p>
                     )}
+                    {product.weight && (
+                      <p className="text-xs text-gray-500">
+                        Weight: {product.weight} {product.weight_unit}
+                      </p>
+                    )}
                   </div>
                 </td>
                 <td className="px-4 py-4">

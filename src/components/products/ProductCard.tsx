@@ -162,7 +162,7 @@ export default function ProductCard({
             </span>
           </div>
 
-          {/* Dimensions with SQM */}
+          {/* Dimensions with SQM and Weight */}
           <div className="space-y-0.5">
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Dim</span>
@@ -174,6 +174,12 @@ export default function ProductCard({
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">SQM</span>
                 <span className="font-medium text-gray-900 truncate">{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
+              </div>
+            )}
+            {product.weight && (
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-gray-500">Weight</span>
+                <span className="font-medium text-gray-900 truncate">{product.weight} {product.weight_unit}</span>
               </div>
             )}
           </div>

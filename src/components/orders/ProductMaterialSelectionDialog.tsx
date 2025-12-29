@@ -69,6 +69,39 @@ export default function ProductMaterialSelectionDialog({
 
   // Apply filters
   const items = allItems.filter(item => {
+    // Search filter
+    if (productSearchTerm) {
+      const searchLower = productSearchTerm.toLowerCase();
+      const isProduct = currentItem?.product_type !== 'raw_material';
+
+      let matchesSearch = false;
+
+      // Common fields for both products and materials
+      matchesSearch =
+        item.name?.toLowerCase().includes(searchLower) ||
+        item.id?.toLowerCase().includes(searchLower) ||
+        item.category?.toLowerCase().includes(searchLower) ||
+        item.color?.toLowerCase().includes(searchLower);
+
+      // Product-specific fields
+      if (isProduct) {
+        matchesSearch = matchesSearch ||
+          item.subcategory?.toLowerCase().includes(searchLower) ||
+          item.pattern?.toLowerCase().includes(searchLower);
+      }
+
+      // Raw material-specific fields
+      if (!isProduct) {
+        matchesSearch = matchesSearch ||
+          item.type?.toLowerCase().includes(searchLower) ||
+          item.supplier_name?.toLowerCase().includes(searchLower) ||
+          item.batch_number?.toLowerCase().includes(searchLower) ||
+          item.quality_grade?.toLowerCase().includes(searchLower);
+      }
+
+      if (!matchesSearch) return false;
+    }
+
     // Category filter
     if (selectedCategories.length > 0 && !selectedCategories.includes(item.category)) {
       return false;

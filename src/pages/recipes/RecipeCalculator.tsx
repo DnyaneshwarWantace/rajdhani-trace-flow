@@ -417,8 +417,6 @@ export default function RecipeCalculator() {
         <TabsContent value="recipes" className="space-y-4 md:space-y-6">
           <RecipeManagementCard
             recipes={recipes}
-            products={products}
-            rawMaterials={rawMaterials}
             onRefresh={loadRecipes}
           />
         </TabsContent>

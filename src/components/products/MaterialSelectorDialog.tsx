@@ -130,19 +130,44 @@ export default function MaterialSelectorDialog({
   // Load materials with pagination (respecting filters)
   const loadMaterials = async () => {
     if (chosenType !== 'material') return;
-    
+
     try {
       setMaterialsLoading(true);
       const filters: MaterialFilters = {
-        search: materialSearchTerm || undefined,
+        // Don't send search to API - handle client-side for more fields
+        search: undefined,
         category: selectedCategory.length > 0 ? selectedCategory : undefined,
         type: selectedMaterialTypes.length > 0 ? selectedMaterialTypes : undefined,
         color: selectedMaterialColors.length > 0 ? selectedMaterialColors : undefined,
         supplier: selectedSupplier.length > 0 ? selectedSupplier : undefined,
         page: materialsPage,
-        limit: itemsPerPage,
+        limit: materialSearchTerm ? 1000 : itemsPerPage, // Fetch all if searching
       };
-      const { materials, total } = await MaterialService.getMaterials(filters);
+      let { materials, total } = await MaterialService.getMaterials(filters);
+
+      // Apply client-side search if search term exists
+      if (materialSearchTerm) {
+        const searchLower = materialSearchTerm.toLowerCase();
+        materials = materials.filter((m: any) =>
+          m.name?.toLowerCase().includes(searchLower) ||
+          m.id?.toLowerCase().includes(searchLower) ||
+          m.category?.toLowerCase().includes(searchLower) ||
+          m.type?.toLowerCase().includes(searchLower) ||
+          m.color?.toLowerCase().includes(searchLower) ||
+          m.supplier_name?.toLowerCase().includes(searchLower) ||
+          m.batch_number?.toLowerCase().includes(searchLower) ||
+          m.quality_grade?.toLowerCase().includes(searchLower)
+        );
+
+        // Update total for filtered results
+        total = materials.length;
+
+        // Apply pagination client-side
+        const startIdx = (materialsPage - 1) * itemsPerPage;
+        const endIdx = startIdx + itemsPerPage;
+        materials = materials.slice(startIdx, endIdx);
+      }
+
       setRawMaterials(materials);
       setMaterialsTotal(total);
     } catch (err) {

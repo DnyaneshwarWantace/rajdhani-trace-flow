@@ -398,9 +398,9 @@ export default function OrderDetails() {
                 Mark as Delivered
               </Button>
             )}
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => window.print()}>
               <Download className="w-4 h-4 mr-2" />
-              Export
+              Export PDF
             </Button>
           </div>
         </div>

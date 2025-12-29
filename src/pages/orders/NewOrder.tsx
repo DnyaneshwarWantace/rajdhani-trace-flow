@@ -86,10 +86,10 @@ export default function NewOrder() {
     loadProductsWithFilters();
   }, [productPage, productSearchTerm, productCategoryFilter, productColorFilter]);
 
-  // Reload materials when page/filters change
+  // Reload materials when page changes (not search - search is handled in dialog)
   useEffect(() => {
     loadRawMaterialsWithFilters();
-  }, [materialPage, productSearchTerm]);
+  }, [materialPage]);
 
   const loadCustomers = async () => {
     try {
@@ -168,7 +168,8 @@ export default function NewOrder() {
         page: materialPage,
         limit: materialItemsPerPage,
       };
-      if (productSearchTerm) filters.search = productSearchTerm;
+      // Don't send search to API - handle search in dialog for more flexibility
+      // if (productSearchTerm) filters.search = productSearchTerm;
 
       const result = await MaterialService.getMaterials(filters);
       // Map materials to expected format
@@ -179,9 +180,14 @@ export default function NewOrder() {
         current_stock: material.current_stock || 0,
         stock: material.current_stock || 0,
         category: material.category,
+        type: material.type,
+        color: material.color,
         brand: material.supplier_name || 'Unknown',
         unit: material.unit,
         supplier: material.supplier_name || 'Unknown',
+        supplier_name: material.supplier_name || 'Unknown',
+        batch_number: material.batch_number,
+        quality_grade: material.quality_grade,
         status: material.status || 'in-stock',
         location: 'Warehouse',
       }));
