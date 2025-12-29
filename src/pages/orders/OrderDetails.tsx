@@ -149,7 +149,7 @@ export default function OrderDetails() {
     }
   };
 
-  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+  const handleUpdateQuantity = async (_itemId: string, newQuantity: number) => {
     // TODO: Call API to update item quantity
     toast({
       title: 'Quantity Updated',
@@ -381,7 +381,7 @@ export default function OrderDetails() {
               // Check if all product items have individual products selected
               const allProductsSelected = orderItems.every(item => {
                 if (item.product_type !== 'product') return true; // Skip raw materials
-                const selectedCount = item.selected_individual_products?.length || 0;
+                const selectedCount = (item as any).selected_individual_products?.length || 0;
                 return selectedCount >= item.quantity;
               });
 

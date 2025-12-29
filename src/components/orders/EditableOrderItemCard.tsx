@@ -48,7 +48,6 @@ interface EditableOrderItemCardProps {
 
 export function EditableOrderItemCard({
   item,
-  index,
   orderStatus,
   onUpdateQuantity,
   onSelectIndividualProducts,

@@ -8,7 +8,6 @@ import { CustomerService, type Customer } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
-import { NotificationService } from '@/services/notificationService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { getSuggestedPricingUnit, type ProductDimensions } from '@/utils/unitConverter';
 import { formatCurrency } from '@/utils/formatHelpers';
@@ -17,7 +16,6 @@ import CustomerForm from '@/components/orders/CustomerForm';
 import OrderItemsList from '@/components/orders/OrderItemsList';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import OrderDetailsForm from '@/components/orders/OrderDetailsForm';
-import GSTSettings from '@/components/orders/GSTSettings';
 import DeliveryAddress from '@/components/orders/DeliveryAddress';
 import OrderSummary from '@/components/orders/OrderSummary';
 
@@ -63,11 +61,7 @@ export default function NewOrder() {
     paidAmount: 0,
   });
 
-  // GST settings
-  const [gstSettings, setGstSettings] = useState({
-    rate: 18,
-    isIncluded: true,
-  });
+  // GST settings - currently not used, rates are handled per item
 
   // Delivery address
   const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{
@@ -356,7 +350,7 @@ export default function NewOrder() {
         delivery_address: orderDeliveryAddress || undefined,
       };
 
-      const { error: orderError, data: newOrder } = await OrderService.createOrder(orderData);
+      const { error: orderError } = await OrderService.createOrder(orderData);
 
       if (orderError) {
         toast({
@@ -490,8 +484,8 @@ export default function NewOrder() {
         {/* Order Summary */}
         <OrderSummary
           subtotal={calculateTotal()}
-          gstRate={gstSettings.rate}
-          gstIncluded={gstSettings.isIncluded}
+          gstRate={18}
+          gstIncluded={true}
           paidAmount={orderDetails.paidAmount}
           onCancel={() => navigate('/orders')}
           onSubmit={handleSubmit}
