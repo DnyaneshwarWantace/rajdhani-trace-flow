@@ -22,6 +22,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const { toast } = useToast();
   const [isFetchingGST, setIsFetchingGST] = useState(false);
   const [gstAutoFilled, setGstAutoFilled] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
@@ -117,6 +118,35 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
         console.error('Error fetching GST details:', error);
       } finally {
         setIsFetchingGST(false);
+      }
+    }
+  };
+
+  const handlePincodeChange = async (value: string) => {
+    // Only allow digits and limit to 6 characters (Indian pincode format)
+    const numericValue = value.replace(/\D/g, '').slice(0, 6);
+    setNewCustomer({ ...newCustomer, pincode: numericValue });
+
+    // Auto-fetch city and state when pincode is 6 digits
+    if (numericValue.length === 6) {
+      setFetchingLocation(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
+        const data = await response.json();
+
+        if (data && data[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+          const postOffice = data[0].PostOffice[0];
+          setNewCustomer({
+            ...newCustomer,
+            pincode: numericValue,
+            city: postOffice.District || newCustomer.city,
+            state: postOffice.State || newCustomer.state,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching location from pincode:', error);
+      } finally {
+        setFetchingLocation(false);
       }
     }
   };
@@ -323,11 +353,17 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           </div>
           <div className="space-y-2">
             <Label>Pincode</Label>
-            <Input
-              value={newCustomer.pincode}
-              onChange={e => setNewCustomer({ ...newCustomer, pincode: e.target.value })}
-              placeholder="Enter pincode"
-            />
+            <div className="relative">
+              <Input
+                value={newCustomer.pincode}
+                onChange={e => handlePincodeChange(e.target.value)}
+                placeholder="Enter pincode"
+                maxLength={6}
+              />
+              {fetchingLocation && (
+                <p className="text-xs text-gray-500 mt-1">Fetching location...</p>
+              )}
+            </div>
           </div>
         </div>
 

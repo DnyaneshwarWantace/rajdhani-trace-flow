@@ -177,7 +177,7 @@ export function EditableOrderItemCard({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <span className="text-sm font-medium">Quantity: {item.quantity} {item.unit}</span>
             {orderStatus === 'accepted' && onUpdateQuantity && (
               <Button
@@ -187,6 +187,25 @@ export function EditableOrderItemCard({
               >
                 <Edit className="w-3 h-3" />
               </Button>
+            )}
+            {/* Show reservation status for raw materials */}
+            {item.product_type === 'raw_material' && (
+              <Badge
+                variant="outline"
+                className={`text-xs ml-auto ${
+                  orderStatus === 'dispatched' || orderStatus === 'delivered'
+                    ? 'bg-orange-50 text-orange-700 border-orange-300'
+                    : orderStatus === 'accepted'
+                    ? 'bg-blue-50 text-blue-700 border-blue-300'
+                    : 'bg-gray-50 text-gray-700 border-gray-300'
+                }`}
+              >
+                {orderStatus === 'dispatched' || orderStatus === 'delivered'
+                  ? 'Sold'
+                  : orderStatus === 'accepted'
+                  ? 'Reserved'
+                  : 'Pending'}
+              </Badge>
             )}
           </div>
         )}
