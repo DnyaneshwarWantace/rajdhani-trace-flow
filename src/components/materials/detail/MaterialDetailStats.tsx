@@ -8,8 +8,11 @@ interface MaterialDetailStatsProps {
 }
 
 export default function MaterialDetailStats({ material }: MaterialDetailStatsProps) {
+  // Use available_stock if available, otherwise fall back to current_stock (same as list page)
+  const displayStock = material.available_stock ?? material.current_stock ?? 0;
+  
   const stockPercentage = material.max_capacity > 0 
-    ? (material.current_stock / material.max_capacity) * 100 
+    ? (displayStock / material.max_capacity) * 100 
     : 0;
 
   const getStockColor = () => {
@@ -27,7 +30,7 @@ export default function MaterialDetailStats({ material }: MaterialDetailStatsPro
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm text-gray-600 mb-1">Current Stock</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {formatIndianNumberWithDecimals(material.current_stock, 2)}
+                {formatIndianNumberWithDecimals(displayStock, 2)}
               </p>
               <p className="text-xs text-gray-500 mt-1">{material.unit}</p>
             </div>

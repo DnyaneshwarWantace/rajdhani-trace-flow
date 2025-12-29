@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Package, Factory, ShoppingCart, CheckCircle, Clock } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
+import { getApiUrl } from '@/utils/apiConfig';
 import type { RawMaterial } from '@/types/material';
 import {
   Select,
@@ -52,7 +53,9 @@ export default function MaterialDetailTransactionHistory({
   const loadHistory = async () => {
     try {
       setLoading(true);
-      const { data, summary: summaryData, error } = await ProductionService.getRawMaterialConsumptionHistory(
+      
+      // Load MaterialConsumption records (production)
+      const { data: consumptionData, summary: summaryData, error } = await ProductionService.getRawMaterialConsumptionHistory(
         material.id,
         {
           status: statusFilter !== 'all' ? statusFilter as any : undefined,
@@ -61,13 +64,85 @@ export default function MaterialDetailTransactionHistory({
       );
 
       if (error) {
-        console.error('Error loading history:', error);
-        setRecords([]);
-        setSummary(null);
-        return;
+        console.error('Error loading consumption history:', error);
       }
 
-      setRecords(data || []);
+      // Load orders for this material
+      let orderRecords: ConsumptionRecord[] = [];
+      try {
+        const token = localStorage.getItem('auth_token');
+        const apiUrl = getApiUrl();
+        const response = await fetch(`${apiUrl}/raw-materials/${material.id}/orders`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { 'Authorization': `Bearer ${token}` }),
+          },
+        });
+
+        if (response.ok) {
+          const orderData = await response.json();
+          const orders = orderData.data || [];
+          
+          // Convert orders to transaction records
+          orderRecords = orders.map((order: any) => {
+            let consumptionStatus: 'reserved' | 'sold' = 'reserved';
+            let consumedAt = order.created_at;
+            let reservedAt: string | undefined;
+            let soldAt: string | undefined;
+            
+            if (order.status === 'pending' || order.status === 'accepted') {
+              consumptionStatus = 'reserved';
+              consumedAt = order.accepted_at || order.created_at;
+              reservedAt = order.accepted_at || order.created_at;
+            } else if (order.status === 'dispatched' || order.status === 'delivered') {
+              consumptionStatus = 'sold';
+              consumedAt = order.dispatched_at || order.delivered_at || order.created_at;
+              soldAt = order.dispatched_at || order.delivered_at;
+            }
+            
+            return {
+              id: `ORDER-${order.order_id}`,
+              production_batch_id: undefined,
+              batch_number: undefined,
+              quantity_used: order.quantity,
+              unit: order.unit,
+              consumption_status: consumptionStatus,
+              consumed_at: consumedAt,
+              order_id: order.order_number,
+              customer_id: undefined,
+              customer_name: order.customer_name,
+              reserved_at: reservedAt,
+              sold_at: soldAt,
+              notes: `Order: ${order.order_number}`,
+              product_id: undefined,
+              product_name: undefined,
+              product_category: undefined,
+              product_color: undefined,
+              product_pattern: undefined,
+            };
+          });
+        }
+      } catch (error) {
+        console.error('Error loading orders:', error);
+      }
+
+      // Combine consumption records and order records
+      const allRecords = [...(consumptionData || []), ...orderRecords];
+      
+      // Filter by status if needed
+      let filteredRecords = allRecords;
+      if (statusFilter !== 'all') {
+        filteredRecords = allRecords.filter(r => r.consumption_status === statusFilter);
+      }
+      
+      // Sort by date (newest first)
+      filteredRecords.sort((a, b) => {
+        const dateA = new Date(a.consumed_at || 0).getTime();
+        const dateB = new Date(b.consumed_at || 0).getTime();
+        return dateB - dateA;
+      });
+
+      setRecords(filteredRecords);
       setSummary(summaryData || {});
     } catch (error) {
       console.error('Error loading transaction history:', error);
@@ -175,8 +250,14 @@ export default function MaterialDetailTransactionHistory({
             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
               <p className="text-sm text-yellow-600 font-medium">Reserved</p>
               <p className="text-2xl font-bold text-yellow-900">
-                {summary.reserved?.toFixed(2) || 0} {material.unit}
+                {/* Reserved from orders (material.reserved) + reserved from MaterialConsumption (summary.reserved) */}
+                {(Number(material.reserved || 0) + Number(summary.reserved || 0)).toFixed(2)} {material.unit}
               </p>
+              {(Number(material.reserved || 0) > 0) && (
+                <p className="text-xs text-yellow-700 mt-1">
+                  {Number(material.reserved || 0).toFixed(2)} from orders
+                </p>
+              )}
             </div>
             <div className="bg-green-50 p-4 rounded-lg border border-green-200">
               <p className="text-sm text-green-600 font-medium">Used</p>
@@ -187,8 +268,14 @@ export default function MaterialDetailTransactionHistory({
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
               <p className="text-sm text-purple-600 font-medium">Sold</p>
               <p className="text-2xl font-bold text-purple-900">
-                {summary.sold?.toFixed(2) || 0} {material.unit}
+                {/* Sold from orders (material.sold) + sold from MaterialConsumption (summary.sold) */}
+                {(Number(material.sold || 0) + Number(summary.sold || 0)).toFixed(2)} {material.unit}
               </p>
+              {(Number(material.sold || 0) > 0) && (
+                <p className="text-xs text-purple-700 mt-1">
+                  {Number(material.sold || 0).toFixed(2)} from orders
+                </p>
+              )}
             </div>
           </div>
         )}
