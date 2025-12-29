@@ -15,9 +15,10 @@ import 'react-international-phone/style.css';
 interface CustomerFormProps {
   onCustomerCreated: (customer: Customer) => void;
   onCancel: () => void;
+  showCard?: boolean;
 }
 
-export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFormProps) {
+export default function CustomerForm({ onCustomerCreated, onCancel, showCard = true }: CustomerFormProps) {
   const { toast } = useToast();
   const [isFetchingGST, setIsFetchingGST] = useState(false);
   const [gstAutoFilled, setGstAutoFilled] = useState(false);
@@ -224,12 +225,8 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add New Customer</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const formContent = (
+    <div className="space-y-4">
         {/* Row 1: Customer Type & Full Name */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
@@ -348,9 +345,21 @@ export default function CustomerForm({ onCustomerCreated, onCancel }: CustomerFo
             Add Customer
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   );
+
+  if (showCard) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Add New Customer</CardTitle>
+        </CardHeader>
+        <CardContent>{formContent}</CardContent>
+      </Card>
+    );
+  }
+
+  return formContent;
 }
 
 

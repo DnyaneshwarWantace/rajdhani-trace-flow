@@ -234,9 +234,13 @@ export default function OrderItemForm({
           <Label>Quantity</Label>
           <Input
             type="number"
-            value={item.quantity}
-            onChange={e => onUpdate(item.id, 'quantity', parseInt(e.target.value) || 0)}
+            value={item.quantity || ''}
+            onChange={e => {
+              const value = e.target.value;
+              onUpdate(item.id, 'quantity', value === '' ? '' : parseInt(value) || '');
+            }}
             min="1"
+            placeholder="Enter quantity"
           />
         </div>
 
@@ -250,13 +254,25 @@ export default function OrderItemForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {selectedProduct && item.product_type === 'product' && selectedProduct.count_unit && (
-                <SelectItem value="unit">Per {selectedProduct.count_unit}</SelectItem>
+              {item.product_type === 'raw_material' ? (
+                // For raw materials, show per unit
+                selectedProduct && selectedProduct.unit && (
+                  <SelectItem value="unit">
+                    Per {selectedProduct.unit}
+                  </SelectItem>
+                )
+              ) : (
+                // For products, show count_unit + all calculation units
+                <>
+                  {selectedProduct && selectedProduct.count_unit && (
+                    <SelectItem value="unit">Per {selectedProduct.count_unit}</SelectItem>
+                  )}
+                  <SelectItem value="sqm">SQM</SelectItem>
+                  <SelectItem value="sqft">SQFT</SelectItem>
+                  <SelectItem value="gsm">GSM</SelectItem>
+                  <SelectItem value="kg">KG</SelectItem>
+                </>
               )}
-              <SelectItem value="sqm">SQM</SelectItem>
-              <SelectItem value="sqft">SQFT</SelectItem>
-              <SelectItem value="gsm">GSM</SelectItem>
-              <SelectItem value="kg">KG</SelectItem>
             </SelectContent>
           </Select>
         </div>

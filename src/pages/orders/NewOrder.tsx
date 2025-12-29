@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, UserPlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerService, type Customer } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
-import { getSuggestedPricingUnit, type ProductDimensions } from '@/utils/unitConverter';
+import { type ProductDimensions } from '@/utils/unitConverter';
 import { formatCurrency } from '@/utils/formatHelpers';
 import CustomerSelection from '@/components/orders/CustomerSelection';
 import CustomerForm from '@/components/orders/CustomerForm';
@@ -179,6 +180,11 @@ export default function NewOrder() {
         price: material.cost_per_unit || 0,
         current_stock: material.current_stock || 0,
         stock: material.current_stock || 0,
+        available_stock: material.available_stock,
+        reserved: material.reserved,
+        in_production: material.in_production,
+        sold: material.sold,
+        used: material.used,
         category: material.category,
         type: material.type,
         color: material.color,
@@ -228,6 +234,28 @@ export default function NewOrder() {
         if (item.id === id) {
           const updated = { ...item, [field]: value };
 
+          // If product_type is changing, clear the selected product
+          if (field === 'product_type' && item.product_type !== value) {
+            updated.product_id = '';
+            updated.product_name = '';
+            updated.unit_price = 0;
+            updated.unit = '';
+            updated.pricing_unit = 'unit';
+            updated.product_dimensions = {
+              productType: value === 'raw_material' ? 'raw_material' : 'carpet',
+            };
+            updated.subtotal = 0;
+            updated.gst_amount = 0;
+            updated.total_price = 0;
+            updated.unit_value = 0;
+            updated.isValid = false;
+            updated.errorMessage = undefined;
+            // Clear unit info
+            (updated as any).length_unit = undefined;
+            (updated as any).width_unit = undefined;
+            (updated as any).weight_unit = undefined;
+          }
+
           if (field === 'product_id') {
             const product =
               updated.product_type === 'raw_material'
@@ -261,8 +289,9 @@ export default function NewOrder() {
               (updated as any).weight_unit = product.weight_unit;
 
               updated.product_dimensions = productDimensions;
-              // Default to 'unit' (count_unit) for products, 'sqm' for raw materials
-              updated.pricing_unit = updated.product_type === 'product' ? 'unit' : getSuggestedPricingUnit(productDimensions);
+              // Default to 'unit' for both products and raw materials
+              // The actual unit (count_unit for products, unit for raw materials) is stored in the 'unit' field
+              updated.pricing_unit = 'unit';
 
               const calculation = pricingCalculator.calculateItemPrice(updated);
               updated.subtotal = calculation.subtotal;
@@ -441,19 +470,47 @@ export default function NewOrder() {
         </div>
 
         {/* Customer Selection or Form */}
-        {!showNewCustomerForm ? (
-          <CustomerSelection
-            customers={customers}
-            selectedCustomer={selectedCustomer}
-            onSelectCustomer={setSelectedCustomer}
-            onShowNewCustomerForm={() => setShowNewCustomerForm(true)}
-          />
-        ) : (
-          <CustomerForm
-            onCustomerCreated={handleCustomerCreated}
-            onCancel={() => setShowNewCustomerForm(false)}
-          />
-        )}
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Customer Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Toggle Buttons - Always Visible */}
+            <div className="flex gap-4">
+              <Button
+                variant={!showNewCustomerForm ? "default" : "outline"}
+                className={`flex-1 ${!showNewCustomerForm ? "text-white" : ""}`}
+                onClick={() => setShowNewCustomerForm(false)}
+              >
+                Select Existing Customer
+              </Button>
+              <Button
+                variant={showNewCustomerForm ? "default" : "outline"}
+                className={`flex-1 ${showNewCustomerForm ? "text-white" : ""}`}
+                onClick={() => setShowNewCustomerForm(true)}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Add New Customer
+              </Button>
+            </div>
+
+            {/* Customer Selection or Form Content */}
+            {!showNewCustomerForm ? (
+              <CustomerSelection
+                customers={customers}
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={setSelectedCustomer}
+                showToggleButtons={false}
+              />
+            ) : (
+              <CustomerForm
+                onCustomerCreated={handleCustomerCreated}
+                onCancel={() => setShowNewCustomerForm(false)}
+                showCard={false}
+              />
+            )}
+          </CardContent>
+        </Card>
 
         {/* Order Items */}
         <OrderItemsList

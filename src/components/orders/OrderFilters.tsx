@@ -76,18 +76,7 @@ export default function OrderFilters({
           <SelectItem value="all">All Customers</SelectItem>
           {customers.map((customer) => (
             <SelectItem key={customer.id} value={customer.id}>
-              <div className="flex flex-col py-1">
-                <div className="font-medium text-gray-900">{customer.name}</div>
-                {customer.phone && (
-                  <div className="text-xs text-gray-600">Phone: {customer.phone}</div>
-                )}
-                {customer.email && (
-                  <div className="text-xs text-gray-600">Email: {customer.email}</div>
-                )}
-                {customer.gst_number && (
-                  <div className="text-xs text-gray-600">GST: {customer.gst_number}</div>
-                )}
-              </div>
+              {customer.name}
             </SelectItem>
           ))}
         </SelectContent>

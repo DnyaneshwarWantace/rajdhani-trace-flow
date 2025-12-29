@@ -120,7 +120,11 @@ export default function ProductMaterialSelectionDialog({
     }
     // Stock filter
     if (selectedStockFilters.length > 0) {
-      const stock = item.current_stock || item.stock || 0;
+      const isProduct = currentItem?.product_type !== 'raw_material';
+      // For raw materials, use available_stock; for products, use current_stock
+      const stock = isProduct
+        ? (item.current_stock || item.stock || 0)
+        : (item.available_stock !== undefined ? item.available_stock : (item.current_stock || item.stock || 0));
       let matchesStock = false;
 
       for (const filter of selectedStockFilters) {
@@ -192,7 +196,10 @@ export default function ProductMaterialSelectionDialog({
     const lengthUnit = item.length_unit || 'm';
     const widthUnit = item.width_unit || 'm';
     const sqm = length > 0 && width > 0 ? calculateSQM(length, width, lengthUnit, widthUnit) : 0;
-    const stock = item.current_stock || item.stock || 0;
+    // For raw materials, show available_stock; for products, show current_stock
+    const stock = isProduct
+      ? (item.current_stock || item.stock || 0)
+      : (item.available_stock !== undefined ? item.available_stock : (item.current_stock || item.stock || 0));
     const stockUnit = isProduct ? (item.count_unit || 'rolls') : (item.unit || 'units');
 
     return (
@@ -373,7 +380,10 @@ export default function ProductMaterialSelectionDialog({
               const lengthUnit = item.length_unit || 'm';
               const widthUnit = item.width_unit || 'm';
               const sqm = length > 0 && width > 0 ? calculateSQM(length, width, lengthUnit, widthUnit) : 0;
-              const stock = item.current_stock || item.stock || 0;
+              // For raw materials, show available_stock; for products, show current_stock
+              const stock = isProduct
+                ? (item.current_stock || item.stock || 0)
+                : (item.available_stock !== undefined ? item.available_stock : (item.current_stock || item.stock || 0));
               const stockUnit = isProduct ? (item.count_unit || 'rolls') : (item.unit || 'units');
 
               return (
