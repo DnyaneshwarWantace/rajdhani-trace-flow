@@ -217,11 +217,11 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                       <TruncatedText text={waste.material_name} maxLength={50} className="block" />
                     </div>
                     <div className="text-sm text-gray-500">
-                      {waste.quantity} {waste.unit}
+                      {Number(waste.quantity).toFixed(4)} {waste.unit}
                     </div>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium text-gray-900">{waste.quantity}</div>
+                        <div className="font-medium text-gray-900">{Number(waste.quantity).toFixed(4)}</div>
                         <div className="text-sm text-gray-500">{waste.unit}</div>
                       </td>
                       <td className="p-4">

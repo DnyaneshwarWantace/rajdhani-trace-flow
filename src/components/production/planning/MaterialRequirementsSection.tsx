@@ -120,11 +120,11 @@ export default function MaterialRequirementsSection({
                   )}
                 </div>
                 <div className="text-sm text-gray-600">
-                  Required: <span className="font-medium">{material.required_quantity}</span> {material.unit}
+                  Required: <span className="font-medium">{Number(material.required_quantity).toFixed(4)}</span> {material.unit}
                   {material.available_quantity !== undefined && (
                     <>
                       {' • '}
-                      Available: <span className="font-medium">{material.available_quantity}</span> {material.unit}
+                      Available: <span className="font-medium">{Number(material.available_quantity).toFixed(4)}</span> {material.unit}
                     </>
                   )}
                 </div>

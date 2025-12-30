@@ -282,7 +282,7 @@ export default function SupplierDetailsDialog({
                         </div>
                         <div>
                           <span className="text-gray-600">Quantity:</span>
-                          <p className="font-medium">{order.quantity} {order.unit}</p>
+                          <p className="font-medium">{Number(order.quantity).toFixed(2)} {order.unit}</p>
                         </div>
                         <div>
                           <span className="text-gray-600">Cost/Unit:</span>

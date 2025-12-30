@@ -217,7 +217,7 @@ export default function RecipeSection({
               <div className="flex-1">
                 <div className="font-medium text-gray-900">{material.materialName}</div>
                 <div className="text-sm text-gray-600">
-                  {material.quantity} {material.unit}
+                  {Number(material.quantity).toFixed(4)} {material.unit}
                 </div>
               </div>
               <button

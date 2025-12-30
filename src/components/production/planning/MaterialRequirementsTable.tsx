@@ -50,7 +50,7 @@ export default function MaterialRequirementsTable({
       materials.forEach((material) => {
         // Only initialize if not already in state (preserves user typing)
         if (!(material.material_id in updated)) {
-          updated[material.material_id] = material.quantity_per_sqm === 0 ? '' : material.quantity_per_sqm.toString();
+          updated[material.material_id] = material.quantity_per_sqm === 0 ? '' : Number(material.quantity_per_sqm).toFixed(4);
         }
       });
       return updated;
@@ -238,25 +238,25 @@ export default function MaterialRequirementsTable({
                             {material.material_type === 'product' ? 'Per 1 SQM of Parent' : 'Per 1 SQM'}
                           </p>
                           <p className="font-semibold text-gray-900">
-                            {material.quantity_per_sqm.toFixed(5)} {material.unit}
+                            {material.quantity_per_sqm.toFixed(4)} {material.unit}
                           </p>
                           {material.material_type === 'product' && (
                             <p className="text-blue-600 text-xs font-medium mt-1">
-                              ({material.quantity_per_sqm.toFixed(5)} {material.unit} needed)
+                              ({material.quantity_per_sqm.toFixed(4)} {material.unit} needed)
                             </p>
                           )}
                         </div>
                         <div className="bg-white rounded p-2">
                           <p className="text-gray-500 mb-1">Per 1 Product</p>
                           <p className="font-semibold text-gray-900">
-                            {quantityPerProduct.toFixed(2)} {material.unit}
+                            {quantityPerProduct.toFixed(4)} {material.unit}
                           </p>
                           <p className="text-gray-400 text-xs">({sqmPerProduct.toFixed(2)} sqm/product)</p>
                         </div>
                         <div className="bg-white rounded p-2">
                           <p className="text-gray-500 mb-1">For {targetQuantity} Products</p>
                           <p className="font-semibold text-blue-700">
-                            {material.required_quantity.toFixed(2)} {material.unit}
+                            {material.required_quantity.toFixed(4)} {material.unit}
                           </p>
                           <p className="text-gray-400 text-xs">({totalSQM.toFixed(2)} sqm total)</p>
                         </div>
@@ -266,11 +266,11 @@ export default function MaterialRequirementsTable({
                             material.status === 'available' ? 'text-green-700' :
                             material.status === 'low' ? 'text-yellow-700' : 'text-red-700'
                           }`}>
-                            {material.available_quantity} {material.unit}
+                            {Number(material.available_quantity).toFixed(4)} {material.unit}
                           </p>
                           {material.shortage && material.shortage > 0 && (
                             <p className="text-red-600 text-xs font-medium">
-                              Short: {material.shortage.toFixed(2)} {material.unit}
+                              Short: {material.shortage.toFixed(4)} {material.unit}
                             </p>
                           )}
                         </div>
@@ -287,12 +287,12 @@ export default function MaterialRequirementsTable({
                           <Input
                             type="text"
                             inputMode="decimal"
-                            step="0.01"
-                            value={quantityInputs[material.material_id] ?? (material.quantity_per_sqm === 0 ? '' : material.quantity_per_sqm.toString())}
+                            step="0.0001"
+                            value={quantityInputs[material.material_id] ?? (material.quantity_per_sqm === 0 ? '' : Number(material.quantity_per_sqm).toFixed(4))}
                             onChange={(e) => {
                               const value = e.target.value;
-                              // Allow empty string, numbers, and decimal points (max 5 decimal places)
-                              if (value === '' || /^\d*\.?\d{0,5}$/.test(value)) {
+                              // Allow empty string, numbers, and decimal points (max 4 decimal places)
+                              if (value === '' || /^\d*\.?\d{0,4}$/.test(value)) {
                                 // Update local state immediately for responsive typing
                                 setQuantityInputs(prev => ({
                                   ...prev,

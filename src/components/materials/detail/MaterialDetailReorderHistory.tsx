@@ -269,7 +269,7 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
                     <div>
                       <p className="text-xs text-gray-500">Quantity</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {order.quantity} {order.unit}
+                        {Number(order.quantity).toFixed(2)} {order.unit}
                       </p>
                     </div>
                     <div>

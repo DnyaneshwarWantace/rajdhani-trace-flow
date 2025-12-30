@@ -385,11 +385,11 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                             </Badge>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="font-medium">{material.quantity_used} {material.unit}</span>
+                            <span className="font-medium">{Number(material.quantity_used).toFixed(4)} {material.unit}</span>
                           </td>
                           <td className="px-4 py-3">
                             {material.actual_consumed_quantity ? (
-                              <span>{material.actual_consumed_quantity.toFixed(2)} {material.unit}</span>
+                              <span>{material.actual_consumed_quantity.toFixed(4)} {material.unit}</span>
                             ) : (
                               <span className="text-gray-400">—</span>
                             )}
@@ -741,7 +741,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-700">{waste.waste_type || '-'}</td>
                             <td className="px-4 py-3">
-                              <span className="font-medium">{waste.quantity} {waste.unit}</span>
+                              <span className="font-medium">{Number(waste.quantity).toFixed(4)} {waste.unit}</span>
                             </td>
                             <td className="px-4 py-3">
                               <Badge variant={waste.waste_category === 'reusable' ? 'default' : 'secondary'} className={waste.waste_category === 'reusable' ? 'text-white' : ''}>

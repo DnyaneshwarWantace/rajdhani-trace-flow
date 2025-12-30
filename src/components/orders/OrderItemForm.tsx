@@ -103,10 +103,10 @@ export default function OrderItemForm({
   return (
     <div className="p-4 border rounded-lg space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Package className="w-5 h-5 text-blue-600" />
-          <h3 className="font-medium text-lg">Order Item #{index + 1}</h3>
-          {item.product_name && <Badge variant="secondary">{item.product_name}</Badge>}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <Package className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <h3 className="font-medium text-lg flex-shrink-0">Order Item #{index + 1}</h3>
+          {item.product_name && <Badge variant="secondary" className="truncate max-w-md" title={item.product_name}>{item.product_name}</Badge>}
         </div>
         <Button
           variant="outline"
@@ -127,9 +127,11 @@ export default function OrderItemForm({
             Selected Product Details
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-            <div>
-              <span className="font-medium text-gray-700">Name:</span>
-              <span className="ml-2 text-gray-900">{item.product_name}</span>
+            <div className="col-span-2 md:col-span-3">
+              <div className="flex items-start gap-2">
+                <span className="font-medium text-gray-700 flex-shrink-0">Name:</span>
+                <span className="text-gray-900 truncate" title={item.product_name}>{item.product_name}</span>
+              </div>
             </div>
             <div>
               <span className="font-medium text-gray-700">Your Price:</span>
@@ -224,9 +226,10 @@ export default function OrderItemForm({
             variant="outline"
             className="w-full justify-start"
             onClick={() => onSelectProduct(item)}
+            title={item.product_name || 'Select Product/Material'}
           >
-            <Search className="w-4 h-4 mr-2" />
-            {item.product_name || 'Select Product/Material'}
+            <Search className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="truncate">{item.product_name || 'Select Product/Material'}</span>
           </Button>
         </div>
 

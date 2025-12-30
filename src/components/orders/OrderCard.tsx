@@ -187,7 +187,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                         <div className="font-medium text-sm">{item.productName}</div>
                         <div className="text-xs text-gray-600 mt-1 space-y-0.5">
                           <div>
-                            {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • Qty: {item.quantity} {item.productType === 'raw_material' ? (item.unit || 'units') : (item.count_unit || 'rolls')}
+                            {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • Qty: {Number(item.quantity).toFixed(2)} {item.productType === 'raw_material' ? (item.unit || 'units') : (item.count_unit || 'rolls')}
                           </div>
                           {item.productType === 'product' && (
                             <>

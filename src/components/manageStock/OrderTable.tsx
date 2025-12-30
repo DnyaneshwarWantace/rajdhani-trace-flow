@@ -77,7 +77,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {order.quantity} {order.unit}
+                    {Number(order.quantity).toFixed(2)} {order.unit}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{formatCurrency(order.totalCost)}</div>

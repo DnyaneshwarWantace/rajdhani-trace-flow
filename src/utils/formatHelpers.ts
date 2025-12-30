@@ -1,10 +1,10 @@
 // Indian Number Formatting - Lakhs and Crores
 export const formatIndianNumber = (value: number, decimals: number = 2): string => {
   if (value === 0) return '0';
-  
+
   const absValue = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  
+
   // Format with Indian numbering system (lakhs, crores)
   if (absValue >= 10000000) {
     // Crores (1 crore = 10 million)
@@ -82,10 +82,10 @@ export const formatIndianNumberWithDecimals = (value: number, maxDecimals: numbe
 // Indian Currency Formatting
 export const formatCurrency = (value: number): string => {
   if (value === null || value === undefined || isNaN(value)) return '₹0';
-  
+
   const absValue = Math.abs(value);
   const sign = value < 0 ? '-' : '';
-  
+
   if (absValue >= 10000000) {
     // Crores
     const crores = absValue / 10000000;

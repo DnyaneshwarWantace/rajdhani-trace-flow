@@ -175,13 +175,13 @@ export default function ProductionStepsSection({
                             {step.materials_needed.map((material, idx) => (
                               <div key={`${step.step}-material-${material.material_id || idx}`} className="border border-gray-200 rounded-lg p-3 bg-white">
                                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-sm md:text-base">{material.material_name}</span>
-                                    <Badge variant="outline" className="font-mono text-xs">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className="font-medium text-sm md:text-base truncate" title={material.material_name}>{material.material_name}</span>
+                                    <Badge variant="outline" className="font-mono text-xs flex-shrink-0">
                                       ID: {material.material_id || 'N/A'}
                                     </Badge>
                                   </div>
-                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs flex-shrink-0">
                                     Raw Material Recipe
                                   </Badge>
                                 </div>
@@ -194,7 +194,7 @@ export default function ProductionStepsSection({
                                     <span className="text-gray-600">Current Stock:</span>
                                     <div className="font-medium">
                                       {material.current_stock !== undefined
-                                        ? `${material.current_stock} ${material.unit}`
+                                        ? `${Number(material.current_stock).toFixed(2)} ${material.unit}`
                                         : 'N/A'}
                                     </div>
                                   </div>

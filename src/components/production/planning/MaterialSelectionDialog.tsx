@@ -485,15 +485,15 @@ export default function MaterialSelectionDialog({
               <p className="font-medium text-gray-900">
                 {material.type === 'product' ? (
                   <>
-                    {material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.count_unit || 'rolls'}
+                    {Number(material.available_stock !== undefined ? material.available_stock : material.current_stock).toFixed(2)} {material.count_unit || 'rolls'}
                   </>
                 ) : (
-                  <>{material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.unit}</>
+                  <>{Number(material.available_stock !== undefined ? material.available_stock : material.current_stock).toFixed(2)} {material.unit}</>
                 )}
               </p>
               {material.in_production && material.in_production > 0 && (
                 <p className="text-xs text-orange-600 mt-1">
-                  ({material.in_production} {material.type === 'product' ? (material.count_unit || 'rolls') : material.unit} in production)
+                  ({Number(material.in_production).toFixed(2)} {material.type === 'product' ? (material.count_unit || 'rolls') : material.unit} in production)
                 </p>
               )}
             </div>
@@ -865,10 +865,10 @@ export default function MaterialSelectionDialog({
                             {activeTab === 'raw_materials' ? (
                               <div>
                                 <span className="font-medium text-gray-900">
-                                  {material.available_stock !== undefined ? material.available_stock : material.current_stock} {material.unit}
+                                  {Number(material.available_stock !== undefined ? material.available_stock : material.current_stock).toFixed(2)} {material.unit}
                                 </span>
                                 {material.in_production && material.in_production > 0 && (
-                                  <p className="text-xs text-orange-600">({material.in_production} {material.unit} in production)</p>
+                                  <p className="text-xs text-orange-600">({Number(material.in_production).toFixed(2)} {material.unit} in production)</p>
                                 )}
                               </div>
                             ) : (
@@ -882,7 +882,7 @@ export default function MaterialSelectionDialog({
                                   return (
                                     <>
                                       <span className="font-medium text-gray-900">
-                                        {availStock} {material.count_unit || 'rolls'}
+                                        {Number(availStock).toFixed(2)} {material.count_unit || 'rolls'}
                                       </span>
                                       {totalSqm > 0 && (
                                         <p className="text-xs text-gray-500 mt-0.5">({totalSqm.toFixed(2)} SQM)</p>

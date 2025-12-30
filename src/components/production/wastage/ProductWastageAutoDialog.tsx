@@ -289,7 +289,7 @@ export default function ProductWastageAutoDialog({
                 <h4 className="font-semibold text-blue-900 mb-2">Wastage Calculation</h4>
                 <div className="space-y-1 text-sm text-blue-800">
                   <p>
-                    <span className="font-medium">Consumed:</span> {material.actual_consumed_quantity.toFixed(2)} {material.unit}
+                    <span className="font-medium">Consumed:</span> {material.actual_consumed_quantity.toFixed(4)} {material.unit}
                   </p>
                   <p>
                     <span className="font-medium">Whole Products Used:</span> {material.whole_product_count} {material.unit}

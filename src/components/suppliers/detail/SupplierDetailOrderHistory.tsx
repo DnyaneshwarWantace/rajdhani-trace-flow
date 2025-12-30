@@ -74,7 +74,7 @@ export default function SupplierDetailOrderHistory({ supplier, orders }: Supplie
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Quantity</p>
-                    <p className="text-sm font-medium text-gray-900">{order.quantity} {order.unit}</p>
+                    <p className="text-sm font-medium text-gray-900">{Number(order.quantity).toFixed(2)} {order.unit}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Cost/Unit</p>

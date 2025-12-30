@@ -131,7 +131,7 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Quantity</p>
-                <p className="font-medium text-gray-900">{order.quantity} {order.unit}</p>
+                <p className="font-medium text-gray-900">{Number(order.quantity).toFixed(2)} {order.unit}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Cost Per Unit</p>

@@ -124,7 +124,7 @@ export default function PlanningStage() {
         `Category: ${productCategory}${productSubcategory ? ` > ${productSubcategory}` : ''}\n` +
         `Planned Quantity: ${plannedQty} units\n\n` +
         `Material Required: ${material.material_name}\n` +
-        `Required: ${material.required_quantity.toFixed(2)} ${material.unit}\n` +
+        `Required: ${material.required_quantity.toFixed(4)} ${material.unit}\n` +
         `Available: ${material.available_quantity} ${material.unit}\n` +
         `Shortage: ${material.shortage?.toFixed(2)} ${material.unit}`;
 

@@ -178,7 +178,7 @@ export function EditableOrderItemCard({
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-1">
-            <span className="text-sm font-medium">Quantity: {item.quantity} {item.unit}</span>
+            <span className="text-sm font-medium">Quantity: {Number(item.quantity).toFixed(2)} {item.unit}</span>
             {orderStatus === 'accepted' && onUpdateQuantity && (
               <Button
                 size="sm"

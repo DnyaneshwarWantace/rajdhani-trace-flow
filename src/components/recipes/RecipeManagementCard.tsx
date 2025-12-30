@@ -270,7 +270,7 @@ export default function RecipeManagementCard({
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground">Quantity (for 1 sqm)</div>
-                                <div className="font-medium">{material.quantity_per_sqm}</div>
+                                <div className="font-medium">{Number(material.quantity_per_sqm).toFixed(2)}</div>
                               </div>
                               <div>
                                 <div className="text-xs text-muted-foreground">Unit</div>

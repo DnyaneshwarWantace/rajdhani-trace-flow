@@ -138,7 +138,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                         <p className="text-sm text-gray-500 capitalize">{material.material_type?.replace('_', ' ')}</p>
                       </div>
                       <Badge variant={material.material_type === 'product' ? 'default' : 'secondary'}>
-                        {material.quantity_used} {material.unit}
+                        {Number(material.quantity_used).toFixed(4)} {material.unit}
                       </Badge>
                     </div>
 
@@ -345,7 +345,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                         <p className="text-sm text-gray-500 capitalize">{wastage.wastage_type?.replace('_', ' ')}</p>
                       </div>
                       <Badge variant="destructive">
-                        {wastage.quantity} {wastage.unit}
+                        {Number(wastage.quantity).toFixed(4)} {wastage.unit}
                       </Badge>
                     </div>
 

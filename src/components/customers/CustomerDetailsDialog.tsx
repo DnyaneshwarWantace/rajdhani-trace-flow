@@ -321,7 +321,7 @@ export default function CustomerDetailsDialog({
                                 <div className="font-medium">{item.productName}</div>
                                 <div className="text-xs text-gray-600">
                                   {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} • 
-                                  Qty: {item.quantity} • 
+                                  Qty: {Number(item.quantity).toFixed(2)} •
                                   ₹{formatCurrency(item.unitPrice)}/unit
                                 </div>
                                 {item.selectedProducts && item.selectedProducts.length > 0 && (

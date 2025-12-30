@@ -56,7 +56,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
         <div className="text-left sm:text-right">
           <div className="text-2xl font-bold text-gray-900">{formatCurrency(order.totalCost)}</div>
           <div className="text-sm text-gray-600">
-            {order.quantity} {order.unit} × ₹{order.costPerUnit}
+            {Number(order.quantity).toFixed(2)} {order.unit} × ₹{order.costPerUnit}
           </div>
         </div>
       </div>
@@ -65,7 +65,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
         <div>
           <span className="text-gray-600">Quantity:</span>
-          <div className="font-medium text-gray-900">{order.quantity} {order.unit}</div>
+          <div className="font-medium text-gray-900">{Number(order.quantity).toFixed(2)} {order.unit}</div>
         </div>
         <div>
           <span className="text-gray-600">Expected Delivery:</span>

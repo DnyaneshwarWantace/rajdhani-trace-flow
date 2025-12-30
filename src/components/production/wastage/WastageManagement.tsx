@@ -320,7 +320,7 @@ export default function WastageManagement({
                             <tbody>
                               <tr className="hover:bg-gray-50">
                                 <td className="border border-gray-200 px-4 py-2 font-medium text-gray-700">Consumed Quantity</td>
-                                <td className="border border-gray-200 px-4 py-2 text-gray-900">{consumed.toFixed(2)} {normalizedMaterial.unit}</td>
+                                <td className="border border-gray-200 px-4 py-2 text-gray-900">{consumed.toFixed(4)} {normalizedMaterial.unit}</td>
                               </tr>
                               <tr className="hover:bg-gray-50">
                                 <td className="border border-gray-200 px-4 py-2 font-medium text-gray-700">Whole Products Used</td>
@@ -494,7 +494,7 @@ export default function WastageManagement({
                       <div>
                         <p className="text-gray-500 text-xs">Quantity</p>
                         <p className="font-medium text-gray-900">
-                          {waste.quantity} {waste.unit}
+                          {Number(waste.quantity).toFixed(4)} {waste.unit}
                         </p>
                       </div>
                       <div>
@@ -619,7 +619,7 @@ export default function WastageManagement({
                       <div>
                         <p className="text-gray-500 text-xs">Quantity</p>
                         <p className="font-medium text-gray-900">
-                          {waste.quantity} {waste.unit}
+                          {Number(waste.quantity).toFixed(4)} {waste.unit}
                         </p>
                       </div>
                       <div>

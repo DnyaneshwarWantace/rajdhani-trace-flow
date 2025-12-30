@@ -61,7 +61,7 @@ export default function WasteCard({ waste, onReturn, isReturning }: WasteCardPro
               Quantity
             </span>
             <span className="font-semibold text-gray-900">
-              {waste.quantity} {waste.unit}
+              {Number(waste.quantity).toFixed(4)} {waste.unit}
             </span>
           </div>
 

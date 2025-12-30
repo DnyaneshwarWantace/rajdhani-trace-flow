@@ -40,7 +40,7 @@ export default function RecipeMaterialsList({ materials, onRemove }: RecipeMater
               <TruncatedText text={material.materialName} maxLength={50} as="span" />
             </div>
             <div className="text-sm text-gray-600">
-              {material.quantity} {material.unit}
+              {Number(material.quantity).toFixed(4)} {material.unit}
             </div>
           </div>
           <Button

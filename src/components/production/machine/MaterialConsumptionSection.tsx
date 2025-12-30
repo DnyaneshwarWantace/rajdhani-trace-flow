@@ -60,14 +60,14 @@ export default function MaterialConsumptionSection({
                     </div>
                     <div className="text-right ml-2">
                       <div className="font-semibold text-sm text-gray-900">
-                        {item.quantity_used || 0}
+                        {Number(item.quantity_used || 0).toFixed(4)}
                       </div>
                       <div className="text-xs text-gray-500">{item.unit || 'units'}</div>
                     </div>
                   </div>
                   {item.actual_consumed_quantity && item.actual_consumed_quantity !== item.quantity_used && (
                     <div className="text-xs text-gray-600 mt-1">
-                      Actual: {item.actual_consumed_quantity.toFixed(2)} {item.unit}
+                      Actual: {item.actual_consumed_quantity.toFixed(4)} {item.unit}
                     </div>
                   )}
                   {item.individual_product_ids && item.individual_product_ids.length > 0 && (
@@ -112,7 +112,7 @@ export default function MaterialConsumptionSection({
                     </div>
                     <div className="text-right ml-2">
                       <div className="font-semibold text-sm text-gray-900">
-                        {item.quantity_used || 0}
+                        {Number(item.quantity_used || 0).toFixed(4)}
                       </div>
                       <div className="text-xs text-gray-500">{item.unit || 'units'}</div>
                     </div>

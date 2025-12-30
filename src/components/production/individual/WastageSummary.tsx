@@ -252,7 +252,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                         <p className="text-xs text-gray-600">Waste #: {waste.waste_number || waste.id}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-blue-700 text-lg">{waste.quantity} {waste.unit}</p>
+                        <p className="font-bold text-blue-700 text-lg">{Number(waste.quantity).toFixed(4)} {waste.unit}</p>
                       </div>
                     </div>
 
@@ -318,7 +318,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                         <p className="text-xs text-gray-600">Waste #: {waste.waste_number || waste.id}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-purple-700 text-lg">{waste.quantity} {waste.unit}</p>
+                        <p className="font-bold text-purple-700 text-lg">{Number(waste.quantity).toFixed(4)} {waste.unit}</p>
                       </div>
                     </div>
 

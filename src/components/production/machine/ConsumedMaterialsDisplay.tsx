@@ -206,15 +206,15 @@ export default function ConsumedMaterialsDisplay({
                         {material.material_type === 'product' ? 'Per 1 SQM of Parent' : 'Per 1 SQM'}
                       </p>
                       <p className="font-semibold text-gray-900">
-                        {material.quantity_per_sqm > 0 
-                          ? material.quantity_per_sqm.toFixed(5) 
-                          : (material.required_quantity / totalSQM).toFixed(5)} {material.unit}
+                        {material.quantity_per_sqm > 0
+                          ? material.quantity_per_sqm.toFixed(4)
+                          : (material.required_quantity / totalSQM).toFixed(4)} {material.unit}
                       </p>
                     </div>
                     <div className="bg-white rounded p-2">
                       <p className="text-gray-500 mb-1">Per 1 Product</p>
                       <p className="font-semibold text-gray-900">
-                        {quantityPerProduct > 0 ? quantityPerProduct.toFixed(2) : (material.required_quantity / targetQuantity).toFixed(2)} {material.unit}
+                        {quantityPerProduct > 0 ? quantityPerProduct.toFixed(4) : (material.required_quantity / targetQuantity).toFixed(4)} {material.unit}
                       </p>
                       {sqmPerProduct > 0 && (
                         <p className="text-gray-400 text-xs">({sqmPerProduct.toFixed(2)} sqm/product)</p>
@@ -223,7 +223,7 @@ export default function ConsumedMaterialsDisplay({
                     <div className="bg-white rounded p-2 border-2 border-blue-300">
                       <p className="text-gray-500 mb-1 font-medium">For {targetQuantity} Products</p>
                       <p className="font-bold text-blue-700 text-base">
-                        {material.required_quantity.toFixed(2)} {material.unit}
+                        {material.required_quantity.toFixed(4)} {material.unit}
                       </p>
                       {totalSQM > 0 && (
                         <p className="text-gray-400 text-xs">({totalSQM.toFixed(2)} sqm total)</p>
@@ -234,11 +234,11 @@ export default function ConsumedMaterialsDisplay({
                       <p className="font-bold text-green-700 text-base">
                         {material.material_type === 'product' && Number.isInteger(consumedQuantity)
                           ? `${consumedQuantity} ${material.unit}`
-                          : `${consumedQuantity.toFixed(2)} ${material.unit}`}
+                          : `${consumedQuantity.toFixed(4)} ${material.unit}`}
                       </p>
                       {material.material_type === 'product' && material.actual_consumed_quantity && material.actual_consumed_quantity !== consumedQuantity && (
                         <p className="text-gray-500 text-xs mt-1">
-                          (Actual: {material.actual_consumed_quantity.toFixed(2)} {material.unit})
+                          (Actual: {material.actual_consumed_quantity.toFixed(4)} {material.unit})
                         </p>
                       )}
                     </div>

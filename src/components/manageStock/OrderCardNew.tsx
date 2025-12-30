@@ -49,7 +49,7 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
         <div className="bg-primary-50 rounded-md p-2 mb-2">
           <div className="text-lg font-bold text-primary-700">{formatCurrency(order.totalCost)}</div>
           <div className="text-[9px] text-primary-600">
-            {order.quantity} {order.unit} × ₹{order.costPerUnit}
+            {Number(order.quantity).toFixed(2)} {order.unit} × ₹{order.costPerUnit}
           </div>
         </div>
 

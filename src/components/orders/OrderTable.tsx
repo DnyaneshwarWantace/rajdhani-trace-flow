@@ -87,7 +87,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                             <div key={idx} className="text-xs">
                               <div className="font-medium text-gray-900">{item.productName}</div>
                               <div className="text-gray-600 flex flex-wrap gap-x-2 gap-y-0.5">
-                                <span>Qty: {item.quantity} {item.count_unit || item.unit || 'units'}</span>
+                                <span>Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}</span>
                                 {item.length && item.width && (
                                   <span>• Size: {item.length}{item.length_unit} × {item.width}{item.width_unit}</span>
                                 )}

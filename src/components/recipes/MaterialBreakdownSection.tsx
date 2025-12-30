@@ -80,7 +80,7 @@ export default function MaterialBreakdownSection({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 text-sm">
                 <div>
                   <div className="text-xs text-muted-foreground">Required Qty</div>
-                  <div className="font-medium">{material.total_quantity.toLocaleString()}</div>
+                  <div className="font-medium">{Number(material.total_quantity).toFixed(4)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground">Unit</div>

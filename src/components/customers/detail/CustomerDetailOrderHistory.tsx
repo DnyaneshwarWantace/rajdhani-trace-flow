@@ -172,7 +172,7 @@ export default function CustomerDetailOrderHistory({ customer, orders, onOrderUp
                               <p className="font-medium text-gray-900">{item.productName}</p>
                               <p className="text-xs text-gray-600">
                                 {item.productType === 'raw_material' ? 'Raw Material' : 'Finished Product'} •
-                                Qty: {item.quantity} •
+                                Qty: {Number(item.quantity).toFixed(2)} •
                                 {formatCurrency(item.unitPrice)}/unit
                               </p>
                             </div>

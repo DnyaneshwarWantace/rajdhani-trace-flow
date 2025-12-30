@@ -42,7 +42,7 @@ export function OrderItemCard({ item }: OrderItemCardProps) {
         <div className="flex-1">
           <h3 className="font-semibold text-base mb-1">{item.product_name}</h3>
           <p className="text-sm text-gray-600">
-            {item.product_type === 'raw_material' ? 'Raw Material' : 'Finished Product'} • Qty: {item.quantity} {item.unit}
+            {item.product_type === 'raw_material' ? 'Raw Material' : 'Finished Product'} • Qty: {Number(item.quantity).toFixed(2)} {item.unit}
           </p>
         </div>
         <div className="text-right ml-4">
