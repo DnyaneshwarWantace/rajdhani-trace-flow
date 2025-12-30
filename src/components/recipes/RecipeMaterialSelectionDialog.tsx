@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Package, Loader2, Check, Filter } from 'lucide-react';
+import { Search, Package, Loader2, Check, Filter, Edit, Trash2 } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 
@@ -22,6 +22,11 @@ interface RecipeMaterialSelectionDialogProps {
   onClose: () => void;
   materialType: 'raw_material' | 'product';
   onSelect: (materials: any[]) => void;
+  existingMaterialIds?: string[];
+  currentRecipe?: any;
+  onEditMaterial?: (material: any, recipe: any) => void;
+  onRemoveMaterial?: (recipeId: string, materialId: string) => void;
+  onMaterialTypeChange?: (type: 'raw_material' | 'product') => void;
 }
 
 export default function RecipeMaterialSelectionDialog({
@@ -29,6 +34,11 @@ export default function RecipeMaterialSelectionDialog({
   onClose,
   materialType,
   onSelect,
+  existingMaterialIds = [],
+  currentRecipe,
+  onEditMaterial,
+  onRemoveMaterial,
+  onMaterialTypeChange,
 }: RecipeMaterialSelectionDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [materials, setMaterials] = useState<any[]>([]);
@@ -200,12 +210,12 @@ export default function RecipeMaterialSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Package className="w-5 h-5" />
-              Select {materialType === 'product' ? 'Products' : 'Raw Materials'}
+              Manage Recipe Materials
             </div>
             {selectedMaterials.length > 0 && (
               <Badge className="bg-blue-600 text-white">
@@ -214,6 +224,28 @@ export default function RecipeMaterialSelectionDialog({
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Material Type Toggle */}
+        <div className="flex gap-2 mb-3">
+          <Button
+            variant={materialType === 'raw_material' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onMaterialTypeChange && onMaterialTypeChange('raw_material')}
+            className={materialType === 'raw_material' ? 'text-white' : ''}
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Raw Materials
+          </Button>
+          <Button
+            variant={materialType === 'product' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onMaterialTypeChange && onMaterialTypeChange('product')}
+            className={materialType === 'product' ? 'text-white' : ''}
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Products
+          </Button>
+        </div>
 
         {/* Search and Filters */}
         <div className="space-y-3">
@@ -526,11 +558,12 @@ export default function RecipeMaterialSelectionDialog({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {paginatedMaterials.map((material) => {
                 const isSelected = selectedMaterials.some((m) => m.id === material.id);
+                const isAlreadyAdded = existingMaterialIds.includes(material.id);
                 return (
                   <Card
                     key={material.id}
                     className={`p-4 cursor-pointer transition-all hover:shadow-md ${
-                      isSelected ? 'border-blue-500 bg-blue-50' : 'hover:border-blue-300'
+                      isSelected ? 'border-blue-500 bg-blue-50' : isAlreadyAdded ? 'border-amber-300 bg-amber-50' : 'hover:border-blue-300'
                     }`}
                     onClick={() => toggleMaterialSelection(material)}
                   >
@@ -542,7 +575,14 @@ export default function RecipeMaterialSelectionDialog({
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2 mb-2">
-                            <h4 className="font-semibold text-sm line-clamp-2">{material.name}</h4>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm line-clamp-2">{material.name}</h4>
+                              {isAlreadyAdded && (
+                                <Badge variant="outline" className="text-xs mt-1 bg-amber-100 text-amber-700 border-amber-300">
+                                  Already in Recipe
+                                </Badge>
+                              )}
+                            </div>
                             <Badge variant="secondary" className="text-xs flex-shrink-0">
                               {materialType === 'product' ? (material.count_unit || 'count') : material.unit}
                             </Badge>

@@ -35,6 +35,9 @@ export default function NewOrder() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
 
+  // Submission state to prevent duplicate orders
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Order items state
   const [orderItems, setOrderItems] = useState<ExtendedOrderItem[]>([]);
   const [realProducts, setRealProducts] = useState<any[]>([]);
@@ -58,12 +61,6 @@ export default function NewOrder() {
     expectedDelivery: '',
     notes: '',
     paidAmount: 0,
-  });
-
-  // GST settings
-  const [gstSettings] = useState({
-    rate: 18,
-    isIncluded: true,
   });
 
   // Delivery address
@@ -328,7 +325,19 @@ export default function NewOrder() {
     return pricingCalculator.calculateOrderTotal(orderItems);
   };
 
+  const calculateOrderBreakdown = () => {
+    const subtotal = orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+    const gstAmount = orderItems.reduce((sum, item) => sum + (item.gst_amount || 0), 0);
+    const total = orderItems.reduce((sum, item) => sum + (item.total_price || 0), 0);
+    return { subtotal, gstAmount, total };
+  };
+
   const handleSubmit = async () => {
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      return;
+    }
+
     if (!selectedCustomer && !showNewCustomerForm) {
       toast({
         title: 'Error',
@@ -346,6 +355,8 @@ export default function NewOrder() {
       });
       return;
     }
+
+    setIsSubmitting(true);
 
     try {
       // Calculate total - each item already has GST included in total_price
@@ -393,6 +404,7 @@ export default function NewOrder() {
           description: orderError,
           variant: 'destructive',
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -403,6 +415,7 @@ export default function NewOrder() {
         description: `Order created successfully! Total: ${formatCurrency(totalAmount)}`,
       });
 
+      // Keep button disabled during navigation
       setTimeout(() => {
         navigate('/orders');
       }, 2000);
@@ -413,6 +426,7 @@ export default function NewOrder() {
         description: 'Failed to create order',
         variant: 'destructive',
       });
+      setIsSubmitting(false);
     }
   };
 
@@ -546,13 +560,14 @@ export default function NewOrder() {
 
         {/* Order Summary */}
         <OrderSummary
-          subtotal={calculateTotal()}
-          gstRate={gstSettings.rate}
-          gstIncluded={gstSettings.isIncluded}
+          subtotal={calculateOrderBreakdown().subtotal}
+          gstAmount={calculateOrderBreakdown().gstAmount}
+          totalAmount={calculateOrderBreakdown().total}
           paidAmount={orderDetails.paidAmount}
           onCancel={() => navigate('/orders')}
           onSubmit={handleSubmit}
           canSubmit={orderItems.length > 0}
+          isSubmitting={isSubmitting}
         />
 
         {/* Product/Material Selection Dialog */}

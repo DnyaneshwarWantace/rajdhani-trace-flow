@@ -5,25 +5,25 @@ import { formatCurrency } from '@/utils/formatHelpers';
 
 interface OrderSummaryProps {
   subtotal: number;
-  gstRate: number;
-  gstIncluded: boolean;
+  gstAmount: number;
+  totalAmount: number;
   paidAmount: number;
   onCancel: () => void;
   onSubmit: () => void;
   canSubmit: boolean;
+  isSubmitting?: boolean;
 }
 
 export default function OrderSummary({
   subtotal,
-  gstRate,
-  gstIncluded,
+  gstAmount,
+  totalAmount,
   paidAmount,
   onCancel,
   onSubmit,
   canSubmit,
+  isSubmitting = false,
 }: OrderSummaryProps) {
-  const gstAmount = gstIncluded ? (subtotal * gstRate) / 100 : 0;
-  const totalAmount = subtotal + gstAmount;
   const outstandingAmount = totalAmount - paidAmount;
 
   return (
@@ -38,7 +38,7 @@ export default function OrderSummary({
             <span>{formatCurrency(subtotal)}</span>
           </div>
           <div className="flex justify-between">
-            <span>GST ({gstRate}%):</span>
+            <span>GST:</span>
             <span>{formatCurrency(gstAmount)}</span>
           </div>
           <div className="flex justify-between font-medium text-lg border-t pt-2">
@@ -56,12 +56,12 @@ export default function OrderSummary({
         </div>
 
         <div className="flex gap-4 mt-6">
-          <Button variant="outline" className="flex-1" onClick={onCancel}>
+          <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} className="flex-1" disabled={!canSubmit}>
+          <Button onClick={onSubmit} className="flex-1" disabled={!canSubmit || isSubmitting}>
             <CheckCircle className="w-4 h-4 mr-2" />
-            Create Order
+            {isSubmitting ? 'Creating Order...' : 'Create Order'}
           </Button>
         </div>
       </CardContent>

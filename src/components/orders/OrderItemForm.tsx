@@ -321,7 +321,7 @@ export default function OrderItemForm({
           <Label>Subtotal (Before GST)</Label>
           <Input
             type="number"
-            value={(item.total_price || 0).toFixed(2)}
+            value={(item.subtotal || 0).toFixed(2)}
             readOnly
             className="bg-gray-50"
           />
@@ -331,7 +331,7 @@ export default function OrderItemForm({
           <Label>GST Amount</Label>
           <Input
             type="number"
-            value={(item.gst_included ? ((item.total_price || 0) * (item.gst_rate || 18)) / 100 : 0).toFixed(2)}
+            value={(item.gst_amount || 0).toFixed(2)}
             readOnly
             className="bg-gray-50"
           />
@@ -341,7 +341,7 @@ export default function OrderItemForm({
           <Label>Total Price (Inc. GST)</Label>
           <Input
             type="number"
-            value={((item.total_price || 0) + (item.gst_included ? ((item.total_price || 0) * (item.gst_rate || 18)) / 100 : 0)).toFixed(2)}
+            value={(item.total_price || 0).toFixed(2)}
             readOnly
             className="bg-gray-50 font-semibold"
           />

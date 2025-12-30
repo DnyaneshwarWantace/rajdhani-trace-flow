@@ -30,39 +30,53 @@ export default function RecipeManagementCard({
   const handleAddMaterial = (recipe: Recipe) => {
     setCurrentRecipeId(recipe.id);
     setSelectedMaterialType('raw_material');
-    setIsMaterialDialogOpen(true);
+    setIsMaterialSelectorOpen(true); // Directly open material selector
   };
 
-  const handleMaterialTypeSelect = () => {
-    setIsMaterialDialogOpen(false);
-    setIsMaterialSelectorOpen(true);
+  const handleMaterialTypeSelect = (type: 'raw_material' | 'product') => {
+    setSelectedMaterialType(type);
+  };
+
+  // Get already added material IDs for the current recipe
+  const getExistingMaterialIds = () => {
+    const currentRecipe = recipes.find(r => r.id === currentRecipeId);
+    if (!currentRecipe || !currentRecipe.materials) return [];
+    return currentRecipe.materials.map((m: any) => m.material_id);
   };
 
   const handleMaterialSelect = (materials: any[]) => {
     // Set the first material or multiple materials for quantity entry
     if (materials.length > 0) {
+      const currentRecipe = recipes.find(r => r.id === currentRecipeId);
+      const existingMaterials = currentRecipe?.materials || [];
+
       setEditingMaterial({
         recipe_id: currentRecipeId,
         materials: materials.map(m => {
+          // Check if this material already exists in the recipe
+          const existingMaterial = existingMaterials.find((em: any) => em.material_id === m.id);
+
           // For products, auto-calculate quantity based on SQM
-          let quantityPerSqm = 1;
+          let quantityPerSqm = existingMaterial?.quantity_per_sqm || 1;
           let unit = m.unit || 'kg';
 
           if (selectedMaterialType === 'product') {
             // For products, use count_unit (rolls, count, etc)
             unit = m.count_unit || 'count';
             // Auto-calculate: if product is X sqm, then you need 1/X products per sqm
-            if (m.sqm && m.sqm > 0) {
-              quantityPerSqm = 1 / m.sqm;
+            if (!existingMaterial && m.sqm && m.sqm > 0) {
+              quantityPerSqm = parseFloat((1 / m.sqm).toFixed(4));
             }
           }
 
           return {
+            id: existingMaterial?.id,  // Include ID if updating existing material
             material_id: m.id,
             material_name: m.name,
             material_type: selectedMaterialType,
             quantity_per_sqm: quantityPerSqm,
             unit: unit,
+            isExisting: !!existingMaterial,  // Flag to show it's already added
           };
         }),
       });
@@ -75,7 +89,7 @@ export default function RecipeManagementCard({
       ...material,
       recipe_id: recipe.id,
     });
-    setIsMaterialDialogOpen(true);
+    setIsMaterialSelectorOpen(false); // Close material selector when editing
   };
 
   const handleRemoveMaterial = async (recipeId: string, materialId: string) => {
@@ -153,18 +167,35 @@ export default function RecipeManagementCard({
       let updatedMaterials = [...recipe.materials];
 
       if (editingMaterial.id) {
-        // Update existing material
+        // Update existing single material
         const index = updatedMaterials.findIndex((m: any) => m.id === editingMaterial.id);
         if (index !== -1) {
           updatedMaterials[index] = { ...updatedMaterials[index], ...editingMaterial };
         }
       } else if (editingMaterial.materials) {
-        // Add multiple new materials
+        // Add or update multiple materials
         editingMaterial.materials.forEach((mat: any) => {
-          updatedMaterials.push({
-            id: `temp_${Date.now()}_${Math.random()}`,
-            ...mat,
-          });
+          if (mat.id) {
+            // Update existing material
+            const index = updatedMaterials.findIndex((m: any) => m.id === mat.id);
+            if (index !== -1) {
+              updatedMaterials[index] = { ...updatedMaterials[index], ...mat };
+            }
+          } else {
+            // Add new material only if it doesn't exist by material_id
+            const existingByMaterialId = updatedMaterials.find((m: any) => m.material_id === mat.material_id);
+            if (existingByMaterialId) {
+              // Update the existing one
+              const index = updatedMaterials.findIndex((m: any) => m.material_id === mat.material_id);
+              updatedMaterials[index] = { ...updatedMaterials[index], ...mat };
+            } else {
+              // Add new
+              updatedMaterials.push({
+                id: `temp_${Date.now()}_${Math.random()}`,
+                ...mat,
+              });
+            }
+          }
         });
       } else {
         // Add single new material
@@ -242,8 +273,8 @@ export default function RecipeManagementCard({
                         </div>
                       </div>
                       <Button variant="outline" size="sm" onClick={() => handleAddMaterial(recipe)} className="w-full md:w-auto">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Material
+                        <Edit className="w-4 h-4 mr-2" />
+                        Manage Materials
                       </Button>
                     </div>
                   </CardHeader>
@@ -305,7 +336,7 @@ export default function RecipeManagementCard({
                         <p>No materials in this recipe</p>
                         <Button variant="outline" size="sm" onClick={() => handleAddMaterial(recipe)} className="mt-2">
                           <Plus className="w-4 h-4 mr-2" />
-                          Add First Material
+                          Manage Materials
                         </Button>
                       </div>
                     )}
@@ -317,57 +348,17 @@ export default function RecipeManagementCard({
         </CardContent>
       </Card>
 
-      {/* Material Type Selection Dialog */}
-      <Dialog open={isMaterialDialogOpen && !editingMaterial} onOpenChange={setIsMaterialDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Select Material Type</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Card
-                className={`p-6 cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
-                  selectedMaterialType === 'raw_material' ? 'border-blue-500 bg-blue-50' : ''
-                }`}
-                onClick={() => setSelectedMaterialType('raw_material')}
-              >
-                <div className="text-center space-y-2">
-                  <Package className="w-8 h-8 mx-auto" />
-                  <div className="font-semibold">Raw Material</div>
-                  <div className="text-xs text-gray-600">Select from raw materials</div>
-                </div>
-              </Card>
-              <Card
-                className={`p-6 cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
-                  selectedMaterialType === 'product' ? 'border-blue-500 bg-blue-50' : ''
-                }`}
-                onClick={() => setSelectedMaterialType('product')}
-              >
-                <div className="text-center space-y-2">
-                  <Package className="w-8 h-8 mx-auto" />
-                  <div className="font-semibold">Product</div>
-                  <div className="text-xs text-gray-600">Select from products</div>
-                </div>
-              </Card>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMaterialDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleMaterialTypeSelect} className="text-white">
-              Next
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Material Selection Dialog */}
+      {/* Unified Material Management Dialog */}
       <RecipeMaterialSelectionDialog
         isOpen={isMaterialSelectorOpen}
         onClose={() => setIsMaterialSelectorOpen(false)}
         materialType={selectedMaterialType}
         onSelect={handleMaterialSelect}
+        existingMaterialIds={getExistingMaterialIds()}
+        currentRecipe={recipes.find(r => r.id === currentRecipeId)}
+        onEditMaterial={handleEditMaterial}
+        onRemoveMaterial={handleRemoveMaterial}
+        onMaterialTypeChange={handleMaterialTypeSelect}
       />
 
       {/* Quantity Entry Dialog (after material selected) */}
@@ -411,7 +402,7 @@ export default function RecipeManagementCard({
                               setEditingMaterial({ ...editingMaterial, materials: updated });
                             }}
                             min="0"
-                            step="0.1"
+                            step="0.0001"
                           />
                         </div>
                       </div>
@@ -452,7 +443,7 @@ export default function RecipeManagementCard({
                         });
                       }}
                       min="0"
-                      step="0.1"
+                      step="0.0001"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
                       Amount needed for 1 square meter (sqm) - this recipe works for all products

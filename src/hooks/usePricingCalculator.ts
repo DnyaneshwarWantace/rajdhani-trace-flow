@@ -69,10 +69,9 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
 
     // For count_unit (unit): simple price * quantity
     if (pricing_unit === 'unit' || !pricing_unit) {
-      const basePrice = unit_price * quantity;
-      const gstAmount = gst_included ? (basePrice * gst_rate) / (100 + gst_rate) : (basePrice * gst_rate) / 100;
-      const subtotal = gst_included ? basePrice - gstAmount : basePrice;
-      const totalPrice = gst_included ? basePrice : basePrice + gstAmount;
+      const subtotal = unit_price * quantity; // Base price before GST
+      const gstAmount = gst_included ? (subtotal * gst_rate) / 100 : 0;
+      const totalPrice = subtotal + gstAmount;
 
       return {
         unitPrice: unit_price,
@@ -141,7 +140,7 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
     }
     
     // Calculate base price with unit conversion support
-    const basePrice = calculateTotalPrice(
+    const subtotal = calculateTotalPrice(
       unit_price,
       quantity,
       pricing_unit,
@@ -150,10 +149,9 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       widthUnit
     );
 
-    // Calculate GST
-    const gstAmount = gst_included ? (basePrice * gst_rate) / (100 + gst_rate) : (basePrice * gst_rate) / 100;
-    const subtotal = gst_included ? basePrice - gstAmount : basePrice;
-    const totalPrice = gst_included ? basePrice : basePrice + gstAmount;
+    // Calculate GST - unit_price is base price, add GST if included
+    const gstAmount = gst_included ? (subtotal * gst_rate) / 100 : 0;
+    const totalPrice = subtotal + gstAmount;
 
     return {
       unitPrice: unit_price,
