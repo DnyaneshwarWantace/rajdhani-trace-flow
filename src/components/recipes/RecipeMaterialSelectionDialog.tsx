@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Package, Loader2, Check, Filter, Edit, Trash2 } from 'lucide-react';
+import { Search, Package, Loader2, Check, Filter } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 
@@ -23,9 +23,6 @@ interface RecipeMaterialSelectionDialogProps {
   materialType: 'raw_material' | 'product';
   onSelect: (materials: any[]) => void;
   existingMaterialIds?: string[];
-  currentRecipe?: any;
-  onEditMaterial?: (material: any, recipe: any) => void;
-  onRemoveMaterial?: (recipeId: string, materialId: string) => void;
   onMaterialTypeChange?: (type: 'raw_material' | 'product') => void;
 }
 
@@ -35,9 +32,6 @@ export default function RecipeMaterialSelectionDialog({
   materialType,
   onSelect,
   existingMaterialIds = [],
-  currentRecipe,
-  onEditMaterial,
-  onRemoveMaterial,
   onMaterialTypeChange,
 }: RecipeMaterialSelectionDialogProps) {
   const [searchTerm, setSearchTerm] = useState('');

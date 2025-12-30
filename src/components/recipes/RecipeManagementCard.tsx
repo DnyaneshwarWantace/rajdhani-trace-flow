@@ -21,7 +21,6 @@ export default function RecipeManagementCard({
   onRefresh,
 }: RecipeManagementCardProps) {
   const { toast } = useToast();
-  const [isMaterialDialogOpen, setIsMaterialDialogOpen] = useState(false);
   const [isMaterialSelectorOpen, setIsMaterialSelectorOpen] = useState(false);
   const [selectedMaterialType, setSelectedMaterialType] = useState<'raw_material' | 'product'>('raw_material');
   const [currentRecipeId, setCurrentRecipeId] = useState<string>('');
@@ -355,9 +354,6 @@ export default function RecipeManagementCard({
         materialType={selectedMaterialType}
         onSelect={handleMaterialSelect}
         existingMaterialIds={getExistingMaterialIds()}
-        currentRecipe={recipes.find(r => r.id === currentRecipeId)}
-        onEditMaterial={handleEditMaterial}
-        onRemoveMaterial={handleRemoveMaterial}
         onMaterialTypeChange={handleMaterialTypeSelect}
       />
 
