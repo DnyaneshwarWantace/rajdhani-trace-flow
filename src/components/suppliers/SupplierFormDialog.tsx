@@ -195,6 +195,68 @@ export default function SupplierFormDialog({
   const cityWordCount = formData.city?.trim() ? formData.city.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const stateWordCount = formData.state?.trim() ? formData.state.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
 
+  // Handler for phone number validation
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+
+  const validatePhoneNumber = (phoneValue: string): boolean => {
+    if (!phoneValue || phoneValue.trim() === '') {
+      setPhoneError(null);
+      return true; // Phone is optional
+    }
+
+    // Extract country code and national number
+    // Format is typically: +91 1234567890 or +1 1234567890
+    const cleaned = phoneValue.replace(/\s+/g, ''); // Remove spaces
+
+    // Extract digits only for national number (after country code)
+    const digitsOnly = cleaned.replace(/^\+\d+/, ''); // Remove country code
+    const nationalNumber = digitsOnly.replace(/\D/g, ''); // Keep only digits
+
+    // Country-specific validation based on country code
+    const countryValidation: Record<string, { length: number; name: string }> = {
+      '+91': { length: 10, name: 'India' },
+      '+1': { length: 10, name: 'USA/Canada' },
+      '+44': { length: 10, name: 'UK' },
+      '+971': { length: 9, name: 'UAE' },
+      '+966': { length: 9, name: 'Saudi Arabia' },
+      '+86': { length: 11, name: 'China' },
+    };
+
+    // Find matching country code
+    let matchedValidation = null;
+    for (const [code, validation] of Object.entries(countryValidation)) {
+      if (cleaned.startsWith(code)) {
+        matchedValidation = validation;
+        break;
+      }
+    }
+
+    if (matchedValidation) {
+      if (nationalNumber.length !== matchedValidation.length) {
+        setPhoneError(`${matchedValidation.name} requires exactly ${matchedValidation.length} digits`);
+        return false;
+      }
+    } else {
+      // For other countries, check if number is at least 6 digits
+      if (nationalNumber.length < 6) {
+        setPhoneError('Phone number is too short (min 6 digits)');
+        return false;
+      }
+      if (nationalNumber.length > 15) {
+        setPhoneError('Phone number is too long (max 15 digits)');
+        return false;
+      }
+    }
+
+    setPhoneError(null);
+    return true;
+  };
+
+  const handlePhoneChange = (value: string) => {
+    onFormDataChange({ ...formData, phone: value });
+    validatePhoneNumber(value);
+  };
+
   // Handler for pincode (max 10 digits) with auto-fill
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
@@ -276,12 +338,18 @@ export default function SupplierFormDialog({
               <PhoneInput
                 defaultCountry="in"
                 value={formData.phone}
-                onChange={(value) => onFormDataChange({ ...formData, phone: value })}
+                onChange={handlePhoneChange}
                 placeholder="Enter phone number"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Select country and enter number
-              </p>
+              {phoneError ? (
+                <p className="text-xs text-red-500 mt-1">
+                  {phoneError}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select country and enter valid number
+                </p>
+              )}
             </div>
           </div>
 
@@ -374,7 +442,7 @@ export default function SupplierFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="bg-primary-600 hover:bg-primary-700 text-white">
+            <Button type="submit" disabled={submitting || !!phoneError} className="bg-primary-600 hover:bg-primary-700 text-white">
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {selectedSupplier ? 'Update' : 'Create'}
             </Button>
