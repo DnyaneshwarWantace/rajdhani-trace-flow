@@ -30,8 +30,8 @@ export default function OrderList() {
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
-    inProduction: 0,
-    ready: 0,
+    accepted: 0,
+    dispatched: 0,
     delivered: 0,
   });
   const [statsLoading, setStatsLoading] = useState(false);
@@ -86,8 +86,8 @@ export default function OrderList() {
       setStats({
         total: ordersData.length,
         pending: ordersData.filter((o: Order) => o.status === 'pending').length,
-        inProduction: ordersData.filter((o: Order) => o.status === 'in_production').length,
-        ready: ordersData.filter((o: Order) => o.status === 'ready').length,
+        accepted: ordersData.filter((o: Order) => o.status === 'accepted').length,
+        dispatched: ordersData.filter((o: Order) => o.status === 'dispatched').length,
         delivered: ordersData.filter((o: Order) => o.status === 'delivered').length,
       });
     } catch (error) {

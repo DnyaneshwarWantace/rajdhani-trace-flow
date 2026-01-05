@@ -1,11 +1,11 @@
-import { ShoppingCart, Clock, Factory, Package, CheckCircle, Loader2 } from 'lucide-react';
+import { ShoppingCart, Clock, CheckSquare, Truck, CheckCircle, Loader2 } from 'lucide-react';
 
 interface OrderStatsBoxesProps {
   stats: {
     total: number;
     pending: number;
-    inProduction: number;
-    ready: number;
+    accepted: number;
+    dispatched: number;
     delivered: number;
   };
   loading?: boolean;
@@ -42,18 +42,18 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
       iconColor: 'text-yellow-600',
     },
     {
-      label: 'In Production',
-      value: stats.inProduction,
-      icon: Factory,
-      color: 'bg-purple-100 text-purple-700',
-      iconColor: 'text-purple-600',
+      label: 'Accepted',
+      value: stats.accepted,
+      icon: CheckSquare,
+      color: 'bg-blue-100 text-blue-700',
+      iconColor: 'text-blue-600',
     },
     {
-      label: 'Ready',
-      value: stats.ready,
-      icon: Package,
-      color: 'bg-indigo-100 text-indigo-700',
-      iconColor: 'text-indigo-600',
+      label: 'Dispatched',
+      value: stats.dispatched,
+      icon: Truck,
+      color: 'bg-orange-100 text-orange-700',
+      iconColor: 'text-orange-600',
     },
     {
       label: 'Delivered',

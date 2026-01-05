@@ -59,8 +59,6 @@ export default function OrderFilters({
           <SelectItem value="all">All Status</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
           <SelectItem value="accepted">Accepted</SelectItem>
-          <SelectItem value="in_production">In Production</SelectItem>
-          <SelectItem value="ready">Ready</SelectItem>
           <SelectItem value="dispatched">Dispatched</SelectItem>
           <SelectItem value="delivered">Delivered</SelectItem>
           <SelectItem value="cancelled">Cancelled</SelectItem>

@@ -96,13 +96,25 @@ export default function StatusDistributionChart({ data, title = 'Status Distribu
           scale: true,
           scaleSize: 5,
         },
-        data: data.map((item) => ({
-          value: item.value,
-          name: item.name,
-          itemStyle: {
-            color: item.color,
-          },
-        })),
+        data: data.map((item) => {
+          const total = data.reduce((sum, d) => sum + d.value, 0);
+          const percentage = total > 0 ? ((item.value / total) * 100) : 0;
+          const isSmall = percentage < 1 && percentage > 0;
+
+          return {
+            value: item.value,
+            name: item.name,
+            itemStyle: {
+              color: item.color,
+            },
+            label: {
+              show: isSmall, // Only show label for small slices
+            },
+            labelLine: {
+              show: isSmall, // Only show line for small slices
+            },
+          };
+        }),
       },
     ],
   };
