@@ -54,16 +54,38 @@ export default function StatusDistributionChart({ data, title = 'Status Distribu
         radius: ['45%', '75%'],
         center: ['60%', '50%'],
         avoidLabelOverlap: true,
+        minAngle: 5, // Minimum angle for small slices (makes tiny slices more visible)
         itemStyle: {
           borderRadius: 6,
-          borderColor: '#fff',
-          borderWidth: 3,
+          borderColor: 'transparent', // Remove white border
+          borderWidth: 0, // No border
         },
         label: {
-          show: false,
+          show: true,
+          position: 'outside',
+          formatter: (params: any) => {
+            const total = data.reduce((sum, d) => sum + d.value, 0);
+            const percentage = total > 0 ? ((params.value / total) * 100).toFixed(2) : '0.00';
+            // Only show label if percentage is less than 1%
+            if (parseFloat(percentage) < 1 && parseFloat(percentage) > 0) {
+              return `${params.name}\n${percentage}%`;
+            }
+            return ''; // Don't show label for large slices
+          },
+          fontSize: 11,
+          color: '#374151',
+          fontWeight: 500,
         },
         labelLine: {
-          show: false,
+          show: true,
+          length: 15,
+          length2: 10,
+          lineStyle: {
+            color: '#9ca3af',
+            width: 1,
+          },
+          // Only show line for items with visible labels
+          showAbove: true,
         },
         emphasis: {
           itemStyle: {
