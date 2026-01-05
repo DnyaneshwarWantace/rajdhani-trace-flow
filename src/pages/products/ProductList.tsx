@@ -9,26 +9,14 @@ import AnalyticsTab from '@/components/products/AnalyticsTab';
 import NotificationsTab from '@/components/products/NotificationsTab';
 import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
 import type { Notification } from '@/services/notificationService';
-import { useToast } from '@/hooks/use-toast';
-import { canDelete } from '@/utils/permissions';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
 export default function ProductList() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabValue>('inventory');
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
