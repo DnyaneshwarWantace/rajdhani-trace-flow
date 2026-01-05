@@ -1,11 +1,54 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield, ArrowLeft, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield, ArrowLeft, KeyRound, CheckCircle2, XCircle } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
+
+// Password validation function (matches backend)
+const validatePassword = (password: string) => {
+  const errors: string[] = [];
+
+  if (!password || password.length < 8) {
+    errors.push('At least 8 characters long');
+  }
+
+  if (password && password.length > 128) {
+    errors.push('Less than 128 characters');
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    errors.push('At least one uppercase letter (A-Z)');
+  }
+
+  if (!/[a-z]/.test(password)) {
+    errors.push('At least one lowercase letter (a-z)');
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push('At least one number (0-9)');
+  }
+
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    errors.push('At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors: errors
+  };
+};
+
+// Password requirements list
+const passwordRequirements = [
+  { id: 'length', label: 'At least 8 characters long', test: (pwd: string) => pwd.length >= 8 },
+  { id: 'uppercase', label: 'At least one uppercase letter (A-Z)', test: (pwd: string) => /[A-Z]/.test(pwd) },
+  { id: 'lowercase', label: 'At least one lowercase letter (a-z)', test: (pwd: string) => /[a-z]/.test(pwd) },
+  { id: 'number', label: 'At least one number (0-9)', test: (pwd: string) => /[0-9]/.test(pwd) },
+  { id: 'special', label: 'At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)', test: (pwd: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd) },
+];
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -22,6 +65,11 @@ export default function ForgotPassword() {
   const [attemptsLeft, setAttemptsLeft] = useState(3);
 
   const API_BASE_URL = getApiUrl();
+
+  // Real-time password validation
+  const passwordValidation = useMemo(() => validatePassword(newPassword), [newPassword]);
+  const isPasswordValid = passwordValidation.isValid;
+  const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
 
   // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
@@ -68,9 +116,9 @@ export default function ForgotPassword() {
       return;
     }
 
-    // Validate password length
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    // Validate password strength (matches backend validation)
+    if (!isPasswordValid) {
+      setError(passwordValidation.errors.join('. '));
       return;
     }
 
@@ -257,10 +305,10 @@ export default function ForgotPassword() {
                     placeholder="••••••••"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    className={`pl-10 pr-10 ${newPassword && !isPasswordValid ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : newPassword && isPasswordValid ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}`}
                     required
                     disabled={isLoading}
-                    minLength={6}
+                    minLength={8}
                   />
                   <button
                     type="button"
@@ -271,6 +319,30 @@ export default function ForgotPassword() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                
+                {/* Password Requirements */}
+                {newPassword && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Password Requirements:</p>
+                    <ul className="space-y-1.5">
+                      {passwordRequirements.map((req) => {
+                        const isValid = req.test(newPassword);
+                        return (
+                          <li key={req.id} className="flex items-start gap-2 text-xs">
+                            {isValid ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            )}
+                            <span className={isValid ? 'text-green-700' : 'text-gray-600'}>
+                              {req.label}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -283,10 +355,10 @@ export default function ForgotPassword() {
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10 pr-10"
+                    className={`pl-10 pr-10 ${confirmPassword && !passwordsMatch ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : confirmPassword && passwordsMatch ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}`}
                     required
                     disabled={isLoading}
-                    minLength={6}
+                    minLength={8}
                   />
                   <button
                     type="button"
@@ -297,6 +369,18 @@ export default function ForgotPassword() {
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {confirmPassword && !passwordsMatch && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <XCircle className="w-3 h-3" />
+                    Passwords do not match
+                  </p>
+                )}
+                {confirmPassword && passwordsMatch && (
+                  <p className="text-xs text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Passwords match
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -313,7 +397,7 @@ export default function ForgotPassword() {
                 <Button
                   type="submit"
                   className="flex-1 bg-primary-500 hover:bg-primary-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-primary-200 hover:shadow-xl hover:shadow-primary-300 transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                  disabled={isLoading || otp.length !== 6 || newPassword.length < 6 || newPassword !== confirmPassword}
+                  disabled={isLoading || otp.length !== 6 || !isPasswordValid || !passwordsMatch}
                 >
                   {isLoading ? (
                     <div className="flex items-center gap-2">
