@@ -16,8 +16,6 @@ export default function CustomerTable({
   customers,
   onView,
   onEdit,
-  onDelete,
-  canDelete,
 }: CustomerTableProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

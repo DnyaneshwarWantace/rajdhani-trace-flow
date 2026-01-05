@@ -31,8 +31,6 @@ export default function ProductCard({
   onStock,
   onProduction,
   onQRCode,
-  onDelete,
-  canDelete = false,
   showActions = true,
   variant: _variant = 'default',
   isSelected = false,

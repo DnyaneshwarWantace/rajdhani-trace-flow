@@ -15,8 +15,6 @@ export default function SupplierTable({
   suppliers,
   onView,
   onEdit,
-  onDelete,
-  canDelete,
 }: SupplierTableProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">

@@ -28,12 +28,10 @@ export default function ProductGroupedView({
   products,
   onView,
   onEdit,
-  onDelete,
   onDuplicate,
   onStock,
   onProduction,
   onQRCode,
-  canDelete = false,
 }: ProductGroupedViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);

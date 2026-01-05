@@ -48,8 +48,6 @@ export default function ProductList() {
     limit: 50,
   });
 
-  // User state for delete permission check
-  const [canDeleteProducts, setCanDeleteProducts] = useState(false);
 
   // Stats state for inventory tab
   const [inventoryStats, setInventoryStats] = useState({
@@ -75,15 +73,6 @@ export default function ProductList() {
   const [isQRCodeDialogOpen, setIsQRCodeDialogOpen] = useState(false);
   const [selectedQRProduct, setSelectedQRProduct] = useState<Product | null>(null);
 
-  // Delete dialog state
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // Check delete permission on mount
-  useEffect(() => {
-    setCanDeleteProducts(canDelete('products'));
-  }, []);
 
   // Load notifications count on mount
   useEffect(() => {
@@ -317,49 +306,6 @@ export default function ProductList() {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (product: Product) => {
-    setProductToDelete(product);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!productToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      // Prioritize custom id field over MongoDB _id
-      const productId = productToDelete.id || productToDelete._id;
-      if (!productId) {
-        throw new Error('Product ID not found');
-      }
-      await ProductService.deleteProduct(productId);
-
-      // Optimistically remove from local state without full reload
-      setProducts(prev => prev.filter(p => (p.id || p._id) !== productId));
-      setTotalProducts(prev => prev - 1);
-      setInventoryStats(prev => ({
-        ...prev,
-        totalProducts: prev.totalProducts - 1,
-      }));
-
-      toast({
-        title: 'Success',
-        description: 'Product deleted successfully',
-      });
-
-      setIsDeleteDialogOpen(false);
-      setProductToDelete(null);
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete product',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   // Calculate unread notifications count
   const unreadCount = notifications.filter(n => n.status === 'unread').length;
@@ -459,44 +405,6 @@ export default function ProductList() {
           product={selectedQRProduct}
         />
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="max-w-[90vw] sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Delete Product</DialogTitle>
-            </DialogHeader>
-            <div className="text-sm text-muted-foreground break-words overflow-hidden">
-              Are you sure you want to delete{' '}
-              <span className="font-semibold text-gray-900 break-all">
-                {productToDelete?.name ? (
-                  <TruncatedText text={`"${productToDelete.name}"`} maxLength={50} as="span" />
-                ) : (
-                  '"this product"'
-                )}
-              </span>
-              ? This action cannot be undone.
-            </div>
-            <DialogFooter className="flex-col sm:flex-row gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsDeleteDialogOpen(false);
-                  setProductToDelete(null);
-                }}
-                disabled={isDeleting}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </Layout>
   );

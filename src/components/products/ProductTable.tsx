@@ -23,7 +23,7 @@ interface ProductTableProps {
 
 
 
-export default function ProductTable({ products, onEdit, onDuplicate, onView, onStock, onProduction, onQRCode, onDelete, canDelete = false }: ProductTableProps) {
+export default function ProductTable({ products, onEdit, onDuplicate, onView, onStock, onProduction, onQRCode }: ProductTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
 
   const getStatusColor = (status: string) => {
