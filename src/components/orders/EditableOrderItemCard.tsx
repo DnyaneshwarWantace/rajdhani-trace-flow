@@ -53,14 +53,16 @@ export function EditableOrderItemCard({
   onSelectIndividualProducts,
 }: EditableOrderItemCardProps) {
   const [isEditingQty, setIsEditingQty] = useState(false);
-  const [editedQuantity, setEditedQuantity] = useState(item.quantity);
+  const [editedQuantity, setEditedQuantity] = useState<number | string>(item.quantity);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveQuantity = async () => {
-    if (onUpdateQuantity) {
+    const qty = typeof editedQuantity === 'string' ? parseFloat(editedQuantity) : editedQuantity;
+
+    if (onUpdateQuantity && qty > 0) {
       setIsSaving(true);
       try {
-        await onUpdateQuantity(item.id, editedQuantity);
+        await onUpdateQuantity(item.id, qty);
         setIsEditingQty(false);
       } catch (error) {
         console.error('Error updating quantity:', error);
@@ -73,6 +75,17 @@ export function EditableOrderItemCard({
   const handleCancelEdit = () => {
     setEditedQuantity(item.quantity);
     setIsEditingQty(false);
+  };
+
+  const handleStartEdit = () => {
+    setEditedQuantity(''); // Clear the field so user can type freely
+    setIsEditingQty(true);
+  };
+
+  // Check if the entered quantity is valid
+  const isValidQuantity = () => {
+    const qty = typeof editedQuantity === 'string' ? parseFloat(editedQuantity) : editedQuantity;
+    return !isNaN(qty) && qty > 0;
   };
 
   const productDetails = item.product_details;
@@ -154,16 +167,18 @@ export function EditableOrderItemCard({
             <Input
               type="number"
               value={editedQuantity}
-              onChange={(e) => setEditedQuantity(parseInt(e.target.value) || 1)}
-              min="1"
+              onChange={(e) => setEditedQuantity(e.target.value)}
+              min="0.01"
+              step="0.01"
               className="w-24"
               disabled={isSaving}
+              autoFocus
             />
             <span className="text-sm text-gray-600">{item.unit}</span>
             <Button
               size="sm"
               onClick={handleSaveQuantity}
-              disabled={isSaving}
+              disabled={isSaving || !isValidQuantity()}
             >
               <Check className="w-4 h-4" />
             </Button>
@@ -183,7 +198,8 @@ export function EditableOrderItemCard({
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setIsEditingQty(true)}
+                onClick={handleStartEdit}
+                title="Edit quantity"
               >
                 <Edit className="w-3 h-3" />
               </Button>
@@ -212,22 +228,29 @@ export function EditableOrderItemCard({
 
         {/* Individual Product Selection */}
         {item.product_type === 'product' && orderStatus === 'accepted' && onSelectIndividualProducts && (
-          <Button
-            size="sm"
-            variant={needsIndividualProductSelection ? 'default' : 'outline'}
-            onClick={() => {
-              console.log('🔵 Select Products clicked for item:', item);
-              console.log('🔵 Item product_id:', item.product_id);
-              console.log('🔵 Item product_name:', item.product_name);
-              onSelectIndividualProducts(item);
-            }}
-            className={needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}
-          >
-            <QrCode className="w-4 h-4 mr-1" />
-            {item.selected_individual_products && item.selected_individual_products.length > 0
-              ? `Selected: ${item.selected_individual_products.length}/${item.quantity}`
-              : 'Select Products'}
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant={needsIndividualProductSelection ? 'default' : 'outline'}
+              onClick={() => {
+                console.log('🔵 Select Products clicked for item:', item);
+                console.log('🔵 Item product_id:', item.product_id);
+                console.log('🔵 Item product_name:', item.product_name);
+                onSelectIndividualProducts(item);
+              }}
+              className={needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}
+            >
+              <QrCode className="w-4 h-4 mr-1" />
+              {item.selected_individual_products && item.selected_individual_products.length > 0
+                ? `Selected: ${item.selected_individual_products.length}/${item.quantity}`
+                : 'Select Products'}
+            </Button>
+            {item.selected_individual_products && item.selected_individual_products.length > 0 && item.selected_individual_products.length < item.quantity && (
+              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+                {item.quantity - item.selected_individual_products.length} more needed
+              </Badge>
+            )}
+          </>
         )}
       </div>
 
@@ -281,11 +304,20 @@ export function EditableOrderItemCard({
         </div>
       )}
 
-      {/* Warning if individual products not selected */}
-      {needsIndividualProductSelection && (
-        <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-          ⚠️ Please select individual products before dispatch
-        </div>
+      {/* Warning if individual products not selected or partially selected */}
+      {item.product_type === 'product' && orderStatus === 'accepted' && (
+        <>
+          {needsIndividualProductSelection && (
+            <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+              ⚠️ Please select individual products before dispatch
+            </div>
+          )}
+          {item.selected_individual_products && item.selected_individual_products.length > 0 && item.selected_individual_products.length < item.quantity && (
+            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+              ℹ️ Partial selection: {item.selected_individual_products.length} of {item.quantity} products reserved. Select {item.quantity - item.selected_individual_products.length} more to dispatch.
+            </div>
+          )}
+        </>
       )}
     </div>
   );

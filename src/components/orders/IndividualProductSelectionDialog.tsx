@@ -10,7 +10,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { QrCode, Package, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { QrCode, Package, Loader2, CheckCircle, AlertTriangle, Search } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 
@@ -36,15 +38,26 @@ export function IndividualProductSelectionDialog({
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [qrCodeDialogOpen, setQrCodeDialogOpen] = useState(false);
   const [selectedQrProduct, setSelectedQrProduct] = useState<any>(null);
+  const [currentOffset, setCurrentOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<string>('newest');
+  const pageSize = 50;
 
   useEffect(() => {
     console.log('🟢 Dialog useEffect - isOpen:', isOpen, 'product_id:', orderItem?.product_id);
     if (isOpen && orderItem?.product_id) {
       console.log('🟢 Calling loadAvailableProducts');
-      loadAvailableProducts();
+      // Reset pagination when dialog opens
+      setCurrentOffset(0);
+      setHasMore(true);
+      setAvailableProducts([]);
+      loadAvailableProducts(0, true);
     } else if (isOpen) {
       console.log('🔴 Dialog opened but NO product_id!');
       console.log('🔴 orderItem:', orderItem);
@@ -59,16 +72,21 @@ export function IndividualProductSelectionDialog({
     }
   }, [orderItem]);
 
-  const loadAvailableProducts = async () => {
+  const loadAvailableProducts = async (offset: number = 0, isInitialLoad: boolean = false) => {
     if (!orderItem?.product_id) {
       console.log('No product_id in orderItem:', orderItem);
       return;
     }
 
-    console.log('Loading individual products for product_id:', orderItem.product_id);
+    console.log('Loading individual products for product_id:', orderItem.product_id, 'offset:', offset);
     console.log('Currently selected products:', orderItem.selected_individual_products);
 
-    setLoading(true);
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
       // Get currently selected product IDs
       const currentlySelectedIds = orderItem.selected_individual_products?.map(p =>
@@ -77,15 +95,26 @@ export function IndividualProductSelectionDialog({
 
       console.log('Currently selected IDs:', currentlySelectedIds);
 
-      // Load available products
+      // Load available products with pagination
       const availableResponse = await IndividualProductService.getIndividualProductsByProductId(
         orderItem.product_id,
-        { status: 'available' }
+        {
+          status: 'available',
+          limit: pageSize,
+          offset: offset
+        }
       );
 
-      // If there are selected products, fetch their full details directly
+      console.log('Fetched products:', availableResponse.products?.length || 0, 'Total:', availableResponse.total);
+      setTotalCount(availableResponse.total);
+
+      // Check if there are more products to load
+      const loadedCount = offset + (availableResponse.products?.length || 0);
+      setHasMore(loadedCount < availableResponse.total);
+
+      // If this is the initial load, also fetch selected/reserved products
       let currentlySelectedFullProducts: any[] = [];
-      if (currentlySelectedIds.length > 0) {
+      if (isInitialLoad && currentlySelectedIds.length > 0) {
         try {
           // Fetch full details of currently selected/reserved products
           const selectedProductsPromises = currentlySelectedIds.map(id =>
@@ -103,40 +132,40 @@ export function IndividualProductSelectionDialog({
         }
       }
 
-      // Combine available and currently selected products
-      const allProducts = [
-        ...(availableResponse.products || []),
-        ...currentlySelectedFullProducts
-      ];
+      if (isInitialLoad) {
+        // Initial load: combine available and selected products
+        const allProducts = [
+          ...currentlySelectedFullProducts,
+          ...(availableResponse.products || [])
+        ];
 
-      // Remove duplicates based on ID
-      const uniqueProducts = Array.from(
-        new Map(allProducts.map(p => [p.id, p])).values()
-      );
+        // Remove duplicates based on ID
+        const uniqueProducts = Array.from(
+          new Map(allProducts.map(p => [p.id, p])).values()
+        );
 
-      // Sort: currently selected products first, then available products
-      const sortedProducts = uniqueProducts.sort((a, b) => {
-        const aIsSelected = currentlySelectedIds.includes(a.id);
-        const bIsSelected = currentlySelectedIds.includes(b.id);
+        setAvailableProducts(uniqueProducts);
+        setSelectedProducts(currentlySelectedFullProducts);
+      } else {
+        // Load more: append new products to existing list
+        const newProducts = availableResponse.products || [];
 
-        if (aIsSelected && !bIsSelected) return -1;
-        if (!aIsSelected && bIsSelected) return 1;
-        return 0;
-      });
+        // Filter out products that are already in the list
+        const existingIds = new Set(availableProducts.map(p => p.id));
+        const uniqueNewProducts = newProducts.filter(p => !existingIds.has(p.id));
 
-      console.log('Loaded available products:', availableResponse.products?.length || 0);
-      console.log('Loaded currently selected products:', currentlySelectedFullProducts.length);
-      console.log('Total unique products:', sortedProducts.length);
+        setAvailableProducts(prev => [...prev, ...uniqueNewProducts]);
+      }
 
-      setAvailableProducts(sortedProducts);
-
-      // Set selected products to full objects
-      setSelectedProducts(currentlySelectedFullProducts);
+      console.log('Total products loaded:', isInitialLoad ? availableResponse.products?.length || 0 : availableProducts.length + (availableResponse.products?.length || 0));
     } catch (error) {
       console.error('Error loading individual products:', error);
-      setAvailableProducts([]);
+      if (isInitialLoad) {
+        setAvailableProducts([]);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -151,9 +180,46 @@ export function IndividualProductSelectionDialog({
     }
   };
 
-  const handleAutoSelect = () => {
-    const productsToSelect = availableProducts.slice(0, orderItem?.quantity || 0);
-    setSelectedProducts(productsToSelect);
+  const handleAutoSelect = async () => {
+    const requiredQty = orderItem?.quantity || 0;
+
+    // If we have enough products loaded, just select them
+    if (availableProducts.length >= requiredQty) {
+      const productsToSelect = availableProducts.slice(0, requiredQty);
+      setSelectedProducts(productsToSelect);
+      return;
+    }
+
+    // Otherwise, load all products first, then select
+    setLoading(true);
+    try {
+      const allProductsResponse = await IndividualProductService.getIndividualProductsByProductId(
+        orderItem?.product_id || '',
+        {
+          status: 'available',
+          limit: requiredQty,
+          offset: 0
+        }
+      );
+
+      const productsToSelect = (allProductsResponse.products || []).slice(0, requiredQty);
+      setSelectedProducts(productsToSelect);
+
+      // Update available products list
+      const existingIds = new Set(availableProducts.map(p => p.id));
+      const uniqueNewProducts = productsToSelect.filter(p => !existingIds.has(p.id));
+      setAvailableProducts(prev => [...prev, ...uniqueNewProducts]);
+    } catch (error) {
+      console.error('Error auto-selecting products:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const nextOffset = currentOffset + pageSize;
+    setCurrentOffset(nextOffset);
+    loadAvailableProducts(nextOffset, false);
   };
 
   const handleSave = async () => {
@@ -173,6 +239,30 @@ export function IndividualProductSelectionDialog({
   const requiredQuantity = orderItem.quantity;
   const selectionComplete = selectedProducts.length === requiredQuantity;
 
+  // Filter and sort products based on search and date
+  const filteredProducts = availableProducts
+    .filter(product => {
+      // Search filter
+      const matchesSearch = searchQuery === '' ||
+        product.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.qr_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.serial_number?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      // Sort by date
+      const dateA = new Date(a.added_date || a.created_at || a.production_date || 0).getTime();
+      const dateB = new Date(b.added_date || b.created_at || b.production_date || 0).getTime();
+
+      if (sortOrder === 'oldest') {
+        return dateA - dateB; // Oldest first
+      } else if (sortOrder === 'newest') {
+        return dateB - dateA; // Newest first
+      }
+      return 0;
+    });
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -183,86 +273,137 @@ export function IndividualProductSelectionDialog({
           </DialogTitle>
           <DialogDescription>
             {orderItem.product_name} • Required: {requiredQuantity} • Selected: {selectedProducts.length}
+            {totalCount > 0 && ` • Available: ${totalCount}`}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto">
+        {/* Search and Sort */}
+        <div className="flex gap-2 px-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search by ID, QR Code, or Serial..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={sortOrder} onValueChange={setSortOrder}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest First</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex-1 overflow-auto px-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
-          ) : availableProducts.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
-              No individual products available
+              {searchQuery ? 'No products match your search' : 'No individual products available'}
             </div>
           ) : (
-            <div className="space-y-2">
-              {availableProducts.map((product) => {
-                const isSelected = selectedProducts.some(p => p.id === product.id);
+            <>
+              {searchQuery ? (
+                <div className="text-sm text-gray-600 mb-2">
+                  Showing {filteredProducts.length} of {availableProducts.length} products
+                </div>
+              ) : null}
+              <div className="space-y-2">
+                {filteredProducts.map((product) => {
+                  const isSelected = selectedProducts.some(p => p.id === product.id);
 
-                return (
-                  <div
-                    key={product.id}
-                    className={`border rounded-lg p-3 cursor-pointer hover:border-blue-300 ${
-                      isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                    }`}
-                    onClick={() => handleToggleProduct(product)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        className="mt-1 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto p-1 hover:bg-blue-100"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedQrProduct(product);
-                              setQrCodeDialogOpen(true);
-                            }}
-                          >
-                            <QrCode className="w-4 h-4 text-blue-600" />
-                          </Button>
-                          <span className="font-semibold">{product.id}</span>
-                          <Badge
-                            variant={isSelected ? 'default' : 'secondary'}
-                            className={`text-xs ${product.status === 'reserved' ? 'bg-blue-600 text-white' : ''}`}
-                          >
-                            {product.status}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-600">
-                          {product.length && product.width && (
-                            <div>
-                              <span className="font-medium">Size:</span> {product.length} × {product.width}
-                            </div>
-                          )}
-                          {product.weight && (
-                            <div>
-                              <span className="font-medium">Weight:</span> {product.weight}
-                            </div>
-                          )}
-                          {product.quality_grade && (
-                            <div>
-                              <span className="font-medium">Grade:</span> {product.quality_grade}
-                            </div>
-                          )}
-                          {product.added_date && (
-                            <div>
-                              <span className="font-medium">Added:</span> {formatIndianDate(product.added_date)}
-                            </div>
-                          )}
+                  return (
+                    <div
+                      key={product.id}
+                      className={`border rounded-lg p-3 cursor-pointer hover:border-blue-300 ${
+                        isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                      }`}
+                      onClick={() => handleToggleProduct(product)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={isSelected}
+                          className="mt-1 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 data-[state=checked]:text-white"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-auto p-1 hover:bg-blue-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedQrProduct(product);
+                                setQrCodeDialogOpen(true);
+                              }}
+                            >
+                              <QrCode className="w-4 h-4 text-blue-600" />
+                            </Button>
+                            <span className="font-semibold">{product.id}</span>
+                            <Badge
+                              variant={isSelected ? 'default' : 'secondary'}
+                              className={`text-xs ${product.status === 'reserved' ? 'bg-blue-600 text-white' : ''}`}
+                            >
+                              {product.status}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-600">
+                            {product.length && product.width && (
+                              <div>
+                                <span className="font-medium">Size:</span> {product.length} × {product.width}
+                              </div>
+                            )}
+                            {product.weight && (
+                              <div>
+                                <span className="font-medium">Weight:</span> {product.weight}
+                              </div>
+                            )}
+                            {product.quality_grade && (
+                              <div>
+                                <span className="font-medium">Grade:</span> {product.quality_grade}
+                              </div>
+                            )}
+                            {product.added_date && (
+                              <div>
+                                <span className="font-medium">Added:</span> {formatIndianDate(product.added_date)}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="flex justify-center mt-4 pb-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="w-full max-w-md"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      `Load More (${availableProducts.length} of ${totalCount})`
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -271,18 +412,23 @@ export function IndividualProductSelectionDialog({
             {selectionComplete && (
               <Badge variant="default" className="bg-green-600 text-white">
                 <CheckCircle className="w-3 h-3 mr-1" />
-                Selection Complete
+                Complete Selection
+              </Badge>
+            )}
+            {selectedProducts.length > 0 && selectedProducts.length < requiredQuantity && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
+                Partial: {selectedProducts.length}/{requiredQuantity}
               </Badge>
             )}
             {selectedProducts.length > requiredQuantity && (
               <Badge variant="destructive">
                 <AlertTriangle className="w-3 h-3 mr-1" />
-                {selectedProducts.length - requiredQuantity} too many selected
+                {selectedProducts.length - requiredQuantity} too many
               </Badge>
             )}
-            {selectedProducts.length < requiredQuantity && (
+            {selectedProducts.length < requiredQuantity && selectedProducts.length > 0 && (
               <span className="text-sm text-gray-600">
-                {requiredQuantity - selectedProducts.length} more needed
+                ({requiredQuantity - selectedProducts.length} more needed for full order)
               </span>
             )}
           </div>
@@ -293,9 +439,13 @@ export function IndividualProductSelectionDialog({
             <Button variant="outline" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={selectedProducts.length !== requiredQuantity || saving} className="text-white">
+            <Button
+              onClick={handleSave}
+              disabled={selectedProducts.length === 0 || selectedProducts.length > requiredQuantity || saving}
+              className="text-white"
+            >
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Save Selection
+              Save Selection ({selectedProducts.length})
             </Button>
           </div>
         </DialogFooter>

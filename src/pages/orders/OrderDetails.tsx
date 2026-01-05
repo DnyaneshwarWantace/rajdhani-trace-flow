@@ -149,13 +149,47 @@ export default function OrderDetails() {
     }
   };
 
-  const handleUpdateQuantity = async (_itemId: string, newQuantity: number) => {
-    // TODO: Call API to update item quantity
-    toast({
-      title: 'Quantity Updated',
-      description: `Quantity updated to ${newQuantity}`,
-    });
-    await loadOrderDetails();
+  const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
+    try {
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch(`${API_URL}/orders/items/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          quantity: newQuantity,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to update quantity',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Success',
+        description: `Quantity updated to ${newQuantity}. Total amount recalculated.`,
+      });
+
+      await loadOrderDetails();
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update quantity',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSelectIndividualProducts = (item: any) => {

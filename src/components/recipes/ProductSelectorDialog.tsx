@@ -140,35 +140,35 @@ export default function ProductSelectorDialog({
 
       setAllProducts(productsWithRecipes);
 
-      // Get unique filter options
+      // Get unique filter options from the newly loaded products
       const uniqueCategories = Array.from(
-        new Set(allProducts.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
+        new Set(productsWithRecipes.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
       ).sort();
       const uniqueSubcategories = Array.from(
-        new Set(allProducts.map((p) => p.subcategory).filter((s): s is string => typeof s === 'string' && s !== ''))
+        new Set(productsWithRecipes.map((p) => p.subcategory).filter((s): s is string => typeof s === 'string' && s !== ''))
       ).sort();
       const uniqueColors = Array.from(
         new Set(
-          allProducts
+          productsWithRecipes
             .map((p) => p.color)
             .filter((c): c is string => typeof c === 'string' && c.trim() !== '' && c.toLowerCase() !== 'n/a')
         )
       ).sort();
       const uniquePatterns = Array.from(
         new Set(
-          allProducts
+          productsWithRecipes
             .map((p) => p.pattern)
             .filter((p): p is string => typeof p === 'string' && p.trim() !== '' && p.toLowerCase() !== 'n/a')
         )
       ).sort();
       const uniqueLengths = Array.from(
-        new Set(allProducts.map((p) => p.length).filter((l): l is string => typeof l === 'string' && l !== ''))
+        new Set(productsWithRecipes.map((p) => p.length).filter((l): l is string => typeof l === 'string' && l !== ''))
       ).sort();
       const uniqueWidths = Array.from(
-        new Set(allProducts.map((p) => p.width).filter((w): w is string => typeof w === 'string' && w !== ''))
+        new Set(productsWithRecipes.map((p) => p.width).filter((w): w is string => typeof w === 'string' && w !== ''))
       ).sort();
       const uniqueWeights = Array.from(
-        new Set(allProducts.map((p) => p.weight).filter((w): w is string => typeof w === 'string' && w !== ''))
+        new Set(productsWithRecipes.map((p) => p.weight).filter((w): w is string => typeof w === 'string' && w !== ''))
       ).sort();
 
       setCategories(uniqueCategories);
