@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Phone, MapPin, Edit, Trash2, Eye } from 'lucide-react';
+import { Mail, Phone, MapPin, Edit, Eye } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Customer } from '@/services/customerService';
 import type { Order } from '@/services/orderService';
@@ -15,7 +15,7 @@ interface CustomerCardProps {
   canDelete: boolean;
 }
 
-export default function CustomerCard({ customer, orders, onEdit, onDelete, canDelete }: CustomerCardProps) {
+export default function CustomerCard({ customer, orders, onEdit }: CustomerCardProps) {
   const navigate = useNavigate();
 
   const handleView = () => {
@@ -161,11 +161,6 @@ export default function CustomerCard({ customer, orders, onEdit, onDelete, canDe
             <Edit className="w-3.5 h-3.5 mr-1" />
             Edit
           </Button>
-          {canDelete && (
-            <Button variant="outline" size="sm" onClick={() => onDelete(customer)}>
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          )}
         </div>
       </CardContent>
     </Card>

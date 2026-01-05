@@ -113,8 +113,6 @@ export default function InventoryTab({
                 onStock={onStock}
                 onProduction={onProduction}
                 onQRCode={onQRCode}
-                onDelete={onDelete}
-                canDelete={canDelete}
               />
             ) : viewMode === 'grouped' ? (
               <ProductGroupedView

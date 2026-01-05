@@ -12,11 +12,16 @@ export interface ProductionBatch {
   actual_quantity?: number;
   start_date?: string;
   completion_date?: string;
-  status: 'planned' | 'in_progress' | 'in_production' | 'completed';
+  status: 'planned' | 'in_progress' | 'in_production' | 'completed' | 'cancelled' | 'on_hold';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   operator?: string;
   supervisor?: string;
   notes?: string;
+  cancellation_details?: {
+    cancelled_by?: string;
+    cancelled_at?: string;
+    cancellation_reason?: string;
+  };
   created_at: string;
   updated_at: string;
   // Product details (populated when needed)
@@ -210,23 +215,24 @@ export class ProductionService {
     }
   }
 
-  static async deleteBatch(batchId: string): Promise<{ data: boolean | null; error: string | null }> {
+  static async deleteBatch(batchId: string, reason?: string): Promise<{ data: boolean | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
-        method: 'DELETE',
+      const response = await fetch(`${API_URL}/production/batches/${batchId}/cancel`, {
+        method: 'POST',
         headers: this.getHeaders(),
+        body: JSON.stringify({ reason }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to delete batch' };
+        return { data: null, error: result.error || 'Failed to cancel batch' };
       }
 
       return { data: result.success, error: null };
     } catch (error) {
       console.error('Error in deleteBatch:', error);
-      return { data: null, error: 'Failed to delete batch' };
+      return { data: null, error: 'Failed to cancel batch' };
     }
   }
 

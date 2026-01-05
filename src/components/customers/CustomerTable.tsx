@@ -1,6 +1,6 @@
 import type { Customer } from '@/services/customerService';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Eye } from 'lucide-react';
+import { Edit, Eye } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 
@@ -105,16 +105,6 @@ export default function CustomerTable({
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(customer)}
-                        className="text-red-600 hover:text-red-900 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
                   </div>
                 </td>
               </tr>

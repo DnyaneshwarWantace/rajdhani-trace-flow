@@ -38,7 +38,7 @@ export default function ProductionList() {
   const [allBatches, setAllBatches] = useState<ProductionBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductionBatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed'>('all');
+  const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -56,6 +56,7 @@ export default function ProductionList() {
     planned: 0,
     active: 0,
     completed: 0,
+    cancelled: 0,
   });
 
   useEffect(() => {
@@ -140,7 +141,7 @@ export default function ProductionList() {
         // Stats will be calculated in useEffect when allBatches updates
       } else {
         setAllBatches([]);
-        setStats({ all: 0, planned: 0, active: 0, completed: 0 });
+        setStats({ all: 0, planned: 0, active: 0, completed: 0, cancelled: 0 });
       }
     } catch (error) {
       console.error('Error loading batches:', error);
@@ -168,6 +169,9 @@ export default function ProductionList() {
         break;
       case 'completed':
         filtered = allBatches.filter(b => b.status === 'completed');
+        break;
+      case 'cancelled':
+        filtered = allBatches.filter(b => b.status === 'cancelled');
         break;
       case 'all':
       default:
@@ -210,8 +214,10 @@ export default function ProductionList() {
     }).length;
     // Completed: only batches with status 'completed'
     const completed = batchesList.filter(b => b.status === 'completed').length;
+    // Cancelled: only batches with status 'cancelled'
+    const cancelled = batchesList.filter(b => b.status === 'cancelled').length;
 
-    setStats({ all, planned, active, completed });
+    setStats({ all, planned, active, completed, cancelled });
   };
 
   const handleCreate = () => {
@@ -227,24 +233,24 @@ export default function ProductionList() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = async (reason: string) => {
     if (!selectedBatch) return;
     setIsDeleting(true);
     try {
-      const { data, error } = await ProductionService.deleteBatch(selectedBatch.id);
+      const { data, error } = await ProductionService.deleteBatch(selectedBatch.id, reason);
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
         return;
       }
       if (data) {
-        toast({ title: 'Success', description: 'Production batch deleted successfully' });
+        toast({ title: 'Success', description: 'Production batch cancelled successfully' });
         setIsDeleteDialogOpen(false);
         setSelectedBatch(null);
         loadBatches();
       }
     } catch (error) {
-      console.error('Error deleting batch:', error);
-      toast({ title: 'Error', description: 'Failed to delete batch', variant: 'destructive' });
+      console.error('Error cancelling batch:', error);
+      toast({ title: 'Error', description: 'Failed to cancel batch', variant: 'destructive' });
     } finally {
       setIsDeleting(false);
     }
@@ -292,6 +298,7 @@ export default function ProductionList() {
           planned={stats.planned}
           active={stats.active}
           completed={stats.completed}
+          cancelled={stats.cancelled}
         />
 
         <ProductionSectionTabs
@@ -301,6 +308,7 @@ export default function ProductionList() {
           plannedCount={stats.planned}
           activeCount={stats.active}
           completedCount={stats.completed}
+          cancelledCount={stats.cancelled}
         />
 
         <ProductionFilters

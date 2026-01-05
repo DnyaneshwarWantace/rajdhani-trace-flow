@@ -1,10 +1,11 @@
 interface ProductionSectionTabsProps {
-  activeSection: 'all' | 'planned' | 'active' | 'completed';
-  onSectionChange: (section: 'all' | 'planned' | 'active' | 'completed') => void;
+  activeSection: 'all' | 'planned' | 'active' | 'completed' | 'cancelled';
+  onSectionChange: (section: 'all' | 'planned' | 'active' | 'completed' | 'cancelled') => void;
   allCount: number;
   plannedCount: number;
   activeCount: number;
   completedCount: number;
+  cancelledCount: number;
 }
 
 export default function ProductionSectionTabs({
@@ -14,6 +15,7 @@ export default function ProductionSectionTabs({
   plannedCount,
   activeCount,
   completedCount,
+  cancelledCount,
 }: ProductionSectionTabsProps) {
   return (
     <div className="mb-6 w-full">
@@ -62,6 +64,17 @@ export default function ProductionSectionTabs({
           >
             Completed
             <span className="ml-2 text-xs text-gray-500">({completedCount})</span>
+          </button>
+          <button
+            onClick={() => onSectionChange('cancelled')}
+            className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all ${
+              activeSection === 'cancelled'
+                ? 'bg-white text-primary-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            Cancelled
+            <span className="ml-2 text-xs text-gray-500">({cancelledCount})</span>
           </button>
         </nav>
       </div>

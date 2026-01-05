@@ -22,6 +22,7 @@ export interface Product {
 
   // Stock
   current_stock: number;
+  available_stock?: number; // Stock available for production (excludes reserved)
   base_quantity: number;
   min_stock_level: number;
   max_stock_level: number;

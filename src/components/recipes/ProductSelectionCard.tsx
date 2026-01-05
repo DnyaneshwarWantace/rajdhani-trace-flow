@@ -128,10 +128,21 @@ export default function ProductSelectionCard({
                 </Label>
                 <Input
                   id={`quantity-${index}`}
-                  type="number"
-                  min="1"
-                  value={item.quantity}
-                  onChange={(e) => onUpdateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                  type="text"
+                  value={item.quantity === 0 ? '' : item.quantity.toString()}
+                  placeholder="1"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow empty string or positive numbers
+                    if (value === '' || /^\d+$/.test(value)) {
+                      const numValue = value === '' ? 0 : parseInt(value, 10);
+                      onUpdateItem(index, 'quantity', numValue);
+                    }
+                  }}
+                  onFocus={(e) => {
+                    // Select all text when focused to make it easy to replace
+                    e.target.select();
+                  }}
                   className="mt-1"
                 />
               </div>
@@ -186,7 +197,15 @@ export default function ProductSelectionCard({
           Add Product
         </Button>
 
-        <Button onClick={onCalculate} disabled={isCalculating || calculationItems.length === 0} className="w-full">
+        <Button 
+          onClick={onCalculate} 
+          disabled={
+            isCalculating || 
+            calculationItems.length === 0 || 
+            calculationItems.some(item => !item.productId || item.quantity <= 0)
+          } 
+          className="w-full"
+        >
           {isCalculating ? (
             <>
               <RefreshCw className="w-4 h-4 mr-2 animate-spin" />

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Eye, ClipboardList, Factory } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -23,6 +23,7 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
   const getCurrentStage = () => {
     // Determine current stage based on batch status
     // This logic should match your backend stage tracking
+    if (batch.status === 'cancelled') return 'cancelled';
     if (batch.status === 'planned') return 'planning';
     if (batch.status === 'in_progress' || batch.status === 'in_production') {
       // You can add more logic here to determine exact stage
@@ -41,6 +42,15 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
 
   const getStageButton = () => {
     const stage = getCurrentStage();
+
+    if (stage === 'cancelled') {
+      return (
+        <Badge className="bg-red-100 text-red-700 border-red-300 px-2 py-1 w-full justify-center">
+          <X className="w-3 h-3 mr-1 inline" />
+          Cancelled
+        </Badge>
+      );
+    }
 
     if (stage === 'planning') {
       return (
@@ -72,6 +82,8 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
         return 'bg-blue-100 text-blue-800';
       case 'planned':
         return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -210,7 +222,8 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
                 onClick={() => onDelete(batch)}
                 title="Cancel Production"
               >
-                <Trash2 className="w-3 h-3" />
+                <X className="w-3 h-3 mr-1" />
+                Cancel
               </Button>
             )}
           </div>

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, AlertCircle, XCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -86,6 +86,8 @@ export default function ProductionDetail() {
             };
           }
         }
+        console.log('Batch data loaded:', enrichedBatch);
+        console.log('Cancellation details:', enrichedBatch.cancellation_details);
         setBatch(enrichedBatch);
       }
     } catch (err) {
@@ -171,6 +173,45 @@ export default function ProductionDetail() {
         <ProductionDetailStats batch={batch} />
 
         <ProductionDetailInfo batch={batch} />
+
+        {/* Cancellation Details - Show only if batch is cancelled */}
+        {batch.status === 'cancelled' && (
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader className="border-b border-red-200">
+              <CardTitle className="flex items-center gap-2 text-red-800">
+                <XCircle className="w-5 h-5" />
+                Cancellation Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Cancelled By</p>
+                  <p className="text-base text-gray-900">
+                    {batch.cancellation_details?.cancelled_by || 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1">Cancelled At</p>
+                  <p className="text-base text-gray-900">
+                    {batch.cancellation_details?.cancelled_at
+                      ? new Date(batch.cancellation_details.cancelled_at).toLocaleString('en-IN', {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div className="md:col-span-1">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Reason</p>
+                  <p className="text-base text-gray-900">
+                    {batch.cancellation_details?.cancellation_reason || 'No reason provided'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Production Stages - Planning, Machine, Wastage, Final Products */}
         <ProductionStagesDetailed batch={batch} />

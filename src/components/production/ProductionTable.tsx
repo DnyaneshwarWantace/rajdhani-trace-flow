@@ -1,7 +1,7 @@
 import type { ProductionBatch } from '@/services/productionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Eye, ClipboardList, Factory, Trash, Package, CheckCircle } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,11 @@ export default function ProductionTable({
 
   // Determine current stage based on batch stage fields (fast, no API calls)
   const getCurrentStage = (batch: ProductionBatch) => {
+    // If batch is cancelled, show cancelled
+    if (batch.status === 'cancelled') {
+      return 'cancelled';
+    }
+
     // If batch is completed, show completed
     if (batch.status === 'completed') {
       return 'completed';
@@ -133,6 +138,15 @@ export default function ProductionTable({
       );
     }
 
+    if (stage === 'cancelled') {
+      return (
+        <Badge className="bg-red-100 text-red-700 border-red-300 px-2 py-1">
+          <X className="w-3 h-3 mr-1 inline" />
+          Cancelled
+        </Badge>
+      );
+    }
+
     return null;
   };
 
@@ -145,6 +159,8 @@ export default function ProductionTable({
         return 'bg-blue-100 text-blue-800';
       case 'planned':
         return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -263,7 +279,8 @@ export default function ProductionTable({
                         className="text-red-600 hover:text-red-900 hover:bg-red-50"
                         title="Cancel Production"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <X className="w-4 h-4 mr-1" />
+                        Cancel
                       </Button>
                     )}
                   </div>

@@ -1,6 +1,6 @@
 import type { Supplier } from '@/services/supplierService';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Eye } from 'lucide-react';
+import { Edit, Eye } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface SupplierTableProps {
@@ -80,16 +80,6 @@ export default function SupplierTable({
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
-                    {canDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDelete(supplier)}
-                        className="text-red-600 hover:text-red-900 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
                   </div>
                 </td>
               </tr>

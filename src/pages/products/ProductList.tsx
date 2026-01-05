@@ -429,8 +429,6 @@ export default function ProductList() {
             onStock={handleStock}
                       onProduction={handleProduction}
             onQRCode={handleQRCode}
-            onDelete={handleDelete}
-            canDelete={canDeleteProducts}
           />
         )}
 

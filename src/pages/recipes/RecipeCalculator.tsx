@@ -124,7 +124,7 @@ export default function RecipeCalculator() {
       {
         productId: '',
         productName: '',
-        quantity: 1,
+        quantity: 0,
         unit: 'piece',
       },
     ]);
@@ -160,6 +160,17 @@ export default function RecipeCalculator() {
       toast({
         title: 'No Items',
         description: 'Please add at least one product to calculate',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Check if any item has invalid quantity (0 or less)
+    const hasInvalidQuantity = calculationItems.some(item => !item.productId || item.quantity <= 0);
+    if (hasInvalidQuantity) {
+      toast({
+        title: 'Invalid Quantity',
+        description: 'Please ensure all products have a quantity greater than 0',
         variant: 'destructive',
       });
       return;

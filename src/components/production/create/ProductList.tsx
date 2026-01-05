@@ -89,7 +89,8 @@ export default function ProductList({
   };
 
   const formatStock = (product: Product) => {
-    const stock = product.current_stock || 0;
+    // Use available_stock for production planning (excludes reserved stock)
+    const stock = product.available_stock !== undefined ? product.available_stock : product.current_stock || 0;
     const unit = product.count_unit || 'units';
     return `${stock} ${unit}`;
   };

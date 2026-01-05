@@ -1,16 +1,17 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Package, Calendar, PlayCircle, CheckCircle } from 'lucide-react';
+import { Package, Calendar, PlayCircle, CheckCircle, XCircle } from 'lucide-react';
 
 interface ProductionStatsBoxesProps {
   all: number;
   planned: number;
   active: number;
   completed: number;
+  cancelled: number;
 }
 
-export default function ProductionStatsBoxes({ all, planned, active, completed }: ProductionStatsBoxesProps) {
+export default function ProductionStatsBoxes({ all, planned, active, completed, cancelled }: ProductionStatsBoxesProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -52,6 +53,17 @@ export default function ProductionStatsBoxes({ all, planned, active, completed }
               <p className="text-xl sm:text-2xl font-bold text-green-600">{completed}</p>
             </div>
             <CheckCircle className="w-8 h-8 text-green-600 opacity-50" />
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600">Cancelled</p>
+              <p className="text-xl sm:text-2xl font-bold text-red-600">{cancelled}</p>
+            </div>
+            <XCircle className="w-8 h-8 text-red-600 opacity-50" />
           </div>
         </CardContent>
       </Card>
