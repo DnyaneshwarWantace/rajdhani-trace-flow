@@ -308,7 +308,7 @@ export default function OrderItemForm({
           <div className="flex items-center space-x-2">
             <Checkbox
               id={`gst-included-${item.id}`}
-              checked={item.gst_included !== false}
+              checked={item.gst_included === true}
               onCheckedChange={(checked) => onUpdate(item.id, 'gst_included', checked)}
             />
             <Label htmlFor={`gst-included-${item.id}`} className="text-sm font-normal cursor-pointer">

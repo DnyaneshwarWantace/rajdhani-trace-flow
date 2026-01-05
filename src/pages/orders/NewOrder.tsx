@@ -378,7 +378,7 @@ export default function NewOrder() {
           unit: item.unit, // Unit of measurement
           unit_price: item.unit_price,
           gst_rate: item.gst_rate || 18, // Per-item GST rate
-          gst_included: item.gst_included !== false, // Per-item GST included flag
+          gst_included: item.gst_included === true, // Per-item GST included flag - explicit boolean
           subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : (item.subtotal || 0),
           gst_amount: typeof item.gst_amount === 'string' ? parseFloat(item.gst_amount) : (item.gst_amount || 0),
           total_price: typeof item.total_price === 'string' ? parseFloat(item.total_price) : item.total_price,
