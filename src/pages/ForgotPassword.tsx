@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, Shield, ArrowLeft, KeyRound } from 'lucide-react';
+import { getApiUrl } from '@/utils/apiConfig';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false);
   const [attemptsLeft, setAttemptsLeft] = useState(3);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = getApiUrl();
 
   // Step 1: Request OTP
   const handleRequestOTP = async (e: React.FormEvent) => {
