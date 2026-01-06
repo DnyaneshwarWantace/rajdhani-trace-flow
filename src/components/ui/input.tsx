@@ -33,27 +33,40 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           // Use setTimeout to ensure focus happens after browser's default behavior
           setTimeout(() => {
             input.focus();
-            if (input.value) {
-              input.setSelectionRange(input.value.length, input.value.length);
+            // setSelectionRange doesn't work on number inputs
+            if (input.value && input.type !== 'number') {
+              try {
+                input.setSelectionRange(input.value.length, input.value.length);
+              } catch (e) {
+                // Ignore errors for inputs that don't support selection
+              }
             }
           }, 0);
         }
       };
 
       const handleFocus = () => {
-        // Place cursor at end on focus
-        if (input.value) {
+        // Place cursor at end on focus (only for non-number inputs)
+        if (input.value && input.type !== 'number') {
           setTimeout(() => {
-            input.setSelectionRange(input.value.length, input.value.length);
+            try {
+              input.setSelectionRange(input.value.length, input.value.length);
+            } catch (e) {
+              // Ignore errors for inputs that don't support selection
+            }
           }, 0);
         }
       };
 
       const handleClick = () => {
-        // Ensure cursor is at end after click
-        if (input.value) {
+        // Ensure cursor is at end after click (only for non-number inputs)
+        if (input.value && input.type !== 'number') {
           setTimeout(() => {
-            input.setSelectionRange(input.value.length, input.value.length);
+            try {
+              input.setSelectionRange(input.value.length, input.value.length);
+            } catch (e) {
+              // Ignore errors for inputs that don't support selection
+            }
           }, 0);
         }
       };
@@ -72,10 +85,14 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     }, []);
 
     const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-      // Prevent auto-selection, place cursor at end instead
+      // Prevent auto-selection, place cursor at end instead (only for non-number inputs)
       setTimeout(() => {
-        if (e.target.value) {
-          e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+        if (e.target.value && e.target.type !== 'number') {
+          try {
+            e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+          } catch (err) {
+            // Ignore errors for number inputs that don't support selection
+          }
         }
       }, 0);
       onFocus?.(e);
@@ -93,14 +110,18 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     };
 
     const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
-      // Ensure cursor is at end after click
+      // Ensure cursor is at end after click (only for non-number inputs)
       setTimeout(() => {
         const target = e.target as HTMLInputElement;
-        if (target.value) {
-          target.setSelectionRange(
-            target.value.length,
-            target.value.length
-          );
+        if (target.value && target.type !== 'number') {
+          try {
+            target.setSelectionRange(
+              target.value.length,
+              target.value.length
+            );
+          } catch (err) {
+            // Ignore errors for number inputs that don't support selection
+          }
         }
       }, 0);
       onClick?.(e);

@@ -301,6 +301,21 @@ export default function NewOrder() {
           }
 
           if (field === 'quantity' || field === 'unit_price' || field === 'pricing_unit' || field === 'product_dimensions' || field === 'gst_rate' || field === 'gst_included') {
+            // Two-way binding: gst_rate = 0 means checkbox unchecked, checkbox unchecked means gst_rate = 0
+            if (field === 'gst_included' && value === false) {
+              updated.gst_rate = 0;
+            } else if (field === 'gst_included' && value === true && (updated.gst_rate === 0 || !updated.gst_rate)) {
+              updated.gst_rate = 18;
+            } else if (field === 'gst_rate') {
+              // If GST rate is set to 0, uncheck the checkbox
+              if (value === 0) {
+                updated.gst_included = false;
+              } else if (value > 0 && updated.gst_included === false) {
+                // If GST rate is > 0 and checkbox is unchecked, check it
+                updated.gst_included = true;
+              }
+            }
+            
             const calculation = pricingCalculator.calculateItemPrice(updated);
             updated.subtotal = calculation.subtotal;
             updated.gst_amount = calculation.gstAmount;
@@ -377,7 +392,9 @@ export default function NewOrder() {
           quantity: item.quantity,
           unit: item.unit, // Unit of measurement
           unit_price: item.unit_price,
-          gst_rate: item.gst_rate || 18, // Per-item GST rate
+          // If gst_included is false, send gst_rate as 0 to backend
+          // Send gst_rate: if gst_included is false OR gst_rate is 0, send 0. Otherwise send the actual rate
+          gst_rate: (item.gst_included === false || item.gst_rate === 0) ? 0 : (item.gst_rate || 18), // Per-item GST rate (0 if not included)
           gst_included: item.gst_included === true, // Per-item GST included flag - explicit boolean
           subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : (item.subtotal || 0),
           gst_amount: typeof item.gst_amount === 'string' ? parseFloat(item.gst_amount) : (item.gst_amount || 0),

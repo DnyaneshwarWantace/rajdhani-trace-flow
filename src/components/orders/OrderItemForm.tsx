@@ -296,11 +296,39 @@ export default function OrderItemForm({
           <Label>GST Rate (%)</Label>
           <Input
             type="number"
-            value={item.gst_rate || 18}
-            onChange={e => onUpdate(item.id, 'gst_rate', parseFloat(e.target.value) || 0)}
+            value={item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : ''}
+            onChange={e => {
+              const inputValue = e.target.value;
+              // Allow empty string - user can clear the field completely
+              if (inputValue === '') {
+                // When field is empty, keep it empty (don't set to 0 yet)
+                // Only set to 0 when user explicitly types 0 or unchecks checkbox
+                onUpdate(item.id, 'gst_rate', undefined);
+                onUpdate(item.id, 'gst_included', false);
+                return;
+              }
+              const numValue = parseFloat(inputValue);
+              if (!isNaN(numValue)) {
+                onUpdate(item.id, 'gst_rate', numValue);
+                // If GST rate is set to 0, automatically uncheck the checkbox
+                if (numValue === 0) {
+                  onUpdate(item.id, 'gst_included', false);
+                } else if (numValue > 0 && !item.gst_included) {
+                  // If GST rate is > 0 and checkbox is unchecked, check it
+                  onUpdate(item.id, 'gst_included', true);
+                }
+              }
+            }}
+            onBlur={e => {
+              // When field loses focus and is empty, set to 0
+              if (e.target.value === '' && (item.gst_rate === undefined || item.gst_rate === null)) {
+                onUpdate(item.id, 'gst_rate', 0);
+              }
+            }}
             min="0"
             max="100"
             step="0.01"
+            placeholder=""
           />
         </div>
 
@@ -309,7 +337,16 @@ export default function OrderItemForm({
             <Checkbox
               id={`gst-included-${item.id}`}
               checked={item.gst_included === true}
-              onCheckedChange={(checked) => onUpdate(item.id, 'gst_included', checked)}
+              onCheckedChange={(checked) => {
+                onUpdate(item.id, 'gst_included', checked);
+                // If checkbox is unchecked, clear GST rate (set to undefined so field is empty, not 0)
+                if (!checked) {
+                  onUpdate(item.id, 'gst_rate', undefined);
+                } else if (checked && (item.gst_rate === undefined || item.gst_rate === null || item.gst_rate === 0)) {
+                  // If checkbox is checked and rate is empty/0, set to 18
+                  onUpdate(item.id, 'gst_rate', 18);
+                }
+              }}
             />
             <Label htmlFor={`gst-included-${item.id}`} className="text-sm font-normal cursor-pointer">
               GST Included
