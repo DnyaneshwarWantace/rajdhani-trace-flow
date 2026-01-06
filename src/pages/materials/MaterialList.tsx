@@ -145,8 +145,8 @@ export default function MaterialList() {
 
       // Only load if filters changed OR first time loading
       if (lastLoadedFiltersRef.current !== currentFiltersKey) {
-        loadMaterialsFast();
         lastLoadedFiltersRef.current = currentFiltersKey;
+        loadMaterialsFast();
       }
     }
   }, [filters, activeTab]);
@@ -183,21 +183,29 @@ export default function MaterialList() {
       setLoading(true);
       setError(null);
 
-      // Build filters without search - handle search client-side for more fields
-      const apiFilters = {
-        ...filters,
-        search: undefined, // Don't send search to API
+      // Build API filters - include all filters except search (handled client-side)
+      const apiFilters: any = {
+        category: filters.category && filters.category.length > 0 ? filters.category : undefined,
+        status: filters.status && filters.status.length > 0 ? filters.status : undefined,
+        type: filters.type && filters.type.length > 0 ? filters.type : undefined,
+        color: filters.color && filters.color.length > 0 ? filters.color : undefined,
+        supplier: filters.supplier && filters.supplier.length > 0 ? filters.supplier : undefined,
+        page: filters.search ? 1 : filters.page, // Reset page if searching
         limit: filters.search ? 10000 : filters.limit, // Fetch all if searching
       };
+
+      // Remove undefined values
+      Object.keys(apiFilters).forEach(key => apiFilters[key] === undefined && delete apiFilters[key]);
 
       let { materials: data, total } = await MaterialService.getMaterials(apiFilters);
 
       // Apply client-side search if search term exists
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
+      if (filters.search && filters.search.trim()) {
+        const searchLower = filters.search.toLowerCase().trim();
         data = data.filter((m: any) =>
           m.name?.toLowerCase().includes(searchLower) ||
           m.id?.toLowerCase().includes(searchLower) ||
+          m.material_id?.toLowerCase().includes(searchLower) ||
           m.category?.toLowerCase().includes(searchLower) ||
           m.type?.toLowerCase().includes(searchLower) ||
           m.color?.toLowerCase().includes(searchLower) ||
@@ -205,7 +213,16 @@ export default function MaterialList() {
           m.batch_number?.toLowerCase().includes(searchLower) ||
           m.quality_grade?.toLowerCase().includes(searchLower)
         );
+        // Update total for search results
+        total = data.length;
         // Apply pagination after client-side filtering
+        const page = filters.page || 1;
+        const limit = filters.limit || 50;
+        const startIdx = (page - 1) * limit;
+        const endIdx = startIdx + limit;
+        data = data.slice(startIdx, endIdx);
+      } else {
+        // Apply pagination for non-search results
         const page = filters.page || 1;
         const limit = filters.limit || 50;
         const startIdx = (page - 1) * limit;
@@ -218,9 +235,11 @@ export default function MaterialList() {
       // Also refresh stats
       loadStats();
     } catch (err) {
+      console.error('Error loading materials:', err);
       setError(err instanceof Error ? err.message : 'Failed to load materials');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
