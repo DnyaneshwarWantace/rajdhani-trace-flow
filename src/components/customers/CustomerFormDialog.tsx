@@ -42,6 +42,35 @@ export default function CustomerFormDialog({
   selectedCustomer,
   submitting,
 }: CustomerFormDialogProps) {
+  // Phone number - preserve country code when clearing (same as SupplierFormDialog)
+  const handlePhoneChange = (value: string) => {
+    // If value is empty or just country code, preserve country code from current value
+    if (!value || value.trim() === '') {
+      // Extract country code from current formData.phone
+      const currentPhone = formData.phone || '+91';
+      const countryCodeMatch = currentPhone.match(/^(\+\d+)/);
+      if (countryCodeMatch) {
+        // Keep only country code
+        onFormDataChange({ ...formData, phone: countryCodeMatch[1] });
+        return;
+      }
+      // Default to India if no previous value
+      onFormDataChange({ ...formData, phone: '+91' });
+      return;
+    }
+
+    // Check if it's just a country code (e.g., +91, +1, +44)
+    const countryCodeOnly = /^\+\d{1,4}$/.test(value);
+    if (countryCodeOnly) {
+      // Just country code, keep it
+      onFormDataChange({ ...formData, phone: value });
+      return;
+    }
+
+    // Update with full phone number
+    onFormDataChange({ ...formData, phone: value });
+  };
+
   // Handler for name fields (max 8 words, max 20 chars per word)
   const handleNameChange = (value: string, field: 'name' | 'company_name') => {
     let inputValue = value;
@@ -254,7 +283,7 @@ export default function CustomerFormDialog({
               <PhoneInput
                 defaultCountry="in"
                 value={formData.phone}
-                onChange={(value) => onFormDataChange({ ...formData, phone: value })}
+                onChange={handlePhoneChange}
                 placeholder="Enter phone number"
               />
               <p className="text-xs text-muted-foreground mt-1">

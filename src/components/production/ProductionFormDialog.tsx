@@ -49,6 +49,7 @@ export default function ProductionFormDialog({
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productName, setProductName] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -62,6 +63,8 @@ export default function ProductionFormDialog({
           supervisor: selectedBatch.supervisor || '',
           notes: selectedBatch.notes || '',
         });
+        // Load product name
+        loadProductName(selectedBatch.product_id, selectedBatch.product_name);
       } else {
         setFormData({
           product_id: '',
@@ -71,9 +74,48 @@ export default function ProductionFormDialog({
           supervisor: '',
           notes: '',
         });
+        setProductName('');
       }
     }
   }, [isOpen, selectedBatch]);
+
+  const loadProductName = async (productId: string, existingName?: string) => {
+    // First try to use existing name from batch
+    if (existingName) {
+      setProductName(existingName);
+      return;
+    }
+    
+    // If products are loaded, find it in the list
+    if (products.length > 0) {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        setProductName(product.name);
+        return;
+      }
+    }
+    
+    // Otherwise, fetch it directly
+    try {
+      const product = await ProductService.getProductById(productId);
+      if (product) {
+        setProductName(product.name);
+      }
+    } catch (error) {
+      console.error('Error loading product name:', error);
+      setProductName('Product');
+    }
+  };
+
+  useEffect(() => {
+    // Update product name when products list loads
+    if (selectedBatch && products.length > 0 && !productName) {
+      const product = products.find(p => p.id === selectedBatch.product_id);
+      if (product) {
+        setProductName(product.name);
+      }
+    }
+  }, [products, selectedBatch, productName]);
 
   const loadProducts = async () => {
     try {
@@ -102,22 +144,32 @@ export default function ProductionFormDialog({
         <DialogHeader>
           <DialogTitle>{selectedBatch ? 'Edit Production Batch' : 'Create Production Batch'}</DialogTitle>
           <DialogDescription>
-            {selectedBatch ? 'Update the production batch details' : 'Create a new production batch for a product'}
+            {selectedBatch 
+              ? `Update the production batch details${productName ? ` - ${productName}` : ''}` 
+              : 'Create a new production batch for a product'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="product_id">Product *</Label>
-              {loadingProducts ? (
+              {loadingProducts && !productName ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+                </div>
+              ) : selectedBatch ? (
+                <div className="flex flex-col gap-2">
+                  <Input
+                    value={productName || 'Loading...'}
+                    disabled
+                    className="bg-gray-50"
+                  />
+                  <p className="text-xs text-gray-500">Product cannot be changed after batch creation</p>
                 </div>
               ) : (
                 <Select
                   value={formData.product_id}
                   onValueChange={(value) => setFormData({ ...formData, product_id: value })}
-                  disabled={!!selectedBatch}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a product" />

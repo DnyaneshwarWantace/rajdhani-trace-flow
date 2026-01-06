@@ -4,9 +4,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Package, Plus, Edit, Trash2, Save } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Save, AlertTriangle } from 'lucide-react';
 import { RecipeService } from '@/services/recipeService';
 import RecipeMaterialSelectionDialog from './RecipeMaterialSelectionDialog';
 import type { Recipe } from '@/types/recipe';
@@ -25,6 +25,11 @@ export default function RecipeManagementCard({
   const [selectedMaterialType, setSelectedMaterialType] = useState<'raw_material' | 'product'>('raw_material');
   const [currentRecipeId, setCurrentRecipeId] = useState<string>('');
   const [editingMaterial, setEditingMaterial] = useState<any>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    recipeId: string;
+    materialId: string;
+    materialName: string;
+  } | null>(null);
 
   const handleAddMaterial = (recipe: Recipe) => {
     setCurrentRecipeId(recipe.id);
@@ -91,17 +96,31 @@ export default function RecipeManagementCard({
     setIsMaterialSelectorOpen(false); // Close material selector when editing
   };
 
-  const handleRemoveMaterial = async (recipeId: string, materialId: string) => {
+  const handleDeleteClick = (recipeId: string, materialId: string, materialName: string, recipe: Recipe) => {
+    if (!recipe.materials || recipe.materials.length <= 1) {
+      toast({
+        title: 'Cannot Remove',
+        description: 'Recipe must have at least one material',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setDeleteConfirmation({
+      recipeId,
+      materialId,
+      materialName,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmation) return;
+
+    const { recipeId, materialId, materialName } = deleteConfirmation;
+
     try {
       const recipe = recipes.find((r) => r.id === recipeId);
-      if (!recipe || !recipe.materials || recipe.materials.length <= 1) {
-        toast({
-          title: 'Cannot Remove',
-          description: 'Recipe must have at least one material',
-          variant: 'destructive',
-        });
-        return;
-      }
+      if (!recipe || !recipe.materials) return;
 
       // Update recipe by removing the material
       const updatedMaterials = recipe.materials.filter((m: any) => m.id !== materialId);
@@ -117,9 +136,10 @@ export default function RecipeManagementCard({
 
       toast({
         title: 'Success',
-        description: 'Material removed from recipe',
+        description: `Material "${materialName}" removed from recipe`,
       });
       onRefresh();
+      setDeleteConfirmation(null);
     } catch (error) {
       console.error('Error removing material:', error);
       toast({
@@ -127,6 +147,7 @@ export default function RecipeManagementCard({
         description: 'Failed to remove material from recipe',
         variant: 'destructive',
       });
+      setDeleteConfirmation(null);
     }
   };
 
@@ -319,7 +340,7 @@ export default function RecipeManagementCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleRemoveMaterial(recipe.id, material.id)}
+                                onClick={() => handleDeleteClick(recipe.id, material.id, material.material_name, recipe)}
                                 disabled={!recipe.materials || recipe.materials.length <= 1}
                                 className="flex-1 md:flex-none text-red-600 hover:bg-red-50"
                               >
@@ -463,6 +484,33 @@ export default function RecipeManagementCard({
             <Button onClick={handleSaveMaterial} className="text-white">
               <Save className="w-4 h-4 mr-2" />
               Save {editingMaterial?.materials?.length > 1 && `(${editingMaterial.materials.length})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="w-5 h-5" />
+              Delete Material from Recipe
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove "{deleteConfirmation?.materialName}" from this recipe? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmation(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Material
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -103,13 +103,21 @@ export default function SupplierFormDialog({
     setGstError(null);
 
     // Auto-fetch details when GST number is complete (15 characters)
+    // Only validate format if it's a new entry (not editing existing)
     if (gstValue.length === 15) {
       setFetchingGST(true);
       try {
         const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
 
         if (error) {
-          setGstError(error);
+          // Only show error if it's not a format validation error (allow manual entry)
+          // Format errors are shown but don't block submission
+          if (error.includes('Invalid GST number format')) {
+            // Don't set error for format issues when editing - allow manual entry
+            setGstError(null);
+          } else {
+            setGstError(error);
+          }
         } else if (data) {
           // Auto-fill supplier details from GST data
           onFormDataChange({
@@ -125,7 +133,8 @@ export default function SupplierFormDialog({
         }
       } catch (error) {
         console.error('Error fetching GST details:', error);
-        setGstError('Failed to fetch GST details');
+        // Don't show error for API failures - allow manual entry
+        setGstError(null);
       } finally {
         setFetchingGST(false);
       }
@@ -195,66 +204,33 @@ export default function SupplierFormDialog({
   const cityWordCount = formData.city?.trim() ? formData.city.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const stateWordCount = formData.state?.trim() ? formData.state.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
 
-  // Handler for phone number validation
-  const [phoneError, setPhoneError] = useState<string | null>(null);
-
-  const validatePhoneNumber = (phoneValue: string): boolean => {
-    if (!phoneValue || phoneValue.trim() === '') {
-      setPhoneError(null);
-      return true; // Phone is optional
-    }
-
-    // Extract country code and national number
-    // Format is typically: +91 1234567890 or +1 1234567890
-    const cleaned = phoneValue.replace(/\s+/g, ''); // Remove spaces
-
-    // Extract digits only for national number (after country code)
-    const digitsOnly = cleaned.replace(/^\+\d+/, ''); // Remove country code
-    const nationalNumber = digitsOnly.replace(/\D/g, ''); // Keep only digits
-
-    // Country-specific validation based on country code
-    const countryValidation: Record<string, { length: number; name: string }> = {
-      '+91': { length: 10, name: 'India' },
-      '+1': { length: 10, name: 'USA/Canada' },
-      '+44': { length: 10, name: 'UK' },
-      '+971': { length: 9, name: 'UAE' },
-      '+966': { length: 9, name: 'Saudi Arabia' },
-      '+86': { length: 11, name: 'China' },
-    };
-
-    // Find matching country code
-    let matchedValidation = null;
-    for (const [code, validation] of Object.entries(countryValidation)) {
-      if (cleaned.startsWith(code)) {
-        matchedValidation = validation;
-        break;
-      }
-    }
-
-    if (matchedValidation) {
-      if (nationalNumber.length !== matchedValidation.length) {
-        setPhoneError(`${matchedValidation.name} requires exactly ${matchedValidation.length} digits`);
-        return false;
-      }
-    } else {
-      // For other countries, check if number is at least 6 digits
-      if (nationalNumber.length < 6) {
-        setPhoneError('Phone number is too short (min 6 digits)');
-        return false;
-      }
-      if (nationalNumber.length > 15) {
-        setPhoneError('Phone number is too long (max 15 digits)');
-        return false;
-      }
-    }
-
-    setPhoneError(null);
-    return true;
-  };
-
+  // Phone number - same as CustomerForm on new order page
   const handlePhoneChange = (value: string) => {
+    // If value is empty or just country code, preserve country code from current value
+    if (!value || value.trim() === '') {
+      // Extract country code from current formData.phone
+      const currentPhone = formData.phone || '+91';
+      const countryCodeMatch = currentPhone.match(/^(\+\d+)/);
+      if (countryCodeMatch) {
+        // Keep only country code
+        onFormDataChange({ ...formData, phone: countryCodeMatch[1] });
+        return;
+      }
+      // Default to India if no previous value
+      onFormDataChange({ ...formData, phone: '+91' });
+      return;
+    }
+
+    // Check if it's just a country code (e.g., +91, +1, +44)
+    const countryCodeOnly = /^\+\d{1,4}$/.test(value);
+    if (countryCodeOnly) {
+      // Just country code, keep it
+      onFormDataChange({ ...formData, phone: value });
+      return;
+    }
+
+    // Update with full phone number
     onFormDataChange({ ...formData, phone: value });
-    validatePhoneNumber(value);
   };
 
   // Handler for pincode (max 10 digits) with auto-fill
@@ -337,19 +313,13 @@ export default function SupplierFormDialog({
               <Label>Phone</Label>
               <PhoneInput
                 defaultCountry="in"
-                value={formData.phone}
+                value={formData.phone || '+91'}
                 onChange={handlePhoneChange}
                 placeholder="Enter phone number"
               />
-              {phoneError ? (
-                <p className="text-xs text-red-500 mt-1">
-                  {phoneError}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Select country and enter valid number
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Select country and enter number
+              </p>
             </div>
           </div>
 
@@ -442,7 +412,7 @@ export default function SupplierFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting || !!phoneError} className="bg-primary-600 hover:bg-primary-700 text-white">
+            <Button type="submit" disabled={submitting} className="bg-primary-600 hover:bg-primary-700 text-white">
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {selectedSupplier ? 'Update' : 'Create'}
             </Button>

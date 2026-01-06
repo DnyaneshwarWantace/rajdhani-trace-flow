@@ -7,6 +7,7 @@ import { CustomerService, type Customer, type CreateCustomerData } from '@/servi
 import { OrderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import CustomerStatsBoxes from '@/components/customers/CustomerStatsBoxes';
 import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerTable from '@/components/customers/CustomerTable';
@@ -279,6 +280,18 @@ export default function CustomerList() {
   const handleSubmit = async () => {
     if (!formData.name.trim() || !formData.phone.trim()) {
       toast({ title: 'Validation Error', description: 'Please fill in required fields (Name and Phone)', variant: 'destructive' });
+      return;
+    }
+
+    // Phone validation - Phone is required
+    if (!formData.phone.trim()) {
+      toast({ title: 'Validation Error', description: 'Phone number is required', variant: 'destructive' });
+      return;
+    }
+
+    // Phone validation using libphonenumber-js (validates according to country code)
+    if (!isValidPhoneNumber(formData.phone)) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid phone number for the selected country', variant: 'destructive' });
       return;
     }
 

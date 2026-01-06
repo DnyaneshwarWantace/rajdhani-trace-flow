@@ -58,6 +58,8 @@ export default function ProductionDetail() {
             const product = await ProductService.getProductById(data.product_id);
             enrichedBatch = {
               ...data,
+              // Preserve cancellation_details
+              cancellation_details: data.cancellation_details,
               product_name: product.name || data.product_name || 'N/A',
               category: product.category || data.category || 'N/A',
               subcategory: product.subcategory || data.subcategory || 'N/A',
@@ -75,6 +77,8 @@ export default function ProductionDetail() {
             // Keep existing data if product fetch fails
             enrichedBatch = {
               ...data,
+              // Preserve cancellation_details
+              cancellation_details: data.cancellation_details,
               product_name: data.product_name || 'Product Not Found',
               category: data.category || 'N/A',
               subcategory: data.subcategory || 'N/A',
@@ -87,7 +91,9 @@ export default function ProductionDetail() {
           }
         }
         console.log('Batch data loaded:', enrichedBatch);
+        console.log('Batch status:', enrichedBatch.status);
         console.log('Cancellation details:', enrichedBatch.cancellation_details);
+        console.log('Full cancellation_details object:', JSON.stringify(enrichedBatch.cancellation_details, null, 2));
         setBatch(enrichedBatch);
       }
     } catch (err) {
@@ -100,10 +106,6 @@ export default function ProductionDetail() {
 
   const handleBack = () => {
     navigate('/production');
-  };
-
-  const handleEdit = () => {
-    setIsEditOpen(true);
   };
 
   const handleEditSuccess = async (data: CreateProductionBatchData) => {
@@ -167,7 +169,6 @@ export default function ProductionDetail() {
         <ProductionDetailHeader
           batch={batch}
           onBack={handleBack}
-          onEdit={handleEdit}
         />
 
         <ProductionDetailStats batch={batch} />

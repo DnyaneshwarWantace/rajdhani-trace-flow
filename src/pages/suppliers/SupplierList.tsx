@@ -7,6 +7,7 @@ import { SupplierService, type Supplier, type CreateSupplierData } from '@/servi
 import { ManageStockService, type StockOrder } from '@/services/manageStockService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import SupplierStatsBoxes from '@/components/suppliers/SupplierStatsBoxes';
 import SupplierFilters from '@/components/suppliers/SupplierFilters';
 import SupplierTable from '@/components/suppliers/SupplierTable';
@@ -174,8 +175,17 @@ export default function SupplierList() {
       return;
     }
 
-    // Validate GST number if provided
-    if (formData.gst_number && formData.gst_number.trim().length > 0 && formData.gst_number.length !== 15) {
+    // Phone validation using libphonenumber-js (validates according to country code)
+    if (formData.phone && formData.phone.trim()) {
+      if (!isValidPhoneNumber(formData.phone)) {
+        toast({ title: 'Validation Error', description: 'Please enter a valid phone number for the selected country', variant: 'destructive' });
+        return;
+      }
+    }
+
+    // Validate GST number if provided (only check length, not format pattern)
+    const cleanGST = formData.gst_number?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || '';
+    if (formData.gst_number && formData.gst_number.trim().length > 0 && cleanGST.length !== 15) {
       toast({ title: 'Validation Error', description: 'GST number must be exactly 15 characters', variant: 'destructive' });
       return;
     }

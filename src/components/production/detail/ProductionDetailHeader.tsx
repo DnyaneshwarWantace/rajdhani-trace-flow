@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit, Factory } from 'lucide-react';
+import { ArrowLeft, Factory } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
@@ -7,13 +7,11 @@ import type { ProductionBatch } from '@/services/productionService';
 interface ProductionDetailHeaderProps {
   batch: ProductionBatch;
   onBack: () => void;
-  onEdit: () => void;
 }
 
 export default function ProductionDetailHeader({
   batch,
   onBack,
-  onEdit,
 }: ProductionDetailHeaderProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -89,14 +87,6 @@ export default function ProductionDetailHeader({
           </div>
         </div>
       </div>
-      <Button
-        onClick={onEdit}
-        className="w-full sm:w-auto"
-        variant="outline"
-      >
-        <Edit className="w-4 h-4 mr-2" />
-        Edit Batch
-      </Button>
     </div>
   );
 }

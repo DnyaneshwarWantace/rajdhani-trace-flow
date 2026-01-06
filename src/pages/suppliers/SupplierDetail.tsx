@@ -103,8 +103,9 @@ export default function SupplierDetail() {
       return;
     }
 
-    // Validate GST number if provided
-    if (formData.gst_number && formData.gst_number.trim().length > 0 && formData.gst_number.length !== 15) {
+    // Validate GST number if provided (only check length, not format pattern)
+    const cleanGST = formData.gst_number?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() || '';
+    if (formData.gst_number && formData.gst_number.trim().length > 0 && cleanGST.length !== 15) {
       toast({ title: 'Validation Error', description: 'GST number must be exactly 15 characters', variant: 'destructive' });
       return;
     }

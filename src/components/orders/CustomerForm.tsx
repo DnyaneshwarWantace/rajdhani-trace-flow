@@ -11,6 +11,7 @@ import { CustomerService, type Customer } from '@/services/customerService';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 
 interface CustomerFormProps {
   onCustomerCreated: (customer: Customer) => void;
@@ -171,11 +172,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
       return;
     }
 
-    // Phone validation - must be at least 10 digits
-    if (newCustomer.phone.replace(/\D/g, '').length < 10) {
+    // Phone validation using libphonenumber-js (validates according to country code)
+    if (!isValidPhoneNumber(newCustomer.phone)) {
       toast({
         title: 'Validation Error',
-        description: 'Please enter a valid phone number',
+        description: 'Please enter a valid phone number for the selected country',
         variant: 'destructive',
       });
       return;

@@ -30,16 +30,52 @@ export default function ProductionDeleteDialog({
   isDeleting,
 }: ProductionDeleteDialogProps) {
   const [reason, setReason] = useState('');
+  const [validationError, setValidationError] = useState('');
+
+  // Validation function
+  const validateReason = (text: string): string => {
+    if (!text.trim()) return ''; // Empty is allowed (optional field)
+
+    const words = text.trim().split(/\s+/);
+
+    // Check word count (max 20 words)
+    if (words.length > 20) {
+      return `Maximum 20 words allowed (currently ${words.length} words)`;
+    }
+
+    // Check each word length (max 15 characters)
+    const longWords = words.filter(word => word.length > 15);
+    if (longWords.length > 0) {
+      return `Each word must be 15 characters or less (found: "${longWords[0]}" with ${longWords[0].length} characters)`;
+    }
+
+    return ''; // Valid
+  };
+
+  const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newReason = e.target.value;
+    setReason(newReason);
+    setValidationError(validateReason(newReason));
+  };
 
   const handleClose = () => {
     setReason(''); // Reset reason on close
+    setValidationError('');
     onClose();
   };
 
   const handleConfirmClick = () => {
+    const error = validateReason(reason);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
     onConfirm(reason);
     setReason(''); // Reset reason after confirm
+    setValidationError('');
   };
+
+  const wordCount = reason.trim() ? reason.trim().split(/\s+/).length : 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -64,14 +100,28 @@ export default function ProductionDeleteDialog({
             id="cancel-reason"
             placeholder="E.g., Material shortage, Order cancelled, Design change..."
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={handleReasonChange}
             disabled={isDeleting}
             rows={3}
-            className="resize-none"
+            className={`resize-none ${validationError ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-          <p className="text-xs text-gray-500">
-            Provide a reason to help track why this production was cancelled
-          </p>
+
+          {/* Validation Error */}
+          {validationError && (
+            <p className="text-xs text-red-600 font-medium">
+              {validationError}
+            </p>
+          )}
+
+          {/* Word Count and Help Text */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              Max 20 words, each word max 15 characters
+            </p>
+            <p className={`text-xs font-medium ${wordCount > 20 ? 'text-red-600' : 'text-gray-600'}`}>
+              {wordCount}/20 words
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
@@ -80,7 +130,7 @@ export default function ProductionDeleteDialog({
           </Button>
           <Button
             onClick={handleConfirmClick}
-            disabled={isDeleting}
+            disabled={isDeleting || !!validationError}
             className="bg-red-600 hover:bg-red-700 text-white border-2 border-red-700"
           >
             {isDeleting ? (

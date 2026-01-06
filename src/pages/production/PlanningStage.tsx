@@ -3,7 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ProductionService } from '@/services/productionService';
+import { ProductionService, type ProductionBatch, type CreateProductionBatchData } from '@/services/productionService';
 import { RecipeService } from '@/services/recipeService';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
@@ -21,6 +21,7 @@ import MaterialRequirementsTable from '@/components/production/planning/Material
 import MaterialSelectionDialog from '@/components/production/planning/MaterialSelectionDialog';
 import MachineSelectionDialog from '@/components/production/planning/MachineSelectionDialog';
 import IndividualProductSelectionDialog from '@/components/production/planning/IndividualProductSelectionDialog';
+import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 
 export default function PlanningStage() {
   const navigate = useNavigate();
@@ -49,6 +50,9 @@ export default function PlanningStage() {
   const [recipeModified, setRecipeModified] = useState(false);
   const [draftSaveTimeout, setDraftSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null); // Track current batch ID
+  const [currentBatch, setCurrentBatch] = useState<ProductionBatch | null>(null); // Track current batch object
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -90,6 +94,40 @@ export default function PlanningStage() {
       if (timeout) clearTimeout(timeout);
     };
   }, [materials, consumedMaterials, formData, selectedProduct]);
+
+  // Recalculate consumed materials totals when planned quantity changes (keep draft in sync)
+  useEffect(() => {
+    if (!selectedProduct || consumedMaterials.length === 0) return;
+
+    const productLength = parseFloat(selectedProduct.length || '0');
+    const productWidth = parseFloat(selectedProduct.width || '0');
+    const lengthUnit = selectedProduct.length_unit || 'm';
+    const widthUnit = selectedProduct.width_unit || 'm';
+    const sqmPerUnit = calculateSQM(productLength, productWidth, lengthUnit, widthUnit);
+    const totalSQM = formData.planned_quantity * sqmPerUnit;
+    if (!isFinite(totalSQM) || totalSQM <= 0) return;
+
+    let changed = false;
+    const updated = consumedMaterials.map((material) => {
+      const qtyPerSqm =
+        typeof material.quantity_per_sqm === 'number'
+          ? material.quantity_per_sqm
+          : totalSQM > 0
+            ? (material.required_quantity || 0) / totalSQM
+            : 0;
+
+      const newRequired = parseFloat((qtyPerSqm * totalSQM).toFixed(4));
+      if (material.required_quantity !== newRequired) {
+        changed = true;
+        return { ...material, required_quantity: newRequired };
+      }
+      return material;
+    });
+
+    if (changed) {
+      setConsumedMaterials(updated);
+    }
+  }, [formData.planned_quantity, selectedProduct, consumedMaterials]);
 
   // Send low stock notification to backend for material section
   const sendLowStockNotification = async (material: any) => {
@@ -193,6 +231,7 @@ export default function PlanningStage() {
 
       setSelectedProduct(product);
       setCurrentBatchId(batch.id); // Store the batch ID
+      setCurrentBatch(batch); // Store the batch object
       setFormData({
         planned_quantity: batch.planned_quantity,
         priority: batch.priority as 'low' | 'medium' | 'high' | 'urgent',
@@ -887,6 +926,40 @@ export default function PlanningStage() {
     return null;
   }
 
+  const handleEdit = () => {
+    setIsEditOpen(true);
+  };
+
+  const handleEditSuccess = async (data: CreateProductionBatchData) => {
+    if (!currentBatchId) return;
+    
+    try {
+      setIsEditing(true);
+      const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(currentBatchId, data);
+      
+      if (updateError) {
+        toast({ title: 'Error', description: updateError, variant: 'destructive' });
+        return;
+      }
+      
+      if (updatedBatch) {
+        toast({ title: 'Success', description: 'Batch updated successfully' });
+        setIsEditOpen(false);
+        
+        // Reload batch and recalculate materials
+        if (selectedProduct && recipe) {
+          await loadBatchAndProduct(currentBatchId);
+          calculateMaterialRequirements(selectedProduct, recipe, updatedBatch.planned_quantity || formData.planned_quantity);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating batch:', error);
+      toast({ title: 'Error', description: 'Failed to update batch', variant: 'destructive' });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
   const productLength = parseFloat(selectedProduct.length || '0');
   const productWidth = parseFloat(selectedProduct.width || '0');
   const lengthUnit = selectedProduct.length_unit || 'm';
@@ -897,7 +970,11 @@ export default function PlanningStage() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        <PlanningStageHeader onBack={() => navigate('/production')} />
+        <PlanningStageHeader 
+          onBack={() => navigate('/production')} 
+          onEdit={handleEdit}
+          batch={currentBatch}
+        />
 
         <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
           {/* Stage Progress */}
@@ -1738,6 +1815,17 @@ export default function PlanningStage() {
         }}
         selectedMachineId={selectedMachine?.id}
       />
+
+      {/* Edit Batch Dialog */}
+      {currentBatch && (
+        <ProductionFormDialog
+          isOpen={isEditOpen}
+          onClose={() => setIsEditOpen(false)}
+          onSubmit={handleEditSuccess}
+          selectedBatch={currentBatch}
+          submitting={isEditing}
+        />
+      )}
     </Layout>
   );
 }
