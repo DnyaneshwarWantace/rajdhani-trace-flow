@@ -422,6 +422,7 @@ export default function UserManagement() {
                                 setShowDeleteDialog(true);
                               }}
                               title={needsDemotionBeforeDelete(user) ? 'Delete (requires demotion first)' : 'Delete user'}
+                              className={`${needsDemotionBeforeDelete(user) ? 'hover:bg-orange-50 hover:text-orange-700' : 'hover:bg-red-50 hover:text-red-700'}`}
                             >
                               <Trash2 className={`w-4 h-4 ${needsDemotionBeforeDelete(user) ? 'text-orange-600' : 'text-red-600'}`} />
                             </Button>
@@ -598,25 +599,32 @@ export default function UserManagement() {
 
       {/* Delete User Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete {selectedUser?.full_name}? This action cannot be undone.
+            <DialogTitle className="text-xl font-semibold text-red-600">Delete User</DialogTitle>
+            <DialogDescription className="text-base">
+              Are you sure you want to delete <span className="font-semibold">{selectedUser?.full_name}</span>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedUser && (
-            <div className="space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="font-medium text-red-900">{selectedUser.full_name}</p>
-                <p className="text-sm text-red-700 font-mono">{selectedUser.email}</p>
-                <p className="text-sm mt-2">
+            <div className="space-y-4 py-2">
+              <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 space-y-2">
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600 font-medium">Name:</p>
+                  <p className="font-semibold text-red-900 text-lg">{selectedUser.full_name}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600 font-medium">Email:</p>
+                  <p className="text-sm text-red-700 font-mono break-all">{selectedUser.email}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-gray-600 font-medium">Role:</p>
                   <Badge className={getRoleBadgeColor(selectedUser.role)}>
                     {selectedUser.role}
                   </Badge>
-                </p>
+                </div>
               </div>
-              
+
               {needsDemotionBeforeDelete(selectedUser) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <div className="flex items-start gap-2">
@@ -641,16 +649,17 @@ export default function UserManagement() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteUser}
               disabled={selectedUser ? needsDemotionBeforeDelete(selectedUser) : false}
+              className="bg-red-600 hover:bg-red-700"
             >
-              {selectedUser && needsDemotionBeforeDelete(selectedUser) ? 'Demote First' : 'Delete'}
+              {selectedUser && needsDemotionBeforeDelete(selectedUser) ? 'Demote First' : 'Delete User'}
             </Button>
           </DialogFooter>
         </DialogContent>

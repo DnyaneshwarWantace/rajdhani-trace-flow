@@ -128,7 +128,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     const numericValue = value.replace(/\D/g, '').slice(0, 6);
     setNewCustomer({ ...newCustomer, pincode: numericValue });
 
-    // Auto-fetch city and state when pincode is 6 digits
+    // Auto-fetch city and state when pincode is exactly 6 digits
     if (numericValue.length === 6) {
       setFetchingLocation(true);
       try {
@@ -197,6 +197,26 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
       toast({
         title: 'Validation Error',
         description: 'Please enter a valid email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Pincode validation (must be exactly 6 digits if provided)
+    if (newCustomer.pincode.trim() && newCustomer.pincode.trim().length !== 6) {
+      toast({
+        title: 'Validation Error',
+        description: 'Pincode must be exactly 6 digits',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // GST number validation (must be exactly 15 characters if provided)
+    if (newCustomer.gstNumber.trim() && newCustomer.gstNumber.trim().length !== 15) {
+      toast({
+        title: 'Validation Error',
+        description: 'GST number must be exactly 15 characters',
         variant: 'destructive',
       });
       return;
@@ -318,11 +338,15 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           <Input
             value={newCustomer.gstNumber}
             onChange={e => handleGSTNumberChange(e.target.value)}
-            placeholder="Enter GST number"
+            placeholder="Enter 15-character GST number"
             maxLength={15}
+            className={newCustomer.gstNumber && newCustomer.gstNumber.length > 0 && newCustomer.gstNumber.length < 15 ? 'border-red-500' : ''}
           />
           {isFetchingGST && <p className="text-xs text-gray-500">Fetching GST details...</p>}
           {gstAutoFilled && <p className="text-xs text-green-600">✓ GST details auto-filled</p>}
+          {newCustomer.gstNumber && newCustomer.gstNumber.length > 0 && newCustomer.gstNumber.length < 15 && (
+            <p className="text-xs text-red-600">GST number must be exactly 15 characters</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -340,7 +364,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             <Label>City</Label>
             <Input
               value={newCustomer.city}
-              onChange={e => setNewCustomer({ ...newCustomer, city: e.target.value })}
+              onChange={e => {
+                // Only allow letters and spaces
+                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                setNewCustomer({ ...newCustomer, city: value });
+              }}
               placeholder="Enter city"
             />
           </div>
@@ -348,7 +376,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             <Label>State</Label>
             <Input
               value={newCustomer.state}
-              onChange={e => setNewCustomer({ ...newCustomer, state: e.target.value })}
+              onChange={e => {
+                // Only allow letters and spaces
+                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                setNewCustomer({ ...newCustomer, state: value });
+              }}
               placeholder="Enter state"
             />
           </div>
@@ -358,11 +390,15 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
               <Input
                 value={newCustomer.pincode}
                 onChange={e => handlePincodeChange(e.target.value)}
-                placeholder="Enter pincode"
+                placeholder="Enter 6-digit pincode"
                 maxLength={6}
+                className={newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 ? 'border-red-500' : ''}
               />
               {fetchingLocation && (
                 <p className="text-xs text-gray-500 mt-1">Fetching location...</p>
+              )}
+              {newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 && (
+                <p className="text-xs text-red-600 mt-1">Pincode must be 6 digits</p>
               )}
             </div>
           </div>
