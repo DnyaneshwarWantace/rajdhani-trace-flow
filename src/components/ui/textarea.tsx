@@ -94,10 +94,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 
     const handleClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
       setTimeout(() => {
-        if (e.target.value) {
-          (e.target as HTMLTextAreaElement).setSelectionRange(
-            e.target.value.length,
-            e.target.value.length
+        const target = e.target as HTMLTextAreaElement;
+        if (target.value) {
+          target.setSelectionRange(
+            target.value.length,
+            target.value.length
           );
         }
       }, 0);

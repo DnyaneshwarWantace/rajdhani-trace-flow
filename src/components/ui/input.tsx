@@ -95,10 +95,11 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
       // Ensure cursor is at end after click
       setTimeout(() => {
-        if (e.target.value) {
-          (e.target as HTMLInputElement).setSelectionRange(
-            e.target.value.length,
-            e.target.value.length
+        const target = e.target as HTMLInputElement;
+        if (target.value) {
+          target.setSelectionRange(
+            target.value.length,
+            target.value.length
           );
         }
       }, 0);
