@@ -218,7 +218,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     try {
       const customerData = {
         name: newCustomer.name.trim(),
-        email: newCustomer.email.trim(),
+        email: newCustomer.email.trim() || undefined,
         phone: newCustomer.phone.trim(),
         address: newCustomer.address.trim() || undefined,
         city: newCustomer.city.trim() || undefined,
