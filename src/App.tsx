@@ -334,7 +334,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter basename="/v2">
+    <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
         <Toaster />
