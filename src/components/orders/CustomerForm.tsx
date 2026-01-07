@@ -182,24 +182,17 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
       return;
     }
 
-    if (!newCustomer.email.trim()) {
-      toast({
-        title: 'Validation Error',
-        description: 'Email is required',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newCustomer.email.trim())) {
-      toast({
-        title: 'Validation Error',
-        description: 'Please enter a valid email address',
-        variant: 'destructive',
-      });
-      return;
+    // Email validation (only if provided)
+    if (newCustomer.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newCustomer.email.trim())) {
+        toast({
+          title: 'Validation Error',
+          description: 'Please enter a valid email address',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     // Pincode validation (must be exactly 6 digits if provided)
@@ -322,12 +315,12 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           </div>
 
           <div className="space-y-2">
-            <Label>Email Address *</Label>
+            <Label>Email Address</Label>
             <Input
               type="email"
               value={newCustomer.email}
               onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
-              placeholder="Enter email"
+              placeholder="Enter email (optional)"
             />
           </div>
         </div>
