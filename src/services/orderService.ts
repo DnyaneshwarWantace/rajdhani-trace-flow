@@ -201,6 +201,17 @@ export class OrderService {
         specifications: item.specifications,
         selected_individual_products: item.selected_individual_products || [],
         product_details: item.product_details || null,
+        // Product details from backend (spread directly from productDetails)
+        category: item.category,
+        subcategory: item.subcategory,
+        color: item.color,
+        pattern: item.pattern,
+        length: item.length,
+        width: item.width,
+        length_unit: item.length_unit,
+        width_unit: item.width_unit,
+        weight: item.weight,
+        weight_unit: item.weight_unit,
       }));
 
       return { data: { order: mappedOrder, items: mappedItems }, error: null };

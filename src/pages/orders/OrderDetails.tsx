@@ -1,12 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useReactToPrint } from 'react-to-print';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   ArrowLeft, Package, User, Calendar, FileText, MapPin,
-  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail
+  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail, Printer
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
@@ -19,6 +27,7 @@ import { EditablePaymentCard } from '@/components/orders/EditablePaymentCard';
 import { IndividualProductSelectionDialog } from '@/components/orders/IndividualProductSelectionDialog';
 import { ActivityTimeline } from '@/components/orders/ActivityTimeline';
 import { ActivityLogTimeline } from '@/components/orders/ActivityLogTimeline';
+import { InvoiceBill } from '@/components/orders/InvoiceBill';
 
 interface OrderItem {
   id: string;
@@ -34,6 +43,16 @@ interface OrderItem {
   total_price: string;
   quality_grade?: string;
   specifications?: string;
+  category?: string;
+  subcategory?: string;
+  color?: string;
+  pattern?: string;
+  length?: string;
+  width?: string;
+  length_unit?: string;
+  width_unit?: string;
+  weight?: string;
+  weight_unit?: string;
 }
 
 const getStatusColor = (status: string) => {
@@ -67,6 +86,13 @@ export default function OrderDetails() {
   const [loading, setLoading] = useState(true);
   const [showIndividualProductDialog, setShowIndividualProductDialog] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<any | null>(null);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+
+  const handlePrint = useReactToPrint({
+    contentRef: invoiceRef,
+    documentTitle: `Invoice-${order?.orderNumber || 'ORDER'}`,
+  });
 
   useEffect(() => {
     if (id) {
@@ -419,23 +445,41 @@ export default function OrderDetails() {
                 return selectedCount >= item.quantity;
               });
 
-              return allProductsSelected && (
-                <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
-                  <Package className="w-4 h-4 mr-2" />
-                  Dispatch Order
-                </Button>
+              return (
+                <>
+                  {allProductsSelected && (
+                    <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
+                      <Package className="w-4 h-4 mr-2" />
+                      Dispatch Order
+                    </Button>
+                  )}
+                  {allProductsSelected && (
+                    <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
+                      <Download className="w-4 h-4 mr-2" />
+                      Generate Bill
+                    </Button>
+                  )}
+                </>
               );
             })()}
             {order.status === 'dispatched' && (
-              <Button onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700 text-white">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Mark as Delivered
+              <>
+                <Button onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700 text-white">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Mark as Delivered
+                </Button>
+                <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
+                  <Download className="w-4 h-4 mr-2" />
+                  Generate Bill
+                </Button>
+              </>
+            )}
+            {order.status === 'delivered' && (
+              <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
+                <Download className="w-4 h-4 mr-2" />
+                Generate Bill
               </Button>
             )}
-            <Button variant="outline" onClick={() => window.print()}>
-              <Download className="w-4 h-4 mr-2" />
-              Export PDF
-            </Button>
           </div>
         </div>
 
@@ -668,6 +712,38 @@ export default function OrderDetails() {
           orderItem={selectedOrderItem}
           onSave={handleSaveIndividualProducts}
         />
+
+        {/* Invoice Bill Dialog */}
+        <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold">Invoice / Bill</DialogTitle>
+              <DialogDescription>
+                Preview and print the invoice for Order #{order?.orderNumber}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4">
+              {order && (
+                <InvoiceBill
+                  ref={invoiceRef}
+                  order={order}
+                  items={orderItems}
+                />
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>
+                Close
+              </Button>
+              <Button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700">
+                <Printer className="w-4 h-4 mr-2" />
+                Print Invoice
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );

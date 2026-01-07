@@ -88,19 +88,31 @@ export function EditableOrderItemCard({
     return !isNaN(qty) && qty > 0;
   };
 
-  const productDetails = item.product_details;
+  // Use direct item properties (same as order table) - backend spreads product details directly on item
+  const productDetails = item.product_details || {};
   const needsIndividualProductSelection =
     item.product_type === 'product' &&
     orderStatus === 'accepted' &&
     (!item.selected_individual_products || item.selected_individual_products.length === 0);
 
+  // Get product details from direct item properties (preferred) or product_details fallback
+  const length = (item as any).length || productDetails.length;
+  const width = (item as any).width || productDetails.width;
+  const length_unit = (item as any).length_unit || productDetails.length_unit;
+  const width_unit = (item as any).width_unit || productDetails.width_unit;
+  const weight = (item as any).weight || productDetails.weight;
+  const weight_unit = (item as any).weight_unit || productDetails.weight_unit;
+  const color = (item as any).color || productDetails.color;
+  const pattern = (item as any).pattern || productDetails.pattern;
+  const category = (item as any).category || productDetails.category;
+
   // Calculate SQM if dimensions available
   let sqm = 0;
-  if (productDetails?.length && productDetails?.width && productDetails?.length_unit && productDetails?.width_unit) {
-    const length = parseFloat(productDetails.length);
-    const width = parseFloat(productDetails.width);
-    if (length > 0 && width > 0) {
-      sqm = calculateSQM(length, width, productDetails.length_unit, productDetails.width_unit);
+  if (length && width && length_unit && width_unit) {
+    const lengthNum = parseFloat(String(length));
+    const widthNum = parseFloat(String(width));
+    if (lengthNum > 0 && widthNum > 0) {
+      sqm = calculateSQM(lengthNum, widthNum, length_unit, width_unit);
     }
   }
 
@@ -118,32 +130,32 @@ export function EditableOrderItemCard({
           </div>
 
           {/* Product Details */}
-          {productDetails && (
+          {(length || width || weight || color || pattern || category) && (
             <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-600">
-              {productDetails.length && productDetails.width && (
+              {length && width && (
                 <div>
-                  <span className="font-medium">Size:</span> {productDetails.length}{productDetails.length_unit} × {productDetails.width}{productDetails.width_unit}
+                  <span className="font-medium">Size:</span> {length}{length_unit} × {width}{width_unit}
                   {sqm > 0 && <span className="text-blue-600 ml-1">({sqm.toFixed(2)} SQM)</span>}
                 </div>
               )}
-              {productDetails.weight && (
+              {weight && (
                 <div>
-                  <span className="font-medium">Weight:</span> {productDetails.weight}{productDetails.weight_unit || ''}
+                  <span className="font-medium">Weight:</span> {weight}{weight_unit || ''}
                 </div>
               )}
-              {productDetails.color && (
+              {color && (
                 <div>
-                  <span className="font-medium">Color:</span> {productDetails.color}
+                  <span className="font-medium">Color:</span> {color}
                 </div>
               )}
-              {productDetails.pattern && (
+              {pattern && (
                 <div>
-                  <span className="font-medium">Pattern:</span> {productDetails.pattern}
+                  <span className="font-medium">Pattern:</span> {pattern}
                 </div>
               )}
-              {productDetails.category && (
+              {category && (
                 <div>
-                  <span className="font-medium">Category:</span> {productDetails.category}
+                  <span className="font-medium">Category:</span> {category}
                 </div>
               )}
               {item.quality_grade && (
