@@ -25,7 +25,6 @@ import { EditableOrderItemCard } from '@/components/orders/EditableOrderItemCard
 import { OrderTimelineCard } from '@/components/orders/OrderTimelineCard';
 import { EditablePaymentCard } from '@/components/orders/EditablePaymentCard';
 import { IndividualProductSelectionDialog } from '@/components/orders/IndividualProductSelectionDialog';
-import { ActivityTimeline } from '@/components/orders/ActivityTimeline';
 import { ActivityLogTimeline } from '@/components/orders/ActivityLogTimeline';
 import { InvoiceBill } from '@/components/orders/InvoiceBill';
 
@@ -566,14 +565,16 @@ export default function OrderDetails() {
               </Card>
             )}
 
-            {/* Order Timeline */}
-            {order.status === 'delivered' && (
-              <OrderTimelineCard
-                acceptedAt={order.acceptedAt}
-                dispatchedAt={order.dispatchedAt}
-                deliveredAt={order.deliveredAt}
-              />
-            )}
+            {/* Order Timeline - Show at all stages */}
+            <OrderTimelineCard
+              orderDate={order.orderDate}
+              createdAt={order.createdAt}
+              acceptedAt={order.acceptedAt}
+              dispatchedAt={order.dispatchedAt}
+              deliveredAt={order.deliveredAt}
+              activityLogs={(order as any).activity_logs || []}
+              currentStatus={order.status}
+            />
 
             {/* Special Instructions */}
             {order.special_instructions && (
@@ -676,9 +677,6 @@ export default function OrderDetails() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Activity Timeline */}
-            <ActivityTimeline activities={(order as any).activity_logs || []} />
 
             {/* Delivery Address */}
             {deliveryAddress && (

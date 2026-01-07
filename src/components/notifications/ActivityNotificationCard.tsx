@@ -47,7 +47,7 @@ export default function ActivityNotificationCard({
   const activityData = notification.related_data;
   const action = activityData?.action || '';
   const actionCategory = activityData?.action_category || '';
-  const userName = activityData?.user_name || activityData?.created_by_user || notification.created_by || 'User';
+  const userName = notification.related_data?.created_by_user || activityData?.user_name || activityData?.created_by_user || 'User';
   const metadata = activityData?.metadata || {};
   
   // Check if this is a purchase order notification
@@ -221,6 +221,11 @@ export default function ActivityNotificationCard({
                 {notification.message && notification.message !== notification.title && (
                   <p className="text-[10px] sm:text-xs text-gray-600 min-w-0 line-clamp-1">
                     {notification.message}
+                  </p>
+                )}
+                {(userName && userName !== 'User') && (
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
+                    By: <span className="font-semibold text-gray-700">{userName}</span>
                   </p>
                 )}
               </div>

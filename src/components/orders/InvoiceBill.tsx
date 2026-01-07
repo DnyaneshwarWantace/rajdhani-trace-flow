@@ -214,15 +214,18 @@ export const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
           </div>
         </div>
 
-        {/* Terms & Conditions */}
-        <div className="mt-4 pt-3 border-t">
-          <h4 className="text-xs font-bold text-gray-700 mb-1">Terms & Conditions</h4>
-          <ul className="text-xs text-gray-500 space-y-0.5">
-            <li>• Payment is due within 30 days unless otherwise specified</li>
-            <li>• All goods remain the property of Rajdhani Carpets until payment is received in full</li>
-            <li>• Returns must be made within 7 days of delivery</li>
-          </ul>
-        </div>
+        {/* Remarks */}
+        {order.remarks && (
+          <div className="mt-4 pt-3 border-t">
+            <h4 className="text-xs font-bold text-gray-700 mb-1">Remarks</h4>
+            <p className="text-xs text-gray-600 whitespace-pre-wrap">{order.remarks}</p>
+            {order.remarks_added_by && order.remarks_added_at && (
+              <p className="text-xs text-gray-400 mt-1">
+                Added by {order.remarks_added_by} on {formatDate(order.remarks_added_at)}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Print Footer */}
         <div className="mt-4 text-center text-xs text-gray-400">

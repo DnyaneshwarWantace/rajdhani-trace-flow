@@ -60,6 +60,7 @@ export default function NewOrder() {
   const [orderDetails, setOrderDetails] = useState({
     expectedDelivery: '',
     notes: '',
+    remarks: '',
     paidAmount: 0,
   });
 
@@ -410,6 +411,7 @@ export default function NewOrder() {
         paid_amount: paidAmount,
         priority: 'medium' as const,
         special_instructions: orderDetails.notes || undefined,
+        remarks: orderDetails.remarks || undefined,
         delivery_address: orderDeliveryAddress || undefined,
       };
 
@@ -559,9 +561,11 @@ export default function NewOrder() {
           expectedDelivery={orderDetails.expectedDelivery}
           paidAmount={orderDetails.paidAmount}
           notes={orderDetails.notes}
+          remarks={orderDetails.remarks}
           onExpectedDeliveryChange={value => setOrderDetails(prev => ({ ...prev, expectedDelivery: value }))}
           onPaidAmountChange={value => setOrderDetails(prev => ({ ...prev, paidAmount: value }))}
           onNotesChange={value => setOrderDetails(prev => ({ ...prev, notes: value }))}
+          onRemarksChange={value => setOrderDetails(prev => ({ ...prev, remarks: value }))}
         />
 
         {/* Delivery Address */}

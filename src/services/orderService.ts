@@ -25,9 +25,21 @@ export interface Order {
   deliveredAt?: string;
   delivery_address?: any;
   special_instructions?: string;
+  remarks?: string;
+  remarks_added_by?: string;
+  remarks_added_at?: string;
   items: OrderItem[];
   createdAt?: string;
   updatedAt?: string;
+  created_by?: string;
+  activity_logs?: Array<{
+    action: string;
+    description: string;
+    performed_by: string;
+    performed_by_email?: string;
+    timestamp: string;
+    details?: any;
+  }>;
 }
 
 export interface OrderItem {
@@ -177,9 +189,14 @@ export class OrderService {
         deliveredAt: order.delivered_at,
         delivery_address: order.delivery_address,
         special_instructions: order.special_instructions,
+        remarks: order.remarks,
+        remarks_added_by: order.remarks_added_by,
+        remarks_added_at: order.remarks_added_at,
         items: [],
         createdAt: order.created_at,
         updatedAt: order.updated_at,
+        created_by: order.created_by,
+        activity_logs: order.activity_logs || [],
       };
 
       // Map order items with all fields needed for details page

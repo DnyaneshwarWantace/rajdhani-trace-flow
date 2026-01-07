@@ -7,18 +7,22 @@ interface OrderDetailsFormProps {
   expectedDelivery: string;
   paidAmount: number;
   notes: string;
+  remarks?: string;
   onExpectedDeliveryChange: (value: string) => void;
   onPaidAmountChange: (value: number) => void;
   onNotesChange: (value: string) => void;
+  onRemarksChange?: (value: string) => void;
 }
 
 export default function OrderDetailsForm({
   expectedDelivery,
   paidAmount,
   notes,
+  remarks = '',
   onExpectedDeliveryChange,
   onPaidAmountChange,
   onNotesChange,
+  onRemarksChange,
 }: OrderDetailsFormProps) {
   return (
     <Card>
@@ -54,6 +58,17 @@ export default function OrderDetailsForm({
             placeholder="Additional notes or special instructions..."
             rows={3}
           />
+        </div>
+        <div className="md:col-span-2 space-y-2">
+          <Label>Remarks (for Invoice)</Label>
+          <Textarea
+            value={remarks || ''}
+            onChange={e => onRemarksChange ? onRemarksChange(e.target.value) : undefined}
+            placeholder="Remarks to display on invoice (optional)..."
+            rows={3}
+            disabled={!onRemarksChange}
+          />
+          <p className="text-xs text-gray-500">This will appear on the invoice instead of standard terms & conditions</p>
         </div>
       </CardContent>
     </Card>
