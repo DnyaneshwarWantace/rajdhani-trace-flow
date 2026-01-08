@@ -76,10 +76,11 @@ export default function RecipeCalculator() {
 
   const loadProducts = async () => {
     try {
-      const result = await ProductService.getProducts({ limit: 1000 });
-      // Filter to only show products that have recipes
-      const productsWithRecipes = (result.products || []).filter(p => p.has_recipe);
-      setProducts(productsWithRecipes);
+      const result = await ProductService.getProducts({
+        limit: 1000,
+        has_recipe: 'true' // Filter at backend level
+      });
+      setProducts(result.products || []);
     } catch (error) {
       console.error('Error loading products:', error);
       toast({

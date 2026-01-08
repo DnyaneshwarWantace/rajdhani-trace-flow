@@ -75,6 +75,10 @@ export class ProductService {
       });
     }
 
+    if (filters?.has_recipe) {
+      queryParams.append('has_recipe', filters.has_recipe);
+    }
+
     // Backend uses offset and limit, not page
     const limit = filters?.limit || 20;
     const page = filters?.page || 1;

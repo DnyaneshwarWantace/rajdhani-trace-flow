@@ -111,6 +111,7 @@ export interface ProductFilters {
   length?: string | string[];
   width?: string | string[];
   weight?: string | string[];
+  has_recipe?: string; // Filter products by recipe availability
   page?: number;
   limit?: number;
 }

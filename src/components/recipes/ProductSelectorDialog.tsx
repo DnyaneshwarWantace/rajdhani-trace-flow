@@ -143,19 +143,19 @@ export default function ProductSelectorDialog({
         filters.weight = selectedWeights;
       }
 
+      // Add has_recipe filter to backend query
+      filters.has_recipe = 'true';
+
       const result = await ProductService.getProducts(filters);
       const loadedProducts = result.products || [];
 
-      // Filter to only show products that have recipes
-      const productsWithRecipes = loadedProducts.filter(p => p.has_recipe);
-
-      setProducts(productsWithRecipes);
+      setProducts(loadedProducts);
       setTotalProducts(result.total || 0);
 
       // Load filter options separately with a high limit to get all unique values
       if (categories.length === 0) {
-        const allResult = await ProductService.getProducts({ limit: 1000 });
-        const allProductsWithRecipes = (allResult.products || []).filter(p => p.has_recipe);
+        const allResult = await ProductService.getProducts({ limit: 1000, has_recipe: 'true' });
+        const allProductsWithRecipes = allResult.products || [];
 
         const uniqueCategories = Array.from(
           new Set(allProductsWithRecipes.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
