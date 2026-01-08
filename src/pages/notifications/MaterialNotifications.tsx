@@ -34,21 +34,16 @@ export default function MaterialNotifications() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const { data } = await NotificationService.getNotifications({ limit: 1000 });
-      
-      // Filter for material-related notifications
-      const materialNotifications = data.filter(n => 
-        n.module === 'materials' || 
-        n.related_data?.action_category === 'MATERIAL' ||
-        n.related_data?.action_category === 'PURCHASE_ORDER' ||
-        n.related_data?.action?.includes('MATERIAL_') ||
-        n.related_data?.action?.includes('PURCHASE_ORDER_')
-      );
-      
+      // Filter at backend level - only fetch material notifications
+      const { data } = await NotificationService.getNotifications({
+        module: 'materials',
+        limit: 1000
+      });
+
       // Separate notifications and activity logs
-      const regularNotifications = materialNotifications.filter(n => !n.related_data?.activity_log_id);
-      const logs = materialNotifications.filter(n => n.related_data?.activity_log_id);
-      
+      const regularNotifications = data.filter(n => !n.related_data?.activity_log_id);
+      const logs = data.filter(n => n.related_data?.activity_log_id);
+
       setNotifications(regularNotifications);
       setActivityLogs(logs);
     } catch (error) {

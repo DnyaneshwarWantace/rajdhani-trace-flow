@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import NotificationDropdown from './NotificationDropdown';
-import { NotificationService } from '@/services/notificationService';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -11,31 +11,11 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
+  const { unreadCount, refreshCount } = useNotifications();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
-
-  // Load unread notification count
-  useEffect(() => {
-    loadUnreadCount();
-    // Refresh count every 30 seconds
-    const interval = setInterval(loadUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadUnreadCount = async () => {
-    try {
-      const { data } = await NotificationService.getNotifications({
-        status: 'unread',
-        limit: 100,
-      });
-      setUnreadCount(data.length);
-    } catch (error) {
-      console.error('Error loading unread count:', error);
-    }
-  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -115,7 +95,7 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
               onClick={() => {
                 setIsNotificationOpen(!isNotificationOpen);
                 if (!isNotificationOpen) {
-                  loadUnreadCount();
+                  refreshCount();
                 }
               }}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
@@ -139,7 +119,7 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
               isOpen={isNotificationOpen}
               onClose={() => {
                 setIsNotificationOpen(false);
-                loadUnreadCount();
+                refreshCount();
               }}
             />
           </div>

@@ -75,6 +75,11 @@ export class ProductService {
       });
     }
 
+    // Filter by has_recipe
+    if (filters?.has_recipe !== undefined) {
+      queryParams.append('has_recipe', String(filters.has_recipe));
+    }
+
     // Backend uses offset and limit, not page
     const limit = filters?.limit || 20;
     const page = filters?.page || 1;
