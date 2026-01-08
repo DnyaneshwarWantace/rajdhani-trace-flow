@@ -72,8 +72,13 @@ export default function MaterialList() {
   const [fullStats, setFullStats] = useState<any>(null); // Full stats for analytics tab
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Notifications state
+  // Notifications state - load count from cache immediately
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(() => {
+    const cached = localStorage.getItem('material_notification_count');
+    return cached ? parseInt(cached, 10) : 0;
+  });
   
   // Waste recovery state
   const [wasteCount, setWasteCount] = useState(0);
@@ -757,23 +762,13 @@ export default function MaterialList() {
 
     try {
       notificationsLoadingRef.current = true;
+      setNotificationsLoading(true);
       const { NotificationService } = await import('@/services/notificationService');
 
-      console.log('🔔 Loading material notifications...');
       const materialNotifications = await NotificationService.getNotifications({
         module: 'materials',
-        limit: 1000  // Get ALL notifications, not just 50
+        limit: 1000
       });
-      console.log('📥 Received notifications:', materialNotifications.data?.length || 0);
-      console.log('📋 All material notifications:', materialNotifications.data);
-
-      // Search for our specific notification
-      const ammoniaNot = materialNotifications.data?.find(n => n.id === 'NOTIF-251222-006');
-      if (ammoniaNot) {
-        console.log('✅ Found Ammonia notification:', ammoniaNot);
-      } else {
-        console.log('❌ Ammonia notification NOTIF-251222-006 NOT FOUND in results');
-      }
 
       const allNotifs = materialNotifications.data || [];
 
@@ -787,21 +782,22 @@ export default function MaterialList() {
         return notificationTypes.includes(n.type);
       });
 
-      console.log('📋 All real notifications (read + unread):', realNotifications.length);
       const unreadCount = realNotifications.filter(n => n.status === 'unread').length;
-      console.log('✉️ Unread:', unreadCount, 'Read:', realNotifications.length - unreadCount);
 
       // Show ALL notifications (both read and unread)
       setNotifications(realNotifications);
+
+      // Update count and cache for fast display
+      setNotificationCount(unreadCount);
+      localStorage.setItem('material_notification_count', unreadCount.toString());
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
       notificationsLoadingRef.current = false;
+      setNotificationsLoading(false);
     }
   };
 
-  // Calculate unread notifications count
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   const loadWasteCount = async () => {
     try {
@@ -849,7 +845,7 @@ export default function MaterialList() {
         <MaterialTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          unreadCount={unreadCount}
+          unreadCount={notificationCount}
           wasteCount={wasteCount}
         />
 
@@ -905,7 +901,7 @@ export default function MaterialList() {
         {activeTab === 'notifications' && (
           <MaterialNotificationsTab
             notifications={notifications}
-            loading={loading}
+            loading={notificationsLoading}
           />
         )}
                         </div>

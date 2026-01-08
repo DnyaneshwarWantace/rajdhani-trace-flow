@@ -49,8 +49,12 @@ export default function ProductList() {
   // const [analyticsLoading, setAnalyticsLoading] = useState(false);
   // const [stats, setStats] = useState<AnalyticsStats>({...});
 
-  // Notifications state
+  // Notifications state - load count from cache immediately
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationCount, setNotificationCount] = useState(() => {
+    const cached = localStorage.getItem('product_notification_count');
+    return cached ? parseInt(cached, 10) : 0;
+  });
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -133,80 +137,23 @@ export default function ProductList() {
 
   const loadNotifications = async () => {
     try {
-      // Load notifications from all modules to find production planning low stock alerts
       const { NotificationService } = await import('@/services/notificationService');
-      const productionNotifications = await NotificationService.getNotificationsByModule('production');
-      const productNotifications = await NotificationService.getNotificationsByModule('products');
-      const materialNotifications = await NotificationService.getNotificationsByModule('materials');
-      
-      // Combine all notifications to check for production planning alerts
-      const allNotifications = [
-        ...(productionNotifications || []), 
-        ...(productNotifications || []),
-        ...(materialNotifications || [])
-      ];
-      
-      // Filter notifications: Show:
-      // 1. Low stock notifications from production planning
-      // 2. Production-related notifications (production_request, production module, etc.)
-      const filteredNotifications = allNotifications.filter(n => {
-        // Exclude activity logs
-        if (n.related_data?.activity_log_id) {
-          return false;
-        }
-        
-        // Check if it's a production-related notification
-        const isProductionRelated = 
-          n.module === 'production' ||
-          n.type === 'production_request' ||
-          (n.title || '').toLowerCase().includes('production');
-        
-        // Check if it's a low stock notification from production planning
-        // Only show if it's about a PRODUCT shortage, not a MATERIAL shortage
-        const isProductLowStockFromProductionPlanning = () => {
-          if (n.type !== 'low_stock') {
-            return false;
-          }
-          
-          const title = (n.title || '').toLowerCase();
-          const hasProductionPlanningInTitle = title.includes('production planning');
-          
-          // Check material_type in related_data
-          // If material_type === 'raw_material', it's a material shortage (exclude)
-          // If material_type === 'product', it's a product shortage (include)
-          const materialType = n.related_data?.material_type;
-          
-          // Exclude material-related low stock notifications
-          if (materialType === 'raw_material') {
-            return false;
-          }
-          
-          // Show if:
-          // 1. Title includes "Production Planning" AND material_type is 'product' (product shortage)
-          // 2. Has batch_id/batch_number (from production) AND material_type is 'product'
-          const hasBatchId = !!n.related_data?.batch_id;
-          const hasBatchNumber = !!n.related_data?.batch_number;
-          const isProductMaterial = materialType === 'product';
-          
-          return (hasProductionPlanningInTitle && isProductMaterial) || 
-                 ((hasBatchId || hasBatchNumber) && isProductMaterial);
-        };
-        
-        // Check if it's product-related (same logic as ProductNotifications page)
-        const isProductRelated = 
-          n.module === 'products' || 
-          n.related_data?.action_category === 'PRODUCT' ||
-          n.related_data?.action?.includes('PRODUCT_');
-        
-        // Include if:
-        // 1. It's product-related (module === 'products' or action_category === 'PRODUCT')
-        // 2. It's production-related (module === 'production' or type === 'production_request')
-        // 3. It's a product low stock notification from production planning
-        return isProductRelated || isProductionRelated || isProductLowStockFromProductionPlanning();
+
+      // Load only product notifications - fast query
+      const { data } = await NotificationService.getNotifications({
+        module: 'products',
+        limit: 1000
       });
-      
+
+      // Filter out activity logs only
+      const filteredNotifications = data.filter(n => !n.related_data?.activity_log_id);
+
       setNotifications(filteredNotifications);
-      console.log('📢 Loaded production and stock notifications:', filteredNotifications.length);
+
+      // Update count and cache in localStorage for fast display
+      const unread = filteredNotifications.filter(n => n.status === 'unread').length;
+      setNotificationCount(unread);
+      localStorage.setItem('product_notification_count', unread.toString());
     } catch (error) {
       console.error('Error loading notifications:', error);
     }
@@ -296,7 +243,6 @@ export default function ProductList() {
 
 
   // Calculate unread notifications count
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
 
   return (
     <Layout>
@@ -334,7 +280,7 @@ export default function ProductList() {
         <ProductTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          unreadCount={unreadCount}
+          unreadCount={notificationCount}
         />
 
         {/* Inventory Tab Content */}

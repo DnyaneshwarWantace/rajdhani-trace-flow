@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -336,8 +337,10 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
-        <Toaster />
+        <NotificationProvider>
+          <AppRoutes />
+          <Toaster />
+        </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>
   );
