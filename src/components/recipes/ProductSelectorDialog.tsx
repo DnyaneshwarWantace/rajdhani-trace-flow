@@ -36,7 +36,6 @@ export default function ProductSelectorDialog({
   selectedProductId,
 }: ProductSelectorDialogProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -56,6 +55,7 @@ export default function ProductSelectorDialog({
   const [weights, setWeights] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [isSelecting, setIsSelecting] = useState(false);
 
   useEffect(() => {
@@ -75,17 +75,21 @@ export default function ProductSelectorDialog({
     }
   }, [isOpen]);
 
+  // Debounce search term
   useEffect(() => {
-    if (
-      isOpen &&
-      (selectedCategories.length > 0 ||
-        selectedSubcategories.length > 0 ||
-        selectedColors.length > 0 ||
-        selectedPatterns.length > 0 ||
-        selectedLengths.length > 0 ||
-        selectedWidths.length > 0 ||
-        selectedWeights.length > 0)
-    ) {
+    if (!isOpen) return;
+
+    const timeoutId = setTimeout(() => {
+      setCurrentPage(1);
+      loadProducts();
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, isOpen]);
+
+  // Reload on filter changes
+  useEffect(() => {
+    if (isOpen) {
       setCurrentPage(1);
       loadProducts();
     }
@@ -101,15 +105,22 @@ export default function ProductSelectorDialog({
   ]);
 
   useEffect(() => {
-    // Apply pagination to filtered products
-    applyPagination();
-  }, [allProducts, currentPage, itemsPerPage, searchTerm]);
+    if (isOpen) {
+      loadProducts();
+    }
+  }, [currentPage, itemsPerPage, isOpen]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const filters: any = { limit: 10000 };
+      const filters: any = {
+        limit: itemsPerPage,
+        page: currentPage
+      };
 
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
       if (selectedCategories.length > 0) {
         filters.category = selectedCategories;
       }
@@ -138,71 +149,57 @@ export default function ProductSelectorDialog({
       // Filter to only show products that have recipes
       const productsWithRecipes = loadedProducts.filter(p => p.has_recipe);
 
-      setAllProducts(productsWithRecipes);
+      setProducts(productsWithRecipes);
+      setTotalProducts(result.total || 0);
 
-      // Get unique filter options from the newly loaded products
-      const uniqueCategories = Array.from(
-        new Set(productsWithRecipes.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
-      ).sort();
-      const uniqueSubcategories = Array.from(
-        new Set(productsWithRecipes.map((p) => p.subcategory).filter((s): s is string => typeof s === 'string' && s !== ''))
-      ).sort();
-      const uniqueColors = Array.from(
-        new Set(
-          productsWithRecipes
-            .map((p) => p.color)
-            .filter((c): c is string => typeof c === 'string' && c.trim() !== '' && c.toLowerCase() !== 'n/a')
-        )
-      ).sort();
-      const uniquePatterns = Array.from(
-        new Set(
-          productsWithRecipes
-            .map((p) => p.pattern)
-            .filter((p): p is string => typeof p === 'string' && p.trim() !== '' && p.toLowerCase() !== 'n/a')
-        )
-      ).sort();
-      const uniqueLengths = Array.from(
-        new Set(productsWithRecipes.map((p) => p.length).filter((l): l is string => typeof l === 'string' && l !== ''))
-      ).sort();
-      const uniqueWidths = Array.from(
-        new Set(productsWithRecipes.map((p) => p.width).filter((w): w is string => typeof w === 'string' && w !== ''))
-      ).sort();
-      const uniqueWeights = Array.from(
-        new Set(productsWithRecipes.map((p) => p.weight).filter((w): w is string => typeof w === 'string' && w !== ''))
-      ).sort();
+      // Load filter options separately with a high limit to get all unique values
+      if (categories.length === 0) {
+        const allResult = await ProductService.getProducts({ limit: 1000 });
+        const allProductsWithRecipes = (allResult.products || []).filter(p => p.has_recipe);
 
-      setCategories(uniqueCategories);
-      setSubcategories(uniqueSubcategories);
-      setColors(uniqueColors);
-      setPatterns(uniquePatterns);
-      setLengths(uniqueLengths);
-      setWidths(uniqueWidths);
-      setWeights(uniqueWeights);
+        const uniqueCategories = Array.from(
+          new Set(allProductsWithRecipes.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
+        ).sort();
+        const uniqueSubcategories = Array.from(
+          new Set(allProductsWithRecipes.map((p) => p.subcategory).filter((s): s is string => typeof s === 'string' && s !== ''))
+        ).sort();
+        const uniqueColors = Array.from(
+          new Set(
+            allProductsWithRecipes
+              .map((p) => p.color)
+              .filter((c): c is string => typeof c === 'string' && c.trim() !== '' && c.toLowerCase() !== 'n/a')
+          )
+        ).sort();
+        const uniquePatterns = Array.from(
+          new Set(
+            allProductsWithRecipes
+              .map((p) => p.pattern)
+              .filter((p): p is string => typeof p === 'string' && p.trim() !== '' && p.toLowerCase() !== 'n/a')
+          )
+        ).sort();
+        const uniqueLengths = Array.from(
+          new Set(allProductsWithRecipes.map((p) => p.length).filter((l): l is string => typeof l === 'string' && l !== ''))
+        ).sort();
+        const uniqueWidths = Array.from(
+          new Set(allProductsWithRecipes.map((p) => p.width).filter((w): w is string => typeof w === 'string' && w !== ''))
+        ).sort();
+        const uniqueWeights = Array.from(
+          new Set(allProductsWithRecipes.map((p) => p.weight).filter((w): w is string => typeof w === 'string' && w !== ''))
+        ).sort();
+
+        setCategories(uniqueCategories);
+        setSubcategories(uniqueSubcategories);
+        setColors(uniqueColors);
+        setPatterns(uniquePatterns);
+        setLengths(uniqueLengths);
+        setWidths(uniqueWidths);
+        setWeights(uniqueWeights);
+      }
     } catch (error) {
       console.error('Error loading products:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const applyPagination = () => {
-    // Filter products by search term
-    const filtered = searchTerm.trim()
-      ? allProducts.filter(
-          (product) =>
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : allProducts;
-
-    // Apply pagination
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedProducts = filtered.slice(startIndex, endIndex);
-
-    setProducts(paginatedProducts);
   };
 
   const toggleGroup = (groupKey: string) => {
@@ -254,22 +251,8 @@ export default function ProductSelectorDialog({
     }
   };
 
-  // Get filtered products count for pagination
-  const getFilteredProducts = () => {
-    return searchTerm.trim()
-      ? allProducts.filter(
-          (product) =>
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : allProducts;
-  };
-
   const filteredProducts = products;
-  const totalFiltered = getFilteredProducts().length;
-  const totalPages = Math.ceil(totalFiltered / itemsPerPage);
+  const totalPages = Math.ceil(totalProducts / itemsPerPage);
 
   // Group products by name
   const groupedProducts = filteredProducts.reduce((acc, product) => {
@@ -564,7 +547,7 @@ export default function ProductSelectorDialog({
           {!loading && filteredProducts.length > 0 && totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
               <div className="text-sm text-gray-600">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalFiltered)} of {totalFiltered} products
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalProducts)} of {totalProducts} products
               </div>
               
               <div className="flex items-center gap-2">
