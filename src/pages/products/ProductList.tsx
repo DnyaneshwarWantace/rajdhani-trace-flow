@@ -11,7 +11,6 @@ import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
 import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
-import type { Notification } from '@/services/notificationService';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
@@ -50,7 +49,6 @@ export default function ProductList() {
   // const [stats, setStats] = useState<AnalyticsStats>({...});
 
   // Notifications state - load count from cache immediately
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationCount, setNotificationCount] = useState(() => {
     const cached = localStorage.getItem('product_notification_count');
     return cached ? parseInt(cached, 10) : 0;
@@ -147,8 +145,6 @@ export default function ProductList() {
 
       // Filter out activity logs only
       const filteredNotifications = data.filter(n => !n.related_data?.activity_log_id);
-
-      setNotifications(filteredNotifications);
 
       // Update count and cache in localStorage for fast display
       const unread = filteredNotifications.filter(n => n.status === 'unread').length;
