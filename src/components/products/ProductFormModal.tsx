@@ -311,9 +311,6 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       if (!formData.category || formData.category.trim() === '') {
         missingFields.push('Category');
       }
-      if (!formData.subcategory || formData.subcategory.trim() === '') {
-        missingFields.push('Subcategory');
-      }
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('Unit');
       }
@@ -513,8 +510,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         }
       }
 
-      // If this is a new product creation and has base_quantity > 0 with individual tracking enabled
-      if (mode === 'create' && createdProduct && finalFormData.base_quantity > 0 && finalFormData.individual_stock_tracking) {
+      // If this is a new product creation/duplication and has base_quantity > 0 with individual tracking enabled
+      if ((mode === 'create' || mode === 'duplicate') && createdProduct && finalFormData.base_quantity > 0 && finalFormData.individual_stock_tracking) {
         try {
           // Get user info from localStorage if available
           const userInfo = localStorage.getItem('user');

@@ -123,7 +123,7 @@ export default function ProductBasicInfoSection({
           value={formData.subcategory || ''}
           placeholder="Select subcategory"
           options={subcategories}
-          required
+          allowNA
           category="subcategory"
           onValueChange={(value) => onFormDataChange({ subcategory: value })}
           onDelete={onDeleteSubcategory}
