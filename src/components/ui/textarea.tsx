@@ -24,13 +24,13 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       const textarea = textareaRef.current;
       if (!textarea) return;
 
-      const handleSelectStart = (e: Event) => {
-        // Prevent text selection
-        e.preventDefault();
-      };
-
       const handleMouseDown = (e: MouseEvent) => {
-        // Prevent default selection behavior
+        // Allow double-click and triple-click selection (detail is click count)
+        if (e.detail > 1) {
+          return; // Let browser handle double/triple-click selection
+        }
+
+        // Prevent default selection behavior for single click only
         if (document.activeElement !== textarea) {
           e.preventDefault();
           setTimeout(() => {
@@ -51,22 +51,29 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         }
       };
 
-      const handleClick = () => {
-        // Ensure cursor is at end after click
-        if (textarea.value) {
-          setTimeout(() => {
-            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-          }, 0);
+      const handleClick = (e: MouseEvent) => {
+        // Allow double-click and triple-click selection (detail is click count)
+        if (e.detail > 1) {
+          return; // Let browser handle double/triple-click selection
+        }
+
+        // Only move cursor to end if textarea was NOT already focused (i.e., first click)
+        // If already focused, let user click anywhere to position cursor
+        if (document.activeElement !== textarea) {
+          // Ensure cursor is at end after single click only
+          if (textarea.value) {
+            setTimeout(() => {
+              textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            }, 0);
+          }
         }
       };
 
-      textarea.addEventListener('selectstart', handleSelectStart);
       textarea.addEventListener('mousedown', handleMouseDown);
       textarea.addEventListener('focus', handleFocus);
       textarea.addEventListener('click', handleClick);
 
       return () => {
-        textarea.removeEventListener('selectstart', handleSelectStart);
         textarea.removeEventListener('mousedown', handleMouseDown);
         textarea.removeEventListener('focus', handleFocus);
         textarea.removeEventListener('click', handleClick);
@@ -83,6 +90,13 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     };
 
     const handleMouseDown = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+      // Allow double-click and triple-click selection (detail is click count)
+      if (e.detail > 1) {
+        onMouseDown?.(e);
+        return; // Let browser handle double/triple-click selection
+      }
+
+      // Prevent auto-selection on single click only
       if (document.activeElement !== e.target) {
         e.preventDefault();
         setTimeout(() => {
@@ -93,15 +107,26 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
     };
 
     const handleClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
-      setTimeout(() => {
-        const target = e.target as HTMLTextAreaElement;
-        if (target.value) {
-          target.setSelectionRange(
-            target.value.length,
-            target.value.length
-          );
-        }
-      }, 0);
+      // Allow double-click and triple-click selection (detail is click count)
+      if (e.detail > 1) {
+        onClick?.(e);
+        return; // Let browser handle double/triple-click selection
+      }
+
+      // Only move cursor to end if textarea was NOT already focused (i.e., first click)
+      // If already focused, let user click anywhere to position cursor
+      if (document.activeElement !== e.target) {
+        // Ensure cursor is at end after single click only
+        setTimeout(() => {
+          const target = e.target as HTMLTextAreaElement;
+          if (target.value) {
+            target.setSelectionRange(
+              target.value.length,
+              target.value.length
+            );
+          }
+        }, 0);
+      }
       onClick?.(e);
     };
 

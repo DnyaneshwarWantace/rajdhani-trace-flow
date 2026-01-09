@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { NotificationService, type Notification } from '@/services/notificationService';
@@ -118,12 +118,19 @@ export default function Notifications() {
     }
   };
 
-  // Separate notifications by type
-  const allNotifications = notifications.filter(n => !n.related_data?.activity_log_id);
-  const activityLogNotifications = notifications.filter(n => n.related_data?.activity_log_id);
+  // Separate notifications by type - memoized
+  const allNotifications = useMemo(() =>
+    notifications.filter(n => !n.related_data?.activity_log_id),
+    [notifications]
+  );
 
-  // Get category counts for activity logs
-  const getCategoryCounts = () => {
+  const activityLogNotifications = useMemo(() =>
+    notifications.filter(n => n.related_data?.activity_log_id),
+    [notifications]
+  );
+
+  // Get category counts for activity logs - memoized
+  const categoryCounts = useMemo(() => {
     const categorized = categorizeActivityLogs(activityLogNotifications);
     const counts: Record<string, number> = {
       all: activityLogNotifications.length,
@@ -134,29 +141,27 @@ export default function Notifications() {
       supplier: 0,
       production: 0,
     };
-    
+
     categorized.forEach(section => {
       if (section.category in counts) {
         counts[section.category] = section.notifications.length;
       }
     });
-    
+
     return counts;
-  };
+  }, [activityLogNotifications]);
   
-  const categoryCounts = getCategoryCounts();
-  
-  // Filter activity logs by selected category
-  const getFilteredActivityLogs = () => {
+  // Filter activity logs by selected category - memoized
+  const getFilteredActivityLogs = useMemo(() => {
     let logs = activityLogNotifications;
-    
+
     // Filter by category first
     if (activeLogCategory !== 'all') {
       const categorized = categorizeActivityLogs(activityLogNotifications);
       const selectedSection = categorized.find(s => s.category === activeLogCategory);
       logs = selectedSection ? selectedSection.notifications : [];
     }
-    
+
     // Apply category-specific filters
     if (activeLogCategory === 'material') {
       // Filter by action type
@@ -166,13 +171,13 @@ export default function Notifications() {
           return action === materialFilterAction || action.includes(materialFilterAction);
         });
       }
-      
+
       // Filter by notification status
       if (materialFilterStatus !== 'all') {
         logs = logs.filter(n => n.status === materialFilterStatus);
       }
     }
-    
+
     // Sort by date (latest first)
     // For activity logs, use the activity log's created_at from related_data if available
     return logs.sort((a, b) => {
@@ -180,50 +185,50 @@ export default function Notifications() {
       const dateB = b.related_data?.created_at || b.created_at;
       return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
-  };
+  }, [activityLogNotifications, activeLogCategory, materialFilterAction, materialFilterStatus]);
 
-  // Filter notifications by selected category
-  const getFilteredNotifications = () => {
+  // Filter notifications by selected category - memoized
+  const getFilteredNotifications = useMemo(() => {
     if (activeNotificationCategory === 'all') {
       return allNotifications;
     }
-    
+
     // Filter by category
     const categoryFilters: Record<string, (n: Notification) => boolean> = {
-      material: (n) => 
-        n.module === 'materials' || 
+      material: (n) =>
+        n.module === 'materials' ||
         n.related_data?.action_category === 'MATERIAL' ||
         n.related_data?.action_category === 'PURCHASE_ORDER' ||
         n.related_data?.action?.includes('MATERIAL_') ||
         n.related_data?.action?.includes('PURCHASE_ORDER_'),
-      product: (n) => 
-        n.module === 'products' || 
+      product: (n) =>
+        n.module === 'products' ||
         n.related_data?.action_category === 'PRODUCT' ||
         n.related_data?.action?.includes('PRODUCT_'),
-      order: (n) => 
+      order: (n) =>
         (n.module === 'orders' && !n.related_data?.action?.includes('PURCHASE_ORDER')) ||
         (n.related_data?.action_category === 'ORDER' && !n.related_data?.action?.includes('PURCHASE_ORDER')) ||
         (n.related_data?.action?.includes('ORDER_') && !n.related_data?.action?.includes('PURCHASE_ORDER')),
-      customer: (n) => 
+      customer: (n) =>
         n.related_data?.action_category === 'CLIENT' ||
         n.related_data?.action?.includes('CLIENT_') ||
         n.related_data?.action?.includes('CUSTOMER_'),
-      supplier: (n) => 
+      supplier: (n) =>
         n.related_data?.action?.includes('SUPPLIER_'),
-      production: (n) => 
+      production: (n) =>
         n.module === 'production' ||
         n.related_data?.action_category === 'RECIPE' ||
         n.related_data?.action_category === 'PRODUCTION' ||
         n.related_data?.action?.includes('RECIPE_') ||
         n.related_data?.action?.includes('PRODUCTION_'),
     };
-    
+
     const filter = categoryFilters[activeNotificationCategory];
     return filter ? allNotifications.filter(filter) : allNotifications;
-  };
+  }, [allNotifications, activeNotificationCategory]);
 
-  // Get notification category counts
-  const getNotificationCategoryCounts = () => {
+  // Get notification category counts - memoized
+  const notificationCategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: allNotifications.length,
       material: 0,
@@ -233,7 +238,7 @@ export default function Notifications() {
       supplier: 0,
       production: 0,
     };
-    
+
     allNotifications.forEach(n => {
       if (n.module === 'materials' || n.related_data?.action_category === 'MATERIAL' || n.related_data?.action_category === 'PURCHASE_ORDER' || n.related_data?.action?.includes('MATERIAL_') || n.related_data?.action?.includes('PURCHASE_ORDER_')) {
         counts.material++;
@@ -249,31 +254,60 @@ export default function Notifications() {
         counts.production++;
       }
     });
-    
+
     return counts;
-  };
+  }, [allNotifications]);
 
-  const notificationCategoryCounts = getNotificationCategoryCounts();
+  // Filter notifications based on active tab - memoized
+  const baseNotifications = useMemo(() =>
+    activeTab === 'activity_logs'
+      ? getFilteredActivityLogs
+      : getFilteredNotifications,
+    [activeTab, getFilteredActivityLogs, getFilteredNotifications]
+  );
 
-  // Filter notifications based on active tab
-  const baseNotifications = activeTab === 'activity_logs' 
-    ? getFilteredActivityLogs() 
-    : getFilteredNotifications();
-
-  // Filter notifications - keep original order, don't re-sort by status
-  const filteredNotifications = baseNotifications
-    .filter(n => {
+  // Filter notifications - keep original order, don't re-sort by status - memoized
+  const filteredNotifications = useMemo(() =>
+    baseNotifications.filter(n => {
       if (filterType !== 'all' && n.type !== filterType) return false;
       if (filterStatus !== 'all' && n.status !== filterStatus) return false;
       if (filterModule !== 'all' && n.module !== filterModule) return false;
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
-    return true;
-  });
+      return true;
+    }),
+    [baseNotifications, filterType, filterStatus, filterModule, filterPriority]
+  );
 
-  const unreadCount = notifications.filter(n => n.status === 'unread').length;
-  const allUnreadCount = allNotifications.filter(n => n.status === 'unread').length;
-  const activityUnreadCount = activityLogNotifications.filter(n => n.status === 'unread').length;
+  const unreadCount = useMemo(() =>
+    notifications.filter(n => n.status === 'unread').length,
+    [notifications]
+  );
 
+  const allUnreadCount = useMemo(() =>
+    allNotifications.filter(n => n.status === 'unread').length,
+    [allNotifications]
+  );
+
+  const activityUnreadCount = useMemo(() =>
+    activityLogNotifications.filter(n => n.status === 'unread').length,
+    [activityLogNotifications]
+  );
+
+  // Memoize callback functions
+  const handleMarkAsRead = useCallback(async (id: string) => {
+    try {
+      await NotificationService.updateNotificationStatus(id, 'read');
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
+      );
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }, []);
+
+  const handleExpand = useCallback((id: string | null) => {
+    setExpandedNotificationId(id);
+  }, []);
 
   return (
     <Layout>
@@ -483,20 +517,8 @@ export default function Notifications() {
                       notification={notification}
                       onClick={() => handleNotificationClick(notification)}
                       expandedId={expandedNotificationId}
-                      onExpand={(id) => {
-                        setExpandedNotificationId(id);
-                      }}
-                      onMarkAsRead={async (id) => {
-                        try {
-                          await NotificationService.updateNotificationStatus(id, 'read');
-                          // Update local state - notification stays in same position
-                          setNotifications(prev =>
-                            prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
-                          );
-                        } catch (error) {
-                          console.error('Error marking notification as read:', error);
-                        }
-                      }}
+                      onExpand={handleExpand}
+                      onMarkAsRead={handleMarkAsRead}
                     />
                   </div>
                 ))}
@@ -522,17 +544,8 @@ export default function Notifications() {
                     onNotificationClick={handleNotificationClick}
                     compact={false}
                     expandedId={expandedNotificationId}
-                    onExpand={(id) => setExpandedNotificationId(id)}
-                    onMarkAsRead={async (id) => {
-                      try {
-                        await NotificationService.updateNotificationStatus(id, 'read');
-                        setNotifications(prev =>
-                          prev.map(n => n.id === id ? { ...n, status: 'read' as const } : n)
-                        );
-                      } catch (error) {
-                        console.error('Error marking notification as read:', error);
-                      }
-                    }}
+                    onExpand={handleExpand}
+                    onMarkAsRead={handleMarkAsRead}
                   />
                 </CardContent>
               </Card>

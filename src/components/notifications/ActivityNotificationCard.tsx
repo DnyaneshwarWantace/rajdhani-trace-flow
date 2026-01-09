@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
@@ -53,27 +53,20 @@ export default function ActivityNotificationCard({
   // Check if this is a purchase order notification
   const isPurchaseOrder = actionCategory === 'PURCHASE_ORDER' || action?.includes('PURCHASE_ORDER');
   const orderNumber = metadata?.order_number || activityData?.target_resource || notification.related_id;
-  
-  // Fetch purchase order details when expanded
-  useEffect(() => {
-    if (isExpanded && isPurchaseOrder && orderNumber && !orderDetails && !loadingOrder) {
-      loadOrderDetails();
-    }
-  }, [isExpanded, isPurchaseOrder, orderNumber]);
-  
-  const loadOrderDetails = async () => {
+
+  const loadOrderDetails = useCallback(async () => {
     if (!orderNumber) return;
-    
+
     try {
       setLoadingOrder(true);
       // Try to find order by order_number or ID
       const { data: orders } = await ManageStockService.getOrders({ limit: 1000 });
-      const order = orders.find((o: StockOrder) => 
-        o.order_number === orderNumber || 
+      const order = orders.find((o: StockOrder) =>
+        o.order_number === orderNumber ||
         o.id === orderNumber ||
         o.id === notification.related_id
       );
-      
+
       if (order) {
         // Get full order details
         const fullOrder = await ManageStockService.getOrderById(order.id);
@@ -88,7 +81,14 @@ export default function ActivityNotificationCard({
     } finally {
       setLoadingOrder(false);
     }
-  };
+  }, [orderNumber, notification.related_id]);
+
+  // Fetch purchase order details when expanded
+  useEffect(() => {
+    if (isExpanded && isPurchaseOrder && orderNumber && !orderDetails && !loadingOrder) {
+      loadOrderDetails();
+    }
+  }, [isExpanded, isPurchaseOrder, orderNumber, orderDetails, loadingOrder, loadOrderDetails]);
 
   // Get icon based on action
   const getIcon = () => {

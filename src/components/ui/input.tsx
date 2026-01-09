@@ -21,13 +21,13 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
       const input = inputRef.current;
       if (!input) return;
 
-      const handleSelectStart = (e: Event) => {
-        // Prevent text selection
-        e.preventDefault();
-      };
-
       const handleMouseDown = (e: MouseEvent) => {
-        // Prevent default selection behavior
+        // Allow double-click and triple-click selection (detail is click count)
+        if (e.detail > 1) {
+          return; // Let browser handle double/triple-click selection
+        }
+
+        // Prevent default selection behavior for single click only
         if (document.activeElement !== input) {
           e.preventDefault();
           // Use setTimeout to ensure focus happens after browser's default behavior
@@ -58,26 +58,33 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         }
       };
 
-      const handleClick = () => {
-        // Ensure cursor is at end after click (only for non-number inputs)
-        if (input.value && input.type !== 'number') {
-          setTimeout(() => {
-            try {
-              input.setSelectionRange(input.value.length, input.value.length);
-            } catch (e) {
-              // Ignore errors for inputs that don't support selection
-            }
-          }, 0);
+      const handleClick = (e: MouseEvent) => {
+        // Allow double-click and triple-click selection (detail is click count)
+        if (e.detail > 1) {
+          return; // Let browser handle double/triple-click selection
+        }
+
+        // Only move cursor to end if input was NOT already focused (i.e., first click)
+        // If already focused, let user click anywhere to position cursor
+        if (document.activeElement !== input) {
+          // Ensure cursor is at end after single click only (only for non-number inputs)
+          if (input.value && input.type !== 'number') {
+            setTimeout(() => {
+              try {
+                input.setSelectionRange(input.value.length, input.value.length);
+              } catch (e) {
+                // Ignore errors for inputs that don't support selection
+              }
+            }, 0);
+          }
         }
       };
 
-      input.addEventListener('selectstart', handleSelectStart);
       input.addEventListener('mousedown', handleMouseDown);
       input.addEventListener('focus', handleFocus);
       input.addEventListener('click', handleClick);
 
       return () => {
-        input.removeEventListener('selectstart', handleSelectStart);
         input.removeEventListener('mousedown', handleMouseDown);
         input.removeEventListener('focus', handleFocus);
         input.removeEventListener('click', handleClick);
@@ -99,7 +106,13 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     };
 
     const handleMouseDown = (e: React.MouseEvent<HTMLInputElement>) => {
-      // Prevent auto-selection on click
+      // Allow double-click and triple-click selection (detail is click count)
+      if (e.detail > 1) {
+        onMouseDown?.(e);
+        return; // Let browser handle double/triple-click selection
+      }
+
+      // Prevent auto-selection on single click only
       if (document.activeElement !== e.target) {
         e.preventDefault();
         setTimeout(() => {
@@ -110,20 +123,30 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     };
 
     const handleClick = (e: React.MouseEvent<HTMLInputElement>) => {
-      // Ensure cursor is at end after click (only for non-number inputs)
-      setTimeout(() => {
-        const target = e.target as HTMLInputElement;
-        if (target.value && target.type !== 'number') {
-          try {
-            target.setSelectionRange(
-              target.value.length,
-              target.value.length
-            );
-          } catch (err) {
-            // Ignore errors for number inputs that don't support selection
+      // Allow double-click and triple-click selection (detail is click count)
+      if (e.detail > 1) {
+        onClick?.(e);
+        return; // Let browser handle double/triple-click selection
+      }
+
+      // Only move cursor to end if input was NOT already focused (i.e., first click)
+      // If already focused, let user click anywhere to position cursor
+      if (document.activeElement !== e.target) {
+        // Ensure cursor is at end after single click only (only for non-number inputs)
+        setTimeout(() => {
+          const target = e.target as HTMLInputElement;
+          if (target.value && target.type !== 'number') {
+            try {
+              target.setSelectionRange(
+                target.value.length,
+                target.value.length
+              );
+            } catch (err) {
+              // Ignore errors for number inputs that don't support selection
+            }
           }
-        }
-      }, 0);
+        }, 0);
+      }
       onClick?.(e);
     };
 
