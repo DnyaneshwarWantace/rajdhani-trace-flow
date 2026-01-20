@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2 } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
@@ -20,6 +20,7 @@ import type { IndividualProduct } from '@/types/product';
 export default function ProductionIndividualProducts() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [batch, setBatch] = useState<ProductionBatch | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
@@ -297,7 +298,18 @@ export default function ProductionIndividualProducts() {
       <div className="space-y-6">
         <IndividualProductsStageHeader
           batch={batch}
-          onBack={() => navigate('/production')}
+          onBack={() => {
+            // Check where we came from based on location state
+            const from = location.state?.from;
+            
+            if (from === 'production-detail' && id) {
+              // If we came from production detail page, go back to production detail
+              navigate(`/production/${id}`);
+            } else {
+              // Default: go to production list
+              navigate('/production');
+            }
+          }}
           onComplete={handleComplete}
           onRefresh={handleRefresh}
           canComplete={canComplete}

@@ -980,7 +980,19 @@ export default function PlanningStage() {
     <Layout>
       <div className="min-h-screen bg-gray-50">
         <PlanningStageHeader 
-          onBack={() => navigate('/production')} 
+          onBack={() => {
+            // Check where we came from based on location state
+            const from = location.state?.from;
+            const batchId = currentBatch?.id;
+            
+            if (from === 'production-detail' && batchId) {
+              // If we came from production detail page, go back to production detail
+              navigate(`/production/${batchId}`);
+            } else {
+              // Default: go to production list
+              navigate('/production');
+            }
+          }} 
           onEdit={handleEdit}
           batch={currentBatch}
         />
