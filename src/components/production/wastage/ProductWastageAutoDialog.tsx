@@ -207,7 +207,6 @@ export default function ProductWastageAutoDialog({
         final_length: p.final_length || '',
         final_width: p.final_width || '',
         final_weight: p.final_weight || '',
-        quality_grade: p.quality_grade || 'C',
         color: (p as any).color || '',
         pattern: (p as any).pattern || '',
         batch_number: p.batch_number || batchId,

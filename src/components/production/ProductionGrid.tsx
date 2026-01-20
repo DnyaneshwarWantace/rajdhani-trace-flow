@@ -5,13 +5,17 @@ import type { ProductionBatch } from '@/services/productionService';
 interface ProductionGridProps {
   batches: ProductionBatch[];
   onDelete: (batch: ProductionBatch) => void;
+  onDuplicate?: (batch: ProductionBatch) => void;
   canDelete: boolean;
+  allBatches?: ProductionBatch[];
 }
 
 export default function ProductionGrid({
   batches,
   onDelete,
+  onDuplicate,
   canDelete,
+  allBatches = [],
 }: ProductionGridProps) {
   const breakpointColumnsObj = {
     default: 3,
@@ -30,7 +34,9 @@ export default function ProductionGrid({
           <ProductionCard
             batch={batch}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
             canDelete={canDelete}
+            allBatches={allBatches}
           />
         </div>
       ))}

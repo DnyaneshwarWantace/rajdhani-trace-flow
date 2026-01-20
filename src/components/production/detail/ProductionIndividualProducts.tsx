@@ -93,7 +93,6 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Dimensions</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Weight</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Quality Grade</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Inspector</th>
@@ -113,11 +112,6 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                       : '—'}
                   </td>
                   <td className="border border-gray-200 p-2 text-sm text-gray-900">{product.final_weight || '—'}</td>
-                  <td className="border border-gray-200 p-2">
-                    <Badge variant="outline" className="text-xs">
-                      {product.quality_grade || 'N/A'}
-                    </Badge>
-                  </td>
                   <td className="border border-gray-200 p-2">
                     <Badge 
                       variant="outline" 

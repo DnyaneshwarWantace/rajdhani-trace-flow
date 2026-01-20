@@ -15,7 +15,7 @@ interface InventoryTabProps {
   totalProducts: number;
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
-  onStatusChange: (value: string) => void;
+  onStatusChange: (values: string[]) => void;
   onColorChange?: (values: string[]) => void;
   onPatternChange?: (values: string[]) => void;
   onLengthChange?: (values: string[]) => void;
@@ -65,7 +65,6 @@ export default function InventoryTab({
     <>
       <InventoryFilters
         filters={filters}
-        viewMode={viewMode}
         onSearchChange={onSearchChange}
         onCategoryChange={onCategoryChange}
         onStatusChange={onStatusChange}
@@ -74,7 +73,6 @@ export default function InventoryTab({
         onLengthChange={onLengthChange}
         onWidthChange={onWidthChange}
         onWeightChange={onWeightChange}
-        onViewModeChange={onViewModeChange}
       />
 
       {/* Loading State */}

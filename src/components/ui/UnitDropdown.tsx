@@ -104,7 +104,7 @@ export function UnitDropdown({
           ))
         )}
         {units.length === 0 && (
-          <SelectItem value="" disabled>
+          <SelectItem value="__no_units__" disabled>
             No units available
           </SelectItem>
         )}

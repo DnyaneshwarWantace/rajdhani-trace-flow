@@ -55,7 +55,6 @@ export class IndividualProductService {
     productId: string,
     filters?: {
       status?: string;
-      quality_grade?: string;
       search?: string;
       start_date?: string;
       end_date?: string;
@@ -67,10 +66,6 @@ export class IndividualProductService {
     
     if (filters?.status && filters.status !== 'all') {
       queryParams.append('status', filters.status);
-    }
-    
-    if (filters?.quality_grade && filters.quality_grade !== 'all') {
-      queryParams.append('quality_grade', filters.quality_grade);
     }
     
     if (filters?.search) {
@@ -164,7 +159,6 @@ export class IndividualProductService {
     quantity: number,
     options?: {
       batch_number?: string;
-      quality_grade?: string;
       inspector?: string;
       notes?: string;
     }
@@ -176,9 +170,8 @@ export class IndividualProductService {
         product_id: productId,
         quantity,
         batch_number: options?.batch_number || `BATCH-${Date.now()}`,
-        quality_grade: options?.quality_grade || 'A',
         inspector: options?.inspector || null,
-        notes: options?.notes || `Auto-created ${quantity} individual products for product entry`,
+        notes: options?.notes || '',
       }),
     });
 

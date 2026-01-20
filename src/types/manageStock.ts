@@ -17,7 +17,6 @@ export interface StockOrder {
   actualDelivery?: string;
   minThreshold?: number;
   maxCapacity?: number;
-  qualityGrade?: string;
   isRestock?: boolean;
   created_by?: string;
   createdAt?: string;

@@ -45,6 +45,7 @@ export default function ProductionFormDialog({
     operator: '',
     supervisor: '',
     notes: '',
+    completion_date: '',
   });
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -62,6 +63,7 @@ export default function ProductionFormDialog({
           operator: selectedBatch.operator || '',
           supervisor: selectedBatch.supervisor || '',
           notes: selectedBatch.notes || '',
+          completion_date: selectedBatch.completion_date || '',
         });
         // Load product name
         loadProductName(selectedBatch.product_id, selectedBatch.product_name);
@@ -73,6 +75,7 @@ export default function ProductionFormDialog({
           operator: '',
           supervisor: '',
           notes: '',
+          completion_date: '',
         });
         setProductName('');
       }
@@ -217,6 +220,23 @@ export default function ProductionFormDialog({
               </Select>
             </div>
 
+            <div>
+              <Label htmlFor="completion_date">
+                Expected Completion Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="completion_date"
+                type="date"
+                value={formData.completion_date || ''}
+                onChange={(e) => setFormData({ ...formData, completion_date: e.target.value })}
+                min={new Date().toISOString().split('T')[0]}
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Target date for completing this production batch
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="operator">Operator</Label>
@@ -253,7 +273,7 @@ export default function ProductionFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting || !formData.product_id || formData.planned_quantity <= 0}>
+            <Button type="submit" disabled={submitting || !formData.product_id || formData.planned_quantity <= 0 || !formData.completion_date}>
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

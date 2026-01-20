@@ -365,11 +365,6 @@ export function IndividualProductSelectionDialog({
                                 <span className="font-medium">Weight:</span> {product.weight}
                               </div>
                             )}
-                            {product.quality_grade && (
-                              <div>
-                                <span className="font-medium">Grade:</span> {product.quality_grade}
-                              </div>
-                            )}
                             {product.added_date && (
                               <div>
                                 <span className="font-medium">Added:</span> {formatIndianDate(product.added_date)}

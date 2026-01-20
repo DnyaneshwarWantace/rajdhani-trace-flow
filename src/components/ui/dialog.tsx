@@ -22,6 +22,9 @@ const DialogOverlay = React.forwardRef<
       "fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overflow-hidden",
       className
     )}
+    onWheel={(e) => e.stopPropagation()}
+    onTouchMove={(e) => e.preventDefault()}
+    style={{ touchAction: 'none' }}
     {...props}
   />
 ))

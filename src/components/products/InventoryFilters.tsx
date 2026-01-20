@@ -13,11 +13,9 @@ import type { ProductFilters } from '@/types/product';
 
 interface InventoryFiltersProps {
   filters: ProductFilters;
-  viewMode: 'grid' | 'table' | 'grouped';
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
-  onStatusChange: (value: string) => void;
-  onViewModeChange: (mode: 'grid' | 'table' | 'grouped') => void;
+  onStatusChange: (values: string[]) => void;
   onColorChange?: (values: string[]) => void;
   onPatternChange?: (values: string[]) => void;
   onLengthChange?: (values: string[]) => void;
@@ -27,11 +25,9 @@ interface InventoryFiltersProps {
 
 export default function InventoryFilters({
   filters,
-  viewMode,
   onSearchChange,
   onCategoryChange,
   onStatusChange,
-  onViewModeChange,
   onColorChange,
   onPatternChange,
   onLengthChange,
@@ -115,7 +111,7 @@ export default function InventoryFilters({
 
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      {/* First Row: Search, Category, Status, View */}
+      {/* First Row: Search, Category, Status */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
         {/* Search */}
         <DebouncedSearchInput
@@ -138,56 +134,18 @@ export default function InventoryFilters({
           />
         </div>
 
-        {/* Status Filter */}
-        <div className="lg:col-span-3">
-          <Select value={filters.status || 'all'} onValueChange={(value) => onStatusChange(value === 'all' ? '' : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="in-stock">In Stock</SelectItem>
-              <SelectItem value="low-stock">Low Stock</SelectItem>
-              <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* View Mode Toggle - Only Grid on mobile, all options on desktop */}
-        <div className="lg:col-span-3 flex items-center gap-2">
-          <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
-
-          {/* Desktop: Show all 3 options */}
-          <button
-            onClick={() => onViewModeChange('table')}
-            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'table'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => onViewModeChange('grid')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'grid'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Grid
-          </button>
-          <button
-            onClick={() => onViewModeChange('grouped')}
-            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'grouped'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Grouped
-          </button>
+        {/* Status Filter - Multi-select */}
+        <div className="lg:col-span-5">
+          <MultiSelect
+            options={[
+              { label: 'In Stock', value: 'in-stock' },
+              { label: 'Low Stock', value: 'low-stock' },
+              { label: 'Out of Stock', value: 'out-of-stock' },
+            ]}
+            selected={Array.isArray(filters.status) ? filters.status : (filters.status ? [filters.status] : [])}
+            onChange={onStatusChange}
+            placeholder="All Status"
+          />
         </div>
       </div>
 

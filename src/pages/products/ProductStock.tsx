@@ -34,7 +34,6 @@ export default function ProductStock() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [qualityFilter, setQualityFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -61,7 +60,7 @@ export default function ProductStock() {
     if (productId) {
       loadIndividualProducts();
     }
-  }, [productId, searchTerm, statusFilter, qualityFilter, startDate, endDate, currentPage, limit]);
+  }, [productId, searchTerm, statusFilter, startDate, endDate, currentPage, limit]);
 
   const loadProduct = async () => {
     if (!productId) return;
@@ -102,7 +101,6 @@ export default function ProductStock() {
       const offset = (currentPage - 1) * limit;
       const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
         status: statusFilter,
-        quality_grade: qualityFilter,
         search: searchTerm || undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
@@ -185,10 +183,6 @@ export default function ProductStock() {
     handleFilterChange();
   };
 
-  const handleQualityChange = (value: string) => {
-    setQualityFilter(value);
-    handleFilterChange();
-  };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
@@ -229,12 +223,10 @@ export default function ProductStock() {
           <ProductStockFilters
             searchTerm={searchTerm}
             statusFilter={statusFilter}
-            qualityFilter={qualityFilter}
             startDate={startDate}
             endDate={endDate}
             onSearchChange={handleSearchChange}
             onStatusChange={handleStatusChange}
-            onQualityChange={handleQualityChange}
             onStartDateChange={handleStartDateChange}
             onEndDateChange={handleEndDateChange}
           />
@@ -245,7 +237,6 @@ export default function ProductStock() {
             productId={productId}
             searchTerm={searchTerm}
             statusFilter={statusFilter}
-            qualityFilter={qualityFilter}
             onView={handleView}
             onEdit={handleEdit}
             onQRCodeClick={handleQRCodeClick}

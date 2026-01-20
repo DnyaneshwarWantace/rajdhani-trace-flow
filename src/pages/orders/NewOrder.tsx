@@ -11,7 +11,7 @@ import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { type ProductDimensions } from '@/utils/unitConverter';
-import { formatCurrency } from '@/utils/formatHelpers';
+import { formatCurrency, formatErrorMessage } from '@/utils/formatHelpers';
 import CustomerSelection from '@/components/orders/CustomerSelection';
 import CustomerForm from '@/components/orders/CustomerForm';
 import OrderItemsList from '@/components/orders/OrderItemsList';
@@ -191,7 +191,6 @@ export default function NewOrder() {
         supplier: material.supplier_name || 'Unknown',
         supplier_name: material.supplier_name || 'Unknown',
         batch_number: material.batch_number,
-        quality_grade: material.quality_grade,
         status: material.status || 'in-stock',
         location: 'Warehouse',
       }));
@@ -354,12 +353,21 @@ export default function NewOrder() {
       return;
     }
 
-    if (!selectedCustomer && !showNewCustomerForm) {
-      toast({
-        title: 'Error',
-        description: 'Please select a customer or add a new one',
-        variant: 'destructive',
-      });
+    // Validate customer - must have a selected customer with a name
+    if (!selectedCustomer || !selectedCustomer.name || selectedCustomer.name.trim() === '') {
+      if (showNewCustomerForm) {
+        toast({
+          title: 'Error',
+          description: 'Please complete adding the new customer before creating the order',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Please select a customer or add a new one',
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
@@ -367,6 +375,15 @@ export default function NewOrder() {
       toast({
         title: 'Error',
         description: 'Please add at least one item to the order',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!orderDetails.expectedDelivery) {
+      toast({
+        title: 'Error',
+        description: 'Please select an expected delivery date',
         variant: 'destructive',
       });
       return;
@@ -384,7 +401,7 @@ export default function NewOrder() {
         customer_name: selectedCustomer?.name || '',
         customer_email: selectedCustomer?.email || '',
         customer_phone: selectedCustomer?.phone || '',
-        expected_delivery: orderDetails.expectedDelivery || undefined,
+        expected_delivery: orderDetails.expectedDelivery,
         items: orderItems.map(item => ({
           product_id: item.product_id,
           raw_material_id: item.raw_material_id,
@@ -403,7 +420,6 @@ export default function NewOrder() {
           pricing_unit: item.pricing_unit,
           unit_value: item.unit_value,
           product_dimensions: item.product_dimensions,
-          quality_grade: item.quality_grade || 'A',
           specifications: item.specifications || '',
           selected_individual_products: item.selectedIndividualProducts?.map((p: any) => p.id) || [],
         })),
@@ -440,9 +456,10 @@ export default function NewOrder() {
       }, 2000);
     } catch (error) {
       console.error('Error creating order:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create order';
       toast({
         title: 'Error',
-        description: 'Failed to create order',
+        description: formatErrorMessage(errorMessage),
         variant: 'destructive',
       });
       setIsSubmitting(false);

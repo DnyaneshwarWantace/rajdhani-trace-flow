@@ -71,7 +71,7 @@ export default function PlanningDetailsForm({ formData, onChange }: PlanningDeta
       <div>
         <Label htmlFor="completion_date" className="flex items-center gap-2">
           <Calendar className="w-4 h-4" />
-          Expected Completion Date
+          Expected Completion Date <span className="text-red-500">*</span>
         </Label>
         <Input
           id="completion_date"
@@ -80,6 +80,7 @@ export default function PlanningDetailsForm({ formData, onChange }: PlanningDeta
           onChange={(e) => handleChange('completion_date', e.target.value)}
           className="mt-1"
           min={new Date().toISOString().split('T')[0]}
+          required
         />
         <div className="flex items-start gap-2 mt-2 p-2 bg-blue-50 rounded-lg">
           <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />

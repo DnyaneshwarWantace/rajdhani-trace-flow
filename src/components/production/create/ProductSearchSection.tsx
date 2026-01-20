@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, X, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import type { Product } from '@/types/product';
 import ProductFilters from './ProductFilters';
@@ -45,6 +45,10 @@ export default function ProductSearchSection({
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(50);
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   useEffect(() => {
     loadCategories();
     loadProducts();
@@ -53,7 +57,7 @@ export default function ProductSearchSection({
   useEffect(() => {
     setPage(1);
     loadProducts();
-  }, [searchTerm, category, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit]);
+  }, [searchTerm, category, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
 
   useEffect(() => {
     loadProducts();
@@ -176,7 +180,30 @@ export default function ProductSearchSection({
       const { products: fetchedProducts, total: totalCount } = await ProductService.getProducts(filters);
 
       console.log('Loaded products:', fetchedProducts.length, 'Total:', totalCount);
-      setProducts(fetchedProducts || []);
+
+      // Apply sorting
+      const sortedProducts = [...(fetchedProducts || [])].sort((a, b) => {
+        let compareValue = 0;
+
+        switch (sortBy) {
+          case 'name':
+            compareValue = (a.name || '').localeCompare(b.name || '');
+            break;
+          case 'stock':
+            compareValue = (a.current_stock || 0) - (b.current_stock || 0);
+            break;
+          case 'category':
+            compareValue = (a.category || '').localeCompare(b.category || '');
+            break;
+          case 'recent':
+            compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            break;
+        }
+
+        return sortOrder === 'asc' ? compareValue : -compareValue;
+      });
+
+      setProducts(sortedProducts);
       setTotal(totalCount || 0);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -221,6 +248,41 @@ export default function ProductSearchSection({
               <X className="w-4 h-4" />
             </button>
           )}
+        </div>
+
+        {/* Sort */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-700">Sort by:</span>
+          <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+            <SelectTrigger className="w-[160px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="stock">Stock</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="recent">Recently Added</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+            <SelectTrigger className="w-[120px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="w-3 h-3" />
+                  Ascending
+                </div>
+              </SelectItem>
+              <SelectItem value="desc">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="w-3 h-3 rotate-180" />
+                  Descending
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Filters */}

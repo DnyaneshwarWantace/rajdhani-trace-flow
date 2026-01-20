@@ -104,7 +104,7 @@ export interface ProductFilters {
   search?: string;
   category?: string | string[]; // Support both single and multi-select
   subcategory?: string | string[]; // Support both single and multi-select
-  status?: string;
+  status?: string | string[]; // Support both single and multi-select
   stock_status?: string;
   color?: string | string[];
   pattern?: string | string[];
@@ -133,7 +133,6 @@ export interface IndividualProduct {
   final_weight?: string;
 
   // Quality
-  quality_grade?: string;
   inspector?: string;
 
   // Location & Notes
@@ -158,7 +157,6 @@ export interface IndividualProductFormData {
   final_length?: string;
   final_width?: string;
   final_weight?: string;
-  quality_grade?: string;
   inspector?: string;
   location?: string;
   notes?: string;

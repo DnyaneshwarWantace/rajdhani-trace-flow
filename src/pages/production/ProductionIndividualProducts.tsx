@@ -226,7 +226,7 @@ export default function ProductionIndividualProducts() {
     }
 
     // Validate that all created products have required fields
-    const requiredFields = ['final_weight', 'final_width', 'final_length', 'quality_grade'];
+    const requiredFields = ['final_weight', 'final_width', 'final_length'];
     const incompleteProducts = createdProducts.filter(p => 
       requiredFields.some(field => !p[field as keyof IndividualProduct] || 
         (typeof p[field as keyof IndividualProduct] === 'string' && 
@@ -236,7 +236,7 @@ export default function ProductionIndividualProducts() {
     if (incompleteProducts.length > 0) {
       toast({
         title: 'Cannot Complete Production',
-        description: `${incompleteProducts.length} products have incomplete data. Please fill in all required fields (Final Weight, Final Width, Final Length, Quality Grade).`,
+        description: `${incompleteProducts.length} products have incomplete data. Please fill in all required fields (Final Weight, Final Width, Final Length).`,
         variant: 'destructive',
       });
       return;
@@ -269,7 +269,7 @@ export default function ProductionIndividualProducts() {
   );
 
   const canComplete = createdProducts.length > 0 && createdProducts.every(p => 
-    p.final_weight && p.final_width && p.final_length && p.quality_grade
+    p.final_weight && p.final_width && p.final_length
   );
 
   if (loading) {

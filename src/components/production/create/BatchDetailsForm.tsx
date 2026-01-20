@@ -17,9 +17,10 @@ interface BatchDetailsFormProps {
   formData: CreateProductionBatchData;
   onChange: (data: CreateProductionBatchData) => void;
   selectedProduct: Product | null;
+  orderDeliveryDate?: string | null;
 }
 
-export default function BatchDetailsForm({ formData, onChange, selectedProduct }: BatchDetailsFormProps) {
+export default function BatchDetailsForm({ formData, onChange, selectedProduct, orderDeliveryDate }: BatchDetailsFormProps) {
   const handleChange = (field: keyof CreateProductionBatchData, value: any) => {
     onChange({ ...formData, [field]: value });
   };
@@ -50,6 +51,11 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct }
   };
 
   const wordsCount = (formData.notes || '').trim().split(/\s+/).filter(w => w.length > 0).length;
+
+  // Check if completion date is after order delivery date
+  const isCompletionAfterDelivery = orderDeliveryDate && formData.completion_date
+    ? new Date(formData.completion_date) >= new Date(orderDeliveryDate)
+    : false;
 
   return (
     <div className="space-y-4">
@@ -152,18 +158,31 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct }
       </div>
 
       <div>
-        <Label htmlFor="completion_date">Expected Completion Date</Label>
+        <Label htmlFor="completion_date">
+          Expected Completion Date <span className="text-red-500">*</span>
+        </Label>
         <Input
           id="completion_date"
           type="date"
           value={formData.completion_date || ''}
           onChange={(e) => handleChange('completion_date', e.target.value)}
-          className="mt-1"
+          className={`mt-1 ${isCompletionAfterDelivery ? 'border-red-500 focus:border-red-500' : ''}`}
           min={new Date().toISOString().split('T')[0]}
+          max={orderDeliveryDate ? new Date(orderDeliveryDate).toISOString().split('T')[0] : undefined}
+          required
         />
-        <p className="text-xs text-gray-500 mt-1">
-          Target date for completing this production batch. Start date will be set automatically when production begins.
-        </p>
+        {isCompletionAfterDelivery ? (
+          <p className="text-xs text-red-600 font-semibold mt-1 flex items-center gap-1">
+            ⚠️ Production must complete before order delivery date ({new Date(orderDeliveryDate!).toLocaleDateString()})
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-1">
+            {orderDeliveryDate
+              ? `Must complete before order delivery on ${new Date(orderDeliveryDate).toLocaleDateString()}`
+              : 'Target date for completing this production batch'
+            }
+          </p>
+        )}
       </div>
 
       <div>

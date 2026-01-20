@@ -45,7 +45,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Expected Delivery
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -98,7 +98,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center justify-end gap-2 flex-wrap">
                       {(order.status === 'ordered' || order.status === 'pending') && (
                         <>
                           <Button

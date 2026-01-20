@@ -12,6 +12,8 @@ import ProductionCreateHeader from '@/components/production/create/ProductionCre
 import ProductSearchSection from '@/components/production/create/ProductSearchSection';
 import SelectedProductCard from '@/components/production/create/SelectedProductCard';
 import BatchDetailsForm from '@/components/production/create/BatchDetailsForm';
+import AllPendingOrdersSection from '@/components/production/create/AllPendingOrdersSection';
+import { ProductService } from '@/services/productService';
 
 export default function ProductionCreate() {
   const navigate = useNavigate();
@@ -20,6 +22,7 @@ export default function ProductionCreate() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedOrderDeliveryDate, setSelectedOrderDeliveryDate] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateProductionBatchData>({
     product_id: '',
     planned_quantity: 0,
@@ -56,6 +59,27 @@ export default function ProductionCreate() {
     }
   }, [location.state, user]);
 
+  // Handle back navigation based on where user came from
+  const handleBack = () => {
+    const from = location.state?.from as string | undefined;
+    const productId = location.state?.productId as string | undefined;
+    const batchId = location.state?.batchId as string | undefined;
+
+    if (from === 'product-detail' && productId) {
+      // Return to product detail page
+      navigate(`/products/${productId}`);
+    } else if (from === 'product-list') {
+      // Return to product list page
+      navigate('/products');
+    } else if (from === 'production-detail' && batchId) {
+      // Return to production detail page
+      navigate(`/production/${batchId}`);
+    } else {
+      // Default: go to production list
+      navigate('/production');
+    }
+  };
+
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
     setFormData((prev) => ({ ...prev, product_id: product.id }));
@@ -70,12 +94,66 @@ export default function ProductionCreate() {
     setFormData(data);
   };
 
+  const handleSelectOrder = async (order: any, productId: string) => {
+    try {
+      // Fetch product details
+      const product = await ProductService.getProductById(productId);
+
+      if (product) {
+        setSelectedProduct(product);
+
+        const deliveryDate = new Date(order.expected_delivery);
+        const completionDate = new Date(deliveryDate);
+        completionDate.setDate(completionDate.getDate() - 2);
+        const formattedDate = completionDate.toISOString().split('T')[0];
+
+        setSelectedOrderDeliveryDate(order.expected_delivery);
+
+        setFormData({
+          product_id: productId,
+          planned_quantity: order.quantity_needed,
+          completion_date: formattedDate,
+          priority: order.priority || 'medium',
+          notes: `Order ${order.order_number} for ${order.customer_name}`,
+          operator: user?.full_name || user?.email || '',
+          supervisor: user?.full_name || user?.email || '',
+        });
+
+        toast({
+          title: 'Order Selected',
+          description: `Product: ${product.name}, Qty: ${order.quantity_needed}`,
+          duration: 4000,
+        });
+
+        // Scroll to form
+        setTimeout(() => {
+          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load product details',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.product_id || formData.planned_quantity <= 0) {
       toast({
         title: 'Validation Error',
         description: 'Please select a product and enter a valid quantity',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!formData.completion_date || formData.completion_date.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select an expected completion date',
         variant: 'destructive',
       });
       return;
@@ -103,9 +181,20 @@ export default function ProductionCreate() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        <ProductionCreateHeader onBack={() => navigate('/production')} />
+        <ProductionCreateHeader onBack={handleBack} />
 
-        <div className="px-2 sm:px-3 lg:px-4 py-6">
+        <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
+          {/* ALL PENDING ORDERS SECTION - AT TOP */}
+          <AllPendingOrdersSection onSelectOrder={handleSelectOrder} />
+
+          {/* SEPARATOR */}
+          <div className="py-4">
+            <hr className="border-t-2 border-gray-300" />
+            <p className="text-center text-gray-600 font-semibold mt-4 text-lg">
+              OR Create Batch for Any Other Product Below
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Product Selection */}
@@ -127,10 +216,11 @@ export default function ProductionCreate() {
                     <CardTitle className="text-lg">Batch Details</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <BatchDetailsForm 
-                      formData={formData} 
+                    <BatchDetailsForm
+                      formData={formData}
                       onChange={handleFormChange}
                       selectedProduct={selectedProduct}
+                      orderDeliveryDate={selectedOrderDeliveryDate}
                     />
                   </CardContent>
                 </Card>
@@ -139,7 +229,7 @@ export default function ProductionCreate() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => navigate('/production')}
+                    onClick={handleBack}
                     className="flex-1"
                     disabled={submitting}
                   >
@@ -148,7 +238,7 @@ export default function ProductionCreate() {
                   <Button
                     type="submit"
                     className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
-                    disabled={submitting || !formData.product_id || formData.planned_quantity <= 0}
+                    disabled={submitting || !formData.product_id || formData.planned_quantity <= 0 || !formData.completion_date}
                   >
                     {submitting ? (
                       <>

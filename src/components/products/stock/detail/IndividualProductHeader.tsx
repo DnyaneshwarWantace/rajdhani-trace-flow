@@ -53,11 +53,6 @@ export default function IndividualProductHeader({
                 >
                   {individualProduct.status}
                 </Badge>
-                {individualProduct.quality_grade && (
-                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                    {individualProduct.quality_grade}
-                  </Badge>
-                )}
               </div>
             </div>
           </div>

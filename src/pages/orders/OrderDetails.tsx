@@ -27,6 +27,7 @@ import { EditablePaymentCard } from '@/components/orders/EditablePaymentCard';
 import { IndividualProductSelectionDialog } from '@/components/orders/IndividualProductSelectionDialog';
 import { ActivityLogTimeline } from '@/components/orders/ActivityLogTimeline';
 import { InvoiceBill } from '@/components/orders/InvoiceBill';
+import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
 
 interface OrderItem {
   id: string;
@@ -40,7 +41,6 @@ interface OrderItem {
   gst_included: boolean;
   subtotal: string;
   total_price: string;
-  quality_grade?: string;
   specifications?: string;
   category?: string;
   subcategory?: string;
@@ -212,6 +212,97 @@ export default function OrderDetails() {
       toast({
         title: 'Error',
         description: 'Failed to update quantity',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string, productName: string) => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to remove "${productName}" from this order?\n\nAny reserved individual products or raw materials will be unreserved and become available again.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+
+      const response = await fetch(`${API_URL}/orders/items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+      });
+
+      const result = await response.json();
+
+      // Check if this is the last item (requires confirmation)
+      if (!response.ok && result.error === 'LAST_ITEM') {
+        if (!order) return;
+
+        // Show confirmation dialog for order cancellation
+        const confirmed = window.confirm(
+          `${result.message}\n\nThis will cancel order ${order.orderNumber}. Are you sure?`
+        );
+
+        if (confirmed) {
+          // User confirmed - cancel the entire order
+          const cancelResponse = await fetch(`${API_URL}/orders/${order.id}/status`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` }),
+            },
+            body: JSON.stringify({ status: 'cancelled' }),
+          });
+
+          const cancelResult = await cancelResponse.json();
+
+          if (!cancelResponse.ok || !cancelResult.success) {
+            toast({
+              title: 'Error',
+              description: cancelResult.error || 'Failed to cancel order',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          toast({
+            title: 'Order Cancelled',
+            description: `Order ${order.orderNumber} has been cancelled`,
+          });
+
+          // Redirect to orders list
+          navigate('/orders');
+        }
+        return;
+      }
+
+      if (!response.ok || !result.success) {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to remove item',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Item Removed',
+        description: `${productName} has been removed from the order. Reserved products/materials have been unreserved.`,
+      });
+
+      await loadOrderDetails();
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove item',
         variant: 'destructive',
       });
     }
@@ -511,6 +602,7 @@ export default function OrderDetails() {
                       orderStatus={order.status}
                       onUpdateQuantity={handleUpdateQuantity}
                       onSelectIndividualProducts={handleSelectIndividualProducts}
+                      onDeleteItem={handleDeleteItem}
                     />
                   ))}
                 </div>
@@ -621,14 +713,64 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
+            {/* Production Information - Show for pending/accepted orders */}
+            <OrderProductionInfo order={order} />
+
             {/* Payment Summary */}
             <EditablePaymentCard
-              subtotal={order.subtotal || '0'}
-              gstAmount={order.gstAmount || '0'}
+              subtotal={(() => {
+                // Calculate subtotal from items if not set
+                if (order.subtotal && parseFloat(order.subtotal.toString()) > 0) {
+                  return order.subtotal;
+                }
+                // Calculate from items
+                const itemsSubtotal = orderItems.reduce((sum, item) => {
+                  return sum + parseFloat(item.subtotal || '0');
+                }, 0);
+                return itemsSubtotal.toString();
+              })()}
+              gstAmount={(() => {
+                // Calculate GST from items if order.gstAmount is not set
+                if (order.gstAmount && parseFloat(order.gstAmount.toString()) > 0) {
+                  return order.gstAmount;
+                }
+                // Calculate from items
+                const itemsGst = orderItems.reduce((sum, item) => {
+                  return sum + parseFloat(item.gst_amount || '0');
+                }, 0);
+                return itemsGst.toString();
+              })()}
               discountAmount={order.discountAmount}
-              totalAmount={parseFloat(order.totalAmount.toString())}
+              totalAmount={(() => {
+                // Calculate total from items (sum of all item total_price)
+                const itemsTotal = orderItems.reduce((sum, item) => {
+                  return sum + parseFloat(item.total_price || '0');
+                }, 0);
+
+                // If items total is greater than order.totalAmount, use items total (correct value)
+                if (itemsTotal > parseFloat(order.totalAmount.toString())) {
+                  return itemsTotal;
+                }
+
+                return parseFloat(order.totalAmount.toString());
+              })()}
               paidAmount={parseFloat(order.paidAmount.toString())}
-              outstandingAmount={parseFloat(order.outstandingAmount.toString())}
+              outstandingAmount={(() => {
+                // Recalculate outstanding based on correct total
+                const itemsTotal = orderItems.reduce((sum, item) => {
+                  return sum + parseFloat(item.total_price || '0');
+                }, 0);
+
+                const correctTotal = itemsTotal > parseFloat(order.totalAmount.toString())
+                  ? itemsTotal
+                  : parseFloat(order.totalAmount.toString());
+
+                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                const finalTotal = correctTotal - discount;
+                const outstanding = finalTotal - parseFloat(order.paidAmount.toString());
+
+                return outstanding;
+              })()}
               paymentHistory={(order as any).payment_history}
               onUpdatePayment={handleUpdatePayment}
             />

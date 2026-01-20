@@ -70,21 +70,25 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           </button>
 
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-            </div>
-            <span className="font-bold text-lg text-gray-900 hidden sm:block">
-              Rajdhani
-            </span>
-          </div>
+          <Link to="/" className="flex items-center">
+            <img 
+              src={`${import.meta.env.BASE_URL}logo.svg`}
+              alt="Rajdhani Logo" 
+              className="h-12 sm:h-14 md:h-16 w-auto object-contain"
+              onError={(e) => {
+                // Try fallback paths
+                const img = e.target as HTMLImageElement;
+                const currentSrc = img.src;
+                if (currentSrc.includes('/v2/logo.svg')) {
+                  img.src = '/logo.svg';
+                } else if (currentSrc.includes('/logo.svg')) {
+                  img.src = '/v2/logo.svg';
+                } else {
+                  console.error('Logo not found at any path');
+                }
+              }}
+            />
+          </Link>
         </div>
 
         {/* Right Section - User Profile */}

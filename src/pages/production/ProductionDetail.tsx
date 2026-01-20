@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, AlertCircle, XCircle } from 'lucide-react';
+import { Loader2, AlertCircle, XCircle, Factory, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
@@ -108,6 +108,44 @@ export default function ProductionDetail() {
     navigate('/production');
   };
 
+  const handleCreateNewBatch = async () => {
+    if (!batch?.product_id) {
+      toast({
+        title: 'Error',
+        description: 'Product information not available',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Fetch product details
+      const product = await ProductService.getProductById(batch.product_id);
+      if (product) {
+        navigate('/production/new', {
+          state: {
+            product,
+            from: 'production-detail',
+            batchId: id,
+          },
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Product not found',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load product details',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleEditSuccess = async (data: CreateProductionBatchData) => {
     try {
       setSubmitting(true);
@@ -166,10 +204,23 @@ export default function ProductionDetail() {
   return (
     <Layout>
       <div className="space-y-6">
-        <ProductionDetailHeader
-          batch={batch}
-          onBack={handleBack}
-        />
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1">
+            <ProductionDetailHeader
+              batch={batch}
+              onBack={handleBack}
+            />
+          </div>
+          {batch.product_id && (
+            <Button
+              onClick={handleCreateNewBatch}
+              className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Batch
+            </Button>
+          )}
+        </div>
 
         <ProductionDetailStats batch={batch} />
 

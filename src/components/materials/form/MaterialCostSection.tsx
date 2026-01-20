@@ -19,15 +19,14 @@ const MaterialCostSection = forwardRef<HTMLInputElement, MaterialCostSectionProp
 
     return (
       <div>
-        <Label htmlFor="costPerUnit">Cost/Unit (₹) *</Label>
+        <Label htmlFor="costPerUnit">Cost/Unit (₹)</Label>
         <Input
           ref={ref}
           id="costPerUnit"
           type="text"
           value={costPerUnit}
           onChange={handleNumericChange}
-          placeholder="450"
-          required
+          placeholder="450 (optional)"
           className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
         />
         <p className="text-xs text-muted-foreground mt-1">Cost per unit</p>

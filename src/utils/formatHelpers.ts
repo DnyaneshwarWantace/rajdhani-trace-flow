@@ -168,3 +168,57 @@ export const getMaxValue = <T extends { value: number }>(data: T[]) => {
   return Math.max(...data.map(d => d.value));
 };
 
+/**
+ * Convert technical error messages to user-friendly messages
+ */
+export const formatErrorMessage = (error: string): string => {
+  if (!error) return 'An error occurred';
+
+  // Field name mappings (technical -> user-friendly)
+  const fieldMappings: Record<string, string> = {
+    'customer_name': 'Customer',
+    'customer_id': 'Customer',
+    'expected_delivery': 'Expected Delivery Date',
+    'Expected_delivery': 'Expected Delivery Date',
+    'order_date': 'Order Date',
+    'total_amount': 'Total Amount',
+    'items': 'Order Items',
+    'delivery_address': 'Delivery Address',
+    'paid_amount': 'Paid Amount',
+    'gst_rate': 'GST Rate',
+    'gst_amount': 'GST Amount',
+    'discount_amount': 'Discount Amount',
+    'product_name': 'Product Name',
+    'quantity': 'Quantity',
+    'unit_price': 'Unit Price',
+    'product_id': 'Product',
+    'raw_material_id': 'Material',
+  };
+
+  // Common error pattern replacements
+  let friendlyError = error;
+
+  // Replace field names
+  Object.entries(fieldMappings).forEach(([tech, friendly]) => {
+    const regex = new RegExp(tech.replace(/_/g, '[_\\s]'), 'gi');
+    friendlyError = friendlyError.replace(regex, friendly);
+  });
+
+  // Common error message patterns
+  friendlyError = friendlyError
+    .replace(/is required/gi, 'is required')
+    .replace(/Path `([^`]+)` is required/gi, '$1 is required')
+    .replace(/Validation Failed:/gi, '')
+    .replace(/Order Validation Failed:/gi, '')
+    .replace(/Customer not found/gi, 'Please select a customer')
+    .replace(/Failed to create order/gi, 'Unable to create order. Please check all fields and try again.')
+    .replace(/Failed to update order/gi, 'Unable to update order. Please check all fields and try again.')
+    .trim();
+
+  // Capitalize first letter
+  if (friendlyError.length > 0) {
+    friendlyError = friendlyError.charAt(0).toUpperCase() + friendlyError.slice(1);
+  }
+
+  return friendlyError;
+};

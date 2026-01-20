@@ -29,7 +29,11 @@ export class ProductService {
       subs.forEach((sub: string) => sub && sub !== 'all' && queryParams.append('subcategory', sub));
     }
 
-    if (filters?.status && filters.status !== 'all') queryParams.append('status', filters.status);
+    // Handle status as array (multi-select)
+    if (filters?.status) {
+      const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+      statuses.forEach(status => status && status !== 'all' && queryParams.append('status', status));
+    }
 
     // Handle other array filters
     if (filters?.color) {

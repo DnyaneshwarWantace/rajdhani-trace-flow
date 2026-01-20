@@ -1,7 +1,7 @@
 import type { ProductionBatch } from '@/services/productionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
@@ -10,16 +10,33 @@ interface ProductionTableProps {
   batches: ProductionBatch[];
   onView: (batch: ProductionBatch) => void;
   onDelete: (batch: ProductionBatch) => void;
+  onDuplicate?: (batch: ProductionBatch) => void;
   canDelete: boolean;
+  allBatches?: ProductionBatch[]; // All batches to check for duplicates
 }
 
 export default function ProductionTable({
   batches,
   onView,
   onDelete,
+  onDuplicate,
   canDelete,
+  allBatches = [],
 }: ProductionTableProps) {
   const navigate = useNavigate();
+
+  // Check if a batch can be duplicated
+  const canDuplicate = (batch: ProductionBatch) => {
+    if (batch.status !== 'completed') return false;
+    if (!onDuplicate) return false;
+    
+    // Check if this batch has already been duplicated and the duplicate is not completed
+    const existingDuplicate = allBatches.find(
+      (b) => b.duplicated_from === batch.id && b.status !== 'completed'
+    );
+    
+    return !existingDuplicate;
+  };
 
   // Determine current stage based on batch stage fields (fast, no API calls)
   const getCurrentStage = (batch: ProductionBatch) => {
@@ -270,6 +287,18 @@ export default function ProductionTable({
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
+                    {/* Show Duplicate button for completed batches that can be duplicated */}
+                    {canDuplicate(batch) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDuplicate?.(batch)}
+                        className="text-green-600 hover:text-green-900 hover:bg-green-50"
+                        title="Duplicate Batch"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    )}
                     {/* Only show Cancel button for planned stage */}
                     {batch.status === 'planned' && canDelete && (
                       <Button

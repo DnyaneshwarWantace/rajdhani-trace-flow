@@ -129,7 +129,6 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
           actualDelivery: order.actual_delivery,
           minThreshold: materialDetails.minThreshold || 100,
           maxCapacity: materialDetails.maxCapacity || 1000,
-          qualityGrade: materialDetails.qualityGrade || 'A',
           isRestock: materialDetails.isRestock || false,
           created_by: order.created_by,
           createdAt: order.createdAt || order.created_at,

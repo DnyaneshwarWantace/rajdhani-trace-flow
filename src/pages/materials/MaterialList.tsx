@@ -215,8 +215,7 @@ export default function MaterialList() {
           m.type?.toLowerCase().includes(searchLower) ||
           m.color?.toLowerCase().includes(searchLower) ||
           m.supplier_name?.toLowerCase().includes(searchLower) ||
-          m.batch_number?.toLowerCase().includes(searchLower) ||
-          m.quality_grade?.toLowerCase().includes(searchLower)
+          m.batch_number?.toLowerCase().includes(searchLower)
         );
         // Update total for search results
         total = data.length;
@@ -667,7 +666,6 @@ export default function MaterialList() {
           costPerUnit: costPerUnit,
           minThreshold: selectedRestockMaterial.min_threshold || 100,
           maxCapacity: selectedRestockMaterial.max_capacity || 1000,
-          qualityGrade: 'A',
           isRestock: !orderIsOutOfStock,
           userNotes: restockForm.notes || '',
         },

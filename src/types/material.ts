@@ -16,7 +16,6 @@ export interface RawMaterial {
   cost_per_unit: number;
   total_value: number;
   batch_number?: string;
-  quality_grade?: string;
   color?: string;
   image_url?: string;
   supplier_performance: number;
@@ -46,7 +45,6 @@ export interface RawMaterialFormData {
   supplier_name: string;
   cost_per_unit: number;
   batch_number?: string;
-  quality_grade?: string;
   color?: string;
   image_url?: string;
 }

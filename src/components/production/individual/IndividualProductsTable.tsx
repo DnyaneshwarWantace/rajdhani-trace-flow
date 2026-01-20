@@ -83,7 +83,6 @@ export default function IndividualProductsTable({
           final_weight: '',
           final_width: '',
           final_length: '',
-          quality_grade: 'A',
           inspector: '',
           location: '',
           notes: '',
@@ -205,12 +204,11 @@ export default function IndividualProductsTable({
         const tempProduct = updated[row];
         const hasRequiredFields = tempProduct.final_weight && 
                                   tempProduct.final_width && 
-                                  tempProduct.final_length && 
-                                  tempProduct.quality_grade &&
+                                  tempProduct.final_length &&
                                   productId;
         
         // Only create if this is the last required field being filled
-        if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'quality_grade')) {
+        if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length')) {
           try {
             // Create the individual product
             const newProduct = await IndividualProductService.createIndividualProduct({
@@ -221,7 +219,6 @@ export default function IndividualProductsTable({
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
               final_weight: tempProduct.final_weight || '',
-              quality_grade: tempProduct.quality_grade || 'A',
               inspector: user?.full_name || user?.email || 'System',
               location: tempProduct.location || 'Warehouse A - General Storage',
               notes: tempProduct.notes || '',
@@ -290,8 +287,7 @@ export default function IndividualProductsTable({
         const tempProduct = updated[row];
         const hasRequiredFields = tempProduct.final_weight && 
                                   tempProduct.final_width && 
-                                  tempProduct.final_length && 
-                                  tempProduct.quality_grade &&
+                                  tempProduct.final_length &&
                                   productId;
         
         // Only create if all required fields are now filled
@@ -306,7 +302,6 @@ export default function IndividualProductsTable({
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
               final_weight: tempProduct.final_weight || '',
-              quality_grade: tempProduct.quality_grade || 'A',
               inspector: user?.full_name || user?.email || 'System',
               location: tempProduct.location || 'Warehouse A - General Storage',
               notes: tempProduct.notes || '',
@@ -365,7 +360,7 @@ export default function IndividualProductsTable({
       final_weight: '',
       final_width: '',
       final_length: '',
-      quality_grade: 'A',
+  
       inspector: '',
       location: '',
       notes: '',
@@ -489,7 +484,6 @@ export default function IndividualProductsTable({
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Quality Grade</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
@@ -570,23 +564,6 @@ export default function IndividualProductsTable({
                         {productItem.final_width || <span className="text-gray-400">Click to edit</span>}
                       </div>
                     )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    <Select
-                      value={productItem.quality_grade || 'A'}
-                      onValueChange={(value) => handleSelectChange(index, 'quality_grade', value)}
-                      disabled={saving === productItem.id}
-                    >
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="A+">A+</SelectItem>
-                        <SelectItem value="A">A</SelectItem>
-                        <SelectItem value="B">B</SelectItem>
-                        <SelectItem value="C">C</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </td>
                   <td className="border border-gray-200 p-2">
                     <Select

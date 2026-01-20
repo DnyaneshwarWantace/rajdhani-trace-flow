@@ -67,12 +67,17 @@ export default function IndividualProductDetail() {
     // Check where we came from based on location state
     const fromPage = location.state?.from;
     
-    if (fromPage === 'product-detail') {
-      // If we came from product detail page, go back to product detail
-      navigate(`/products/${productId}`);
+    if (fromPage === 'product-detail' || fromPage === 'stock-page') {
+      // If we came from product detail or stock (which came from product-detail), 
+      // go back to stock page with the same navigation state
+      navigate(`/products/${productId}/stock`, {
+        state: { from: fromPage }
+      });
     } else {
       // Default: go back to stock page (product list -> stock -> individual)
-      navigate(`/products/${productId}/stock`);
+      navigate(`/products/${productId}/stock`, {
+        state: { from: 'product-list' }
+      });
     }
   };
 
@@ -119,8 +124,8 @@ export default function IndividualProductDetail() {
             <p className="text-gray-600 mb-6">
               {error || 'The individual product you are looking for does not exist.'}
             </p>
-            <Button onClick={() => navigate(`/products/${productId}/stock`)}>
-              Back to Stock
+            <Button onClick={handleBack}>
+              Back
             </Button>
           </div>
         </div>

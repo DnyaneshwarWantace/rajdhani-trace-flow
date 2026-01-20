@@ -53,7 +53,6 @@ export interface OrderItem {
   unit?: string; // Unit for raw materials (kg, meters, etc.)
   unitPrice: number;
   totalPrice: number;
-  qualityGrade?: string;
   specifications?: string;
   selectedProducts?: any[];
   // Product details for display
@@ -130,7 +129,6 @@ export class OrderService {
           unit: item.unit, // For raw materials (kg, meters, etc.)
           unitPrice: parseFloat(item.unit_price || 0),
           totalPrice: parseFloat(item.total_price || item.unit_price * item.quantity || 0),
-          qualityGrade: item.quality_grade,
           specifications: item.specifications,
           selectedProducts: item.selected_individual_products || [],
           // Product details for display (SQM, GSM calculation)
@@ -214,7 +212,6 @@ export class OrderService {
         gst_included: item.gst_included !== false,
         subtotal: item.subtotal || '0.00',
         total_price: item.total_price || '0.00',
-        quality_grade: item.quality_grade,
         specifications: item.specifications,
         selected_individual_products: item.selected_individual_products || [],
         product_details: item.product_details || null,
@@ -254,7 +251,6 @@ export class OrderService {
       pricing_unit?: string;
       unit_value?: number;
       product_dimensions?: any;
-      quality_grade?: string;
       specifications?: string;
       selected_individual_products?: string[];
     }>;
@@ -280,7 +276,10 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to create order' };
+        // Import formatErrorMessage dynamically to avoid circular dependencies
+        const { formatErrorMessage } = await import('@/utils/formatHelpers');
+        const friendlyError = formatErrorMessage(result.error || 'Failed to create order');
+        return { data: null, error: friendlyError };
       }
 
       // Map backend order to frontend format
@@ -314,7 +313,6 @@ export class OrderService {
           quantity: item.quantity || 0,
           unitPrice: parseFloat(item.unit_price || 0),
           totalPrice: parseFloat(item.total_price || item.unit_price * item.quantity || 0),
-          qualityGrade: item.quality_grade,
           specifications: item.specifications,
           selectedProducts: item.selected_individual_products || []
         })),
@@ -378,7 +376,6 @@ export class OrderService {
           unit: item.unit,
           unitPrice: parseFloat(item.unit_price || 0),
           totalPrice: parseFloat(item.total_price || item.unit_price * item.quantity || 0),
-          qualityGrade: item.quality_grade,
           specifications: item.specifications,
           selectedProducts: item.selected_individual_products || [],
           length: item.length,
@@ -449,6 +446,51 @@ export class OrderService {
     } catch (error) {
       console.error('Error in updateOrderPayment:', error);
       return { data: null, error: 'Failed to update payment' };
+    }
+  }
+
+  static async getPendingOrdersForProduct(productId: string): Promise<{
+    data: Array<{
+      order_id: string;
+      order_number: string;
+      customer_id?: string;
+      customer_name: string;
+      customer_email?: string;
+      customer_phone?: string;
+      order_date: string;
+      expected_delivery: string;
+      status: string;
+      priority: string;
+      quantity_needed: number;
+      product_value: number;
+      order_items: Array<{
+        id: string;
+        product_name: string;
+        quantity: number;
+        unit: string;
+        unit_price: string;
+        total_price: string;
+        specifications?: string;
+      }>;
+    }> | null;
+    error: string | null;
+    count?: number;
+  }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/product/${productId}/pending`, {
+        headers: this.getHeaders(),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return { data: null, error: result.error || 'Failed to fetch pending orders' };
+      }
+
+      return { data: result.data || [], error: null, count: result.count };
+    } catch (error) {
+      console.error('Error in getPendingOrdersForProduct:', error);
+      return { data: null, error: 'Failed to fetch pending orders' };
     }
   }
 }

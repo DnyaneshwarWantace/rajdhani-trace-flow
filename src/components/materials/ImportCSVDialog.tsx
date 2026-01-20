@@ -250,8 +250,8 @@ export default function ImportCSVDialog({
     if (!material.unit || material.unit.trim() === '') {
       return 'Unit is required';
     }
-    if (material.cost_per_unit === undefined || material.cost_per_unit < 0) {
-      return 'Cost per unit is required and must be a valid number';
+    if (material.cost_per_unit !== undefined && material.cost_per_unit < 0) {
+      return 'Cost per unit must be a valid number (>= 0)';
     }
     return null;
   };

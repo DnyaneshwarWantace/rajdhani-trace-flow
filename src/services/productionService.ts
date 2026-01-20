@@ -7,6 +7,7 @@ export interface ProductionBatch {
   batch_number: string;
   product_id: string;
   product_name?: string;
+  duplicated_from?: string; // ID of the batch this was duplicated from
   order_id?: string;
   planned_quantity: number;
   actual_quantity?: number;
@@ -148,10 +149,36 @@ export class ProductionService {
     }
   }
 
+  static async duplicateBatch(batchId: string, plannedQuantity: number, completionDate: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}/duplicate`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ 
+          planned_quantity: plannedQuantity,
+          completion_date: completionDate 
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: result.error || 'Failed to duplicate production batch' };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in duplicateBatch:', error);
+      return { data: null, error: 'Failed to duplicate production batch' };
+    }
+  }
+
   static async getBatches(filters?: {
     search?: string;
     status?: string;
     priority?: string;
+    order_id?: string;
+    product_id?: string;
   }): Promise<{ data: ProductionBatch[] | null; error: string | null }> {
     try {
       const params = new URLSearchParams();
@@ -159,6 +186,8 @@ export class ProductionService {
       if (filters?.search) params.append('search', filters.search);
       if (filters?.status) params.append('status', filters.status);
       if (filters?.priority) params.append('priority', filters.priority);
+      if (filters?.order_id) params.append('order_id', filters.order_id);
+      if (filters?.product_id) params.append('product_id', filters.product_id);
 
       const response = await fetch(`${API_URL}/production/batches?${params}`, {
         headers: this.getHeaders(),

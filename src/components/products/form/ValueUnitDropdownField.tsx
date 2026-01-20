@@ -74,10 +74,22 @@ export default function ValueUnitDropdownField({
   const displayValue = value !== null && value !== undefined && value !== '' ? String(value) : '';
   const currentCombinedValue = displayValue && unit ? `${displayValue} ${unit}`.trim() : '';
 
-  // Filter combined values based on search
-  const filteredValues = combinedValues.filter((val) =>
-    val.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter combined values based on search and remove N/A values for required fields
+  const filteredValues = combinedValues
+    .filter((val) => {
+      // Remove N/A values if field is required
+      if (required) {
+        const normalized = val.trim().toLowerCase();
+        // Remove any variations of N/A: "N/A", "N/A (No Width)", "n/a", etc.
+        if (normalized === 'n/a' || 
+            normalized.startsWith('n/a ') || 
+            normalized.includes('(no ') ||
+            normalized.includes('n/a (no')) {
+          return false;
+        }
+      }
+      return val.toLowerCase().includes(searchTerm.toLowerCase());
+    });
 
   // Handle selecting from dropdown
   const handleSelectChange = (selectedValue: string) => {
@@ -462,10 +474,7 @@ export default function ValueUnitDropdownField({
             </div>
           </SelectItem>
 
-          {/* N/A Option */}
-          <SelectItem value="N/A" className="text-gray-500 italic pr-10 pl-7 text-left">
-            N/A (No {label})
-          </SelectItem>
+          {/* N/A Option - Completely removed for required fields (length, width, weight) */}
 
           {/* Combined Values with Delete */}
           {filteredValues.length > 0 ? (

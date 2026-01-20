@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Package, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
@@ -53,22 +52,6 @@ export default function IndividualProductStats({ individualProduct }: Individual
               </div>
             </CardContent>
           </Card>
-
-          {individualProduct.quality_grade && (
-            <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Quality Grade</CardTitle>
-                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                  {individualProduct.quality_grade}
-                </Badge>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {individualProduct.quality_grade}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

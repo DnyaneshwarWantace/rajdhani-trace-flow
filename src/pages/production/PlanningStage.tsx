@@ -736,6 +736,15 @@ export default function PlanningStage() {
       return;
     }
 
+    if (!formData.completion_date || formData.completion_date.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Please select an expected completion date',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (materials.length === 0) {
       toast({
         title: 'Validation Error',
@@ -1023,6 +1032,7 @@ export default function PlanningStage() {
               disabled={
                 submitting ||
                 formData.planned_quantity <= 0 ||
+                !formData.completion_date ||
                 materials.length === 0
               }
               className="bg-primary-600 hover:bg-primary-700"
@@ -1327,6 +1337,17 @@ export default function PlanningStage() {
 
           // After machine selection, create the batch and set up production flow
           if (!selectedProduct) return;
+
+          // Validate completion date is provided
+          if (!formData.completion_date || formData.completion_date.trim() === '') {
+            toast({
+              title: 'Validation Error',
+              description: 'Please select an expected completion date before starting production',
+              variant: 'destructive',
+            });
+            setSubmitting(false);
+            return;
+          }
 
           // CRITICAL: Check for low stock materials in consumed materials BEFORE starting production
           const lowStockMaterials = consumedMaterials.filter(

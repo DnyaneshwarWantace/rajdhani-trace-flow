@@ -79,6 +79,12 @@ body.modal-open {
   position: fixed !important;
   width: 100% !important;
   height: 100% !important;
+  touch-action: none !important; /* Prevent touch scrolling on mobile */
+}
+
+/* Prevent scroll on html when modal is open */
+html.modal-open {
+  overflow: hidden !important;
 }
 
 #root {

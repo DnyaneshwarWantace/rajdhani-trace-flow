@@ -12,12 +12,10 @@ import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 interface ProductStockFiltersProps {
   searchTerm: string;
   statusFilter: string;
-  qualityFilter: string;
   startDate: string;
   endDate: string;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
-  onQualityChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
 }
@@ -25,12 +23,10 @@ interface ProductStockFiltersProps {
 export default function ProductStockFilters({
   searchTerm,
   statusFilter,
-  qualityFilter,
   startDate,
   endDate,
   onSearchChange,
   onStatusChange,
-  onQualityChange,
   onStartDateChange,
   onEndDateChange,
 }: ProductStockFiltersProps) {
@@ -61,20 +57,6 @@ export default function ProductStockFilters({
               <SelectItem value="sold">Sold</SelectItem>
               <SelectItem value="damaged">Damaged</SelectItem>
               <SelectItem value="returned">Returned</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Quality Filter */}
-          <Select value={qualityFilter} onValueChange={onQualityChange}>
-            <SelectTrigger className="w-full lg:w-48">
-              <SelectValue placeholder="Filter by Quality" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Quality</SelectItem>
-              <SelectItem value="A+">A+ Grade</SelectItem>
-              <SelectItem value="A">A Grade</SelectItem>
-              <SelectItem value="B">B Grade</SelectItem>
-              <SelectItem value="C">C Grade</SelectItem>
             </SelectContent>
           </Select>
         </div>

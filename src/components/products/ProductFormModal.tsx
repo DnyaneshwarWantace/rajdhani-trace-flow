@@ -530,9 +530,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             finalFormData.base_quantity,
             {
               batch_number: `BATCH-${Date.now()}`,
-              quality_grade: 'A',
               inspector: inspectorName,
-              notes: `Auto-created ${finalFormData.base_quantity} individual products for ${createdProduct.name}`,
+              notes: '',
             }
           );
         } catch (individualProductError) {
@@ -553,16 +552,62 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     }
   };
 
-  // Lock body scroll when dialog is open
+  // Lock body scroll when dialog is open - robust approach to prevent scroll when dropdowns open
   useEffect(() => {
     if (isOpen) {
+      // Store current scroll position
+      const scrollY = window.scrollY;
+      
+      // Prevent scrolling on body
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      // Prevent touch move on iOS and lock position
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${scrollY}px`;
+      
+      // Also lock html element
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.classList.add('modal-open');
+      
+      // Also add class for CSS rules
       document.body.classList.add('modal-open');
+      
+      // Store scroll position for restoration
+      document.body.setAttribute('data-scroll-y', scrollY.toString());
     } else {
+      // Restore scroll position
+      const scrollY = document.body.getAttribute('data-scroll-y');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
+      
+      document.documentElement.style.overflow = '';
+      document.documentElement.classList.remove('modal-open');
+      
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY, 10));
+      }
     }
 
     return () => {
+      // Cleanup on unmount
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
+      
+      document.documentElement.style.overflow = '';
+      document.documentElement.classList.remove('modal-open');
     };
   }, [isOpen]);
 
@@ -571,8 +616,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const title = mode === 'create' ? 'Add Product' : mode === 'edit' ? 'Edit Product' : 'Duplicate Product';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div 
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden"
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.preventDefault()}
+      style={{ touchAction: 'none' }}
+    >
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Copy } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -10,10 +10,12 @@ import type { ProductionBatch } from '@/services/productionService';
 interface ProductionCardProps {
   batch: ProductionBatch;
   onDelete: (batch: ProductionBatch) => void;
+  onDuplicate?: (batch: ProductionBatch) => void;
   canDelete: boolean;
+  allBatches?: ProductionBatch[];
 }
 
-export default function ProductionCard({ batch, onDelete, canDelete }: ProductionCardProps) {
+export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete, allBatches = [] }: ProductionCardProps) {
   const navigate = useNavigate();
 
   const handleView = () => {
@@ -38,6 +40,19 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
     const stage = getCurrentStage();
     if (stage === 'planning') navigate(`/production/planning?batchId=${batch.id}`);
     else if (stage === 'machine') navigate(`/production/${batch.id}/machine`);
+  };
+
+  // Check if a batch can be duplicated
+  const canDuplicate = () => {
+    if (batch.status !== 'completed') return false;
+    if (!onDuplicate) return false;
+    
+    // Check if this batch has already been duplicated and the duplicate is not completed
+    const existingDuplicate = allBatches.find(
+      (b) => b.duplicated_from === batch.id && b.status !== 'completed'
+    );
+    
+    return !existingDuplicate;
   };
 
   const getStageButton = () => {
@@ -213,6 +228,18 @@ export default function ProductionCard({ batch, onDelete, canDelete }: Productio
               <Eye className="w-3 h-3 mr-1" />
               View
             </Button>
+            {/* Show Duplicate button for completed batches that can be duplicated */}
+            {canDuplicate() && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs py-1 h-7 px-2 text-green-600 hover:text-green-900 hover:bg-green-50 border-green-300"
+                onClick={() => onDuplicate?.(batch)}
+                title="Duplicate Batch"
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            )}
             {/* Only show Cancel button for planned stage */}
             {batch.status === 'planned' && canDelete && (
               <Button

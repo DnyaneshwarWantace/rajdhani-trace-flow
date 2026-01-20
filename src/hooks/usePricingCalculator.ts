@@ -39,7 +39,6 @@ export interface ExtendedOrderItem {
   gst_amount?: number; // Calculated GST amount
 
   total_price: number;
-  quality_grade?: string;
   specifications?: string;
   supplier?: string;
   pricing_unit: PricingUnit;

@@ -145,7 +145,7 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
           </div>
 
           {/* Additional Information */}
-          {(order.minThreshold || order.maxCapacity || order.qualityGrade) && (
+          {(order.minThreshold || order.maxCapacity || order.isRestock) && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -159,12 +159,6 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
                   <div>
                     <p className="text-sm text-gray-600">Max Capacity</p>
                     <p className="font-medium text-gray-900">{order.maxCapacity}</p>
-                  </div>
-                )}
-                {order.qualityGrade && (
-                  <div>
-                    <p className="text-sm text-gray-600">Quality Grade</p>
-                    <p className="font-medium text-gray-900">{order.qualityGrade}</p>
                   </div>
                 )}
                 {order.isRestock && (

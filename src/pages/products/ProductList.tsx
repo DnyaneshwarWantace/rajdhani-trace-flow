@@ -25,7 +25,7 @@ export default function ProductList() {
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
     category: [],
-    status: '',
+    status: [],
     color: [],
     pattern: [],
     length: [],
@@ -164,8 +164,8 @@ export default function ProductList() {
     setFilters({ ...filters, category: values, page: 1 });
   };
 
-  const handleStatusFilter = (value: string) => {
-    setFilters({ ...filters, status: value, page: 1 });
+  const handleStatusFilter = (values: string[]) => {
+    setFilters({ ...filters, status: values, page: 1 });
   };
 
   const handleColorFilter = (values: string[]) => {
@@ -216,13 +216,18 @@ export default function ProductList() {
 
   const handleStock = (product: Product) => {
     // Navigate to product stock page showing individual products
-    navigate(`/products/${product.id || product._id}/stock`);
+    navigate(`/products/${product.id || product._id}/stock`, {
+      state: { from: 'product-list' }
+    });
   };
 
   const handleProduction = (product: Product) => {
     // Navigate to production create page with product data
     navigate('/production/new', {
-      state: { product }
+      state: { 
+        product,
+        from: 'product-list'
+      }
     });
   };
 
@@ -251,15 +256,52 @@ export default function ProductList() {
               <p className="text-gray-600 mt-1">Manage your product catalog</p>
             </div>
             {activeTab === 'inventory' && (
-              <button
-                onClick={handleCreate}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="font-medium">Add Product</span>
-              </button>
+              <div className="flex items-center gap-3">
+                {/* View Mode Toggle */}
+                <div className="hidden sm:flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      viewMode === 'table'
+                        ? 'bg-primary-100 text-primary-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      viewMode === 'grid'
+                        ? 'bg-primary-100 text-primary-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Grid
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grouped')}
+                    className={`hidden lg:block px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      viewMode === 'grouped'
+                        ? 'bg-primary-100 text-primary-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Grouped
+                  </button>
+                </div>
+
+                {/* Add Product Button */}
+                <button
+                  onClick={handleCreate}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  <span className="font-medium">Add Product</span>
+                </button>
+              </div>
             )}
           </div>
         </div>

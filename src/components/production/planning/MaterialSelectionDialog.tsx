@@ -10,7 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
-import { Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List, ArrowUpDown } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +87,10 @@ export default function MaterialSelectionDialog({
   const [selectedMaterials, setSelectedMaterials] = useState<Map<string, SelectedMaterial>>(
     new Map(existingMaterials.map((m) => [m.material_id, m]))
   );
+
+  // Sorting
+  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -230,8 +241,7 @@ export default function MaterialSelectionDialog({
             m.material_type?.toLowerCase().includes(searchLower) ||
             m.color?.toLowerCase().includes(searchLower) ||
             m.supplier_name?.toLowerCase().includes(searchLower) ||
-            m.batch_number?.toLowerCase().includes(searchLower) ||
-            m.quality_grade?.toLowerCase().includes(searchLower)
+            m.batch_number?.toLowerCase().includes(searchLower)
           );
         }
 
@@ -582,6 +592,31 @@ export default function MaterialSelectionDialog({
 
   const currentMaterials = activeTab === 'raw_materials' ? rawMaterials : products;
 
+  // Apply sorting
+  const sortedMaterials = [...currentMaterials].sort((a, b) => {
+    let compareValue = 0;
+
+    switch (sortBy) {
+      case 'name':
+        compareValue = (a.name || '').localeCompare(b.name || '');
+        break;
+      case 'stock': {
+        const stockA = a.available_stock !== undefined ? a.available_stock : a.current_stock;
+        const stockB = b.available_stock !== undefined ? b.available_stock : b.current_stock;
+        compareValue = stockA - stockB;
+        break;
+      }
+      case 'category':
+        compareValue = (a.category || '').localeCompare(b.category || '');
+        break;
+      case 'recent':
+        compareValue = new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime();
+        break;
+    }
+
+    return sortOrder === 'asc' ? compareValue : -compareValue;
+  });
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal={true}>
       <DialogContent className="max-w-5xl h-[90vh] p-0 gap-0 flex flex-col overflow-hidden">
@@ -656,6 +691,31 @@ export default function MaterialSelectionDialog({
                 <List className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* Sort Controls */}
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-xs font-medium text-gray-700">Sort:</span>
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="stock">Stock</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="recent">Recently Added</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+              <SelectTrigger className="w-[110px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -809,7 +869,7 @@ export default function MaterialSelectionDialog({
                 <p className="text-sm text-gray-500 mt-1">Please wait</p>
               </div>
             </div>
-          ) : currentMaterials.length === 0 ? (
+          ) : sortedMaterials.length === 0 ? (
             <div className="flex items-center justify-center h-full min-h-[400px]">
               <div className="text-center">
                 <Package className="w-12 h-12 mx-auto text-gray-400 mb-3" />
@@ -819,7 +879,7 @@ export default function MaterialSelectionDialog({
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
-              {currentMaterials.map((material) => (
+              {sortedMaterials.map((material) => (
                 <MaterialCard key={material.id} material={material} />
               ))}
             </div>
@@ -848,7 +908,7 @@ export default function MaterialSelectionDialog({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {currentMaterials.map((material) => {
+                    {sortedMaterials.map((material) => {
                       const isSelected = selectedMaterials.has(material.id);
 
                       return (

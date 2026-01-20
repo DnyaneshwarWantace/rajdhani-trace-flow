@@ -26,7 +26,6 @@ export interface StockOrder {
   actualDelivery?: string;
   minThreshold?: number;
   maxCapacity?: number;
-  qualityGrade?: string;
   isRestock?: boolean;
 }
 
@@ -48,7 +47,6 @@ export interface CreateStockOrderData {
     costPerUnit: number;
     minThreshold?: number;
     maxCapacity?: number;
-    qualityGrade?: string;
     isRestock?: boolean;
     userNotes?: string;
   };
@@ -167,7 +165,6 @@ export class ManageStockService {
           actualDelivery: order.actual_delivery,
           minThreshold: materialDetails.minThreshold || 100,
           maxCapacity: materialDetails.maxCapacity || 1000,
-          qualityGrade: materialDetails.qualityGrade || 'A',
           isRestock: materialDetails.isRestock || false,
           created_by: order.created_by,
           createdAt: order.createdAt || order.created_at,
@@ -239,7 +236,6 @@ export class ManageStockService {
         actualDelivery: order.actual_delivery,
         minThreshold: materialDetails.minThreshold,
         maxCapacity: materialDetails.maxCapacity,
-        qualityGrade: materialDetails.qualityGrade,
         isRestock: materialDetails.isRestock,
         created_by: order.created_by,
         createdAt: order.createdAt || order.created_at,

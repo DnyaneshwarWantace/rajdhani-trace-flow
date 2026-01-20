@@ -5,6 +5,7 @@ import type { Order } from '@/services/orderService';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { useNavigate } from 'react-router-dom';
 import { calculateSQM } from '@/utils/sqmCalculator';
+import OrderProductionInfo from './OrderProductionInfo';
 
 interface OrderCardProps {
   order: Order;
@@ -120,6 +121,13 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           </div>
         )}
 
+        {/* Production Info - Show for pending/accepted orders */}
+        {(order.status === 'pending' || order.status === 'accepted') && (
+          <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+            <OrderProductionInfo order={order} compact />
+          </div>
+        )}
+
         {/* Dates Grid */}
         <div className="grid grid-cols-2 gap-3 text-sm mb-3">
           <div>
@@ -141,8 +149,13 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             <div className="font-medium">{order.items?.length || 0} products</div>
           </div>
           <div>
-            <div className="text-gray-600 text-xs">Total Amount:</div>
-            <div className="font-medium">{formatCurrency(order.totalAmount)}</div>
+            <div className="text-gray-600 text-xs">Total Amount (incl. GST):</div>
+            <div className="font-bold text-gray-900">{formatCurrency(order.totalAmount)}</div>
+            {order.gstAmount && parseFloat(order.gstAmount) > 0 && (
+              <div className="text-xs text-gray-500 mt-0.5">
+                GST: {formatCurrency(parseFloat(order.gstAmount))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -237,12 +237,6 @@ export default function IndividualProductSelectionDialog({
                               <span className="ml-1 font-medium">{product.batch_number}</span>
                             </div>
                           )}
-                          {product.quality_grade && (
-                            <div>
-                              <span className="text-gray-500">Grade:</span>
-                              <span className="ml-1 font-medium">{product.quality_grade}</span>
-                            </div>
-                          )}
                           {product.location && (
                             <div>
                               <span className="text-gray-500">Location:</span>

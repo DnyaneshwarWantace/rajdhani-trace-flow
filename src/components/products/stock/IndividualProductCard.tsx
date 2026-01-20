@@ -33,19 +33,6 @@ export default function IndividualProductCard({
     }
   };
 
-  const getQualityColor = (grade: string) => {
-    switch (grade) {
-      case 'A+':
-        return 'bg-purple-100 text-purple-700 border-purple-200';
-      case 'A':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'B':
-        return 'bg-green-100 text-green-700 border-green-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
   return (
     <Card
       onClick={onClick}
@@ -72,21 +59,6 @@ export default function IndividualProductCard({
             {individualProduct.status}
           </Badge>
         </div>
-
-        {/* Quality Grade - Prominent if available */}
-        {individualProduct.quality_grade && (
-          <div className="bg-purple-50 rounded-md p-2 mb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-purple-600">Quality Grade</span>
-              <Badge
-                variant="outline"
-                className={`${getQualityColor(individualProduct.quality_grade)} text-[10px] px-1.5 py-0`}
-              >
-                {individualProduct.quality_grade}
-              </Badge>
-            </div>
-          </div>
-        )}
 
         {/* Details Grid */}
         <div className="space-y-1.5 text-[10px] mb-2">

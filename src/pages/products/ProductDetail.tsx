@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
@@ -20,6 +20,7 @@ import ProductFormModal from '@/components/products/ProductFormModal';
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [product, setProduct] = useState<Product | null>(null);
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +89,18 @@ export default function ProductDetail() {
   };
 
   const handleBack = () => {
-    navigate('/products');
+    // Check where we came from based on location state
+    const fromPage = location.state?.from;
+    
+    if (fromPage === 'stock-page' && id) {
+      // If we came from stock page, go back to stock page
+      navigate(`/products/${id}/stock`, {
+        state: { from: 'product-detail' }
+      });
+    } else {
+      // Default: go back to product list
+      navigate('/products');
+    }
   };
 
   if (loading) {
@@ -197,7 +209,11 @@ export default function ProductDetail() {
                     className="w-full justify-start bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
                     onClick={() => {
                       navigate('/production/new', {
-                        state: { product }
+                        state: { 
+                          product,
+                          from: 'product-detail',
+                          productId: id
+                        }
                       });
                     }}
                   >

@@ -113,8 +113,7 @@ export default function RecipeMaterialSelectionDialog({
           m.type?.toLowerCase().includes(searchLower) ||
           m.color?.toLowerCase().includes(searchLower) ||
           m.supplier_name?.toLowerCase().includes(searchLower) ||
-          m.batch_number?.toLowerCase().includes(searchLower) ||
-          m.quality_grade?.toLowerCase().includes(searchLower);
+          m.batch_number?.toLowerCase().includes(searchLower)
       }
 
       if (!matchesSearch) return false;

@@ -129,36 +129,62 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     }
   }, [isOpen, mode, material, units]);
 
-  // Lock body scroll when dialog is open
+  // Lock body scroll when dialog is open - robust approach to prevent scroll when dropdowns open
   useEffect(() => {
     if (isOpen) {
+      // Store current scroll position
+      const scrollY = window.scrollY;
+      
       // Prevent scrolling on body
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       document.body.style.overflow = 'hidden';
       document.body.style.paddingRight = `${scrollbarWidth}px`;
-      // Prevent touch move on iOS
+      
+      // Prevent touch move on iOS and lock position
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      document.body.style.top = `-${window.scrollY}px`;
+      document.body.style.top = `-${scrollY}px`;
+      
+      // Also lock html element
+      document.documentElement.style.overflow = 'hidden';
+      document.documentElement.classList.add('modal-open');
+      
+      // Also add class for CSS rules
+      document.body.classList.add('modal-open');
+      
+      // Store scroll position for restoration
+      document.body.setAttribute('data-scroll-y', scrollY.toString());
     } else {
       // Restore scroll position
-      const scrollY = document.body.style.top;
+      const scrollY = document.body.getAttribute('data-scroll-y');
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
+      document.body.removeAttribute('data-scroll-y');
+      document.body.classList.remove('modal-open');
+      
+      document.documentElement.style.overflow = '';
+      document.documentElement.classList.remove('modal-open');
+      
       if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        window.scrollTo(0, parseInt(scrollY, 10));
       }
     }
 
     return () => {
+      // Cleanup on unmount
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
       document.body.style.position = '';
       document.body.style.width = '';
       document.body.style.top = '';
+      document.body.removeAttribute('data-scroll-y');
+      document.body.classList.remove('modal-open');
+      
+      document.documentElement.style.overflow = '';
+      document.documentElement.classList.remove('modal-open');
     };
   }, [isOpen]);
 
@@ -430,9 +456,6 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('unit');
       }
-      if (!formData.costPerUnit || formData.costPerUnit.trim() === '') {
-        missingFields.push('costPerUnit');
-      }
       if (mode === 'create' && (!formData.expectedDelivery || formData.expectedDelivery.trim() === '')) {
         missingFields.push('expectedDelivery');
       }
@@ -450,7 +473,6 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           supplier: 'Supplier',
           category: 'Category',
           unit: 'Unit',
-          costPerUnit: 'Cost per Unit',
           expectedDelivery: 'Expected Delivery Date',
         };
         
@@ -627,23 +649,13 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
       // Get quantity from form and validate
       const orderQuantity = parseFloat(formData.quantity);
-      const costPerUnit = parseFloat(formData.costPerUnit);
+      const costPerUnit = parseFloat(formData.costPerUnit) || 0;
 
-      // Validate quantity and cost per unit must be greater than 0 for orders
+      // Validate quantity must be greater than 0 for orders
       if (isNaN(orderQuantity) || orderQuantity <= 0) {
         toast({
           title: 'Invalid Quantity',
           description: 'Order quantity must be greater than 0.',
-          variant: 'destructive',
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (isNaN(costPerUnit) || costPerUnit <= 0) {
-        toast({
-          title: 'Invalid Price',
-          description: 'Cost per unit must be greater than 0.',
           variant: 'destructive',
         });
         setLoading(false);
@@ -670,7 +682,6 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           costPerUnit: costPerUnit,
           minThreshold: parseFloat(formData.minThreshold) || 10,
           maxCapacity: parseFloat(formData.maxCapacity) || 1000,
-          qualityGrade: 'A',
           isRestock: false,
           userNotes: `Material procurement order for ${formData.name}`,
         },
@@ -738,7 +749,10 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden"
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.preventDefault()}
+      style={{ touchAction: 'none' }}
       onClick={(e) => {
         // Close dialog if clicking on backdrop
         if (e.target === e.currentTarget) {
@@ -997,21 +1011,12 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               !formData.supplier ||
               !formData.category ||
               !formData.unit ||
-              !formData.costPerUnit ||
               (mode === 'create' && (
                 !formData.quantity ||
                 !formData.expectedDelivery ||
                 formData.quantity === '0' ||
-                formData.costPerUnit === '0' ||
                 parseFloat(formData.quantity || '0') <= 0 ||
-                parseFloat(formData.costPerUnit || '0') <= 0 ||
-                isNaN(parseFloat(formData.quantity || '0')) ||
-                isNaN(parseFloat(formData.costPerUnit || '0'))
-              )) ||
-              (mode === 'edit' && (
-                formData.costPerUnit === '0' ||
-                parseFloat(formData.costPerUnit || '0') <= 0 ||
-                isNaN(parseFloat(formData.costPerUnit || '0'))
+                isNaN(parseFloat(formData.quantity || '0'))
               ))
             } 
             className="bg-primary-600 text-white hover:bg-primary-700"

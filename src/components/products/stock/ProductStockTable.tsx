@@ -31,10 +31,6 @@ export default function ProductStockTable({
     }
   };
 
-  const getQualityVariant = (grade: string) => {
-    return grade === 'A+' ? 'default' : 'secondary';
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -47,7 +43,6 @@ export default function ProductStockTable({
             </th>
             <th className="text-left p-3 font-medium text-gray-600">Final Length</th>
             <th className="text-left p-3 font-medium text-gray-600">Final Width</th>
-            <th className="text-left p-3 font-medium text-gray-600">Quality Grade</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">Inspector</th>
             <th className="text-left p-3 font-medium text-gray-600">Status</th>
             <th className="text-left p-3 font-medium text-gray-600">Actions</th>
@@ -104,11 +99,6 @@ export default function ProductStockTable({
                     ? item.final_width
                     : `${item.final_width} ${product.width_unit || 'feet'}`
                   : 'N/A'}
-              </td>
-              <td className="p-3">
-                <Badge variant={getQualityVariant(item.quality_grade || 'N/A')}>
-                  {item.quality_grade || 'N/A'}
-                </Badge>
               </td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.inspector || 'N/A'}</td>
               <td className="p-3">

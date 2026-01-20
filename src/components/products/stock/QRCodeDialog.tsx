@@ -91,9 +91,6 @@ export default function QRCodeDialog({
               <strong>Status:</strong> {individualProduct.status}
             </p>
             <p>
-              <strong>Quality Grade:</strong> {individualProduct.quality_grade}
-            </p>
-            <p>
               <strong>Production Date:</strong>{' '}
               {individualProduct.production_date &&
               individualProduct.production_date !== 'null'

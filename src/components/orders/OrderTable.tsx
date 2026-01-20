@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { Order } from '@/services/orderService';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import OrderProductionInfo from './OrderProductionInfo';
 
 interface OrderTableProps {
   orders: Order[];
@@ -47,6 +48,9 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                 Date
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                Production
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -113,6 +117,11 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                     <div className="text-sm font-medium text-gray-900">
                       {formatCurrency(order.totalAmount)}
                     </div>
+                    {order.gstAmount && parseFloat(order.gstAmount.toString()) > 0 && (
+                      <div className="text-xs text-gray-500">
+                        (incl. GST: {formatCurrency(parseFloat(order.gstAmount.toString()))})
+                      </div>
+                    )}
                     {order.outstandingAmount > 0 && (
                       <div className="text-xs text-red-600">
                         Outstanding: {formatCurrency(order.outstandingAmount)}
@@ -131,8 +140,15 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                       {formatIndianDate(order.orderDate)}
                     </div>
                   </td>
+                  <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    {(order.status === 'pending' || order.status === 'accepted') ? (
+                      <OrderProductionInfo order={order} compact />
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-end gap-2">
                       {order.status === 'pending' && (
                         <Button
                           size="sm"

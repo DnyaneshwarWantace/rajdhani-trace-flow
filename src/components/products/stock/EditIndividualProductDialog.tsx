@@ -37,7 +37,6 @@ export default function EditIndividualProductDialog({
     final_weight: '',
     final_width: '',
     final_length: '',
-    quality_grade: '',
     inspector: '',
     location: '',
     notes: '',
@@ -51,7 +50,6 @@ export default function EditIndividualProductDialog({
         final_weight: individualProduct.final_weight || '',
         final_width: individualProduct.final_width || '',
         final_length: individualProduct.final_length || '',
-        quality_grade: individualProduct.quality_grade || '',
         inspector: individualProduct.inspector || '',
         location: individualProduct.location || '',
         notes: individualProduct.notes || '',
@@ -115,24 +113,6 @@ export default function EditIndividualProductDialog({
               onChange={(e) => setFormData({ ...formData, final_length: e.target.value })}
               placeholder="e.g., 2.74m"
             />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="qualityGrade">Quality Grade</Label>
-            <Select
-              value={formData.quality_grade}
-              onValueChange={(value) => setFormData({ ...formData, quality_grade: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select quality grade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="A+">A+ (Premium)</SelectItem>
-                <SelectItem value="A">A (High)</SelectItem>
-                <SelectItem value="B">B (Good)</SelectItem>
-                <SelectItem value="C">C (Standard)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="space-y-2">

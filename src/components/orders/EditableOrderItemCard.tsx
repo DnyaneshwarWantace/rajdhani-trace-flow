@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Package, Edit, Check, X, QrCode } from 'lucide-react';
+import { Package, Edit, Check, X, QrCode, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
 
@@ -35,7 +35,6 @@ interface EditableOrderItemCardProps {
     gst_included: boolean;
     subtotal: string;
     total_price: string;
-    quality_grade?: string;
     specifications?: string;
     product_details?: ProductDetails | null;
     selected_individual_products?: any[];
@@ -44,6 +43,7 @@ interface EditableOrderItemCardProps {
   orderStatus: string;
   onUpdateQuantity?: (itemId: string, newQuantity: number) => Promise<void>;
   onSelectIndividualProducts?: (item: any) => void;
+  onDeleteItem?: (itemId: string, productName: string) => Promise<void>;
 }
 
 export function EditableOrderItemCard({
@@ -51,6 +51,7 @@ export function EditableOrderItemCard({
   orderStatus,
   onUpdateQuantity,
   onSelectIndividualProducts,
+  onDeleteItem,
 }: EditableOrderItemCardProps) {
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [editedQuantity, setEditedQuantity] = useState<number | string>(item.quantity);
@@ -158,11 +159,6 @@ export function EditableOrderItemCard({
                   <span className="font-medium">Category:</span> {category}
                 </div>
               )}
-              {item.quality_grade && (
-                <div>
-                  <span className="font-medium">Grade:</span> {item.quality_grade}
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -206,7 +202,7 @@ export function EditableOrderItemCard({
         ) : (
           <div className="flex items-center gap-2 flex-1">
             <span className="text-sm font-medium">Quantity: {Number(item.quantity).toFixed(2)} {item.unit}</span>
-            {orderStatus === 'accepted' && onUpdateQuantity && (
+            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && onUpdateQuantity && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -214,6 +210,17 @@ export function EditableOrderItemCard({
                 title="Edit quantity"
               >
                 <Edit className="w-3 h-3" />
+              </Button>
+            )}
+            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && onDeleteItem && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => onDeleteItem(item.id, item.product_name)}
+                title="Remove item from order"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <Trash2 className="w-3 h-3" />
               </Button>
             )}
             {/* Show reservation status for raw materials */}

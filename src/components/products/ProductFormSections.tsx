@@ -177,7 +177,7 @@ export default function ProductFormSections({
                   <SelectValue placeholder="Unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unit</SelectItem>
+                  <SelectItem value="__placeholder__" disabled>Unit</SelectItem>
                   <SelectItem value="kg">KG</SelectItem>
                   <SelectItem value="g">Grams</SelectItem>
                   <SelectItem value="GSM">GSM</SelectItem>

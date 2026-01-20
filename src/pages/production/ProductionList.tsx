@@ -14,6 +14,7 @@ import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
+import ProductionDuplicateDialog from '@/components/production/ProductionDuplicateDialog';
 import {
   Select,
   SelectContent,
@@ -49,6 +50,9 @@ export default function ProductionList() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<ProductionBatch | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [batchToDuplicate, setBatchToDuplicate] = useState<ProductionBatch | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
 
   const [stats, setStats] = useState({
@@ -256,6 +260,34 @@ export default function ProductionList() {
     }
   };
 
+  const handleDuplicate = (batch: ProductionBatch) => {
+    setBatchToDuplicate(batch);
+    setIsDuplicateDialogOpen(true);
+  };
+
+  const handleConfirmDuplicate = async (quantity: number, completionDate: string) => {
+    if (!batchToDuplicate) return;
+    setIsDuplicating(true);
+    try {
+      const { data, error } = await ProductionService.duplicateBatch(batchToDuplicate.id, quantity, completionDate);
+      if (error) {
+        toast({ title: 'Error', description: error, variant: 'destructive' });
+        return;
+      }
+      if (data) {
+        toast({ title: 'Success', description: 'Production batch duplicated successfully' });
+        setIsDuplicateDialogOpen(false);
+        setBatchToDuplicate(null);
+        loadBatches();
+      }
+    } catch (error) {
+      console.error('Error duplicating batch:', error);
+      toast({ title: 'Error', description: 'Failed to duplicate batch', variant: 'destructive' });
+    } finally {
+      setIsDuplicating(false);
+    }
+  };
+
   return (
     <Layout>
       <div>
@@ -329,13 +361,17 @@ export default function ProductionList() {
             batches={filteredBatches}
             onView={handleView}
             onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
             canDelete={user?.role === 'admin' || false}
+            allBatches={allBatches}
           />
         ) : (
           <ProductionGrid
             batches={filteredBatches}
             onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
             canDelete={user?.role === 'admin' || false}
+            allBatches={allBatches}
           />
         )}
 
@@ -444,6 +480,17 @@ export default function ProductionList() {
           onConfirm={handleConfirmDelete}
           batch={selectedBatch}
           isDeleting={isDeleting}
+        />
+
+        <ProductionDuplicateDialog
+          isOpen={isDuplicateDialogOpen}
+          onClose={() => {
+            setIsDuplicateDialogOpen(false);
+            setBatchToDuplicate(null);
+          }}
+          onConfirm={handleConfirmDuplicate}
+          batch={batchToDuplicate}
+          isDuplicating={isDuplicating}
         />
       </div>
     </Layout>

@@ -27,7 +27,6 @@ interface OrderItemCardProps {
     gst_included: boolean;
     subtotal: string;
     total_price: string;
-    quality_grade?: string;
     specifications?: string;
     product_details?: ProductDetails | null;
   };

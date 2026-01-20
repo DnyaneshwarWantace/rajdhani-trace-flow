@@ -155,8 +155,7 @@ export default function MaterialSelectorDialog({
           m.type?.toLowerCase().includes(searchLower) ||
           m.color?.toLowerCase().includes(searchLower) ||
           m.supplier_name?.toLowerCase().includes(searchLower) ||
-          m.batch_number?.toLowerCase().includes(searchLower) ||
-          m.quality_grade?.toLowerCase().includes(searchLower)
+          m.batch_number?.toLowerCase().includes(searchLower)
         );
 
         // Update total for filtered results

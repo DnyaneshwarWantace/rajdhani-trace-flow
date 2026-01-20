@@ -8,10 +8,17 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Check, ChevronDown, ChevronRight, Package } from 'lucide-react';
+import { Search, Check, ChevronDown, ChevronRight, Package, ArrowUpDown } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import type { Product } from '@/types/product';
 import { MultiSelect } from '@/components/ui/multi-select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Pagination,
   PaginationContent,
@@ -57,6 +64,10 @@ export default function ProductSelectorDialog({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isSelecting, setIsSelecting] = useState(false);
+
+  // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     if (isOpen) {
@@ -271,8 +282,30 @@ export default function ProductSelectorDialog({
   const totalFiltered = getFilteredProducts().length;
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
+  // Apply sorting
+  const sortedProducts = [...filteredProducts].sort((a, b) => {
+    let compareValue = 0;
+
+    switch (sortBy) {
+      case 'name':
+        compareValue = (a.name || '').localeCompare(b.name || '');
+        break;
+      case 'stock':
+        compareValue = (a.current_stock || 0) - (b.current_stock || 0);
+        break;
+      case 'category':
+        compareValue = (a.category || '').localeCompare(b.category || '');
+        break;
+      case 'recent':
+        compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        break;
+    }
+
+    return sortOrder === 'asc' ? compareValue : -compareValue;
+  });
+
   // Group products by name
-  const groupedProducts = filteredProducts.reduce((acc, product) => {
+  const groupedProducts = sortedProducts.reduce((acc, product) => {
     const key = product.name.trim().toLowerCase();
     if (!acc[key]) {
       acc[key] = [];
@@ -324,6 +357,31 @@ export default function ProductSelectorDialog({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-700">Sort:</span>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                <SelectTrigger className="w-[110px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

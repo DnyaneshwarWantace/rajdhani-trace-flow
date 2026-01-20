@@ -174,9 +174,12 @@ export default function ProductDropdownField({
 
   // Check if current value exists in options
   const valueExistsInOptions = value && options.includes(value);
+  
+  // Check if value is N/A (either from options or as a special value)
+  const isNAValue = value === 'N/A' || value === 'NA';
 
-  // Use value only if it exists in options, otherwise empty string
-  const selectValue = valueExistsInOptions ? value : (allowNA ? 'N/A' : '');
+  // Use value only if it exists in options, otherwise use N/A for empty if allowNA
+  const selectValue = valueExistsInOptions || isNAValue ? value : (value === '' && allowNA ? 'N/A' : '');
 
   return (
     <div>
@@ -195,15 +198,15 @@ export default function ProductDropdownField({
         onValueChange={(selectedValue) => {
           if (selectedValue === 'add_new') {
             setShowAdd(true);
-          } else if (selectedValue && selectedValue !== '') {
-            // Only update if we have a real non-empty value
-            onValueChange(selectedValue === 'N/A' ? '' : selectedValue);
+          } else {
+            // Keep N/A as the value so it displays properly
+            onValueChange(selectedValue);
             setSearchTerm('');
           }
         }}
       >
         <SelectTrigger>
-          <SelectValue placeholder={value || placeholder || `Select ${label.toLowerCase()}`} />
+          <SelectValue placeholder={placeholder || `Select ${label.toLowerCase()}`} />
         </SelectTrigger>
         <SelectContent>
           {searchable && (

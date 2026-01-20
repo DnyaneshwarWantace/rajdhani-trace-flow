@@ -38,7 +38,7 @@ export function formatNotes(notes: string | undefined | null): string | null {
       // But if it's just material details (which we already show), don't display it
       const materialFields = ['materialName', 'materialCategory', 
                              'materialBatchNumber', 'quantity', 'unit', 'costPerUnit',
-                             'minThreshold', 'maxCapacity', 'qualityGrade', 'isRestock'];
+                             'minThreshold', 'maxCapacity', 'isRestock'];
       
       const hasOnlyMaterialFields = Object.keys(parsed).every(key => 
         materialFields.includes(key) || key === 'userNotes'
