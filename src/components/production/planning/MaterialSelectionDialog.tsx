@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List, ArrowUpDown } from 'lucide-react';
+import { Package, Layers, Plus, Check, ChevronLeft, ChevronRight, AlertCircle, Grid3x3, List } from 'lucide-react';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { Badge } from '@/components/ui/badge';

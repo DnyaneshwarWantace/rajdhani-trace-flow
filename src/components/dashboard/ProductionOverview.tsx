@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom';
 import { Factory, ArrowRight, Clock, Play, CheckCircle, AlertCircle } from 'lucide-react';
-import { formatIndianDate } from '@/utils/formatHelpers';
 
 interface ProductionBatch {
   id: string;

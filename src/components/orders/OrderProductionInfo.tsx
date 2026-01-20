@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Factory, Calendar, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Factory, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import type { Order } from '@/services/orderService';

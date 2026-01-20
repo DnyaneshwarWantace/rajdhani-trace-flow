@@ -1,11 +1,4 @@
 import { useState, useEffect } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { ProductService } from '@/services/productService';

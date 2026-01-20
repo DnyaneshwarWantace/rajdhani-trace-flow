@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Check, ChevronDown, ChevronRight, Package, ArrowUpDown } from 'lucide-react';
+import { Search, Check, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import type { Product } from '@/types/product';
 import { MultiSelect } from '@/components/ui/multi-select';

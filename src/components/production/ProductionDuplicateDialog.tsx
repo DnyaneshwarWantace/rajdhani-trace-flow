@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, User, Box, AlertCircle } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 import { OrderService } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
@@ -84,13 +84,14 @@ export default function ProductionDuplicateDialog({
             let currentStock = 0;
             let shortage = 0;
 
-            if (order.product_id) {
+            // Use the product_id from batch since we're fetching orders for that product
+            if (batch?.product_id) {
               try {
-                const product = await ProductService.getProductById(order.product_id);
+                const product = await ProductService.getProductById(batch.product_id);
                 currentStock = product.current_stock || 0;
                 shortage = Math.max(0, order.quantity_needed - currentStock);
               } catch (error) {
-                console.error(`Error fetching product ${order.product_id}:`, error);
+                console.error(`Error fetching product ${batch.product_id}:`, error);
               }
             }
 

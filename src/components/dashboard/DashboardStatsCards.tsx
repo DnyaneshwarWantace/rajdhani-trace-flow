@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, DollarSign, Factory, Users, Building2, AlertTriangle, FileText, Trash2 } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, Factory, Users, Building2, FileText, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 
 interface StatsCardsProps {

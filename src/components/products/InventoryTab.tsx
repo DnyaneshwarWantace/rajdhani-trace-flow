@@ -49,7 +49,7 @@ export default function InventoryTab({
   onLengthChange,
   onWidthChange,
   onWeightChange,
-  onViewModeChange,
+  onViewModeChange: _onViewModeChange,
   onPageChange,
   onLimitChange,
   onView,
