@@ -88,6 +88,7 @@ export function ConfirmDialog({
             variant={buttonVariants[variant]}
             onClick={onConfirm}
             disabled={isLoading}
+            className={buttonClasses[variant]}
           >
             {isLoading ? 'Processing...' : confirmText}
           </Button>
