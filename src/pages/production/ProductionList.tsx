@@ -42,10 +42,10 @@ export default function ProductionList() {
   const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [subcategoryFilter, setSubcategoryFilter] = useState<string[]>([]);
-  const [colorFilter, setColorFilter] = useState<string[]>([]);
-  const [patternFilter, setPatternFilter] = useState<string[]>([]);
+  const [categoryFilter, _setCategoryFilter] = useState<string[]>([]);
+  const [subcategoryFilter, _setSubcategoryFilter] = useState<string[]>([]);
+  const [colorFilter, _setColorFilter] = useState<string[]>([]);
+  const [patternFilter, _setPatternFilter] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'start_date' | 'batch_number' | 'product_name' | 'priority' | 'completion_date'>('start_date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
