@@ -257,12 +257,14 @@ export function EditableOrderItemCard({
                 console.log('🔵 Item product_name:', item.product_name);
                 onSelectIndividualProducts(item);
               }}
-              className={needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}
+              className={`h-7 text-xs px-2 ${needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
             >
-              <QrCode className="w-4 h-4 mr-1" />
-              {item.selected_individual_products && item.selected_individual_products.length > 0
-                ? `Selected: ${item.selected_individual_products.length}/${item.quantity}`
-                : 'Select Products'}
+              <QrCode className="w-3 h-3 mr-1" />
+              <span className="truncate max-w-[120px]">
+                {item.selected_individual_products && item.selected_individual_products.length > 0
+                  ? `${item.selected_individual_products.length}/${item.quantity}`
+                  : 'Select'}
+              </span>
             </Button>
             {item.selected_individual_products && item.selected_individual_products.length > 0 && item.selected_individual_products.length < item.quantity && (
               <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">

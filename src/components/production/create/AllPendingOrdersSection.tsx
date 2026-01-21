@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
+import { getApiUrl } from '@/utils/apiConfig';
 
 interface PendingOrder {
   order_id: string;
@@ -50,7 +51,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
       console.log('🔍 Loading ALL orders...');
 
       // Get orders with status: pending, accepted, in_production, ready (NOT dispatched, delivered, cancelled)
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/orders`, {
+      const response = await fetch(`${getApiUrl()}/orders`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,

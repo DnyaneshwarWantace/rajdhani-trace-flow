@@ -33,22 +33,16 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                 Order
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Customer
+                Customer & Total
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Items
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Total
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Production
+                Date & Production
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                 Actions
@@ -76,37 +70,42 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <div className="text-sm text-gray-900 truncate">
-                        <TruncatedText text={order.customerName} maxLength={20} as="span" />
+                    <div className="flex items-start gap-2">
+                      <User className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <div className="text-sm text-gray-900 truncate">
+                          <TruncatedText text={order.customerName} maxLength={18} as="span" />
+                        </div>
+                        <div className="text-sm font-medium text-gray-900 mt-1">
+                          {formatCurrency(order.totalAmount)}
+                        </div>
+                        {order.outstandingAmount > 0 && (
+                          <div className="text-xs text-red-600">
+                            Due: {formatCurrency(order.outstandingAmount)}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-900">
-                    <div className="max-w-md">
+                    <div className="max-w-[200px]">
                       {order.items && order.items.length > 0 ? (
                         <div className="space-y-1">
-                          {order.items.map((item, idx) => (
+                          {order.items.slice(0, 2).map((item, idx) => (
                             <div key={idx} className="text-xs">
-                              <div className="font-medium text-gray-900">{item.productName}</div>
-                              <div className="text-gray-600 flex flex-wrap gap-x-2 gap-y-0.5">
-                                <span>Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}</span>
-                                {item.length && item.width && (
-                                  <span>• Size: {item.length}{item.length_unit} × {item.width}{item.width_unit}</span>
-                                )}
-                                {item.weight && (
-                                  <span>• {item.weight}{item.weight_unit}</span>
-                                )}
-                                {item.color && (
-                                  <span>• {item.color}</span>
-                                )}
-                                {item.pattern && (
-                                  <span>• {item.pattern}</span>
-                                )}
+                              <div className="font-medium text-gray-900 truncate">
+                                <TruncatedText text={item.productName} maxLength={25} as="span" />
+                              </div>
+                              <div className="text-gray-600 truncate">
+                                Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}
                               </div>
                             </div>
                           ))}
+                          {order.items.length > 2 && (
+                            <div className="text-xs text-gray-500">
+                              +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <span className="text-gray-500">No items</span>
@@ -114,38 +113,23 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                     </div>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(order.totalAmount)}
-                    </div>
-                    {order.gstAmount && parseFloat(order.gstAmount.toString()) > 0 && (
-                      <div className="text-xs text-gray-500">
-                        (incl. GST: {formatCurrency(parseFloat(order.gstAmount.toString()))})
-                      </div>
-                    )}
-                    {order.outstandingAmount > 0 && (
-                      <div className="text-xs text-red-600">
-                        Outstanding: {formatCurrency(order.outstandingAmount)}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${status.color}`}>
                       <StatusIcon className="w-3 h-3" />
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      {formatIndianDate(order.orderDate)}
-                    </div>
-                  </td>
                   <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                    {(order.status === 'pending' || order.status === 'accepted') ? (
-                      <OrderProductionInfo order={order} compact />
-                    ) : (
-                      <span className="text-xs text-gray-400">-</span>
-                    )}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-sm text-gray-900">
+                        <Calendar className="w-3 h-3 text-gray-400" />
+                        {formatIndianDate(order.orderDate)}
+                      </div>
+                      {(order.status === 'pending' || order.status === 'accepted') ? (
+                        <div className="text-xs">
+                          <OrderProductionInfo order={order} compact />
+                        </div>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-2">
@@ -222,9 +206,9 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                           onViewDetails(order);
                         }}
                         className="text-xs"
+                        title="View order details"
                       >
-                        <Eye className="w-3 h-3 mr-1" />
-                        View
+                        <Eye className="w-3 h-3" />
                       </Button>
                     </div>
                   </td>

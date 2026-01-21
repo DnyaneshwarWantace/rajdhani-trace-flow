@@ -28,6 +28,7 @@ import { IndividualProductSelectionDialog } from '@/components/orders/Individual
 import { ActivityLogTimeline } from '@/components/orders/ActivityLogTimeline';
 import { InvoiceBill } from '@/components/orders/InvoiceBill';
 import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface OrderItem {
   id: string;
@@ -86,6 +87,13 @@ export default function OrderDetails() {
   const [showIndividualProductDialog, setShowIndividualProductDialog] = useState(false);
   const [selectedOrderItem, setSelectedOrderItem] = useState<any | null>(null);
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [confirmDialogConfig, setConfirmDialogConfig] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant: 'danger' | 'warning' | 'info';
+  } | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
@@ -218,14 +226,18 @@ export default function OrderDetails() {
   };
 
   const handleDeleteItem = async (itemId: string, productName: string) => {
-    // Show confirmation dialog
-    const confirmed = window.confirm(
-      `Are you sure you want to remove "${productName}" from this order?\n\nAny reserved individual products or raw materials will be unreserved and become available again.`
-    );
+    // Show custom confirmation dialog
+    setConfirmDialogConfig({
+      title: 'Remove Item from Order',
+      description: `Are you sure you want to remove "${productName}" from this order?\n\nAny reserved individual products or raw materials will be unreserved and become available again.`,
+      variant: 'danger',
+      onConfirm: () => performDeleteItem(itemId, productName),
+    });
+    setShowConfirmDialog(true);
+  };
 
-    if (!confirmed) {
-      return;
-    }
+  const performDeleteItem = async (itemId: string, productName: string) => {
+    setShowConfirmDialog(false);
 
     try {
       const API_URL = getApiUrl();
@@ -246,40 +258,13 @@ export default function OrderDetails() {
         if (!order) return;
 
         // Show confirmation dialog for order cancellation
-        const confirmed = window.confirm(
-          `${result.message}\n\nThis will cancel order ${order.orderNumber}. Are you sure?`
-        );
-
-        if (confirmed) {
-          // User confirmed - cancel the entire order
-          const cancelResponse = await fetch(`${API_URL}/orders/${order.id}/status`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token && { 'Authorization': `Bearer ${token}` }),
-            },
-            body: JSON.stringify({ status: 'cancelled' }),
-          });
-
-          const cancelResult = await cancelResponse.json();
-
-          if (!cancelResponse.ok || !cancelResult.success) {
-            toast({
-              title: 'Error',
-              description: cancelResult.error || 'Failed to cancel order',
-              variant: 'destructive',
-            });
-            return;
-          }
-
-          toast({
-            title: 'Order Cancelled',
-            description: `Order ${order.orderNumber} has been cancelled`,
-          });
-
-          // Redirect to orders list
-          navigate('/orders');
-        }
+        setConfirmDialogConfig({
+          title: 'Cancel Order',
+          description: `${result.message}\n\nThis will cancel order ${order.orderNumber}. Are you sure?`,
+          variant: 'danger',
+          onConfirm: () => performOrderCancellation(order.id, order.orderNumber),
+        });
+        setShowConfirmDialog(true);
         return;
       }
 
@@ -303,6 +288,50 @@ export default function OrderDetails() {
       toast({
         title: 'Error',
         description: 'Failed to remove item',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const performOrderCancellation = async (orderId: string, orderNumber: string) => {
+    setShowConfirmDialog(false);
+
+    try {
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+
+      const cancelResponse = await fetch(`${API_URL}/orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+
+      const cancelResult = await cancelResponse.json();
+
+      if (!cancelResponse.ok || !cancelResult.success) {
+        toast({
+          title: 'Error',
+          description: cancelResult.error || 'Failed to cancel order',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Order Cancelled',
+        description: `Order ${orderNumber} has been cancelled`,
+      });
+
+      // Redirect to orders list
+      navigate('/orders');
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to cancel order',
         variant: 'destructive',
       });
     }
@@ -884,6 +913,20 @@ export default function OrderDetails() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Custom Confirm Dialog */}
+        {confirmDialogConfig && (
+          <ConfirmDialog
+            isOpen={showConfirmDialog}
+            onClose={() => setShowConfirmDialog(false)}
+            onConfirm={confirmDialogConfig.onConfirm}
+            title={confirmDialogConfig.title}
+            description={confirmDialogConfig.description}
+            variant={confirmDialogConfig.variant}
+            confirmText="Yes, Remove"
+            cancelText="Cancel"
+          />
+        )}
       </div>
     </Layout>
   );

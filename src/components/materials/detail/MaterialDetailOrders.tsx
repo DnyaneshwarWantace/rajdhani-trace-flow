@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, Package, CheckCircle, Clock } from 'lucide-react';
 import { formatIndianDate, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
+import { getApiUrl } from '@/utils/apiConfig';
 import type { RawMaterial } from '@/types/material';
 
 interface MaterialDetailOrdersProps {
@@ -36,7 +37,7 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
     try {
       setLoading(true);
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:8000/api/raw-materials/${material.id}/orders`, {
+      const response = await fetch(`${getApiUrl()}/raw-materials/${material.id}/orders`, {
         headers: {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
