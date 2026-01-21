@@ -50,6 +50,12 @@ export function ConfirmDialog({
     info: 'default',
   } as const;
 
+  const buttonClasses = {
+    danger: 'bg-red-600 hover:bg-red-700 text-white border border-red-700',
+    warning: '',
+    info: '',
+  };
+
   const Icon = icons[variant];
 
   return (
