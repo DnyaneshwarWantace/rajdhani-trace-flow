@@ -267,7 +267,7 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                             <h4 className="font-semibold text-[11px] sm:text-sm text-gray-900 line-clamp-1 break-all">{notification.title}</h4>
                             {!isExpanded && (
                               <>
-                                <p className="text-[10px] sm:text-xs text-gray-600 line-clamp-1 break-all">{notification.message}</p>
+                              <p className="text-[10px] sm:text-xs text-gray-600 line-clamp-1 break-all">{notification.message}</p>
                                 {notification.related_data?.created_by_user && (
                                   <p className="text-[10px] sm:text-xs text-gray-500 mt-1">
                                     By: <span className="font-semibold text-gray-700">{notification.related_data.created_by_user}</span>
@@ -520,8 +520,8 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                         {/* Footer */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                               <span className="truncate">
                                 {notification.created_at
                                   ? (formatIndianDateTime(notification.created_at) !== 'N/A'
@@ -594,22 +594,22 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
                             {/* Production Planning Low Stock - Original Add to Production */}
                             {notification.type === 'low_stock' && notification.related_data && hasIndividualStock(notification.related_data.productId) && (
-                              <Button
-                                size="sm"
-                                className="bg-primary-600 text-white hover:bg-primary-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleAddToProductionFromNotification(notification);
-                                }}
-                                disabled={isAddingToProduction === notification.related_data?.productId}
-                              >
-                                {isAddingToProduction === notification.related_data?.productId ? (
-                                  <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                                ) : (
-                                  <ArrowRight className="w-3 h-3 mr-1" />
-                                )}
-                                <span className="truncate">{isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}</span>
-                              </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-primary-600 text-white hover:bg-primary-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToProductionFromNotification(notification);
+                                  }}
+                                  disabled={isAddingToProduction === notification.related_data?.productId}
+                                >
+                                  {isAddingToProduction === notification.related_data?.productId ? (
+                                    <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <ArrowRight className="w-3 h-3 mr-1" />
+                                  )}
+                                  <span className="truncate">{isAddingToProduction === notification.related_data?.productId ? 'Adding...' : 'Add to Production'}</span>
+                                </Button>
                             )}
                             <Button
                               size="sm"

@@ -92,6 +92,14 @@ export class ProductService {
     queryParams.append('limit', limit.toString());
     queryParams.append('offset', offset.toString());
 
+    // Add sorting parameters
+    if (filters?.sortBy) {
+      queryParams.append('sortBy', filters.sortBy);
+    }
+    if (filters?.sortOrder) {
+      queryParams.append('sortOrder', filters.sortOrder);
+    }
+
     const response = await fetch(`${API_URL}/products?${queryParams}`, {
       headers: this.getHeaders(),
     });

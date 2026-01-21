@@ -37,6 +37,10 @@ export default function ProductStock() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  // Sorting
+  const [sortBy, setSortBy] = useState<'qr_code' | 'status' | 'created_at'>('created_at');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -60,7 +64,7 @@ export default function ProductStock() {
     if (productId) {
       loadIndividualProducts();
     }
-  }, [productId, searchTerm, statusFilter, startDate, endDate, currentPage, limit]);
+  }, [productId, searchTerm, statusFilter, startDate, endDate, currentPage, limit, sortBy, sortOrder]);
 
   const loadProduct = async () => {
     if (!productId) return;
@@ -106,6 +110,8 @@ export default function ProductStock() {
         end_date: endDate || undefined,
         limit,
         offset,
+        sortBy,
+        sortOrder,
       });
 
       setIndividualProducts(result.products);
@@ -194,6 +200,12 @@ export default function ProductStock() {
     handleFilterChange();
   };
 
+  const handleSortChange = (newSortBy: 'qr_code' | 'status' | 'created_at', newSortOrder: 'asc' | 'desc') => {
+    setSortBy(newSortBy);
+    setSortOrder(newSortOrder);
+    setCurrentPage(1);
+  };
+
   if (loading && !individualProducts.length) {
     return (
       <Layout>
@@ -225,10 +237,13 @@ export default function ProductStock() {
             statusFilter={statusFilter}
             startDate={startDate}
             endDate={endDate}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
             onSearchChange={handleSearchChange}
             onStatusChange={handleStatusChange}
             onStartDateChange={handleStartDateChange}
             onEndDateChange={handleEndDateChange}
+            onSortChange={handleSortChange}
           />
 
           <ProductStockGrid

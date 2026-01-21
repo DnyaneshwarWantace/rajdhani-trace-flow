@@ -68,4 +68,6 @@ export interface MaterialFilters {
   supplier?: string | string[];
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }

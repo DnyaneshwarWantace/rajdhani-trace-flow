@@ -14,10 +14,13 @@ interface ProductStockFiltersProps {
   statusFilter: string;
   startDate: string;
   endDate: string;
+  sortBy: 'qr_code' | 'status' | 'created_at';
+  sortOrder: 'asc' | 'desc';
   onSearchChange: (value: string) => void;
   onStatusChange: (value: string) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
+  onSortChange: (sortBy: 'qr_code' | 'status' | 'created_at', sortOrder: 'asc' | 'desc') => void;
 }
 
 export default function ProductStockFilters({
@@ -25,10 +28,13 @@ export default function ProductStockFilters({
   statusFilter,
   startDate,
   endDate,
+  sortBy,
+  sortOrder,
   onSearchChange,
   onStatusChange,
   onStartDateChange,
   onEndDateChange,
+  onSortChange,
 }: ProductStockFiltersProps) {
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -87,6 +93,36 @@ export default function ProductStockFilters({
               className="pl-10"
             />
           </div>
+        </div>
+
+        {/* Sorting Controls */}
+        <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+          <Select
+            value={sortBy}
+            onValueChange={(value) => onSortChange(value as 'qr_code' | 'status' | 'created_at', sortOrder)}
+          >
+            <SelectTrigger className="w-[160px] h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at">Recently Added</SelectItem>
+              <SelectItem value="qr_code">QR Code</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={sortOrder}
+            onValueChange={(value: 'asc' | 'desc') => onSortChange(sortBy, value)}
+          >
+            <SelectTrigger className="w-[130px] h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
     </div>

@@ -81,6 +81,8 @@ export class OrderService {
     customer_id?: string;
     limit?: number;
     offset?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
   }): Promise<{ data: Order[] | null; error: string | null; count?: number }> {
     try {
       const params = new URLSearchParams();
@@ -89,6 +91,8 @@ export class OrderService {
       if (filters?.customer_id) params.append('customer_id', filters.customer_id);
       if (filters?.limit) params.append('limit', filters.limit.toString());
       if (filters?.offset) params.append('offset', filters.offset.toString());
+      if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+      if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder);
 
       const response = await fetch(`${API_URL}/orders?${params}`, {
         headers: this.getHeaders(),

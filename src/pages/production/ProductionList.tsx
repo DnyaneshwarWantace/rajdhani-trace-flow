@@ -42,6 +42,12 @@ export default function ProductionList() {
   const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [subcategoryFilter, setSubcategoryFilter] = useState<string[]>([]);
+  const [colorFilter, setColorFilter] = useState<string[]>([]);
+  const [patternFilter, setPatternFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'start_date' | 'batch_number' | 'product_name' | 'priority' | 'completion_date'>('start_date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -75,12 +81,12 @@ export default function ProductionList() {
 
   useEffect(() => {
     filterBatches();
-  }, [activeSection, allBatches, searchTerm, priorityFilter, page, limit]);
+  }, [activeSection, allBatches, searchTerm, priorityFilter, sortBy, sortOrder, page, limit]);
 
   useEffect(() => {
     // Reset to page 1 when filters change
     setPage(1);
-  }, [activeSection, searchTerm, priorityFilter]);
+  }, [activeSection, searchTerm, priorityFilter, categoryFilter, subcategoryFilter, colorFilter, patternFilter]);
 
   const enrichBatchesWithProductNames = async (batches: ProductionBatch[]): Promise<ProductionBatch[]> => {
     const enrichedBatches = await Promise.all(
@@ -196,6 +202,58 @@ export default function ProductionList() {
     if (priorityFilter.length > 0) {
       filtered = filtered.filter(batch => priorityFilter.includes(batch.priority));
     }
+
+    // Filter by category
+    if (categoryFilter.length > 0) {
+      filtered = filtered.filter(batch => batch.category && categoryFilter.includes(batch.category));
+    }
+
+    // Filter by subcategory
+    if (subcategoryFilter.length > 0) {
+      filtered = filtered.filter(batch => batch.subcategory && subcategoryFilter.includes(batch.subcategory));
+    }
+
+    // Filter by color
+    if (colorFilter.length > 0) {
+      filtered = filtered.filter(batch => batch.color && colorFilter.includes(batch.color));
+    }
+
+    // Filter by pattern
+    if (patternFilter.length > 0) {
+      filtered = filtered.filter(batch => batch.pattern && patternFilter.includes(batch.pattern));
+    }
+
+    // Apply sorting
+    const sortDirection = sortOrder === 'desc' ? -1 : 1;
+    filtered.sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortBy) {
+        case 'batch_number':
+          compareValue = (a.batch_number || '').localeCompare(b.batch_number || '');
+          break;
+        case 'product_name':
+          compareValue = (a.product_name || '').localeCompare(b.product_name || '');
+          break;
+        case 'priority':
+          const priorityOrder: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+          compareValue = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+          break;
+        case 'completion_date':
+          const dateA = a.completion_date ? new Date(a.completion_date).getTime() : 0;
+          const dateB = b.completion_date ? new Date(b.completion_date).getTime() : 0;
+          compareValue = dateA - dateB;
+          break;
+        case 'start_date':
+        default:
+          const startA = a.start_date ? new Date(a.start_date).getTime() : 0;
+          const startB = b.start_date ? new Date(b.start_date).getTime() : 0;
+          compareValue = startA - startB; // Sort by start date
+          break;
+      }
+
+      return sortDirection * compareValue;
+    });
 
     setTotalBatches(filtered.length);
 
@@ -348,6 +406,13 @@ export default function ProductionList() {
           onSearchChange={setSearchTerm}
           priorityFilter={priorityFilter}
           onPriorityFilterChange={setPriorityFilter}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={(newSortBy, newSortOrder) => {
+            setSortBy(newSortBy);
+            setSortOrder(newSortOrder);
+            setPage(1);
+          }}
         />
 
         {loading ? (

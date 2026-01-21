@@ -60,6 +60,8 @@ export class IndividualProductService {
       end_date?: string;
       limit?: number;
       offset?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
     }
   ): Promise<{ products: IndividualProduct[]; total: number }> {
     const queryParams = new URLSearchParams();
@@ -86,6 +88,14 @@ export class IndividualProductService {
     
     if (filters?.offset !== undefined) {
       queryParams.append('offset', filters.offset.toString());
+    }
+
+    if (filters?.sortBy) {
+      queryParams.append('sortBy', filters.sortBy);
+    }
+
+    if (filters?.sortOrder) {
+      queryParams.append('sortOrder', filters.sortOrder);
     }
 
     const response = await fetch(

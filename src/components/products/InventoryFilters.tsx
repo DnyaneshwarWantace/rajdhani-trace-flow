@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProductService } from '@/services/productService';
 import type { ProductFilters } from '@/types/product';
 
@@ -14,6 +15,7 @@ interface InventoryFiltersProps {
   onLengthChange?: (values: string[]) => void;
   onWidthChange?: (values: string[]) => void;
   onWeightChange?: (values: string[]) => void;
+  onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
 }
 
 export default function InventoryFilters({
@@ -26,6 +28,7 @@ export default function InventoryFilters({
   onLengthChange,
   onWidthChange,
   onWeightChange,
+  onSortChange,
 }: InventoryFiltersProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
@@ -194,6 +197,39 @@ export default function InventoryFilters({
               placeholder="All Weights"
             />
           )}
+        </div>
+      )}
+
+      {/* Sorting Controls */}
+      {onSortChange && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+          <Select
+            value={filters.sortBy || 'name'}
+            onValueChange={(value) => onSortChange(value, filters.sortOrder || 'asc')}
+          >
+            <SelectTrigger className="w-[160px] h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="stock">Stock</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+              <SelectItem value="recent">Recently Added</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.sortOrder || 'asc'}
+            onValueChange={(value: 'asc' | 'desc') => onSortChange(filters.sortBy || 'name', value)}
+          >
+            <SelectTrigger className="w-[130px] h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       )}
     </div>

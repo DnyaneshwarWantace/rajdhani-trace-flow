@@ -120,9 +120,19 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                   </td>
                   <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                     <div className="space-y-1">
-                      <div className="flex items-center gap-1 text-sm text-gray-900">
-                        <Calendar className="w-3 h-3 text-gray-400" />
-                        {formatIndianDate(order.orderDate)}
+                      <div className="space-y-0.5 text-sm">
+                        <div className="flex items-center gap-1 text-gray-900">
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-600">Order:</span>
+                          <span>{formatIndianDate(order.orderDate)}</span>
+                        </div>
+                        {order.expectedDelivery && (
+                          <div className="flex items-center gap-1 text-gray-900">
+                            <Calendar className="w-3 h-3 text-gray-400" />
+                            <span className="text-xs text-gray-600">Expected:</span>
+                            <span>{formatIndianDate(order.expectedDelivery)}</span>
+                          </div>
+                        )}
                       </div>
                       {(order.status === 'pending' || order.status === 'accepted') ? (
                         <div className="text-xs">

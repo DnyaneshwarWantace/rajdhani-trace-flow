@@ -107,7 +107,7 @@ export default function ProductionWastage() {
             console.error('Error fetching product:', error);
           }
         }
-
+        
         setBatch(enrichedBatch);
         
         // Load material consumption
@@ -425,28 +425,28 @@ export default function ProductionWastage() {
                 const recordUpdatePromises = recordsToUpdate.map(async (record: any) => {
                   try {
                     const response = await fetch(`${API_URL}/material-consumption/${record.id}`, {
-                      method: 'PUT',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        Authorization: `Bearer ${token}`,
-                      },
-                      body: JSON.stringify({
-                        consumption_status: 'used'
-                      }),
-                    });
-                    
-                    if (response.ok) {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    consumption_status: 'used'
+                  }),
+                });
+                
+                if (response.ok) {
                       console.log(`✅ Updated consumption record ${record.id} for ${material.material_name} (${material.material_type}) to "used"`);
-                      return true;
-                    } else {
-                      const error = await response.json();
+                  return true;
+                } else {
+                  const error = await response.json();
                       console.error(`❌ Error updating record ${record.id} for ${material.material_name}:`, error);
                       return false;
                     }
                   } catch (error) {
                     console.error(`❌ Error updating record for ${material.material_name}:`, error);
-                    return false;
-                  }
+                  return false;
+                }
                 });
                 
                 const recordResults = await Promise.all(recordUpdatePromises);
@@ -643,7 +643,7 @@ export default function ProductionWastage() {
             variant: 'destructive',
           });
           // Still allow navigation if status update was successful
-        } else {
+          } else {
           console.log('✅ Wastage stage marked as completed successfully');
           // Verify the update
           if (updatedBatch.wastage_stage?.status !== 'completed') {

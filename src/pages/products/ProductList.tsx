@@ -33,6 +33,8 @@ export default function ProductList() {
     weight: [],
     page: 1,
     limit: 50,
+    sortBy: 'name',
+    sortOrder: 'asc',
   });
 
 
@@ -109,13 +111,10 @@ export default function ProductList() {
       setLoading(true);
       setError(null);
 
-      // Backend expects 'status' parameter with values: 'in-stock', 'low-stock', 'out-of-stock'
-      // Only send status if it's not empty
-      const statusParam = filters.status && filters.status !== 'all' ? filters.status : undefined;
-
       const { products: data, total } = await ProductService.getProducts({
         ...filters,
-        status: statusParam,
+        sortBy: filters.sortBy || 'name',
+        sortOrder: filters.sortOrder || 'asc',
       });
 
       // Backend handles sorting - no need to sort on frontend
@@ -194,6 +193,10 @@ export default function ProductList() {
 
   const handleLimitChange = (limit: number) => {
     setFilters({ ...filters, limit, page: 1 });
+  };
+
+  const handleSortChange = (sortBy: string, sortOrder: 'asc' | 'desc') => {
+    setFilters({ ...filters, sortBy, sortOrder, page: 1 });
   };
 
   // Product handlers
@@ -341,6 +344,7 @@ export default function ProductList() {
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}
+            onSortChange={handleSortChange}
                       onView={handleView}
                       onEdit={handleEdit}
                       onDuplicate={handleDuplicate}

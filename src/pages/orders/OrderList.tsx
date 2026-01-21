@@ -25,6 +25,8 @@ export default function OrderList() {
     customer_id: 'all',
     page: 1,
     limit: 50,
+    sortBy: 'order_date',
+    sortOrder: 'desc' as 'asc' | 'desc',
   });
   const [totalOrders, setTotalOrders] = useState(0);
   const [stats, setStats] = useState({
@@ -36,9 +38,14 @@ export default function OrderList() {
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
+  // Load stats only on mount
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Load orders when filters change
   useEffect(() => {
     loadOrders();
-    loadStats();
   }, [filters]);
 
   const loadOrders = async () => {
@@ -50,6 +57,8 @@ export default function OrderList() {
         customer_id: filters.customer_id !== 'all' ? filters.customer_id : undefined,
         limit: filters.limit,
         offset: (filters.page - 1) * filters.limit,
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
       });
 
       if (error) {
@@ -147,33 +156,14 @@ export default function OrderList() {
     <Layout>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Orders</h1>
             <p className="text-gray-600 mt-1">Manage customer orders and track fulfillment</p>
           </div>
-          <Button onClick={() => navigate('/orders/new')} className="text-white">
-            <Plus className="w-4 h-4 mr-2" />
-            New Order
-          </Button>
-        </div>
-
-        {/* Stats Boxes */}
-        <OrderStatsBoxes stats={stats} loading={statsLoading} />
-
-        {/* Filters and View Toggle */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <OrderFilters
-              filters={filters}
-              onSearchChange={(value) => handleFilterChange('search', value)}
-              onStatusChange={(value) => handleFilterChange('status', value)}
-              onCustomerChange={(value) => handleFilterChange('customer_id', value)}
-            />
-
-            {/* View Mode Toggle - Desktop Only */}
-            <div className="hidden lg:flex items-center gap-2">
-              <span className="text-sm text-gray-600 whitespace-nowrap">View:</span>
+          <div className="flex items-center gap-3">
+            {/* View Mode Toggle */}
+            <div className="hidden sm:flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
               <button
                 onClick={() => setViewMode('table')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
@@ -197,7 +187,29 @@ export default function OrderList() {
                 <Grid3x3 className="w-4 h-4" />
               </button>
             </div>
+
+            {/* New Order Button */}
+            <Button onClick={() => navigate('/orders/new')} className="text-white">
+              <Plus className="w-4 h-4 mr-2" />
+              New Order
+            </Button>
           </div>
+        </div>
+
+        {/* Stats Boxes */}
+        <OrderStatsBoxes stats={stats} loading={statsLoading} />
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <OrderFilters
+            filters={filters}
+            onSearchChange={(value) => handleFilterChange('search', value)}
+            onStatusChange={(value) => handleFilterChange('status', value)}
+            onCustomerChange={(value) => handleFilterChange('customer_id', value)}
+            onSortChange={(sortBy, sortOrder) => {
+              setFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }));
+            }}
+          />
         </div>
 
         {/* Orders List */}

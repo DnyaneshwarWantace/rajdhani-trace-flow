@@ -114,6 +114,8 @@ export interface ProductFilters {
   has_recipe?: string | boolean; // Filter by has_recipe
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface IndividualProduct {

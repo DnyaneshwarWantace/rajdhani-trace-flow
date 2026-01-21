@@ -24,6 +24,7 @@ interface InventoryTabProps {
   onViewModeChange: (mode: 'grid' | 'table' | 'grouped') => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
+  onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
   onView: (product: Product) => void;
   onEdit: (product: Product) => void;
   onDuplicate: (product: Product) => void;
@@ -52,6 +53,7 @@ export default function InventoryTab({
   onViewModeChange: _onViewModeChange,
   onPageChange,
   onLimitChange,
+  onSortChange,
   onView,
   onEdit,
   onDuplicate,
@@ -73,6 +75,7 @@ export default function InventoryTab({
         onLengthChange={onLengthChange}
         onWidthChange={onWidthChange}
         onWeightChange={onWeightChange}
+        onSortChange={onSortChange}
       />
 
       {/* Loading State */}

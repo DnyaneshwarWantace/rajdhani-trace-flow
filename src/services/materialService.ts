@@ -53,6 +53,14 @@ export class MaterialService {
     queryParams.append('offset', offset.toString());
     queryParams.append('include_consumption', 'true'); // Include stock breakdown
 
+    // Add sorting parameters
+    if (filters?.sortBy) {
+      queryParams.append('sortBy', filters.sortBy);
+    }
+    if (filters?.sortOrder) {
+      queryParams.append('sortOrder', filters.sortOrder);
+    }
+
     const response = await fetch(`${API_URL}/raw-materials?${queryParams}`, {
       headers: this.getHeaders(),
     });

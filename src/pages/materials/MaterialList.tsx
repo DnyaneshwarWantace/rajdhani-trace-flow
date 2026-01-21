@@ -60,6 +60,8 @@ export default function MaterialList() {
     supplier: [],
     page: 1,
     limit: 50,
+    sortBy: 'name',
+    sortOrder: 'asc',
   });
   const [totalMaterials, setTotalMaterials] = useState(0);
 
@@ -197,6 +199,8 @@ export default function MaterialList() {
         supplier: filters.supplier && filters.supplier.length > 0 ? filters.supplier : undefined,
         page: filters.search ? 1 : filters.page, // Reset page if searching
         limit: filters.search ? 10000 : filters.limit, // Fetch all if searching
+        sortBy: filters.sortBy || 'name',
+        sortOrder: filters.sortOrder || 'asc',
       };
 
       // Remove undefined values
@@ -225,6 +229,25 @@ export default function MaterialList() {
         const startIdx = (page - 1) * limit;
         const endIdx = startIdx + limit;
         data = data.slice(startIdx, endIdx);
+        // Apply client-side sorting for search results
+        const dir = filters.sortOrder === 'desc' ? -1 : 1;
+        data = data.sort((a: any, b: any) => {
+          switch (filters.sortBy) {
+            case 'stock':
+              return ((a.current_stock || 0) - (b.current_stock || 0)) * dir;
+            case 'category':
+              return (a.category || '').localeCompare(b.category || '') * dir;
+            case 'type':
+              return (a.type || '').localeCompare(b.type || '') * dir;
+            case 'supplier':
+              return (a.supplier_name || '').localeCompare(b.supplier_name || '') * dir;
+            case 'recent':
+              return (new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()) * (dir === 1 ? -1 : 1);
+            case 'name':
+            default:
+              return (a.name || '').localeCompare(b.name || '') * dir;
+          }
+        });
       } else {
         // Apply pagination for non-search results
         const page = filters.page || 1;
@@ -309,6 +332,10 @@ export default function MaterialList() {
 
   const handleLimitChange = (limit: number) => {
     setFilters({ ...filters, limit, page: 1 });
+  };
+
+  const handleSortChange = (sortBy: string, sortOrder: 'asc' | 'desc') => {
+    setFilters({ ...filters, sortBy, sortOrder, page: 1 });
   };
 
   // Material handlers
@@ -859,6 +886,7 @@ export default function MaterialList() {
             onColorChange={handleColorFilter}
             onSupplierChange={handleSupplierFilter}
             onViewModeChange={setViewMode}
+            onSortChange={handleSortChange}
           />
         )}
 
