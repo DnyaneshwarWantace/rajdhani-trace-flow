@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
@@ -41,8 +40,8 @@ interface Props {
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
+  const [sortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadAllOrders();
