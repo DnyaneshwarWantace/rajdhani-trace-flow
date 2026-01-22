@@ -111,33 +111,52 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     }
   }, [isOpen]);
 
-  // Populate form when product data changes
+  // Populate form when product data changes - ensure dropdowns are loaded first
   useEffect(() => {
     if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
-        setFormData({
-          name: product.name,
-          category: product.category,
-          subcategory: product.subcategory || '',
-          color: product.color || '',
-          pattern: product.pattern || '',
-          base_quantity: mode === 'duplicate' ? '' as any : (product.base_quantity || 0),
-          unit: product.unit,
-          individual_stock_tracking: product.individual_stock_tracking,
-          length: product.length !== null && product.length !== undefined && product.length !== '' ? String(product.length) : '',
-          width: product.width !== null && product.width !== undefined && product.width !== '' ? String(product.width) : '',
-          length_unit: product.length_unit || '',
-          width_unit: product.width_unit || '',
-          weight: product.weight !== null && product.weight !== undefined && product.weight !== '' ? String(product.weight) : '',
-          weight_unit: product.weight_unit || '',
-          min_stock_level: product.min_stock_level,
-          max_stock_level: product.max_stock_level || 100,
-          reorder_point: product.reorder_point || 20,
-          notes: product.notes || '',
-          image_url: product.image_url || '',
-          status: product.status,
-        });
-        if (product.image_url) {
-          setImagePreview(product.image_url);
+      // Ensure values match dropdown options (trim and handle empty strings)
+      // Find matching values in dropdowns to ensure exact match
+      const findMatchingValue = (value: string | null | undefined, options: string[]): string => {
+        if (!value) return '';
+        const trimmed = String(value).trim();
+        // Try exact match first
+        if (options.includes(trimmed)) return trimmed;
+        // Try case-insensitive match
+        const found = options.find(opt => opt.toLowerCase() === trimmed.toLowerCase());
+        return found || trimmed; // Return original if not found (will be added to dropdown)
+      };
+      
+      const unitValue = findMatchingValue(product.unit, units);
+      const patternValue = findMatchingValue(product.pattern, patterns);
+      const colorValue = findMatchingValue(product.color, colors);
+      const categoryValue = findMatchingValue(product.category, categories);
+      const subcategoryValue = findMatchingValue(product.subcategory, subcategories);
+      
+      setFormData({
+        name: product.name || '',
+        category: categoryValue,
+        subcategory: subcategoryValue,
+        color: colorValue,
+        pattern: patternValue,
+        base_quantity: mode === 'duplicate' ? '' as any : (product.base_quantity || 0),
+        unit: unitValue,
+        individual_stock_tracking: product.individual_stock_tracking !== undefined ? product.individual_stock_tracking : true,
+        length: product.length !== null && product.length !== undefined && product.length !== '' ? String(product.length) : '',
+        width: product.width !== null && product.width !== undefined && product.width !== '' ? String(product.width) : '',
+        length_unit: product.length_unit || '',
+        width_unit: product.width_unit || '',
+        weight: product.weight !== null && product.weight !== undefined && product.weight !== '' ? String(product.weight) : '',
+        weight_unit: product.weight_unit || '',
+        min_stock_level: product.min_stock_level || 10,
+        max_stock_level: product.max_stock_level || 100,
+        reorder_point: product.reorder_point || 20,
+        notes: product.notes || '',
+        image_url: product.image_url || '',
+        status: product.status || 'active',
+      });
+      
+      if (product.image_url) {
+        setImagePreview(product.image_url);
       } else {
         setImagePreview('');
       }
@@ -147,7 +166,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     } else if (isOpen && !product && mode === 'create') {
       resetForm();
     }
-  }, [isOpen, product, mode]);
+  }, [isOpen, product, mode, categories, units, patterns, colors, subcategories]);
 
   const loadRecipe = async (productId: string) => {
     try {
@@ -239,9 +258,17 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   };
 
   const addProductMaterial = () => {
-    // Allow adding materials even if quantity is empty (for raw materials, user can fill later)
-    // Only materialId and unit are required - validation happens on form submit
+    // Require materialId, unit, and quantity > 0
     if (!newMaterial.materialId || !newMaterial.unit) return;
+    const quantity = parseFloat(newMaterial.quantity) || 0;
+    if (quantity <= 0 || newMaterial.quantity.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a quantity greater than 0 for the material',
+        variant: 'destructive',
+      });
+      return;
+    }
     setRecipeMaterials([...recipeMaterials, newMaterial]);
     setNewMaterial({
       materialId: '',
@@ -256,6 +283,15 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     // Direct add function that bypasses newMaterial state
     // This is used when materials are selected from the dialog
     if (!material.materialId || !material.unit) return;
+    const quantity = parseFloat(material.quantity) || 0;
+    if (quantity <= 0 || material.quantity.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Please enter a quantity greater than 0 for the material',
+        variant: 'destructive',
+      });
+      return;
+    }
     setRecipeMaterials([...recipeMaterials, material]);
   };
 
@@ -286,12 +322,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
         
         // Allow ALL characters - only check word count and character limits
-        // Check word count (max 50 words)
-        if (words.length > 50) {
-          missingFields.push('Product Name (max 50 words)');
+        // Check word count (max 10 words - matches input handler limit)
+        if (words.length > 10) {
+          missingFields.push('Product Name (max 10 words)');
           toast({
             title: 'Validation Error',
-            description: 'Product name can have maximum 50 words',
+            description: 'Product name can have maximum 10 words',
             variant: 'destructive',
           });
         }
@@ -310,6 +346,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       }
       if (!formData.category || formData.category.trim() === '') {
         missingFields.push('Category');
+      }
+      if (!formData.subcategory || formData.subcategory.trim() === '') {
+        missingFields.push('Subcategory');
       }
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('Unit');
@@ -355,6 +394,27 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         const quantity = (formData.base_quantity === null || formData.base_quantity === undefined || isNaN(Number(formData.base_quantity))) ? 0 : Number(formData.base_quantity);
         if (quantity < 0 || isNaN(quantity)) {
           missingFields.push('Base Quantity (must be >= 0)');
+        }
+      }
+
+      // Validate recipe materials - if materials are added, all must have quantity > 0
+      if (recipeMaterials.length > 0) {
+        const invalidMaterials: string[] = [];
+        recipeMaterials.forEach((mat, index) => {
+          const quantity = parseFloat(mat.quantity) || 0;
+          if (quantity <= 0 || mat.quantity.trim() === '') {
+            invalidMaterials.push(mat.materialName || `Material ${index + 1}`);
+          }
+        });
+        
+        if (invalidMaterials.length > 0) {
+          toast({
+            title: 'Recipe Validation Error',
+            description: `Please enter a quantity greater than 0 for: ${invalidMaterials.join(', ')}`,
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
         }
       }
 
@@ -541,6 +601,16 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         }
       }
 
+      // Show success toast
+      toast({
+        title: 'Success',
+        description: mode === 'create' 
+          ? 'Product created successfully' 
+          : mode === 'edit' 
+          ? 'Product updated successfully' 
+          : 'Product duplicated successfully',
+      });
+
       onSuccess();
       onClose();
       resetForm();
@@ -552,62 +622,16 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     }
   };
 
-  // Lock body scroll when dialog is open - robust approach to prevent scroll when dropdowns open
+  // Lock body scroll when dialog is open
   useEffect(() => {
     if (isOpen) {
-      // Store current scroll position
-      const scrollY = window.scrollY;
-      
-      // Prevent scrolling on body
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      
-      // Prevent touch move on iOS and lock position
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.top = `-${scrollY}px`;
-      
-      // Also lock html element
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.classList.add('modal-open');
-      
-      // Also add class for CSS rules
       document.body.classList.add('modal-open');
-      
-      // Store scroll position for restoration
-      document.body.setAttribute('data-scroll-y', scrollY.toString());
     } else {
-      // Restore scroll position
-      const scrollY = document.body.getAttribute('data-scroll-y');
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
-      
-      document.documentElement.style.overflow = '';
-      document.documentElement.classList.remove('modal-open');
-      
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY, 10));
-      }
     }
 
     return () => {
-      // Cleanup on unmount
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
-      
-      document.documentElement.style.overflow = '';
-      document.documentElement.classList.remove('modal-open');
     };
   }, [isOpen]);
 
@@ -616,13 +640,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const title = mode === 'create' ? 'Add Product' : mode === 'edit' ? 'Edit Product' : 'Duplicate Product';
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden"
-      onWheel={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.preventDefault()}
-      style={{ touchAction: 'none' }}
-    >
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Fixed Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div>

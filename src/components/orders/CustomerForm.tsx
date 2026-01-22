@@ -216,17 +216,18 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     }
 
     try {
+      // Convert empty strings to undefined for optional fields (prevents MongoDB duplicate key errors)
       const customerData = {
         name: newCustomer.name.trim(),
-        email: newCustomer.email.trim() || undefined,
+        email: (newCustomer.email && newCustomer.email.trim()) ? newCustomer.email.trim() : undefined,
         phone: newCustomer.phone.trim(),
-        address: newCustomer.address.trim() || undefined,
-        city: newCustomer.city.trim() || undefined,
-        state: newCustomer.state.trim() || undefined,
-        pincode: newCustomer.pincode.trim() || undefined,
+        address: (newCustomer.address && newCustomer.address.trim()) ? newCustomer.address.trim() : undefined,
+        city: (newCustomer.city && newCustomer.city.trim()) ? newCustomer.city.trim() : undefined,
+        state: (newCustomer.state && newCustomer.state.trim()) ? newCustomer.state.trim() : undefined,
+        pincode: (newCustomer.pincode && newCustomer.pincode.trim()) ? newCustomer.pincode.trim() : undefined,
         customer_type: newCustomer.customerType,
-        gst_number: newCustomer.gstNumber.trim() || undefined,
-        company_name: newCustomer.companyName.trim() || undefined,
+        gst_number: (newCustomer.gstNumber && newCustomer.gstNumber.trim()) ? newCustomer.gstNumber.trim() : undefined,
+        company_name: (newCustomer.companyName && newCustomer.companyName.trim()) ? newCustomer.companyName.trim() : undefined,
       };
 
       const { data: newCustomerData, error } = await CustomerService.createCustomer(customerData);
@@ -404,7 +405,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!newCustomer.name.trim() || !newCustomer.email.trim() || !newCustomer.phone.trim()}
+            disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()}
             className="flex-1"
           >
             <Save className="w-4 h-4 mr-2" />

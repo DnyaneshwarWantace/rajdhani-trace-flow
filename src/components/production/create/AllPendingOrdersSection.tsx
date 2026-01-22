@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
@@ -40,10 +41,54 @@ interface Props {
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     loadAllOrders();
   }, []);
+
+  // Sort orders when sortBy or sortOrder changes
+  useEffect(() => {
+    if (allOrders.length === 0) return;
+
+    const sorted = [...allOrders].sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortBy) {
+        case 'delivery_date':
+          const aDate = new Date(a.expected_delivery).getTime();
+          const bDate = new Date(b.expected_delivery).getTime();
+          compareValue = aDate - bDate;
+          break;
+        case 'order_number':
+          compareValue = (a.order_number || '').localeCompare(b.order_number || '');
+          break;
+        case 'product_name':
+          compareValue = (a.product_name || '').localeCompare(b.product_name || '');
+          break;
+        case 'priority':
+          const priorityOrder: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+          compareValue = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+          break;
+        case 'shortage':
+          const aShortage = a.shortage ?? 0;
+          const bShortage = b.shortage ?? 0;
+          // First sort by whether they have shortage (shortage > 0 first)
+          if (aShortage > 0 && bShortage === 0) return -1;
+          if (aShortage === 0 && bShortage > 0) return 1;
+          // Then sort by shortage amount
+          compareValue = bShortage - aShortage;
+          break;
+        default:
+          compareValue = 0;
+      }
+
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+
+    setAllOrders(sorted);
+  }, [sortBy, sortOrder]);
 
   const loadAllOrders = async () => {
     setLoading(true);
@@ -116,23 +161,6 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
         }
 
         console.log('📋 Total orders with products:', ordersWithProducts.length);
-
-        // Sort orders: 
-        // 1. First: Orders with shortage (need to make) - sorted by delivery date (earliest first)
-        // 2. Last: Orders with sufficient stock - sorted by delivery date (earliest first)
-        ordersWithProducts.sort((a, b) => {
-          const aHasShortage = (a.shortage ?? 0) > 0;
-          const bHasShortage = (b.shortage ?? 0) > 0;
-          
-          // If one has shortage and the other doesn't, prioritize the one with shortage
-          if (aHasShortage && !bHasShortage) return -1;
-          if (!aHasShortage && bHasShortage) return 1;
-          
-          // If both have shortage or both don't, sort by delivery date (earliest first)
-          const aDate = new Date(a.expected_delivery).getTime();
-          const bDate = new Date(b.expected_delivery).getTime();
-          return aDate - bDate;
-        });
 
         setAllOrders(ordersWithProducts);
       }

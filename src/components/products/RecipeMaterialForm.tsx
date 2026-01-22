@@ -185,7 +185,6 @@ export default function RecipeMaterialForm({
                   e.stopPropagation();
                 }
               }}
-              placeholder={isProduct ? 'Auto-calculated for products' : 'e.g., 0.5, 2.5, 0.2'}
             />
             <p className="text-xs text-gray-500 mt-1">
               {isProduct
@@ -232,7 +231,12 @@ export default function RecipeMaterialForm({
         type="button"
         onClick={onAdd}
         className="w-full mt-4"
-        disabled={!newMaterial.materialId || !newMaterial.quantity || !newMaterial.unit}
+        disabled={
+          !newMaterial.materialId || 
+          !newMaterial.quantity || 
+          !newMaterial.unit ||
+          parseFloat(newMaterial.quantity) <= 0
+        }
       >
         <Plus className="w-4 h-4 mr-2" />
         Add Material to Recipe

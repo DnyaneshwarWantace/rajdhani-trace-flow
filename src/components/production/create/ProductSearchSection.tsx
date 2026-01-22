@@ -25,7 +25,7 @@ export default function ProductSearchSection({
   selectedProductId,
 }: ProductSearchSectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
@@ -57,7 +57,7 @@ export default function ProductSearchSection({
   useEffect(() => {
     setPage(1);
     loadProducts();
-  }, [searchTerm, category, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
+  }, [searchTerm, selectedCategories, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
 
   useEffect(() => {
     loadProducts();
@@ -146,8 +146,8 @@ export default function ProductSearchSection({
         filters.search = searchTerm.trim();
       }
 
-      if (category) {
-        filters.category = category;
+      if (selectedCategories.length > 0) {
+        filters.category = selectedCategories;
       }
 
       if (selectedSubcategories.length > 0) {
@@ -177,33 +177,21 @@ export default function ProductSearchSection({
         filters.weight = selectedWeights.map(w => w.split(' ')[0]);
       }
 
+      // Pass sorting to backend - backend expects: 'name', 'stock', 'category', 'recent'
+      filters.sortBy = sortBy;
+      filters.sortOrder = sortOrder;
+
+      console.log('🔍 Sorting params:', { sortBy, sortOrder });
+
       const { products: fetchedProducts, total: totalCount } = await ProductService.getProducts(filters);
 
       console.log('Loaded products:', fetchedProducts.length, 'Total:', totalCount);
+      if (fetchedProducts.length > 0) {
+        console.log('First product:', fetchedProducts[0].name, 'Last product:', fetchedProducts[fetchedProducts.length - 1].name);
+      }
 
-      // Apply sorting
-      const sortedProducts = [...(fetchedProducts || [])].sort((a, b) => {
-        let compareValue = 0;
-
-        switch (sortBy) {
-          case 'name':
-            compareValue = (a.name || '').localeCompare(b.name || '');
-            break;
-          case 'stock':
-            compareValue = (a.current_stock || 0) - (b.current_stock || 0);
-            break;
-          case 'category':
-            compareValue = (a.category || '').localeCompare(b.category || '');
-            break;
-          case 'recent':
-            compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-            break;
-        }
-
-        return sortOrder === 'asc' ? compareValue : -compareValue;
-      });
-
-      setProducts(sortedProducts);
+      // Backend handles sorting, so use products directly
+      setProducts(fetchedProducts || []);
       setTotal(totalCount || 0);
     } catch (error) {
       console.error('Error loading products:', error);
@@ -287,17 +275,14 @@ export default function ProductSearchSection({
 
         {/* Filters */}
         <ProductFilters
-          category={category}
+          categoriesSelected={selectedCategories}
           subcategoriesSelected={selectedSubcategories}
           colorsSelected={selectedColors}
           patternsSelected={selectedPatterns}
           lengthsSelected={selectedLengths}
           widthsSelected={selectedWidths}
           weightsSelected={selectedWeights}
-          onCategoryChange={(value) => {
-            setCategory(value);
-            setSelectedSubcategories([]);
-          }}
+          onCategoriesChange={setSelectedCategories}
           onSubcategoriesChange={setSelectedSubcategories}
           onColorsChange={setSelectedColors}
           onPatternsChange={setSelectedPatterns}
@@ -320,6 +305,7 @@ export default function ProductSearchSection({
             selectedProductId={selectedProductId}
             onSelect={onSelect}
             loading={loading}
+            sortBy={sortBy}
           />
         </div>
 

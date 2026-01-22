@@ -7,6 +7,7 @@ interface ProductListProps {
   selectedProductId: string | null;
   onSelect: (product: Product) => void;
   loading: boolean;
+  sortBy?: 'name' | 'stock' | 'category' | 'recent';
 }
 
 interface GroupedProducts {
@@ -18,6 +19,7 @@ export default function ProductList({
   selectedProductId,
   onSelect,
   loading,
+  sortBy = 'name',
 }: ProductListProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
@@ -49,17 +51,41 @@ export default function ProductList({
     );
   }
 
-  // Group products by name
-  const groupedProducts: GroupedProducts = products.reduce((acc, product) => {
-    const key = product.name.trim().toLowerCase();
-    if (!acc[key]) {
-      acc[key] = [];
-    }
-    acc[key].push(product);
-    return acc;
-  }, {} as GroupedProducts);
-
-  const sortedGroupKeys = Object.keys(groupedProducts).sort();
+  // Group products by name only when sorting by name
+  // Otherwise, show products in sorted order without grouping
+  const shouldGroup = sortBy === 'name';
+  
+  let groupedProducts: GroupedProducts = {};
+  let sortedGroupKeys: string[] = [];
+  
+  if (shouldGroup) {
+    // Group products by name while preserving backend sort order
+    // Use a Map to track insertion order
+    const groupMap = new Map<string, Product[]>();
+    const groupOrder: string[] = [];
+    
+    products.forEach((product) => {
+      const key = product.name.trim().toLowerCase();
+      if (!groupMap.has(key)) {
+        groupMap.set(key, []);
+        groupOrder.push(key);
+      }
+      groupMap.get(key)!.push(product);
+    });
+    
+    // Convert Map to object and preserve order
+    groupOrder.forEach(key => {
+      groupedProducts[key] = groupMap.get(key)!;
+    });
+    
+    // Use the preserved order (backend already sorted correctly)
+    sortedGroupKeys = groupOrder;
+  } else {
+    // For non-name sorting, create a single "all" group with all products
+    // Products are already sorted by backend - use them directly
+    groupedProducts = { 'all': products };
+    sortedGroupKeys = ['all'];
+  }
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups((prev) => {
@@ -105,37 +131,40 @@ export default function ProductList({
 
           return (
             <div key={groupKey} className="border-b border-gray-100 last:border-b-0">
-              {/* Group Row - Product Name with Variant Count */}
-              <div
-                className="px-2 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => toggleGroup(groupKey)}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-900 truncate" title={firstProduct.name}>
-                    {firstProduct.name}
-                  </p>
-                  <p className="text-[10px] text-blue-600 font-medium">
-                    ({groupProducts.length} Variant{groupProducts.length !== 1 ? 's' : ''})
-                  </p>
+              {/* Group Row - Product Name with Variant Count (only show when grouping) */}
+              {shouldGroup && (
+                <div
+                  className="px-2 py-2 flex items-center gap-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-900 truncate" title={firstProduct.name}>
+                      {firstProduct.name}
+                    </p>
+                    <p className="text-[10px] text-blue-600 font-medium">
+                      ({groupProducts.length} Variant{groupProducts.length !== 1 ? 's' : ''})
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Variant Rows - Show table with headers */}
-              {isExpanded && (
+              {(isExpanded || !shouldGroup) && (
                 <div className="bg-gray-50 border-t border-gray-200">
                   {/* Table Header for Variants */}
                   <div className="bg-white border-b border-gray-200 px-2 py-1.5">
                     <div className="flex gap-3 text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
-                      <div className="w-[22%] pl-5">Category</div>
-                      <div className="w-[22%]">Dimensions</div>
-                      <div className="w-[18%]">Weight</div>
-                      <div className="w-[25%]">Color / Pattern</div>
-                      <div className="w-[13%]">Stock</div>
+                      {!shouldGroup && <div className="w-[20%] pl-3">Product Name</div>}
+                      <div className={`${shouldGroup ? 'w-[22%] pl-5' : 'w-[18%]'}`}>Category</div>
+                      <div className={`${shouldGroup ? 'w-[22%]' : 'w-[18%]'}`}>Dimensions</div>
+                      <div className={`${shouldGroup ? 'w-[18%]' : 'w-[15%]'}`}>Weight</div>
+                      <div className={`${shouldGroup ? 'w-[25%]' : 'w-[20%]'}`}>Color / Pattern</div>
+                      <div className={`${shouldGroup ? 'w-[13%]' : 'w-[12%]'}`}>Stock</div>
                     </div>
                   </div>
 
@@ -153,8 +182,15 @@ export default function ProductList({
                             : 'hover:bg-white'
                         }`}
                       >
-                        <div className="w-[22%] pl-3 flex items-start gap-1">
-                          <span className="text-gray-400 text-xs mt-0.5">↳</span>
+                        {!shouldGroup && (
+                          <div className="w-[20%] pl-3">
+                            <span className="text-xs font-medium text-gray-900 truncate block" title={product.name}>
+                              {product.name}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`${shouldGroup ? 'w-[22%] pl-3' : 'w-[18%]'} flex items-start gap-1`}>
+                          {shouldGroup && <span className="text-gray-400 text-xs mt-0.5">↳</span>}
                           <div className="flex-1 min-w-0">
                             <span className="text-xs text-gray-700 truncate block">
                               {(product.category && product.category !== 'NA' && product.category !== 'N/A') ? product.category : '-'}
@@ -166,15 +202,15 @@ export default function ProductList({
                             )}
                           </div>
                         </div>
-                        <div className="w-[22%]">
+                        <div className={`${shouldGroup ? 'w-[22%]' : 'w-[18%]'}`}>
                           <span className="text-xs text-gray-700">{formatDimensions(product)}</span>
                         </div>
-                        <div className="w-[18%]">
+                        <div className={`${shouldGroup ? 'w-[18%]' : 'w-[15%]'}`}>
                           <span className="text-xs text-gray-700">
                             {(product.weight && product.weight !== 'NA' && product.weight !== 'N/A') ? `${product.weight} ${product.weight_unit || ''}`.trim() : '-'}
                           </span>
                         </div>
-                        <div className="w-[25%]">
+                        <div className={`${shouldGroup ? 'w-[25%]' : 'w-[20%]'}`}>
                           {product.color && product.color !== 'NA' && product.color !== 'N/A' && (
                             <span className="text-xs text-gray-700 block">
                               {product.color}
@@ -190,7 +226,7 @@ export default function ProductList({
                             <span className="text-xs text-gray-400">-</span>
                           )}
                         </div>
-                        <div className="w-[13%] flex items-center gap-2">
+                        <div className={`${shouldGroup ? 'w-[13%]' : 'w-[12%]'} flex items-center gap-2`}>
                           <span className="text-xs text-gray-700 font-medium">
                             {formatStock(product)}
                           </span>

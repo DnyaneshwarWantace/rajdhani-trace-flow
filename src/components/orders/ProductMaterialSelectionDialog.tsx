@@ -38,6 +38,14 @@ interface ProductMaterialSelectionDialogProps {
   materialItemsPerPage: number;
   onProductPageChange: (page: number) => void;
   onMaterialPageChange: (page: number) => void;
+  productSortBy?: 'name' | 'stock' | 'category' | 'recent';
+  productSortOrder?: 'asc' | 'desc';
+  materialSortBy?: 'name' | 'stock' | 'category' | 'recent';
+  materialSortOrder?: 'asc' | 'desc';
+  onProductSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent') => void;
+  onProductSortOrderChange?: (sortOrder: 'asc' | 'desc') => void;
+  onMaterialSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent') => void;
+  onMaterialSortOrderChange?: (sortOrder: 'asc' | 'desc') => void;
 }
 
 export default function ProductMaterialSelectionDialog({
@@ -55,6 +63,14 @@ export default function ProductMaterialSelectionDialog({
   materialItemsPerPage,
   onProductPageChange,
   onMaterialPageChange,
+  productSortBy = 'name',
+  productSortOrder = 'asc',
+  materialSortBy = 'name',
+  materialSortOrder = 'asc',
+  onProductSortChange,
+  onProductSortOrderChange,
+  onMaterialSortChange,
+  onMaterialSortOrderChange,
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -65,9 +81,29 @@ export default function ProductMaterialSelectionDialog({
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
   const [selectedStockFilters, setSelectedStockFilters] = useState<string[]>([]);
 
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // Use sorting from props (controlled by parent)
+  const sortBy = currentItem?.product_type === 'raw_material' ? materialSortBy : productSortBy;
+  const sortOrder = currentItem?.product_type === 'raw_material' ? materialSortOrder : productSortOrder;
+  
+  const handleSortByChange = (newSortBy: 'name' | 'stock' | 'category' | 'recent') => {
+    if (currentItem?.product_type === 'raw_material') {
+      onMaterialSortChange?.(newSortBy);
+      onMaterialPageChange(1); // Reset to first page
+    } else {
+      onProductSortChange?.(newSortBy);
+      onProductPageChange(1); // Reset to first page
+    }
+  };
+  
+  const handleSortOrderChange = (newSortOrder: 'asc' | 'desc') => {
+    if (currentItem?.product_type === 'raw_material') {
+      onMaterialSortOrderChange?.(newSortOrder);
+      onMaterialPageChange(1); // Reset to first page
+    } else {
+      onProductSortOrderChange?.(newSortOrder);
+      onProductPageChange(1); // Reset to first page
+    }
+  };
 
   const allItems = currentItem?.product_type === 'raw_material' ? materials : products;
 
@@ -142,8 +178,13 @@ export default function ProductMaterialSelectionDialog({
     return true;
   });
 
-  // Apply sorting
-  const sortedItems = [...items].sort((a, b) => {
+  // Apply client-side sorting only if search/filters are applied (since backend already sorted)
+  // If no search/filters, items are already sorted by backend
+  const needsClientSideSorting = productSearchTerm || selectedCategories.length > 0 || 
+    selectedSubcategories.length > 0 || selectedColors.length > 0 || 
+    selectedPatterns.length > 0 || selectedStockFilters.length > 0;
+  
+  const sortedItems = needsClientSideSorting ? [...items].sort((a, b) => {
     let compareValue = 0;
 
     switch (sortBy) {
@@ -170,7 +211,7 @@ export default function ProductMaterialSelectionDialog({
     }
 
     return sortOrder === 'asc' ? compareValue : -compareValue;
-  });
+  }) : items;
 
   const totalCount = sortedItems.length;
   const perPage = currentItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage;
@@ -620,7 +661,7 @@ export default function ProductMaterialSelectionDialog({
                         className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
                           sortBy === option.value ? 'bg-blue-50' : ''
                         }`}
-                        onClick={() => setSortBy(option.value as any)}
+                        onClick={() => handleSortByChange(option.value as any)}
                       >
                         <div className="flex-1 text-sm">{option.label}</div>
                         {sortBy === option.value && <Check className="h-4 w-4 text-blue-600" />}
@@ -631,7 +672,7 @@ export default function ProductMaterialSelectionDialog({
                         className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
                           sortOrder === 'asc' ? 'bg-blue-50' : ''
                         }`}
-                        onClick={() => setSortOrder('asc')}
+                        onClick={() => handleSortOrderChange('asc')}
                       >
                         <div className="flex-1 text-sm">Ascending</div>
                         {sortOrder === 'asc' && <Check className="h-4 w-4 text-blue-600" />}
@@ -640,7 +681,7 @@ export default function ProductMaterialSelectionDialog({
                         className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
                           sortOrder === 'desc' ? 'bg-blue-50' : ''
                         }`}
-                        onClick={() => setSortOrder('desc')}
+                        onClick={() => handleSortOrderChange('desc')}
                       >
                         <div className="flex-1 text-sm">Descending</div>
                         {sortOrder === 'desc' && <Check className="h-4 w-4 text-blue-600" />}

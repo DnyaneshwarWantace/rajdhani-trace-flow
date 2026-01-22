@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import ImageViewDialog from '@/components/ui/ImageViewDialog';
 
 interface ProductCardProps {
   product: Product;
@@ -36,8 +34,6 @@ export default function ProductCard({
   isSelected = false,
   onClick,
 }: ProductCardProps) {
-  const [isImageViewOpen, setIsImageViewOpen] = useState(false);
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -71,11 +67,7 @@ export default function ProductCard({
           <img
             src={product.image_url}
             alt={product.name}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsImageViewOpen(true);
-            }}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100">
@@ -255,16 +247,6 @@ export default function ProductCard({
           </div>
         )}
       </div>
-
-      {/* Image View Dialog */}
-      {product.image_url && (
-        <ImageViewDialog
-          isOpen={isImageViewOpen}
-          onClose={() => setIsImageViewOpen(false)}
-          imageUrl={product.image_url}
-          alt={product.name}
-        />
-      )}
     </div>
   );
 }

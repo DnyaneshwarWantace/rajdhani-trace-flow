@@ -305,7 +305,7 @@ export default function CustomerList() {
       setSubmitting(true);
 
       // Prepare data with serialized addresses
-      const submitData = {
+      const submitData: any = {
         ...formData,
         permanent_address: formData.permanentAddress ? JSON.stringify(formData.permanentAddress) : undefined,
         delivery_address: formData.deliveryAddress ? JSON.stringify(formData.deliveryAddress) : undefined,
@@ -315,6 +315,17 @@ export default function CustomerList() {
         state: formData.permanentAddress?.state || formData.state,
         pincode: formData.permanentAddress?.pincode || formData.pincode,
       };
+
+      // Convert empty strings to undefined for optional fields (prevents MongoDB duplicate key errors)
+      if (submitData.email && submitData.email.trim() === '') {
+        submitData.email = undefined;
+      }
+      if (submitData.company_name && submitData.company_name.trim() === '') {
+        submitData.company_name = undefined;
+      }
+      if (submitData.gst_number && submitData.gst_number.trim() === '') {
+        submitData.gst_number = undefined;
+      }
 
       // Remove form-only fields
       delete submitData.permanentAddress;

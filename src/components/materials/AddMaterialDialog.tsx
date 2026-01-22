@@ -97,94 +97,77 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     }
   }, [isOpen, mode]);
 
-  // Set form data for edit mode after units are loaded
+  // Set form data for edit mode after dropdowns are loaded
   useEffect(() => {
-    if (isOpen && mode === 'edit' && material && units.length > 0) {
-      // Find matching unit in the loaded units (case-insensitive)
-      const materialUnit = material.unit || '';
-      const matchingUnit = units.find(u => 
-        u.toLowerCase() === materialUnit.toLowerCase() || 
-        u === materialUnit
-      ) || materialUnit;
+    if (isOpen && mode === 'edit' && material) {
+      // Find matching values in dropdown options (case-insensitive fallback)
+      const findMatchingValue = (value: string | null | undefined, options: string[]): string => {
+        if (!value) return '';
+        const trimmed = String(value).trim();
+        // Try exact match first
+        if (options.includes(trimmed)) return trimmed;
+        // Try case-insensitive match
+        const found = options.find(opt => opt.toLowerCase() === trimmed.toLowerCase());
+        return found || trimmed; // Return original if not found
+      };
       
-      // Populate form with material data for edit mode
-      setFormData({
-        name: material.name || '',
-        type: material.type || '',
-        category: material.category || '',
-        unit: matchingUnit,
-        quantity: '1',
-        currentStock: String(material.current_stock || 0),
-        minThreshold: String(material.min_threshold || 10),
-        maxCapacity: String(material.max_capacity || 1000),
-        reorderPoint: String(material.reorder_point || 50),
-        supplier: material.supplier_name || '',
-        costPerUnit: String(material.cost_per_unit || 0),
-        expectedDelivery: '',
-        color: material.color || 'NA',
-      });
-      if (material.image_url) {
-        setImagePreview(material.image_url);
+      // Find matching supplier by name
+      const findMatchingSupplier = (supplierName: string | null | undefined): string => {
+        if (!supplierName) return '';
+        const trimmed = String(supplierName).trim();
+        // Try exact match first
+        const exactMatch = suppliers.find(s => s.name === trimmed);
+        if (exactMatch) return exactMatch.name;
+        // Try case-insensitive match
+        const found = suppliers.find(s => s.name.toLowerCase() === trimmed.toLowerCase());
+        return found ? found.name : trimmed;
+      };
+      
+      // Only populate if dropdowns are loaded (at least units and categories)
+      if (units.length > 0 && categories.length > 0) {
+        const matchingUnit = findMatchingValue(material.unit, units);
+        const matchingCategory = findMatchingValue(material.category, categories);
+        const matchingType = findMatchingValue(material.type, types);
+        const matchingColor = findMatchingValue(material.color, colors);
+        const matchingSupplier = findMatchingSupplier(material.supplier_name);
+        
+        // Populate form with material data for edit mode
+        setFormData({
+          name: material.name || '',
+          type: matchingType,
+          category: matchingCategory,
+          unit: matchingUnit,
+          quantity: '1',
+          currentStock: String(material.current_stock || 0),
+          minThreshold: String(material.min_threshold || 10),
+          maxCapacity: String(material.max_capacity || 1000),
+          reorderPoint: String(material.reorder_point || 50),
+          supplier: matchingSupplier,
+          costPerUnit: String(material.cost_per_unit || 0),
+          expectedDelivery: '',
+          color: matchingColor || 'NA',
+        });
+        
+        if (material.image_url) {
+          setImagePreview(material.image_url);
+        } else {
+          setImagePreview('');
+        }
+        setImageFile(null);
       }
     }
-  }, [isOpen, mode, material, units]);
+  }, [isOpen, mode, material, units, categories, types, colors, suppliers]);
 
-  // Lock body scroll when dialog is open - robust approach to prevent scroll when dropdowns open
+  // Lock body scroll when dialog is open
   useEffect(() => {
     if (isOpen) {
-      // Store current scroll position
-      const scrollY = window.scrollY;
-      
-      // Prevent scrolling on body
-      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-      document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
-      
-      // Prevent touch move on iOS and lock position
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.top = `-${scrollY}px`;
-      
-      // Also lock html element
-      document.documentElement.style.overflow = 'hidden';
-      document.documentElement.classList.add('modal-open');
-      
-      // Also add class for CSS rules
       document.body.classList.add('modal-open');
-      
-      // Store scroll position for restoration
-      document.body.setAttribute('data-scroll-y', scrollY.toString());
     } else {
-      // Restore scroll position
-      const scrollY = document.body.getAttribute('data-scroll-y');
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
-      
-      document.documentElement.style.overflow = '';
-      document.documentElement.classList.remove('modal-open');
-      
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY, 10));
-      }
     }
 
     return () => {
-      // Cleanup on unmount
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.top = '';
-      document.body.removeAttribute('data-scroll-y');
       document.body.classList.remove('modal-open');
-      
-      document.documentElement.style.overflow = '';
-      document.documentElement.classList.remove('modal-open');
     };
   }, [isOpen]);
 
@@ -425,12 +408,12 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
         
         // Allow ALL characters - only check word count and character limits
-        // Check word count (max 50 words)
-        if (words.length > 50) {
+        // Check word count (max 10 words - matches input handler limit)
+        if (words.length > 10) {
           missingFields.push('name');
           toast({
             title: 'Validation Error',
-            description: 'Material name can have maximum 50 words',
+            description: 'Material name can have maximum 10 words',
             variant: 'destructive',
           });
         }
@@ -749,10 +732,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden"
-      onWheel={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.preventDefault()}
-      style={{ touchAction: 'none' }}
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       onClick={(e) => {
         // Close dialog if clicking on backdrop
         if (e.target === e.currentTarget) {
@@ -761,7 +741,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       }}
     >
       <div
-        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto"
+        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Fixed Header */}

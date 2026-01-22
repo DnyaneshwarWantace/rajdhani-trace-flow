@@ -87,16 +87,7 @@ export default function ProductSelectorDialog({
   }, [isOpen]);
 
   useEffect(() => {
-    if (
-      isOpen &&
-      (selectedCategories.length > 0 ||
-        selectedSubcategories.length > 0 ||
-        selectedColors.length > 0 ||
-        selectedPatterns.length > 0 ||
-        selectedLengths.length > 0 ||
-        selectedWidths.length > 0 ||
-        selectedWeights.length > 0)
-    ) {
+    if (isOpen) {
       setCurrentPage(1);
       loadProducts();
     }
@@ -108,13 +99,15 @@ export default function ProductSelectorDialog({
     selectedLengths,
     selectedWidths,
     selectedWeights,
+    sortBy,
+    sortOrder,
     isOpen,
   ]);
 
   useEffect(() => {
     // Apply pagination to filtered products
     applyPagination();
-  }, [allProducts, currentPage, itemsPerPage, searchTerm]);
+  }, [allProducts, currentPage, itemsPerPage, searchTerm, sortBy, sortOrder]);
 
   const loadProducts = async () => {
     try {
@@ -142,6 +135,10 @@ export default function ProductSelectorDialog({
       if (selectedWeights.length > 0) {
         filters.weight = selectedWeights;
       }
+
+      // Pass sorting to backend
+      filters.sortBy = sortBy;
+      filters.sortOrder = sortOrder;
 
       const result = await ProductService.getProducts(filters);
       const loadedProducts = result.products || [];
@@ -198,7 +195,7 @@ export default function ProductSelectorDialog({
 
   const applyPagination = () => {
     // Filter products by search term
-    const filtered = searchTerm.trim()
+    let filtered = searchTerm.trim()
       ? allProducts.filter(
           (product) =>
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,6 +204,30 @@ export default function ProductSelectorDialog({
             product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
         )
       : allProducts;
+
+    // Apply sorting before pagination (backend already sorted, but re-sort if search filter applied)
+    if (searchTerm.trim()) {
+      filtered.sort((a, b) => {
+        let compareValue = 0;
+
+        switch (sortBy) {
+          case 'name':
+            compareValue = (a.name || '').localeCompare(b.name || '');
+            break;
+          case 'stock':
+            compareValue = (a.current_stock || 0) - (b.current_stock || 0);
+            break;
+          case 'category':
+            compareValue = (a.category || '').localeCompare(b.category || '');
+            break;
+          case 'recent':
+            compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+            break;
+        }
+
+        return sortOrder === 'asc' ? compareValue : -compareValue;
+      });
+    }
 
     // Apply pagination
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -278,55 +299,36 @@ export default function ProductSelectorDialog({
       : allProducts;
   };
 
+  // Products are already sorted by backend (or client-side if search is applied)
+  // No need to sort again here since applyPagination handles it
   const filteredProducts = products;
   const totalFiltered = getFilteredProducts().length;
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
-  // Apply sorting
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    let compareValue = 0;
+  // Use products directly (already sorted by backend or in applyPagination)
+  const sortedProducts = filteredProducts;
 
-    switch (sortBy) {
-      case 'name':
-        compareValue = (a.name || '').localeCompare(b.name || '');
-        break;
-      case 'stock':
-        compareValue = (a.current_stock || 0) - (b.current_stock || 0);
-        break;
-      case 'category':
-        compareValue = (a.category || '').localeCompare(b.category || '');
-        break;
-      case 'recent':
-        compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        break;
-    }
-
-    return sortOrder === 'asc' ? compareValue : -compareValue;
-  });
-
-  // Group products by name
-  const groupedProducts = sortedProducts.reduce((acc, product) => {
+  // Group products by name while preserving sort order
+  const groupMap = new Map<string, Product[]>();
+  const groupOrder: string[] = [];
+  
+  sortedProducts.forEach((product) => {
     const key = product.name.trim().toLowerCase();
-    if (!acc[key]) {
-      acc[key] = [];
+    if (!groupMap.has(key)) {
+      groupMap.set(key, []);
+      groupOrder.push(key);
     }
-    acc[key].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
-
-  // Sort groups: products with recipes first, then products without recipes
-  const sortedGroupKeys = Object.keys(groupedProducts).sort((a, b) => {
-    const aHasRecipe = groupedProducts[a].some(p => p.has_recipe);
-    const bHasRecipe = groupedProducts[b].some(p => p.has_recipe);
-
-    // If both have recipe or both don't have recipe, sort alphabetically
-    if (aHasRecipe === bHasRecipe) {
-      return a.localeCompare(b);
-    }
-
-    // Products with recipes come first
-    return bHasRecipe ? 1 : -1;
+    groupMap.get(key)!.push(product);
   });
+
+  const groupedProducts: Record<string, Product[]> = {};
+  groupOrder.forEach(key => {
+    groupedProducts[key] = groupMap.get(key)!;
+  });
+
+  // Since all products shown have recipes (filtered in loadProducts), 
+  // preserve the backend sort order from groupOrder
+  const sortedGroupKeys = groupOrder;
 
   const handleDialogClose = (open: boolean) => {
     // Prevent closing if we're in the middle of selecting
@@ -619,24 +621,25 @@ export default function ProductSelectorDialog({
           </div>
 
           {/* Pagination */}
-          {!loading && filteredProducts.length > 0 && totalPages > 1 && (
+          {!loading && filteredProducts.length > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
               <div className="text-sm text-gray-600">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalFiltered)} of {totalFiltered} products
               </div>
               
               <div className="flex items-center gap-2">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                      />
-                    </PaginationItem>
-                    
-                    {/* Page Numbers */}
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                {totalPages > 1 && (
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+
+                      {/* Page Numbers */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                       let pageNum: number;
                       if (totalPages <= 5) {
                         pageNum = i + 1;
@@ -675,22 +678,28 @@ export default function ProductSelectorDialog({
                     </PaginationItem>
                   </PaginationContent>
                 </Pagination>
+                )}
 
                 <div className="flex items-center gap-2 ml-4">
-                  <span className="text-sm text-gray-600">Per page:</span>
-                  <select
-                    value={itemsPerPage}
-                    onChange={(e) => {
-                      setItemsPerPage(Number(e.target.value));
+                  <span className="text-xs whitespace-nowrap">Per page:</span>
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={(value) => {
+                      setItemsPerPage(parseInt(value));
                       setCurrentPage(1);
                     }}
-                    className="border rounded px-2 py-1 text-sm"
                   >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
+                    <SelectTrigger className="w-20 h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Always show all options regardless of total items */}
+                      <SelectItem value="10" disabled={false}>10</SelectItem>
+                      <SelectItem value="20" disabled={false}>20</SelectItem>
+                      <SelectItem value="50" disabled={false}>50</SelectItem>
+                      <SelectItem value="100" disabled={false}>100</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

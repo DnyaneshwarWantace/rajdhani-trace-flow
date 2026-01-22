@@ -137,7 +137,14 @@ export default function CustomerFormDialog({
         const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
 
         if (error) {
-          setGstError(error);
+          // Only show error if it's not a format validation error (allow manual entry)
+          // Format errors are shown but don't block submission
+          if (error.includes('Invalid GST number format')) {
+            // Don't set error for format issues - allow manual entry
+            setGstError(null);
+          } else {
+            setGstError(error);
+          }
         } else if (data) {
           // Auto-fill customer details from GST data
           onFormDataChange({
@@ -145,15 +152,18 @@ export default function CustomerFormDialog({
             gst_number: gstValue,
             name: data.name || formData.name,
             company_name: data.companyName || formData.company_name,
-            address: data.address || formData.address,
-            city: data.city || formData.city,
-            state: data.state || formData.state,
-            pincode: data.pincode || formData.pincode,
+            permanentAddress: {
+              address: data.address || formData.permanentAddress?.address || '',
+              city: data.city || formData.permanentAddress?.city || '',
+              state: data.state || formData.permanentAddress?.state || '',
+              pincode: data.pincode || formData.permanentAddress?.pincode || '',
+            },
           });
         }
       } catch (error) {
         console.error('Error fetching GST details:', error);
-        setGstError('Failed to fetch GST details');
+        // Don't show error for API failures - allow manual entry
+        setGstError(null);
       } finally {
         setFetchingGST(false);
       }
@@ -330,7 +340,7 @@ export default function CustomerFormDialog({
                 onChange={(e) => handleNameChange(e.target.value, 'company_name')}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {companyWordCount}/50 words • Max 20 characters per word
+                {companyWordCount}/8 words • Max 20 characters per word
               </p>
             </div>
           )}
