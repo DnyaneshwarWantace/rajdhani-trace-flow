@@ -12,6 +12,7 @@ import { Tag, Ruler, Weight } from 'lucide-react';
 import type { CreateProductionBatchData } from '@/services/productionService';
 import type { Product } from '@/types/product';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface BatchDetailsFormProps {
   formData: CreateProductionBatchData;
@@ -130,8 +131,13 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
           id="planned_quantity"
           type="number"
           min="1"
+          max="99999"
+          step="1"
           value={formData.planned_quantity || ''}
-          onChange={(e) => handleChange('planned_quantity', parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+            handleChange('planned_quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
+          }}
           required
           className="mt-1"
         />

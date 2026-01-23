@@ -62,7 +62,6 @@ export default function ProductStockFilters({
               <SelectItem value="available">Available</SelectItem>
               <SelectItem value="sold">Sold</SelectItem>
               <SelectItem value="damaged">Damaged</SelectItem>
-              <SelectItem value="returned">Returned</SelectItem>
             </SelectContent>
           </Select>
         </div>

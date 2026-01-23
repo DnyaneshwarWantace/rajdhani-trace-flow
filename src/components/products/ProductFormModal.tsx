@@ -42,6 +42,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Track which fields have been touched for validation messages
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
 
   // Form state
   const [formData, setFormData] = useState<ProductFormData>({
@@ -223,6 +230,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       unit: '',
       cost: '',
     });
+    // Reset touched fields when form is reset
+    setTouchedFields(new Set());
   };
 
   const loadMaterials = async () => {
@@ -322,12 +331,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
         
         // Allow ALL characters - only check word count and character limits
-        // Check word count (max 10 words - matches input handler limit)
-        if (words.length > 10) {
-          missingFields.push('Product Name (max 10 words)');
+        // Check word count (max 50 words)
+        if (words.length > 50) {
+          missingFields.push('Product Name (max 50 words)');
           toast({
             title: 'Validation Error',
-            description: 'Product name can have maximum 10 words',
+            description: 'Product name can have maximum 50 words',
             variant: 'destructive',
           });
         }
@@ -622,12 +631,16 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     }
   };
 
-  // Lock body scroll when dialog is open
+  // Lock body scroll when dialog is open and reset touched fields when form opens/closes
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('modal-open');
+      // Reset touched fields when form opens
+      setTouchedFields(new Set());
     } else {
       document.body.classList.remove('modal-open');
+      // Reset touched fields when form closes
+      setTouchedFields(new Set());
     }
 
     return () => {
@@ -680,6 +693,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                 onDeleteColor={deleteColor}
                 onDeletePattern={deletePattern}
                 reloadDropdowns={reloadDropdowns}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
               />
 
               {/* Stock Section */}
@@ -690,6 +705,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                 onDeleteUnit={deleteUnit}
                 reloadDropdowns={reloadDropdowns}
                 mode={mode}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
               />
 
               {/* Dimensions Section */}
@@ -703,6 +720,8 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                 weights={weights}
                 onFormDataChange={(data) => setFormData({ ...formData, ...data })}
                 onReload={reloadDropdowns}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
               />
 
               {/* Stock Levels Section */}

@@ -33,6 +33,7 @@ import { UserService } from '@/services/userService';
 import type { CreateUserData, UpdateUserData } from '@/services/userService';
 import type { User } from '@/types/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { validateEmail } from '@/utils/formValidation';
 
 export default function UserManagement() {
   const { toast } = useToast();
@@ -70,6 +71,7 @@ export default function UserManagement() {
   });
 
   const [tempPassword, setTempPassword] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -92,6 +94,18 @@ export default function UserManagement() {
   };
 
   const handleCreateUser = async () => {
+    // Validate email
+    const emailValidationError = validateEmail(createForm.email);
+    if (emailValidationError) {
+      setEmailError(emailValidationError);
+      toast({
+        title: 'Validation Error',
+        description: emailValidationError,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     if (!createForm.email || !createForm.full_name) {
       toast({
         title: 'Validation Error',
@@ -351,7 +365,7 @@ export default function UserManagement() {
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{user.email}</TableCell>
+                      <TableCell className="font-mono text-sm email-preserve-case">{user.email}</TableCell>
                       <TableCell>
                         <Badge className={getRoleBadgeColor(user.role)}>
                           {user.role}
@@ -366,7 +380,7 @@ export default function UserManagement() {
                         {user.created_by_user ? (
                           <div className="text-sm">
                             <div className="font-medium">{user.created_by_user.full_name}</div>
-                            <div className="text-xs text-gray-500 font-mono">{user.created_by_user.email}</div>
+                            <div className="text-xs text-gray-500 font-mono email-preserve-case">{user.created_by_user.email}</div>
                           </div>
                         ) : user.created_by === 'system' ? (
                           <span className="text-sm text-gray-500">System</span>
@@ -454,9 +468,28 @@ export default function UserManagement() {
                 id="create-email"
                 type="email"
                 value={createForm.email}
-                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setCreateForm({ ...createForm, email: value });
+                  // Validate email on change
+                  const error = validateEmail(value);
+                  setEmailError(error);
+                }}
+                onBlur={() => {
+                  const error = validateEmail(createForm.email);
+                  setEmailError(error);
+                }}
                 placeholder="user@example.com"
+                className={emailError ? 'border-red-500' : ''}
               />
+              {emailError && (
+                <p className="text-xs text-red-500 mt-1">{emailError}</p>
+              )}
+              {!emailError && createForm.email && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {createForm.email.length}/320 characters
+                </p>
+              )}
             </div>
             <div>
               <Label htmlFor="create-full_name">Full Name *</Label>
@@ -615,7 +648,7 @@ export default function UserManagement() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-gray-600 font-medium">Email:</p>
-                  <p className="text-sm text-red-700 font-mono break-all">{selectedUser.email}</p>
+                  <p className="text-sm text-red-700 font-mono break-all email-preserve-case">{selectedUser.email}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-gray-600 font-medium">Role:</p>

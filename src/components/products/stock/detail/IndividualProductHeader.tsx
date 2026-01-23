@@ -26,8 +26,6 @@ export default function IndividualProductHeader({
         return 'secondary';
       case 'damaged':
         return 'destructive';
-      case 'returned':
-        return 'outline';
       default:
         return 'outline';
     }

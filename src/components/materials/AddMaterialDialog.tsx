@@ -408,12 +408,12 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         const words = trimmedName.split(/\s+/).filter(w => w.length > 0);
         
         // Allow ALL characters - only check word count and character limits
-        // Check word count (max 10 words - matches input handler limit)
-        if (words.length > 10) {
+        // Check word count (max 50 words)
+        if (words.length > 50) {
           missingFields.push('name');
           toast({
             title: 'Validation Error',
-            description: 'Material name can have maximum 10 words',
+            description: 'Material name can have maximum 50 words',
             variant: 'destructive',
           });
         }

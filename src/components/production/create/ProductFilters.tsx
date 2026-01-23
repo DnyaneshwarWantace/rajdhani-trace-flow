@@ -1,15 +1,22 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
 
 interface ProductFiltersProps {
-  categoriesSelected: string[];
+  category: string;
   subcategoriesSelected: string[];
   colorsSelected: string[];
   patternsSelected: string[];
   lengthsSelected: string[];
   widthsSelected: string[];
   weightsSelected: string[];
-  onCategoriesChange: (values: string[]) => void;
+  onCategoryChange: (value: string) => void;
   onSubcategoriesChange: (values: string[]) => void;
   onColorsChange: (values: string[]) => void;
   onPatternsChange: (values: string[]) => void;
@@ -26,14 +33,14 @@ interface ProductFiltersProps {
 }
 
 export default function ProductFilters({
-  categoriesSelected,
+  category,
   subcategoriesSelected,
   colorsSelected,
   patternsSelected,
   lengthsSelected,
   widthsSelected,
   weightsSelected,
-  onCategoriesChange,
+  onCategoryChange,
   onSubcategoriesChange,
   onColorsChange,
   onPatternsChange,
@@ -54,17 +61,19 @@ export default function ProductFilters({
         <Label htmlFor="category-filter" className="text-xs font-medium text-gray-700">
           Category
         </Label>
-        <div className="mt-1">
-          <MultiSelect
-            options={categories
-              .filter((cat) => cat && cat.trim())
-              .map((cat) => ({ label: cat, value: cat }))}
-            selected={categoriesSelected}
-            onChange={onCategoriesChange}
-            placeholder="All"
-            className="h-8 text-xs"
-          />
-        </div>
+        <Select value={category || 'all'} onValueChange={(value) => onCategoryChange(value === 'all' ? '' : value)}>
+          <SelectTrigger id="category-filter" className="mt-1 h-8 text-xs">
+            <SelectValue placeholder="All" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {categories.filter(cat => cat && cat.trim()).map((cat) => (
+              <SelectItem key={cat} value={cat}>
+                {cat}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div>

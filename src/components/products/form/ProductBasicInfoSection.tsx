@@ -15,6 +15,8 @@ interface ProductBasicInfoSectionProps {
   onDeleteColor: (value: string) => Promise<void>;
   onDeletePattern: (value: string) => Promise<void>;
   reloadDropdowns: () => Promise<void>;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 export default function ProductBasicInfoSection({
@@ -29,6 +31,8 @@ export default function ProductBasicInfoSection({
   onDeleteColor,
   onDeletePattern,
   reloadDropdowns,
+  touchedFields = new Set(),
+  markFieldTouched = () => {},
 }: ProductBasicInfoSectionProps) {
   return (
     <>
@@ -87,14 +91,24 @@ export default function ProductBasicInfoSection({
 
             onFormDataChange({ name: inputValue });
           }}
+          onBlur={() => markFieldTouched('name')}
           placeholder="e.g., Traditional Persian Carpet"
-          required
         />
         {(() => {
           const wordCount = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
           const words = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0) : [];
           const hasLongWord = words.some(word => word.length > 20);
           const totalChars = formData.name.length;
+
+          // Show error if touched and empty
+          if (touchedFields.has('name') && !formData.name.trim()) {
+            return (
+              <p className="text-xs text-red-500 mt-1">
+                Product name is required
+              </p>
+            );
+          }
+
           return (
             <p className="text-xs text-muted-foreground mt-1">
               {wordCount}/10 words • Max 20 characters per word • {totalChars} total characters
@@ -106,17 +120,28 @@ export default function ProductBasicInfoSection({
 
       {/* Category and Subcategory */}
       <div className="grid grid-cols-2 gap-4">
-        <ProductDropdownField
-          label="Category"
-          value={formData.category}
-          placeholder="Select category"
-          options={categories}
-          required
-          category="category"
-          onValueChange={(value) => onFormDataChange({ category: value })}
-          onDelete={onDeleteCategory}
-          reloadDropdowns={reloadDropdowns}
-        />
+        <div onBlur={() => markFieldTouched('category')}>
+          <ProductDropdownField
+            label="Category"
+            value={formData.category}
+            placeholder="Select category"
+            options={categories}
+            required
+            category="category"
+            onValueChange={(value) => {
+              onFormDataChange({ category: value });
+            }}
+            onDelete={onDeleteCategory}
+            reloadDropdowns={reloadDropdowns}
+            markFieldTouched={markFieldTouched}
+            fieldName="category"
+          />
+          {touchedFields.has('category') && !formData.category.trim() && (
+            <p className="text-xs text-red-500 mt-1">
+              Category is required
+            </p>
+          )}
+        </div>
 
         <ProductDropdownField
           label="Subcategory"

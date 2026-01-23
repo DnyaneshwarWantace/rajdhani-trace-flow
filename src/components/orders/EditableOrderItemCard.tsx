@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Edit, Check, X, QrCode, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface ProductDetails {
   color?: string;
@@ -175,9 +176,13 @@ export function EditableOrderItemCard({
             <Input
               type="number"
               value={editedQuantity}
-              onChange={(e) => setEditedQuantity(e.target.value)}
-              min="0.01"
-              step="0.01"
+              onChange={(e) => {
+                const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+                setEditedQuantity(validation.value);
+              }}
+              min="1"
+              max="99999"
+              step="1"
               className="w-24"
               disabled={isSaving}
               autoFocus

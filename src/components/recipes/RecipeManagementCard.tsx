@@ -29,6 +29,7 @@ export default function RecipeManagementCard({
     recipeId: string;
     materialId: string;
     materialName: string;
+    materialType: 'raw_material' | 'product';
   } | null>(null);
 
   const handleAddMaterial = (recipe: Recipe) => {
@@ -96,7 +97,7 @@ export default function RecipeManagementCard({
     setIsMaterialSelectorOpen(false); // Close material selector when editing
   };
 
-  const handleDeleteClick = (recipeId: string, materialId: string, materialName: string, recipe: Recipe) => {
+  const handleDeleteClick = (recipeId: string, materialId: string, materialName: string, recipe: Recipe, material: any) => {
     if (!recipe.materials || recipe.materials.length <= 1) {
       toast({
         title: 'Cannot Remove',
@@ -110,13 +111,14 @@ export default function RecipeManagementCard({
       recipeId,
       materialId,
       materialName,
+      materialType: material.material_type || 'raw_material',
     });
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteConfirmation) return;
 
-    const { recipeId, materialId, materialName } = deleteConfirmation;
+    const { recipeId, materialId, materialName, materialType } = deleteConfirmation;
 
     try {
       const recipe = recipes.find((r) => r.id === recipeId);
@@ -134,17 +136,19 @@ export default function RecipeManagementCard({
         })),
       });
 
+      const isProduct = materialType === 'product';
       toast({
         title: 'Success',
-        description: `Material "${materialName}" removed from recipe`,
+        description: isProduct ? `Deleted product "${materialName}"` : `Deleted material "${materialName}"`,
       });
       onRefresh();
       setDeleteConfirmation(null);
     } catch (error) {
       console.error('Error removing material:', error);
+      const isProduct = deleteConfirmation.materialType === 'product';
       toast({
         title: 'Error',
-        description: 'Failed to remove material from recipe',
+        description: isProduct ? 'Failed to remove product from recipe' : 'Failed to remove material from recipe',
         variant: 'destructive',
       });
       setDeleteConfirmation(null);
@@ -340,7 +344,7 @@ export default function RecipeManagementCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDeleteClick(recipe.id, material.id, material.material_name, recipe)}
+                                onClick={() => handleDeleteClick(recipe.id, material.id, material.material_name, recipe, material)}
                                 disabled={!recipe.materials || recipe.materials.length <= 1}
                                 className="flex-1 md:flex-none text-red-600 hover:bg-red-50"
                               >

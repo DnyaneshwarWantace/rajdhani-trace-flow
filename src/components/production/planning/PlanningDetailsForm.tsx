@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Calendar, AlertCircle } from 'lucide-react';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface PlanningDetailsFormProps {
   formData: {

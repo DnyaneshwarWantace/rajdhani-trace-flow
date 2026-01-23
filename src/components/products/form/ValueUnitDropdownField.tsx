@@ -12,6 +12,7 @@ import {
 import { Trash2, Plus } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface ValueUnitDropdownFieldProps {
   label: string;
@@ -27,6 +28,8 @@ interface ValueUnitDropdownFieldProps {
   onUnitChange: (unit: string) => void;
   onCombinedChange?: (value: string, unit: string) => void;
   onReload: () => Promise<void>;
+  markFieldTouched?: (fieldName: string) => void;
+  fieldName?: string;
 }
 
 // Parse combined value like "5 m" into { value: "5", unit: "m" }
@@ -60,6 +63,8 @@ export default function ValueUnitDropdownField({
   onUnitChange,
   onCombinedChange,
   onReload,
+  markFieldTouched,
+  fieldName,
 }: ValueUnitDropdownFieldProps) {
   const { toast } = useToast();
   const [showAddNew, setShowAddNew] = useState(false);
@@ -305,17 +310,16 @@ export default function ValueUnitDropdownField({
         <div className="space-y-2">
           <div className="flex gap-2">
             <Input
-              type="text"
+              type="number"
               value={newValueInput}
               onChange={(e) => {
-                const val = e.target.value;
-                // Allow only numbers with max 4 digits before decimal and 2 after
-                // Pattern: up to 4 digits, optional decimal, up to 2 digits after decimal
-                if (/^\d{0,4}(\.\d{0,2})?$/.test(val)) {
-                  setNewValueInput(val);
-                }
+                const validation = validateNumberInput(e.target.value, ValidationPresets.DIMENSION);
+                setNewValueInput(validation.value);
               }}
               placeholder={placeholder || 'e.g., 5'}
+              min="0"
+              max="9999.99"
+              step="0.01"
               className="flex-1"
             />
             <div className="flex gap-2 flex-1">
@@ -448,6 +452,12 @@ export default function ValueUnitDropdownField({
       <Select
         value={selectValue}
         onValueChange={handleSelectChange}
+        onOpenChange={(open) => {
+          // When dropdown closes (open = false), mark field as touched
+          if (!open && markFieldTouched && fieldName) {
+            markFieldTouched(fieldName);
+          }
+        }}
       >
         <SelectTrigger>
           <SelectValue

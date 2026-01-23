@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface MaterialStockSectionProps {
   currentStock: string;
@@ -22,24 +23,6 @@ export default function MaterialStockSection({
   onMinThresholdChange,
   onMaxCapacityChange,
 }: MaterialStockSectionProps) {
-  const handleNumericChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setter: (value: string) => void
-  ) => {
-    const value = e.target.value;
-    // Allow max 4 digits before decimal, 2 after decimal
-    if (value === '' || /^\d{0,4}(\.\d{0,2})?$/.test(value)) {
-      setter(value);
-    }
-  };
-
-  const handleMinThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    // Min threshold: max 10 digits
-    if (value === '' || /^\d{0,10}$/.test(value)) {
-      onMinThresholdChange(value);
-    }
-  };
 
   return (
     <div className="grid grid-cols-2 gap-4">
@@ -48,12 +31,19 @@ export default function MaterialStockSection({
           <Label htmlFor="currentStock">Current Stock {isCurrentStockEditable ? '*' : ''}</Label>
           <Input
             id="currentStock"
-            type="text"
+            type="number"
             value={currentStock}
-            onChange={(e) => onCurrentStockChange && handleNumericChange(e, onCurrentStockChange)}
-            placeholder="0"
+            onChange={(e) => {
+              if (onCurrentStockChange) {
+                const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
+                onCurrentStockChange(validation.value);
+              }
+            }}
             disabled={!isCurrentStockEditable}
             required={isCurrentStockEditable}
+            min="0"
+            max="99999.99"
+            step="0.01"
             className={!isCurrentStockEditable ? 'bg-gray-100 cursor-not-allowed' : ''}
           />
           {!isCurrentStockEditable ? (
@@ -69,21 +59,31 @@ export default function MaterialStockSection({
         <Label htmlFor="minThreshold">Min Stock Threshold</Label>
         <Input
           id="minThreshold"
-          type="text"
+          type="number"
           value={minThreshold}
-          onChange={handleMinThresholdChange}
-          placeholder="10 (auto-set if empty)"
+          onChange={(e) => {
+            const validation = validateNumberInput(e.target.value, ValidationPresets.STOCK_LEVEL);
+            onMinThresholdChange(validation.value);
+          }}
+          min="0"
+          max="99999"
+          step="1"
         />
-        <p className="text-xs text-muted-foreground mt-1">Max 10 digits - Minimum quantity before alert (default: 10)</p>
+        <p className="text-xs text-muted-foreground mt-1">Minimum quantity before alert (default: 10)</p>
       </div>
       <div>
         <Label htmlFor="maxCapacity">Max Stock Capacity</Label>
         <Input
           id="maxCapacity"
-          type="text"
+          type="number"
           value={maxCapacity}
-          onChange={(e) => handleNumericChange(e, onMaxCapacityChange)}
-          placeholder="1000 (auto-set if empty)"
+          onChange={(e) => {
+            const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
+            onMaxCapacityChange(validation.value);
+          }}
+          min="0"
+          max="99999.99"
+          step="0.01"
         />
         <p className="text-xs text-muted-foreground mt-1">Maximum quantity the inventory can hold (default: 1000)</p>
       </div>

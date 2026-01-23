@@ -25,7 +25,7 @@ export default function ProductSearchSection({
   selectedProductId,
 }: ProductSearchSectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [category, setCategory] = useState('');
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
@@ -57,7 +57,7 @@ export default function ProductSearchSection({
   useEffect(() => {
     setPage(1);
     loadProducts();
-  }, [searchTerm, selectedCategories, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
+  }, [searchTerm, category, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
 
   useEffect(() => {
     loadProducts();
@@ -177,18 +177,30 @@ export default function ProductSearchSection({
         filters.weight = selectedWeights.map(w => w.split(' ')[0]);
       }
 
-      // Pass sorting to backend - backend expects: 'name', 'stock', 'category', 'recent'
-      filters.sortBy = sortBy;
-      filters.sortOrder = sortOrder;
+      // Map frontend sortBy to backend sortBy
+      let backendSortBy = 'name'; // default
+      switch (sortBy) {
+        case 'name':
+          backendSortBy = 'name';
+          break;
+        case 'stock':
+          backendSortBy = 'current_stock';
+          break;
+        case 'category':
+          backendSortBy = 'category';
+          break;
+        case 'recent':
+          backendSortBy = 'created_at';
+          break;
+      }
 
-      console.log('🔍 Sorting params:', { sortBy, sortOrder });
+      // Pass sorting to backend
+      filters.sortBy = backendSortBy;
+      filters.sortOrder = sortOrder;
 
       const { products: fetchedProducts, total: totalCount } = await ProductService.getProducts(filters);
 
       console.log('Loaded products:', fetchedProducts.length, 'Total:', totalCount);
-      if (fetchedProducts.length > 0) {
-        console.log('First product:', fetchedProducts[0].name, 'Last product:', fetchedProducts[fetchedProducts.length - 1].name);
-      }
 
       // Backend handles sorting, so use products directly
       setProducts(fetchedProducts || []);
@@ -275,14 +287,17 @@ export default function ProductSearchSection({
 
         {/* Filters */}
         <ProductFilters
-          categoriesSelected={selectedCategories}
+          category={category}
           subcategoriesSelected={selectedSubcategories}
           colorsSelected={selectedColors}
           patternsSelected={selectedPatterns}
           lengthsSelected={selectedLengths}
           widthsSelected={selectedWidths}
           weightsSelected={selectedWeights}
-          onCategoriesChange={setSelectedCategories}
+          onCategoryChange={(value) => {
+            setCategory(value);
+            setSelectedSubcategories([]);
+          }}
           onSubcategoriesChange={setSelectedSubcategories}
           onColorsChange={setSelectedColors}
           onPatternsChange={setSelectedPatterns}
@@ -305,7 +320,6 @@ export default function ProductSearchSection({
             selectedProductId={selectedProductId}
             onSelect={onSelect}
             loading={loading}
-            sortBy={sortBy}
           />
         </div>
 

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSign, Edit, Check, X } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface PaymentHistory {
   amount: number;
@@ -111,9 +112,12 @@ export function EditablePaymentCard({
               <Input
                 type="number"
                 value={editedPaidAmount}
-                onChange={(e) => setEditedPaidAmount(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
+                  setEditedPaidAmount(parseFloat(validation.value) || 0);
+                }}
                 min="0"
-                max={totalAmount}
+                max="9999999.99"
                 step="0.01"
               />
             </div>

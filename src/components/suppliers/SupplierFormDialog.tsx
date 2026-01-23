@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import { validateEmail } from '@/utils/formValidation';
 
 interface SupplierFormDialogProps {
   isOpen: boolean;
@@ -35,6 +36,14 @@ export default function SupplierFormDialog({
   selectedSupplier,
   submitting,
 }: SupplierFormDialogProps) {
+  // Track which fields have been touched
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
+
   // Handler for name fields with different limits
   const handleNameChange = (value: string, field: 'name' | 'contact_person') => {
     let inputValue = value;
@@ -281,11 +290,17 @@ export default function SupplierFormDialog({
               <Input
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value, 'name')}
-                required
+                onBlur={() => markFieldTouched('name')}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                {nameWordCount}/8 words • Max 20 characters per word
-              </p>
+              {touchedFields.has('name') && !formData.name.trim() ? (
+                <p className="text-xs text-red-500 mt-1">
+                  Supplier name is required
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {nameWordCount}/8 words • Max 20 characters per word
+                </p>
+              )}
             </div>
             <div>
               <Label>Contact Person</Label>
@@ -305,21 +320,56 @@ export default function SupplierFormDialog({
               <Label>Email</Label>
               <Input
                 type="email"
-                value={formData.email}
-                onChange={(e) => onFormDataChange({ ...formData, email: e.target.value })}
+                value={formData.email || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onFormDataChange({ ...formData, email: value });
+                  // Validate email on change
+                  const error = validateEmail(value);
+                  setEmailError(error);
+                }}
+                onBlur={() => {
+                  const error = validateEmail(formData.email);
+                  setEmailError(error);
+                  markFieldTouched('email');
+                }}
+                className={emailError ? 'border-red-500' : ''}
               />
+              {emailError && (
+                <p className="text-xs text-red-500 mt-1">{emailError}</p>
+              )}
+              {!emailError && formData.email && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.email.length}/320 characters
+                </p>
+              )}
             </div>
             <div>
               <Label>Phone</Label>
-              <PhoneInput
-                defaultCountry="in"
-                value={formData.phone || '+91'}
-                onChange={handlePhoneChange}
-                placeholder="Enter phone number"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Select country and enter number
-              </p>
+              <div onBlur={() => markFieldTouched('phone')}>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={formData.phone || '+91'}
+                  onChange={handlePhoneChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              {(() => {
+                const isJustCountryCode = formData.phone && /^\+\d{1,4}$/.test(formData.phone.trim());
+                const showError = touchedFields.has('phone') && isJustCountryCode;
+                if (showError) {
+                  return (
+                    <p className="text-xs text-red-500 mt-1">
+                      Please enter a complete phone number
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select country and enter number
+                  </p>
+                );
+              })()}
             </div>
           </div>
 
@@ -412,7 +462,11 @@ export default function SupplierFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="bg-primary-600 hover:bg-primary-700 text-white">
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white"
+            >
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {selectedSupplier ? 'Update' : 'Create'}
             </Button>

@@ -7,7 +7,6 @@ import { MaterialService } from '@/services/materialService';
 import type { Product } from '@/types/product';
 import type { RawMaterial } from '@/types/material';
 import type { Recipe } from '@/types/recipe';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProductSelectionCard from '@/components/recipes/ProductSelectionCard';
 import CalculationResultsCard from '@/components/recipes/CalculationResultsCard';
 import RecipeManagementCard from '@/components/recipes/RecipeManagementCard';
@@ -59,6 +58,7 @@ interface ProductionStep {
 
 export default function RecipeCalculator() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'calculator' | 'recipes'>('calculator');
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -398,41 +398,67 @@ export default function RecipeCalculator() {
           </p>
         </div>
 
-      <Tabs defaultValue="calculator" className="space-y-4 md:space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calculator">Calculator</TabsTrigger>
-          <TabsTrigger value="recipes">Recipes</TabsTrigger>
-        </TabsList>
+      {/* Tabs Navigation */}
+      <div className="mb-6 w-full">
+        <div className="bg-gray-100 rounded-lg p-1 w-full">
+          <nav className="flex gap-1 w-full" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('calculator')}
+              className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all ${
+                activeTab === 'calculator'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Calculator
+            </button>
+            <button
+              onClick={() => setActiveTab('recipes')}
+              className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all ${
+                activeTab === 'recipes'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              Recipes
+            </button>
+          </nav>
+        </div>
+      </div>
 
-        <TabsContent value="calculator" className="space-y-4 md:space-y-6">
-          <ProductSelectionCard
-            calculationItems={calculationItems}
-            products={products}
-            onAddItem={addCalculationItem}
-            onUpdateItem={updateCalculationItem}
-            onRemoveItem={removeCalculationItem}
-            onCalculate={calculateRecipes}
-            isCalculating={isCalculating}
-          />
+      {/* Tab Content */}
+      <div className="space-y-4 md:space-y-6">
+        {activeTab === 'calculator' && (
+          <>
+            <ProductSelectionCard
+              calculationItems={calculationItems}
+              products={products}
+              onAddItem={addCalculationItem}
+              onUpdateItem={updateCalculationItem}
+              onRemoveItem={removeCalculationItem}
+              onCalculate={calculateRecipes}
+              isCalculating={isCalculating}
+            />
 
-          <CalculationResultsCard
-            productionSteps={productionSteps}
-            finalBreakdown={finalBreakdown}
-            calculationItems={calculationItems}
-            products={products}
-            rawMaterials={rawMaterials}
-            expandedSteps={expandedSteps}
-            onToggleStep={toggleStepExpansion}
-          />
-        </TabsContent>
+            <CalculationResultsCard
+              productionSteps={productionSteps}
+              finalBreakdown={finalBreakdown}
+              calculationItems={calculationItems}
+              products={products}
+              rawMaterials={rawMaterials}
+              expandedSteps={expandedSteps}
+              onToggleStep={toggleStepExpansion}
+            />
+          </>
+        )}
 
-        <TabsContent value="recipes" className="space-y-4 md:space-y-6">
+        {activeTab === 'recipes' && (
           <RecipeManagementCard
             recipes={recipes}
             onRefresh={loadRecipes}
           />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
       </div>
     </Layout>
   );

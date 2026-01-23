@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +17,7 @@ const API_URL = getApiUrl();
 export default function Settings() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'users'>('profile');
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -194,26 +194,52 @@ export default function Settings() {
           <p className="text-sm text-gray-500 mt-1">Manage your account settings and preferences</p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className={`grid w-full ${user?.role === 'admin' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-            <TabsTrigger value="profile" className="flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Key className="w-4 h-4" />
-              Security
-            </TabsTrigger>
-            {user?.role === 'admin' && (
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Users
-              </TabsTrigger>
-            )}
-          </TabsList>
+        <div className="space-y-6">
+          {/* Custom Tabs matching ProductTabs style */}
+          <div className="mb-6 w-full">
+            <div className="bg-gray-100 rounded-lg p-1 w-full">
+              <nav className="flex gap-1 w-full" aria-label="Tabs">
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
+                    activeTab === 'profile'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  Profile
+                </button>
+                <button
+                  onClick={() => setActiveTab('security')}
+                  className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
+                    activeTab === 'security'
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  <Key className="w-4 h-4" />
+                  Security
+                </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => setActiveTab('users')}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
+                      activeTab === 'users'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    Users
+                  </button>
+                )}
+              </nav>
+            </div>
+          </div>
 
           {/* Profile Tab */}
-          <TabsContent value="profile">
+          {activeTab === 'profile' && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -365,10 +391,10 @@ export default function Settings() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Security Tab */}
-          <TabsContent value="security">
+          {activeTab === 'security' && (
             <Card>
               <CardHeader>
                 <CardTitle>Change Password</CardTitle>
@@ -464,15 +490,13 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
           {/* Users Tab (Admin Only) */}
-          {user?.role === 'admin' && (
-            <TabsContent value="users">
-              <UserManagement />
-            </TabsContent>
+          {user?.role === 'admin' && activeTab === 'users' && (
+            <UserManagement />
           )}
-        </Tabs>
+        </div>
       </div>
     </Layout>
   );

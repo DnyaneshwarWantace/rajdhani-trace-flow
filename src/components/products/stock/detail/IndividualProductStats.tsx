@@ -15,8 +15,6 @@ export default function IndividualProductStats({ individualProduct }: Individual
         return <Package className="w-5 h-5 text-blue-500" />;
       case 'damaged':
         return <XCircle className="w-5 h-5 text-red-500" />;
-      case 'returned':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       default:
         return <Package className="w-5 h-5 text-gray-500" />;
     }
@@ -30,8 +28,6 @@ export default function IndividualProductStats({ individualProduct }: Individual
         return 'text-blue-600';
       case 'damaged':
         return 'text-red-600';
-      case 'returned':
-        return 'text-yellow-600';
       default:
         return 'text-gray-600';
     }

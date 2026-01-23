@@ -13,8 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Search, Package, Loader2, Check, Filter, ArrowUp, ArrowDown } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, Package, Loader2, Check, Filter } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 
@@ -50,10 +49,6 @@ export default function RecipeMaterialSelectionDialog({
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
 
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
   useEffect(() => {
     if (isOpen) {
       // Clear materials immediately to avoid showing stale data
@@ -71,29 +66,21 @@ export default function RecipeMaterialSelectionDialog({
       // Load new materials
       loadMaterials();
     }
-  }, [isOpen, materialType, sortBy, sortOrder]);
+  }, [isOpen, materialType]);
 
-  // Reset to page 1 when search or sorting changes
+  // Reset to page 1 when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, sortBy, sortOrder]);
+  }, [searchTerm]);
 
   const loadMaterials = async () => {
     setLoading(true);
     try {
       if (materialType === 'product') {
-        const { products } = await ProductService.getProducts({ 
-          limit: 1000,
-          sortBy: sortBy,
-          sortOrder: sortOrder,
-        });
+        const { products } = await ProductService.getProducts({ limit: 1000 });
         setMaterials(products || []);
       } else {
-        const { materials: rawMats } = await MaterialService.getMaterials({ 
-          limit: 1000,
-          sortBy: sortBy,
-          sortOrder: sortOrder,
-        });
+        const { materials: rawMats } = await MaterialService.getMaterials({ limit: 1000 });
         setMaterials(rawMats || []);
       }
     } catch (error) {
@@ -104,7 +91,7 @@ export default function RecipeMaterialSelectionDialog({
   };
 
   // Client-side search and filter
-  let filteredMaterials = materials.filter((m) => {
+  const filteredMaterials = materials.filter((m) => {
     // Search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
@@ -166,32 +153,6 @@ export default function RecipeMaterialSelectionDialog({
     return true;
   });
 
-  // Apply client-side sorting if search or filters are applied (since we fetch all data)
-  if (searchTerm || selectedCategories.length > 0 || selectedSubcategories.length > 0 || 
-      selectedColors.length > 0 || selectedPatterns.length > 0 || 
-      selectedTypes.length > 0 || selectedSuppliers.length > 0) {
-    filteredMaterials.sort((a, b) => {
-      let compareValue = 0;
-
-      switch (sortBy) {
-        case 'name':
-          compareValue = (a.name || '').localeCompare(b.name || '');
-          break;
-        case 'stock':
-          compareValue = (a.current_stock || 0) - (b.current_stock || 0);
-          break;
-        case 'category':
-          compareValue = (a.category || '').localeCompare(b.category || '');
-          break;
-        case 'recent':
-          compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-          break;
-      }
-
-      return sortOrder === 'asc' ? compareValue : -compareValue;
-    });
-  }
-
   const toggleMaterialSelection = (material: any) => {
     const isSelected = selectedMaterials.some((m) => m.id === material.id);
     if (isSelected) {
@@ -242,7 +203,7 @@ export default function RecipeMaterialSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -289,42 +250,6 @@ export default function RecipeMaterialSelectionDialog({
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
-          </div>
-
-          {/* Sorting Controls */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort by:</Label>
-              <Select value={sortBy} onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => setSortBy(value)}>
-                <SelectTrigger className="h-8 w-[140px] text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="stock">Stock</SelectItem>
-                  <SelectItem value="category">Category</SelectItem>
-                  <SelectItem value="recent">Recently Added</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="h-8 text-xs"
-            >
-              {sortOrder === 'asc' ? (
-                <>
-                  <ArrowUp className="w-3 h-3 mr-1" />
-                  Ascending
-                </>
-              ) : (
-                <>
-                  <ArrowDown className="w-3 h-3 mr-1" />
-                  Descending
-                </>
-              )}
-            </Button>
           </div>
 
           {/* Filters */}
@@ -613,13 +538,13 @@ export default function RecipeMaterialSelectionDialog({
         </div>
 
         {/* Material List */}
-        <div className="flex-1 overflow-auto min-h-[400px]">
+        <div className="flex-1 overflow-auto">
           {loading ? (
-            <div className="flex items-center justify-center h-full min-h-[400px]">
+            <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
           ) : filteredMaterials.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 h-full min-h-[400px] flex items-center justify-center">
+            <div className="text-center py-12 text-gray-500">
               No {materialType === 'product' ? 'products' : 'materials'} found
             </div>
           ) : (

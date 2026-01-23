@@ -26,6 +26,9 @@ interface ProductDropdownFieldProps {
   onDelete?: (value: string) => void;
   onAdd?: (value: string) => Promise<void>;
   reloadDropdowns?: () => Promise<void>;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
+  fieldName?: string;
 }
 
 export default function ProductDropdownField({
@@ -41,6 +44,8 @@ export default function ProductDropdownField({
   onDelete,
   onAdd,
   reloadDropdowns,
+  markFieldTouched,
+  fieldName,
 }: ProductDropdownFieldProps) {
   const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
@@ -202,6 +207,12 @@ export default function ProductDropdownField({
             // Keep N/A as the value so it displays properly
             onValueChange(selectedValue);
             setSearchTerm('');
+          }
+        }}
+        onOpenChange={(open) => {
+          // When dropdown closes (open = false), mark field as touched
+          if (!open && markFieldTouched && fieldName) {
+            markFieldTouched(fieldName);
           }
         }}
       >

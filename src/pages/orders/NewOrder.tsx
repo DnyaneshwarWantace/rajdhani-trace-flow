@@ -56,12 +56,6 @@ export default function NewOrder() {
   const [materialPage, setMaterialPage] = useState(1);
   const [materialItemsPerPage] = useState(50);
 
-  // Sorting state
-  const [productSortBy, setProductSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
-  const [productSortOrder, setProductSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
-  const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
-
   // Order details
   const [orderDetails, setOrderDetails] = useState({
     expectedDelivery: '',
@@ -86,15 +80,15 @@ export default function NewOrder() {
     loadRawMaterialsWithFilters();
   }, []);
 
-  // Reload products when page/filters/sorting change
+  // Reload products when page/filters change
   useEffect(() => {
     loadProductsWithFilters();
-  }, [productPage, productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder]);
+  }, [productPage, productSearchTerm, productCategoryFilter, productColorFilter]);
 
-  // Reload materials when page/sorting changes (not search - search is handled in dialog)
+  // Reload materials when page changes (not search - search is handled in dialog)
   useEffect(() => {
     loadRawMaterialsWithFilters();
-  }, [materialPage, materialSortBy, materialSortOrder]);
+  }, [materialPage]);
 
   const loadCustomers = async () => {
     try {
@@ -118,10 +112,6 @@ export default function NewOrder() {
       if (productSearchTerm) filters.search = productSearchTerm;
       if (productCategoryFilter !== 'all') filters.category = [productCategoryFilter];
       if (productColorFilter !== 'all') filters.color = [productColorFilter];
-      
-      // Add sorting parameters
-      filters.sortBy = productSortBy;
-      filters.sortOrder = productSortOrder;
 
       const { products: data } = await ProductService.getProducts(filters);
       
@@ -179,10 +169,6 @@ export default function NewOrder() {
       };
       // Don't send search to API - handle search in dialog for more flexibility
       // if (productSearchTerm) filters.search = productSearchTerm;
-      
-      // Add sorting parameters
-      filters.sortBy = materialSortBy;
-      filters.sortOrder = materialSortOrder;
 
       const result = await MaterialService.getMaterials(filters);
       // Map materials to expected format
@@ -643,14 +629,6 @@ export default function NewOrder() {
           materialItemsPerPage={materialItemsPerPage}
           onProductPageChange={setProductPage}
           onMaterialPageChange={setMaterialPage}
-          productSortBy={productSortBy}
-          productSortOrder={productSortOrder}
-          materialSortBy={materialSortBy}
-          materialSortOrder={materialSortOrder}
-          onProductSortChange={setProductSortBy}
-          onProductSortOrderChange={setProductSortOrder}
-          onMaterialSortChange={setMaterialSortBy}
-          onMaterialSortOrderChange={setMaterialSortOrder}
         />
       </div>
     </Layout>

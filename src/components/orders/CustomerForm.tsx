@@ -12,6 +12,7 @@ import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { isValidPhoneNumber } from 'libphonenumber-js';
+import { validateEmail } from '@/utils/formValidation';
 
 interface CustomerFormProps {
   onCustomerCreated: (customer: Customer) => void;
@@ -24,6 +25,14 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const [isFetchingGST, setIsFetchingGST] = useState(false);
   const [gstAutoFilled, setGstAutoFilled] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  
+  // Track which fields have been touched for validation messages
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
@@ -216,18 +225,17 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     }
 
     try {
-      // Convert empty strings to undefined for optional fields (prevents MongoDB duplicate key errors)
       const customerData = {
         name: newCustomer.name.trim(),
-        email: (newCustomer.email && newCustomer.email.trim()) ? newCustomer.email.trim() : undefined,
+        email: newCustomer.email.trim() || undefined,
         phone: newCustomer.phone.trim(),
-        address: (newCustomer.address && newCustomer.address.trim()) ? newCustomer.address.trim() : undefined,
-        city: (newCustomer.city && newCustomer.city.trim()) ? newCustomer.city.trim() : undefined,
-        state: (newCustomer.state && newCustomer.state.trim()) ? newCustomer.state.trim() : undefined,
-        pincode: (newCustomer.pincode && newCustomer.pincode.trim()) ? newCustomer.pincode.trim() : undefined,
+        address: newCustomer.address.trim() || undefined,
+        city: newCustomer.city.trim() || undefined,
+        state: newCustomer.state.trim() || undefined,
+        pincode: newCustomer.pincode.trim() || undefined,
         customer_type: newCustomer.customerType,
-        gst_number: (newCustomer.gstNumber && newCustomer.gstNumber.trim()) ? newCustomer.gstNumber.trim() : undefined,
-        company_name: (newCustomer.companyName && newCustomer.companyName.trim()) ? newCustomer.companyName.trim() : undefined,
+        gst_number: newCustomer.gstNumber.trim() || undefined,
+        company_name: newCustomer.companyName.trim() || undefined,
       };
 
       const { data: newCustomerData, error } = await CustomerService.createCustomer(customerData);
@@ -297,9 +305,15 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             <Input
               value={newCustomer.name}
               onChange={e => handleNameChange(e.target.value)}
+              onBlur={() => markFieldTouched('name')}
               placeholder="Enter customer name"
+              className={touchedFields.has('name') && !newCustomer.name.trim() ? 'border-red-500' : ''}
             />
-            <p className="text-xs text-gray-500">Max 8 words, 20 characters per word</p>
+            {touchedFields.has('name') && !newCustomer.name.trim() ? (
+              <p className="text-xs text-red-500 mt-1">Full name is required</p>
+            ) : (
+              <p className="text-xs text-gray-500">Max 8 words, 20 characters per word</p>
+            )}
           </div>
         </div>
 
@@ -307,12 +321,17 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Phone Number *</Label>
-            <PhoneInput
-              defaultCountry="in"
-              value={newCustomer.phone}
-              onChange={(value) => setNewCustomer({ ...newCustomer, phone: value })}
-              placeholder="Enter phone number"
-            />
+            <div onBlur={() => markFieldTouched('phone')}>
+              <PhoneInput
+                defaultCountry="in"
+                value={newCustomer.phone}
+                onChange={(value) => setNewCustomer({ ...newCustomer, phone: value })}
+                placeholder="Enter phone number"
+              />
+            </div>
+            {touchedFields.has('phone') && (!newCustomer.phone || newCustomer.phone.trim() === '' || newCustomer.phone.trim() === '+91') && (
+              <p className="text-xs text-red-500 mt-1">Phone number is required</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -320,9 +339,28 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             <Input
               type="email"
               value={newCustomer.email}
-              onChange={e => setNewCustomer({ ...newCustomer, email: e.target.value })}
+              onChange={(e) => {
+                const value = e.target.value;
+                setNewCustomer({ ...newCustomer, email: value });
+                // Validate email on change
+                const error = validateEmail(value);
+                setEmailError(error);
+              }}
+              onBlur={() => {
+                const error = validateEmail(newCustomer.email);
+                setEmailError(error);
+              }}
               placeholder="Enter email (optional)"
+              className={emailError ? 'border-red-500' : ''}
             />
+            {emailError && (
+              <p className="text-xs text-red-500 mt-1">{emailError}</p>
+            )}
+            {!emailError && newCustomer.email && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {newCustomer.email.length}/320 characters
+              </p>
+            )}
           </div>
         </div>
 
@@ -405,7 +443,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!newCustomer.name.trim() || !newCustomer.phone.trim()}
+            disabled={!newCustomer.name.trim() || !newCustomer.email.trim() || !newCustomer.phone.trim()}
             className="flex-1"
           >
             <Save className="w-4 h-4 mr-2" />

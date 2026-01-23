@@ -10,6 +10,7 @@ import type { PricingUnit } from '@/utils/unitConverter';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import { useState, useEffect } from 'react';
 import { IndividualProductService } from '@/services/individualProductService';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface OrderItemFormProps {
   item: ExtendedOrderItem;
@@ -239,10 +240,12 @@ export default function OrderItemForm({
             type="number"
             value={item.quantity || ''}
             onChange={e => {
-              const value = e.target.value;
-              onUpdate(item.id, 'quantity', value === '' ? '' : parseInt(value) || '');
+              const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+              onUpdate(item.id, 'quantity', validation.value === '' ? '' : parseInt(validation.value) || '');
             }}
             min="1"
+            max="99999"
+            step="1"
             placeholder="Enter quantity"
           />
         </div>
@@ -285,10 +288,13 @@ export default function OrderItemForm({
           <Input
             type="number"
             value={item.unit_price || ''}
-            onChange={e => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+            onChange={e => {
+              const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
+              onUpdate(item.id, 'unit_price', validation.value === '' ? 0 : parseFloat(validation.value) || 0);
+            }}
             min="0"
+            max="9999999.99"
             step="0.01"
-            placeholder=""
           />
         </div>
 
@@ -298,7 +304,8 @@ export default function OrderItemForm({
             type="number"
             value={item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : ''}
             onChange={e => {
-              const inputValue = e.target.value;
+              const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
+              const inputValue = validation.value;
               // Allow empty string - user can clear the field completely
               if (inputValue === '') {
                 // When field is empty, keep it empty (don't set to 0 yet)

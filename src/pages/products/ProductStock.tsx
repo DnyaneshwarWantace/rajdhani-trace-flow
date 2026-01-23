@@ -129,11 +129,9 @@ export default function ProductStock() {
     available: allIndividualProducts.filter((p) => p.status === 'available').length,
     in_production: allIndividualProducts.filter((p) => p.status === 'in_production').length,
     used: allIndividualProducts.filter((p) => p.status === 'used').length,
-    quality_check: allIndividualProducts.filter((p) => p.status === 'quality_check').length,
     reserved: allIndividualProducts.filter((p) => p.status === 'reserved').length,
     sold: allIndividualProducts.filter((p) => p.status === 'sold').length,
     damaged: allIndividualProducts.filter((p) => p.status === 'damaged').length,
-    returned: allIndividualProducts.filter((p) => p.status === 'returned').length,
     total: allIndividualProducts.length,
   };
 

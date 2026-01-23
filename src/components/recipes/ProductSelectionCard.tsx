@@ -45,7 +45,7 @@ export default function ProductSelectionCard({
       
       // Also explicitly set the name and unit to ensure they're set even if product lookup fails
       onUpdateItem(index, 'productName', product.name);
-      onUpdateItem(index, 'unit', product.unit || 'piece');
+      onUpdateItem(index, 'unit', product.unit || 'rolls');
       
       console.log('All state updates called, waiting before closing dialog');
       
@@ -121,8 +121,8 @@ export default function ProductSelectionCard({
                 )}
               </div>
 
-              {/* Quantity - Smaller on mobile */}
-              <div className="w-full md:w-24">
+              {/* Quantity - Larger input field */}
+              <div className="w-full md:w-64">
                 <Label htmlFor={`quantity-${index}`} className="text-sm font-medium">
                   Quantity
                 </Label>
@@ -143,20 +143,21 @@ export default function ProductSelectionCard({
                     // Select all text when focused to make it easy to replace
                     e.target.select();
                   }}
-                  className="mt-1"
+                  className="mt-1 h-10 text-base"
                 />
               </div>
 
-              {/* Unit - Smaller on mobile */}
-              <div className="w-full md:w-24">
+              {/* Unit - Larger input field */}
+              <div className="w-full md:w-64">
                 <Label htmlFor={`unit-${index}`} className="text-sm font-medium">
                   Unit
                 </Label>
                 <Input
                   id={`unit-${index}`}
-                  value={item.unit}
+                  value={item.unit || ''}
+                  placeholder="rolls"
                   readOnly
-                  className="mt-1 bg-muted"
+                  className="mt-1 bg-muted h-10 text-base"
                 />
               </div>
 

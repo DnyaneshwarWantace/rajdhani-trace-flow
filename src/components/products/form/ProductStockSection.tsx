@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProductDropdownField from './ProductDropdownField';
 import type { ProductFormData } from '@/types/product';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface ProductStockSectionProps {
   formData: ProductFormData;
@@ -10,6 +11,8 @@ interface ProductStockSectionProps {
   onDeleteUnit: (value: string) => Promise<void>;
   reloadDropdowns: () => Promise<void>;
   mode?: 'create' | 'edit' | 'duplicate';
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 export default function ProductStockSection({
@@ -19,6 +22,8 @@ export default function ProductStockSection({
   onDeleteUnit,
   reloadDropdowns,
   mode = 'create',
+  touchedFields = new Set(),
+  markFieldTouched = () => {},
 }: ProductStockSectionProps) {
   const isEditMode = mode === 'edit';
   const isQuantityDisabled = isEditMode;
@@ -42,48 +47,64 @@ export default function ProductStockSection({
               <span className="text-sm text-gray-500">(Read Only)</span>
             </div>
           ) : (
-            <Input
-              id="quantity"
-              type="number"
-              value={formData.base_quantity ?? ''}
-              onChange={(e) => {
-                const value = e.target.value;
-                // Allow empty string, 0, or any positive number
-                if (value === '') {
-                  onFormDataChange({ base_quantity: '' as any });
-                } else {
-                  const numValue = Number(value);
-                  if (!isNaN(numValue) && numValue >= 0) {
-                    onFormDataChange({ base_quantity: numValue });
-                  }
-                }
-              }}
-              placeholder="Enter quantity"
-              min="0"
-            />
+            <>
+              <Input
+                id="quantity"
+                type="number"
+                value={formData.base_quantity ?? ''}
+                onChange={(e) => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+                  onFormDataChange({ base_quantity: validation.value === '' ? '' as any : parseInt(validation.value) || 0 });
+                }}
+                onBlur={() => markFieldTouched('base_quantity')}
+                min="0"
+                max="99999"
+                step="1"
+              />
+              {touchedFields.has('base_quantity') && (formData.base_quantity === null || formData.base_quantity === undefined || formData.base_quantity === 0 || formData.base_quantity === '' || String(formData.base_quantity).trim() === '') && (
+                <p className="text-xs text-red-500 mt-1">
+                  Base quantity is required
+                </p>
+              )}
+            </>
           )}
-          <p className="text-xs text-gray-500 mt-1">
-            {isQuantityDisabled
-              ? 'Quantity cannot be edited. Use inventory management to update stock.'
-              : 'Initial stock quantity'}
-          </p>
+          {!touchedFields.has('base_quantity') || (formData.base_quantity !== null && formData.base_quantity !== undefined && formData.base_quantity !== 0 && formData.base_quantity !== '' && String(formData.base_quantity).trim() !== '') ? (
+            <p className="text-xs text-gray-500 mt-1">
+              {isQuantityDisabled
+                ? 'Quantity cannot be edited. Use inventory management to update stock.'
+                : 'Initial stock quantity'}
+            </p>
+          ) : null}
         </div>
 
-        <ProductDropdownField
-          label="Unit"
-          value={formData.unit}
-          placeholder="Select unit (e.g., SQM, kg, meters)"
-          options={units}
-          searchable
-          required
-          category="unit"
-          onValueChange={(value) => onFormDataChange({ unit: value })}
-          onDelete={onDeleteUnit}
-          reloadDropdowns={reloadDropdowns}
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Note: Unit is for measurement (SQM, kg, meters, etc.). Stock count is displayed in rolls (1 roll, 2 rolls, etc.) regardless of unit.
-        </p>
+        <div onBlur={() => markFieldTouched('unit')}>
+          <ProductDropdownField
+            label="Unit"
+            value={formData.unit}
+            placeholder="Select unit (e.g., SQM, kg, meters)"
+            options={units}
+            searchable
+            required
+            category="unit"
+            onValueChange={(value) => {
+              onFormDataChange({ unit: value });
+            }}
+            onDelete={onDeleteUnit}
+            reloadDropdowns={reloadDropdowns}
+            markFieldTouched={markFieldTouched}
+            fieldName="unit"
+          />
+          {touchedFields.has('unit') && !formData.unit.trim() && (
+            <p className="text-xs text-red-500 mt-1">
+              Unit is required
+            </p>
+          )}
+          {!touchedFields.has('unit') || formData.unit.trim() ? (
+            <p className="text-xs text-gray-500 mt-1">
+              Note: Unit is for measurement (SQM, kg, meters, etc.). Stock count is displayed in rolls (1 roll, 2 rolls, etc.) regardless of unit.
+            </p>
+          ) : null}
+        </div>
       </div>
 
       {/* Individual Stock Tracking */}

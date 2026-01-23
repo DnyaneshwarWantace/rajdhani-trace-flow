@@ -175,8 +175,15 @@ export default function SupplierList() {
       return;
     }
 
-    // Phone validation using libphonenumber-js (validates according to country code)
+    // Phone validation - check if it's just a country code
     if (formData.phone && formData.phone.trim()) {
+      const isJustCountryCode = /^\+\d{1,4}$/.test(formData.phone.trim());
+      if (isJustCountryCode) {
+        toast({ title: 'Validation Error', description: 'Please enter a complete phone number', variant: 'destructive' });
+        return;
+      }
+
+      // Phone validation using libphonenumber-js (validates according to country code)
       if (!isValidPhoneNumber(formData.phone)) {
         toast({ title: 'Validation Error', description: 'Please enter a valid phone number for the selected country', variant: 'destructive' });
         return;

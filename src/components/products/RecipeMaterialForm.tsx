@@ -7,6 +7,7 @@ import MaterialSelectorDialog from './MaterialSelectorDialog';
 import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface RecipeMaterial {
   materialId: string;
@@ -170,13 +171,11 @@ export default function RecipeMaterialForm({
             <Label htmlFor="materialQuantity">Quantity *</Label>
             <Input
               id="materialQuantity"
-              type="text"
+              type="number"
               value={newMaterial.quantity}
               onChange={(e) => {
-                const value = e.target.value;
-                if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                  onMaterialChange({ ...newMaterial, quantity: value });
-                }
+                const validation = validateNumberInput(e.target.value, ValidationPresets.RECIPE_QUANTITY);
+                onMaterialChange({ ...newMaterial, quantity: validation.value });
               }}
               onKeyDown={(e) => {
                 // Prevent form submission on Enter key
@@ -185,6 +184,9 @@ export default function RecipeMaterialForm({
                   e.stopPropagation();
                 }
               }}
+              min="0"
+              max="9999.999"
+              step="0.001"
             />
             <p className="text-xs text-gray-500 mt-1">
               {isProduct

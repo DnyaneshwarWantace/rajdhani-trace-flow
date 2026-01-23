@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import { validateEmail } from '@/utils/formValidation';
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -42,6 +43,14 @@ export default function CustomerFormDialog({
   selectedCustomer,
   submitting,
 }: CustomerFormDialogProps) {
+  // Track which fields have been touched
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
+
   // Phone number - preserve country code when clearing (same as SupplierFormDialog)
   const handlePhoneChange = (value: string) => {
     // If value is empty or just country code, preserve country code from current value
@@ -271,34 +280,75 @@ export default function CustomerFormDialog({
               <Input
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value, 'name')}
-                required
+                onBlur={() => markFieldTouched('name')}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                {nameWordCount}/8 words • Max 20 characters per word
-              </p>
+              {touchedFields.has('name') && !formData.name.trim() ? (
+                <p className="text-xs text-red-500 mt-1">
+                  Customer name is required
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {nameWordCount}/8 words • Max 20 characters per word
+                </p>
+              )}
             </div>
             <div>
               <Label>Email</Label>
               <Input
                 type="email"
-                value={formData.email}
-                onChange={(e) => onFormDataChange({ ...formData, email: e.target.value })}
+                value={formData.email || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onFormDataChange({ ...formData, email: value });
+                  // Validate email on change
+                  const error = validateEmail(value);
+                  setEmailError(error);
+                }}
+                onBlur={() => {
+                  const error = validateEmail(formData.email);
+                  setEmailError(error);
+                  markFieldTouched('email');
+                }}
+                className={emailError ? 'border-red-500' : ''}
               />
+              {emailError && (
+                <p className="text-xs text-red-500 mt-1">{emailError}</p>
+              )}
+              {!emailError && formData.email && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.email.length}/320 characters
+                </p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Phone *</Label>
-              <PhoneInput
-                defaultCountry="in"
-                value={formData.phone}
-                onChange={handlePhoneChange}
-                placeholder="Enter phone number"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Select country and enter number
-              </p>
+              <div onBlur={() => markFieldTouched('phone')}>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={formData.phone}
+                  onChange={handlePhoneChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              {(() => {
+                const isJustCountryCode = /^\+\d{1,4}$/.test(formData.phone?.trim() || '');
+                const showError = touchedFields.has('phone') && isJustCountryCode;
+                if (showError) {
+                  return (
+                    <p className="text-xs text-red-500 mt-1">
+                      Please enter a complete phone number
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select country and enter number
+                  </p>
+                );
+              })()}
             </div>
             <div>
               <Label>GST Number</Label>
@@ -597,7 +647,11 @@ export default function CustomerFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting} className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white">
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white"
+            >
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {selectedCustomer ? 'Update' : 'Create'}
             </Button>

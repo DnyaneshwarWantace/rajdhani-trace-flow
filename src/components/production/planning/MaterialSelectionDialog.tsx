@@ -147,13 +147,13 @@ export default function MaterialSelectionDialog({
     }
   }, [isOpen, activeTab]);
 
-  // Load materials when filters or sorting change
+  // Load materials when filters change
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
       loadMaterials();
     }
-  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter, sortBy, sortOrder]);
+  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
 
   // Load filtered materials when page changes
   useEffect(() => {
@@ -224,10 +224,8 @@ export default function MaterialSelectionDialog({
           // Don't send search to API - handle search client-side for more fields
           // search: searchQuery || undefined,
           category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
-          page: categoryFilter.length > 1 || searchQuery ? 1 : currentPage, // Always fetch from page 1 if client-side filtering
+          page: currentPage,
           limit: categoryFilter.length > 1 || searchQuery ? 1000 : itemsPerPage, // Fetch all if search or multiple categories
-          sortBy: sortBy,
-          sortOrder: sortOrder,
         });
 
         let materialsData = response.materials || [];
@@ -263,43 +261,9 @@ export default function MaterialSelectionDialog({
           materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
         }
 
-        // Apply client-side sorting if needed (when doing client-side filtering)
-        const needsClientSideSorting = searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1;
-        if (needsClientSideSorting) {
-          materialsData.sort((a: any, b: any) => {
-            let aValue: any;
-            let bValue: any;
-            
-            switch (sortBy) {
-              case 'name':
-                aValue = (a.name || '').toLowerCase();
-                bValue = (b.name || '').toLowerCase();
-                break;
-              case 'stock':
-                aValue = a.current_stock || 0;
-                bValue = b.current_stock || 0;
-                break;
-              case 'category':
-                aValue = (a.category || '').toLowerCase();
-                bValue = (b.category || '').toLowerCase();
-                break;
-              case 'recent':
-                aValue = new Date(a.created_at || 0).getTime();
-                bValue = new Date(b.created_at || 0).getTime();
-                break;
-              default:
-                return 0;
-            }
-            
-            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
         // Paginate client-side if search or multiple filters selected
         const totalFilteredCount = materialsData.length;
-        if (needsClientSideSorting) {
+        if (searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1) {
           const startIdx = (currentPage - 1) * itemsPerPage;
           const endIdx = startIdx + itemsPerPage;
           materialsData = materialsData.slice(startIdx, endIdx);
@@ -325,7 +289,6 @@ export default function MaterialSelectionDialog({
         setTotalPages(Math.ceil((searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
       } else {
         // Fetch filtered products for display
-        const needsClientSideFiltering = categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1;
         const response = await ProductService.getProducts({
           search: searchQuery || undefined,
           category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
@@ -335,10 +298,8 @@ export default function MaterialSelectionDialog({
           length: lengthFilter.length > 0 ? lengthFilter : undefined,
           width: widthFilter.length > 0 ? widthFilter : undefined,
           weight: weightFilter.length > 0 ? weightFilter : undefined,
-          page: needsClientSideFiltering ? 1 : currentPage, // Always fetch from page 1 if client-side filtering
-          limit: needsClientSideFiltering ? 1000 : itemsPerPage,
-          sortBy: sortBy,
-          sortOrder: sortOrder,
+          page: currentPage,
+          limit: categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? 1000 : itemsPerPage,
         });
 
         let productsData = response.products || [];
@@ -377,42 +338,9 @@ export default function MaterialSelectionDialog({
           });
         }
 
-        // Apply client-side sorting if needed (when doing client-side filtering)
-        if (needsClientSideFiltering) {
-          productsData.sort((a: any, b: any) => {
-            let aValue: any;
-            let bValue: any;
-            
-            switch (sortBy) {
-              case 'name':
-                aValue = (a.name || '').toLowerCase();
-                bValue = (b.name || '').toLowerCase();
-                break;
-              case 'stock':
-                aValue = a.current_stock || 0;
-                bValue = b.current_stock || 0;
-                break;
-              case 'category':
-                aValue = (a.category || '').toLowerCase();
-                bValue = (b.category || '').toLowerCase();
-                break;
-              case 'recent':
-                aValue = new Date(a.created_at || 0).getTime();
-                bValue = new Date(b.created_at || 0).getTime();
-                break;
-              default:
-                return 0;
-            }
-            
-            if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-            if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-          });
-        }
-
         // Paginate client-side if multiple filters selected
         const totalFilteredCount = productsData.length;
-        if (needsClientSideFiltering) {
+        if (categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1) {
           const startIdx = (currentPage - 1) * itemsPerPage;
           const endIdx = startIdx + itemsPerPage;
           productsData = productsData.slice(startIdx, endIdx);

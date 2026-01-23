@@ -136,9 +136,67 @@ export const VALIDATION_RULES = {
 
   EMAIL: {
     required: false,
-    maxLength: 100,
+    minLength: 5, // Minimum: a@b.c
+    maxLength: 320, // Maximum total length per RFC 5322
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     patternMessage: 'Please enter a valid email address',
+    custom: (value: string) => {
+      if (!value || value.trim() === '') return null; // Optional field
+      
+      const trimmed = value.trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      
+      // Basic format check
+      if (!emailRegex.test(trimmed)) {
+        return 'Please enter a valid email address';
+      }
+      
+      // Split into local and domain parts
+      const parts = trimmed.split('@');
+      if (parts.length !== 2) {
+        return 'Email must contain exactly one @ symbol';
+      }
+      
+      const [localPart, domainPart] = parts;
+      
+      // Local part validation (before @)
+      if (localPart.length < 1) {
+        return 'Email local part must have at least 1 character';
+      }
+      if (localPart.length > 64) {
+        return 'Email local part cannot exceed 64 characters';
+      }
+      if (localPart.startsWith('.') || localPart.endsWith('.')) {
+        return 'Email local part cannot start or end with a period';
+      }
+      if (localPart.includes('..')) {
+        return 'Email local part cannot have consecutive periods';
+      }
+      
+      // Domain part validation (after @)
+      if (domainPart.length < 1) {
+        return 'Email domain must have at least 1 character';
+      }
+      if (domainPart.length > 253) {
+        return 'Email domain cannot exceed 253 characters';
+      }
+      if (!domainPart.includes('.')) {
+        return 'Email domain must contain at least one dot (e.g., .com)';
+      }
+      if (domainPart.startsWith('.') || domainPart.endsWith('.')) {
+        return 'Email domain cannot start or end with a period';
+      }
+      if (domainPart.includes('..')) {
+        return 'Email domain cannot have consecutive periods';
+      }
+      
+      // Total length check
+      if (trimmed.length > 320) {
+        return 'Email address cannot exceed 320 characters';
+      }
+      
+      return null;
+    },
   } as ValidationRule,
 
   // Address validations
@@ -310,3 +368,64 @@ export function formatValidationErrors(errors: string[]): string {
   return `Please fix the following:\n${errors.map((e, i) => `${i + 1}. ${e}`).join('\n')}`;
 }
 
+/**
+ * Validate email address with detailed rules
+ * Returns error message or null if valid
+ */
+export function validateEmail(email: string | undefined | null): string | null {
+  if (!email || email.trim() === '') return null; // Optional field
+  
+  const trimmed = email.trim();
+  
+  // Basic format check
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(trimmed)) {
+    return 'Please enter a valid email address';
+  }
+  
+  // Split into local and domain parts
+  const parts = trimmed.split('@');
+  if (parts.length !== 2) {
+    return 'Email must contain exactly one @ symbol';
+  }
+  
+  const [localPart, domainPart] = parts;
+  
+  // Local part validation (before @)
+  if (localPart.length < 1) {
+    return 'Email local part must have at least 1 character';
+  }
+  if (localPart.length > 64) {
+    return 'Email local part cannot exceed 64 characters';
+  }
+  if (localPart.startsWith('.') || localPart.endsWith('.')) {
+    return 'Email local part cannot start or end with a period';
+  }
+  if (localPart.includes('..')) {
+    return 'Email local part cannot have consecutive periods';
+  }
+  
+  // Domain part validation (after @)
+  if (domainPart.length < 1) {
+    return 'Email domain must have at least 1 character';
+  }
+  if (domainPart.length > 253) {
+    return 'Email domain cannot exceed 253 characters';
+  }
+  if (!domainPart.includes('.')) {
+    return 'Email domain must contain at least one dot (e.g., .com)';
+  }
+  if (domainPart.startsWith('.') || domainPart.endsWith('.')) {
+    return 'Email domain cannot start or end with a period';
+  }
+  if (domainPart.includes('..')) {
+    return 'Email domain cannot have consecutive periods';
+  }
+  
+  // Total length check
+  if (trimmed.length > 320) {
+    return 'Email address cannot exceed 320 characters';
+  }
+  
+  return null;
+}
