@@ -33,6 +33,14 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const markFieldTouched = (fieldName: string) => {
     setTouchedFields(prev => new Set(prev).add(fieldName));
   };
+
+  // Reset touched fields when form is cancelled
+  const handleCancel = () => {
+    setTouchedFields(new Set());
+    setEmailError(null);
+    onCancel();
+  };
+
   const [newCustomer, setNewCustomer] = useState({
     name: '',
     email: '',
@@ -502,7 +510,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
         </div>
 
         <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={onCancel} className="flex-1">
+          <Button variant="outline" onClick={handleCancel} className="flex-1">
             <X className="w-4 h-4 mr-2" />
             Cancel
           </Button>

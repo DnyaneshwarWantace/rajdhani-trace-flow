@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import type { Customer, CreateCustomerData } from '@/services/customerService';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
@@ -50,6 +50,14 @@ export default function CustomerFormDialog({
   const markFieldTouched = (fieldName: string) => {
     setTouchedFields(prev => new Set(prev).add(fieldName));
   };
+
+  // Reset touched fields when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setTouchedFields(new Set());
+      setEmailError(null);
+    }
+  }, [isOpen]);
 
   // Phone number - preserve country code when clearing (same as SupplierFormDialog)
   const handlePhoneChange = (value: string) => {

@@ -217,27 +217,30 @@ export default function ProductionIndividualProducts() {
       p.id && !p.id.startsWith('temp-')
     );
 
-    if (createdProducts.length === 0) {
+    const plannedQty = batch?.planned_quantity || 0;
+
+    // Must have at least plannedQuantity number of created products
+    if (createdProducts.length < plannedQty) {
       toast({
         title: 'Cannot Complete Production',
-        description: 'No individual products have been created and added to stock. Please create and save at least one individual product before completing.',
+        description: `You must create and save at least ${plannedQty} individual product(s) before completing. Currently you have ${createdProducts.length} product(s).`,
         variant: 'destructive',
       });
       return;
     }
 
-    // Validate that all created products have required fields
+    // Validate that at least plannedQuantity products have all required fields
     const requiredFields = ['final_weight', 'final_width', 'final_length'];
-    const incompleteProducts = createdProducts.filter(p => 
-      requiredFields.some(field => !p[field as keyof IndividualProduct] || 
+    const completeProducts = createdProducts.filter(p => 
+      requiredFields.every(field => p[field as keyof IndividualProduct] && 
         (typeof p[field as keyof IndividualProduct] === 'string' && 
-         (p[field as keyof IndividualProduct] as string).trim() === ''))
+         (p[field as keyof IndividualProduct] as string).trim() !== ''))
     );
 
-    if (incompleteProducts.length > 0) {
+    if (completeProducts.length < plannedQty) {
       toast({
         title: 'Cannot Complete Production',
-        description: `${incompleteProducts.length} products have incomplete data. Please fill in all required fields (Final Weight, Final Width, Final Length).`,
+        description: `You must fill in all required fields (Final Weight, Final Width, Final Length) for at least ${plannedQty} product(s). Currently ${completeProducts.length} product(s) are complete.`,
         variant: 'destructive',
       });
       return;
@@ -269,9 +272,13 @@ export default function ProductionIndividualProducts() {
     p.id && !p.id.startsWith('temp-')
   );
 
-  const canComplete = createdProducts.length > 0 && createdProducts.every(p => 
+  const plannedQty = batch?.planned_quantity || 0;
+  const completeProducts = createdProducts.filter(p => 
     p.final_weight && p.final_width && p.final_length
   );
+
+  // Can complete if at least plannedQuantity products are created and complete
+  const canComplete = createdProducts.length >= plannedQty && completeProducts.length >= plannedQty;
 
   if (loading) {
     return (
@@ -323,7 +330,7 @@ export default function ProductionIndividualProducts() {
           <>
             <ProductionOverviewStats
               targetQuantity={batch?.planned_quantity || 0}
-              unit={product.unit || 'units'}
+              unit={product.count_unit || product.unit || 'units'}
               materialsUsed={consumedMaterials.length}
               expectedLength={product.length ? parseFloat(product.length) : undefined}
               expectedWidth={product.width ? parseFloat(product.width) : undefined}

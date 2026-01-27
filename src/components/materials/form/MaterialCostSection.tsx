@@ -15,7 +15,7 @@ const MaterialCostSection = forwardRef<HTMLInputElement, MaterialCostSectionProp
   ({ costPerUnit, onCostPerUnitChange, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
     return (
       <div>
-        <Label htmlFor="costPerUnit">Cost/Unit (₹) *</Label>
+        <Label htmlFor="costPerUnit">Cost/Unit (₹)</Label>
         <Input
           ref={ref}
           id="costPerUnit"
@@ -29,16 +29,10 @@ const MaterialCostSection = forwardRef<HTMLInputElement, MaterialCostSectionProp
           min="0"
           max="9999999.99"
           step="0.01"
-          className={(hasError || (touchedFields.has('costPerUnit') && (!costPerUnit || costPerUnit.trim() === '' || parseFloat(costPerUnit) === 0))) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+          placeholder="Optional"
+          className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
         />
-        {touchedFields.has('costPerUnit') && (!costPerUnit || costPerUnit.trim() === '' || parseFloat(costPerUnit) === 0) && (
-          <p className="text-xs text-red-500 mt-1">
-            Cost per unit is required
-          </p>
-        )}
-        {(!touchedFields.has('costPerUnit') || (costPerUnit && costPerUnit.trim() !== '' && parseFloat(costPerUnit) > 0)) && (
-          <p className="text-xs text-muted-foreground mt-1">Cost per unit</p>
-        )}
+        <p className="text-xs text-muted-foreground mt-1">Optional - Cost per unit</p>
       </div>
     );
   }

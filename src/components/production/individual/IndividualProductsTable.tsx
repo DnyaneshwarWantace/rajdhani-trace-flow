@@ -66,60 +66,62 @@ export default function IndividualProductsTable({
     'Temporary Storage',
   ];
 
-  // Auto-populate rows based on planned quantity if no products exist
+  // Auto-populate rows based on planned quantity - always maintain at least plannedQuantity rows
   useEffect(() => {
-    if (individualProducts.length === 0 && plannedQuantity > 0 && productId) {
-      // Create empty rows for planned quantity only if localProducts is also empty
-      if (localProducts.length === 0) {
-        const newProducts: IndividualProduct[] = Array.from({ length: plannedQuantity }).map((_, index) => ({
-          _id: `temp-${Date.now()}-${index}`,
-          id: `temp-${Date.now()}-${index}`,
-          product_id: productId,
-          qr_code: '',
-          serial_number: '',
-          status: 'available', // Default to available (not in_production)
-          production_date: new Date().toISOString().split('T')[0],
-          batch_number: batchId || '',
-          final_weight: '',
-          final_width: '',
-          final_length: '',
-          inspector: '',
-          location: '',
-          notes: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-        setLocalProducts(newProducts);
+    if (!productId || plannedQuantity <= 0) return;
+
+    // Merge backend products with local temporary products
+    const tempProducts = localProducts.filter(p => p.id.startsWith('temp-'));
+    const backendProducts = individualProducts.filter(p => !p.id.startsWith('temp-'));
+    
+    // Start with temporary products (preserve them)
+    const mergedProducts: IndividualProduct[] = [...tempProducts];
+    
+    // Add/update backend products
+    backendProducts.forEach(backendProduct => {
+      const existingIndex = mergedProducts.findIndex(p => p.id === backendProduct.id);
+      if (existingIndex >= 0) {
+        // Update existing product with backend data
+        mergedProducts[existingIndex] = backendProduct;
+      } else {
+        // Add new backend product
+        mergedProducts.push(backendProduct);
       }
-    } else {
-      // Merge backend products with local temporary products
-      // Keep temporary products that haven't been saved yet
-      const tempProducts = localProducts.filter(p => p.id.startsWith('temp-'));
-      const backendProducts = individualProducts.filter(p => !p.id.startsWith('temp-'));
-      
-      // Start with temporary products (preserve them)
-      const mergedProducts: IndividualProduct[] = [...tempProducts];
-      
-      // Add/update backend products
-      backendProducts.forEach(backendProduct => {
-        const existingIndex = mergedProducts.findIndex(p => p.id === backendProduct.id);
-        if (existingIndex >= 0) {
-          // Update existing product with backend data
-          mergedProducts[existingIndex] = backendProduct;
-        } else {
-          // Add new backend product
-          mergedProducts.push(backendProduct);
-        }
-      });
-      
-      // Only update if there are actual changes
-      const localIds = localProducts.map(p => p.id).sort().join(',');
-      const mergedIds = mergedProducts.map(p => p.id).sort().join(',');
-      
-      if (localIds !== mergedIds || mergedProducts.length !== localProducts.length) {
-        setLocalProducts(mergedProducts);
-      }
+    });
+    
+    // Ensure we have at least plannedQuantity rows
+    const currentCount = mergedProducts.length;
+    if (currentCount < plannedQuantity) {
+      const rowsToAdd = plannedQuantity - currentCount;
+      const newProducts: IndividualProduct[] = Array.from({ length: rowsToAdd }).map((_, index) => ({
+        _id: `temp-${Date.now()}-${index}`,
+        id: `temp-${Date.now()}-${index}`,
+        product_id: productId,
+        qr_code: '',
+        serial_number: '',
+        status: 'available',
+        production_date: new Date().toISOString().split('T')[0],
+        batch_number: batchId || '',
+        final_weight: '',
+        final_width: '',
+        final_length: '',
+        inspector: '',
+        location: '',
+        notes: '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+      mergedProducts.push(...newProducts);
     }
+    
+    // Only update if there are actual changes
+    const localIds = localProducts.map(p => p.id).sort().join(',');
+    const mergedIds = mergedProducts.map(p => p.id).sort().join(',');
+    
+    if (localIds !== mergedIds || mergedProducts.length !== localProducts.length) {
+      setLocalProducts(mergedProducts);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [individualProducts, plannedQuantity, productId, batchId]);
 
   const handleCellClick = (row: number, col: string) => {
@@ -372,6 +374,26 @@ export default function IndividualProductsTable({
 
   const handleRemoveRow = (index: number) => {
     const productToRemove = localProducts[index];
+    
+    // Don't allow deletion if we're at or below plannedQuantity
+    const nonTempProducts = localProducts.filter(p => !p.id.startsWith('temp-'));
+    
+    // Allow deletion if:
+    // 1. It's a temp product AND we have more than plannedQuantity total rows, OR
+    // 2. It's a real product AND we have more than plannedQuantity non-temp products
+    const canDelete = productToRemove.id.startsWith('temp-')
+      ? localProducts.length > plannedQuantity
+      : nonTempProducts.length > plannedQuantity;
+    
+    if (!canDelete) {
+      toast({
+        title: 'Cannot Remove',
+        description: `You must maintain at least ${plannedQuantity} products. You can add more rows if needed.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     const updated = localProducts.filter((_, i) => i !== index);
     setLocalProducts(updated);
     

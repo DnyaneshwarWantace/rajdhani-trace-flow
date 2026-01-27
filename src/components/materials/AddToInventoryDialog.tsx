@@ -61,7 +61,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     reorderPoint: '', // Optional - will default to 50 if empty
     supplier: '',
     costPerUnit: '',
-    color: 'NA',
+    color: '',
   });
 
   useEffect(() => {
@@ -127,10 +127,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setColors(colorValues);
       
-      // Set default type if available
-      if (typeValues.length > 0 && !typeValues.includes(formData.type)) {
-        setFormData({ ...formData, type: typeValues[0] });
-      }
+      // Don't set default type - let user select
     } catch (error) {
       console.error('Error loading dropdowns:', error);
       toast({
@@ -389,7 +386,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
         reorder_point: parseFloat(formData.reorderPoint) || 50,
         supplier_name: formData.supplier,
         cost_per_unit: parseFloat(formData.costPerUnit) || 0,
-        color: formData.type === 'color' ? formData.color : 'NA',
+        color: formData.type === 'color' && formData.color ? formData.color : 'NA',
         image_url: imageUrl,
       };
 
@@ -401,10 +398,9 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       });
 
       // Reset form
-      const defaultType = types.length > 0 ? types[0] : '';
       setFormData({
         name: '',
-        type: defaultType,
+        type: '',
         category: '',
         unit: '',
         currentStock: '0',
@@ -413,7 +409,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
         reorderPoint: '', // Optional - will default to 50 if empty
         supplier: '',
         costPerUnit: '',
-        color: 'NA',
+        color: '',
       });
       setImageFile(null);
       setImagePreview('');
@@ -572,7 +568,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
                 setFormData({
                   ...formData,
                   type: value,
-                  color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
+                  color: value !== 'color' ? '' : formData.color, // Keep color if type is 'color', otherwise clear
                 })
               }
               onColorChange={(value) => setFormData({ ...formData, color: value })}

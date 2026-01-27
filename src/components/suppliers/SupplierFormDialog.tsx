@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2 } from 'lucide-react';
 import type { Supplier, CreateSupplierData } from '@/services/supplierService';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
@@ -44,6 +44,14 @@ export default function SupplierFormDialog({
   const markFieldTouched = (fieldName: string) => {
     setTouchedFields(prev => new Set(prev).add(fieldName));
   };
+
+  // Reset touched fields when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setTouchedFields(new Set());
+      setEmailError(null);
+    }
+  }, [isOpen]);
 
   // Handler for name fields with different limits
   const handleNameChange = (value: string, field: 'name' | 'contact_person') => {

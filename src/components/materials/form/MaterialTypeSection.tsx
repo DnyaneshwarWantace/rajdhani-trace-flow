@@ -256,7 +256,7 @@ export default function MaterialTypeSection({
           <Label htmlFor="color">Color</Label>
           <Select value={color || ''} onValueChange={onColorChange}>
             <SelectTrigger id="color">
-              <SelectValue placeholder="Select color" />
+              <SelectValue placeholder="Add color" />
             </SelectTrigger>
             <SelectContent>
               {colors.length > 0 ? (
