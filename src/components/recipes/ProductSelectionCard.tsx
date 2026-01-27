@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Calculator, Plus, Minus, RefreshCw, Search } from 'lucide-react';
 import type { Product } from '@/types/product';
 import ProductSelectorDialog from './ProductSelectorDialog';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface RecipeCalculationItem {
   productId: string;
@@ -132,19 +133,19 @@ export default function ProductSelectionCard({
                   value={item.quantity === 0 ? '' : item.quantity.toString()}
                   placeholder="1"
                   onChange={(e) => {
-                    const value = e.target.value;
-                    // Allow empty string or positive numbers
-                    if (value === '' || /^\d+$/.test(value)) {
-                      const numValue = value === '' ? 0 : parseInt(value, 10);
-                      onUpdateItem(index, 'quantity', numValue);
-                    }
+                    const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+                    const numValue = validation.value === '' ? 0 : parseInt(validation.value, 10) || 0;
+                    onUpdateItem(index, 'quantity', numValue);
                   }}
                   onFocus={(e) => {
                     // Select all text when focused to make it easy to replace
                     e.target.select();
                   }}
+                  min="0"
+                  max="99999"
                   className="mt-1 h-10 text-base"
                 />
+                <p className="text-xs text-gray-500 mt-1">Max: 99,999</p>
               </div>
 
               {/* Unit - Larger input field */}
