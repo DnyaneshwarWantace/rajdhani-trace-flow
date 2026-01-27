@@ -6,10 +6,12 @@ interface MaterialBasicInfoProps {
   name: string;
   onNameChange: (value: string) => void;
   hasError?: boolean;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 const MaterialBasicInfo = forwardRef<HTMLInputElement, MaterialBasicInfoProps>(
-  ({ name, onNameChange, hasError = false }, ref) => {
+  ({ name, onNameChange, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let inputValue = e.target.value;
 
@@ -73,14 +75,22 @@ const MaterialBasicInfo = forwardRef<HTMLInputElement, MaterialBasicInfoProps>(
           id="materialName"
           value={name}
           onChange={handleChange}
+          onBlur={() => markFieldTouched('name')}
           placeholder="e.g., Cotton Yarn Premium"
           required
-          className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+          className={(hasError || (touchedFields.has('name') && !name.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          {wordCount}/10 words • Max 20 characters per word • {totalChars} total characters
-          {hasLongWord && <span className="text-red-600 ml-1">(Some words exceed 20 characters)</span>}
-        </p>
+        {touchedFields.has('name') && !name.trim() && (
+          <p className="text-xs text-red-500 mt-1">
+            Material name is required
+          </p>
+        )}
+        {(!touchedFields.has('name') || name.trim()) && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {wordCount}/10 words • Max 20 characters per word • {totalChars} total characters
+            {hasLongWord && <span className="text-red-600 ml-1">(Some words exceed 20 characters)</span>}
+          </p>
+        )}
       </div>
     );
   }

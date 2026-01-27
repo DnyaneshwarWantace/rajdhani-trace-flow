@@ -11,6 +11,8 @@ interface MaterialStockSectionProps {
   onCurrentStockChange?: (value: string) => void;
   onMinThresholdChange: (value: string) => void;
   onMaxCapacityChange: (value: string) => void;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 export default function MaterialStockSection({
@@ -22,6 +24,8 @@ export default function MaterialStockSection({
   onCurrentStockChange,
   onMinThresholdChange,
   onMaxCapacityChange,
+  touchedFields = new Set(),
+  markFieldTouched = () => {},
 }: MaterialStockSectionProps) {
 
   return (
@@ -39,16 +43,30 @@ export default function MaterialStockSection({
                 onCurrentStockChange(validation.value);
               }
             }}
+            onBlur={() => {
+              if (isCurrentStockEditable) {
+                markFieldTouched('currentStock');
+              }
+            }}
             disabled={!isCurrentStockEditable}
             required={isCurrentStockEditable}
             min="0"
             max="99999.99"
             step="0.01"
-            className={!isCurrentStockEditable ? 'bg-gray-100 cursor-not-allowed' : ''}
+            className={!isCurrentStockEditable 
+              ? 'bg-gray-100 cursor-not-allowed' 
+              : (touchedFields.has('currentStock') && (!currentStock || currentStock.trim() === '' || (parseFloat(currentStock) < 0 || isNaN(parseFloat(currentStock)))))
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                : ''
+            }
           />
           {!isCurrentStockEditable ? (
             <p className="text-xs text-orange-600 mt-1 font-medium">
               ⚠️ Contact admin to edit quantity
+            </p>
+          ) : touchedFields.has('currentStock') && (!currentStock || currentStock.trim() === '' || (parseFloat(currentStock) < 0 || isNaN(parseFloat(currentStock)))) ? (
+            <p className="text-xs text-red-500 mt-1">
+              Current stock is required and must be greater than or equal to 0
             </p>
           ) : (
             <p className="text-xs text-muted-foreground mt-1">Current quantity in stock</p>

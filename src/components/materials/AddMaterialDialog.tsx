@@ -46,6 +46,13 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
+  
+  // Track which fields have been touched for validation messages
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
 
   // Refs for form fields to focus on validation errors
   const nameRef = useRef<HTMLInputElement>(null);
@@ -54,13 +61,14 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const unitRef = useRef<HTMLButtonElement>(null);
   const costPerUnitRef = useRef<HTMLInputElement>(null);
   const expectedDeliveryRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: '',
     type: '',
     category: '',
     unit: '',
-    quantity: '1',
+    quantity: '',
     currentStock: '', // Only used in edit mode
     minThreshold: '', // Optional - will default to 10 if empty
     maxCapacity: '', // Optional - will default to 1000 if empty
@@ -74,6 +82,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   useEffect(() => {
     if (isOpen) {
       loadDropdowns();
+      setTouchedFields(new Set()); // Reset touched fields when dialog opens
       if (mode === 'create') {
         // Reset form for create mode
         setFormData({
@@ -81,7 +90,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           type: '',
           category: '',
           unit: '',
-          quantity: '1',
+          quantity: '',
           currentStock: '', // Not used in create mode (orders start with 0 stock)
           minThreshold: '', // Optional - will default to 10 if empty
           maxCapacity: '', // Optional - will default to 1000 if empty
@@ -137,7 +146,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           type: matchingType,
           category: matchingCategory,
           unit: matchingUnit,
-          quantity: '1',
+          quantity: '',
           currentStock: String(material.current_stock || 0),
           minThreshold: String(material.min_threshold || 10),
           maxCapacity: String(material.max_capacity || 1000),
@@ -398,6 +407,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         unit: unitRef,
         costPerUnit: costPerUnitRef,
         expectedDelivery: expectedDeliveryRef,
+        quantity: quantityRef,
       };
 
       // Check each field - use trim() for strings and check for empty strings
@@ -442,9 +452,18 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       if (mode === 'create' && (!formData.expectedDelivery || formData.expectedDelivery.trim() === '')) {
         missingFields.push('expectedDelivery');
       }
+      if (mode === 'create' && (!formData.quantity || formData.quantity.trim() === '' || formData.quantity === '0')) {
+        missingFields.push('quantity');
+      }
 
       if (missingFields.length > 0) {
         setInvalidFields(new Set(missingFields));
+        // Mark all missing fields as touched to show validation errors
+        setTouchedFields(prev => {
+          const next = new Set(prev);
+          missingFields.forEach(field => next.add(field));
+          return next;
+        });
         
         // Focus on first missing field (in order of form appearance)
         const firstMissingField = missingFields[0];
@@ -457,6 +476,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           category: 'Category',
           unit: 'Unit',
           expectedDelivery: 'Expected Delivery Date',
+          quantity: 'Order Quantity',
         };
         
         const missingFieldNames = missingFields.map(f => fieldNames[f] || f).join(', ');
@@ -702,7 +722,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         type: defaultType,
         category: '',
         unit: '',
-        quantity: '1',
+        quantity: '',
         currentStock: '', // Not used in create mode
         minThreshold: '10',
         maxCapacity: '1000',
@@ -785,6 +805,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               });
             }}
             hasError={invalidFields.has('name')}
+            touchedFields={touchedFields}
+            markFieldTouched={markFieldTouched}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -801,6 +823,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
                 });
               }}
               hasError={invalidFields.has('supplier')}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
             <MaterialCategorySection
               ref={categoryRef}
@@ -816,6 +840,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               }}
               onCategoriesReload={loadDropdowns}
               hasError={invalidFields.has('category')}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
           </div>
 
@@ -851,6 +877,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               }}
               onUnitsReload={loadDropdowns}
               hasError={invalidFields.has('unit')}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
           </div>
 
@@ -858,52 +886,52 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           {mode === 'create' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Order Quantity *
-                </label>
-                <input
+                <Label htmlFor="quantity">Order Quantity *</Label>
+                <Input
+                  ref={quantityRef}
+                  id="quantity"
                   type="number"
                   min="1"
                   step="1"
                   value={formData.quantity}
                   onChange={(e) => {
-                    // Only allow numeric input (integers only, no decimals)
+                    // Allow empty string or numeric input (integers only, no decimals)
                     let value = e.target.value;
                     // Remove any non-numeric characters except empty string
                     value = value.replace(/[^0-9]/g, '');
-                    // Ensure it's not empty, default to '1' if empty
-                    if (value === '') {
-                      value = '1';
-                    }
-                    // Ensure minimum value is 1
-                    const numValue = parseInt(value, 10);
-                    if (!isNaN(numValue) && numValue < 1) {
-                      value = '1';
-                    }
+                    // Allow empty value - don't force to '1'
                     setFormData({ ...formData, quantity: value });
                   }}
-                  onKeyDown={(e) => {
-                    // Prevent non-numeric keys (except backspace, delete, arrow keys, etc.)
-                    if (
-                      !/[0-9]/.test(e.key) &&
-                      !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter'].includes(e.key) &&
-                      !(e.ctrlKey || e.metaKey) // Allow Ctrl/Cmd + A, C, V, etc.
-                    ) {
-                      e.preventDefault();
+                  onBlur={() => {
+                    // Only mark as touched and validate on blur
+                    markFieldTouched('quantity');
+                    // Ensure minimum value is 1 only if user entered something
+                    const numValue = parseInt(formData.quantity, 10);
+                    if (!isNaN(numValue) && numValue < 1 && formData.quantity !== '') {
+                      setFormData({ ...formData, quantity: '1' });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  placeholder="1"
+                  className={touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0')
+                    ? 'border-red-500 focus-visible:border-red-500'
+                    : ''
+                  }
+                  placeholder="Enter quantity"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Quantity to order (numbers only)</p>
+                {touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0') && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Order quantity is required and must be greater than 0
+                  </p>
+                )}
+                {(!touchedFields.has('quantity') || (formData.quantity && formData.quantity !== '' && formData.quantity !== '0')) && (
+                  <p className="text-xs text-gray-500 mt-1">Quantity to order (numbers only)</p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Expected Delivery Date *
-                </label>
-                <input
+                <Label htmlFor="expectedDelivery">Expected Delivery Date *</Label>
+                <Input
                   ref={expectedDeliveryRef}
+                  id="expectedDelivery"
                   type="date"
                   value={formData.expectedDelivery}
                   onChange={(e) => {
@@ -914,15 +942,22 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
                       return next;
                     });
                   }}
+                  onBlur={() => markFieldTouched('expectedDelivery')}
                   min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-primary-500 outline-none ${
-                    invalidFields.has('expectedDelivery')
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                      : 'border-gray-300 focus:ring-primary-500'
-                  }`}
+                  className={(invalidFields.has('expectedDelivery') || (touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim()))
+                    ? 'border-red-500 focus-visible:border-red-500'
+                    : ''
+                  }
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Expected delivery date (must be a future date)</p>
+                {touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim() && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Expected delivery date is required
+                  </p>
+                )}
+                {(!touchedFields.has('expectedDelivery') || formData.expectedDelivery.trim()) && (
+                  <p className="text-xs text-gray-500 mt-1">Expected delivery date (must be a future date)</p>
+                )}
               </div>
             </div>
           )}
@@ -962,6 +997,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             </div>
 
             <MaterialCostSection
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
               ref={costPerUnitRef}
               costPerUnit={formData.costPerUnit}
               onCostPerUnitChange={(value: string) => {
@@ -984,21 +1021,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           </Button>
           <Button 
             type="submit" 
-            onClick={handleSubmit} 
-            disabled={
-              loading ||
-              !formData.name ||
-              !formData.supplier ||
-              !formData.category ||
-              !formData.unit ||
-              (mode === 'create' && (
-                !formData.quantity ||
-                !formData.expectedDelivery ||
-                formData.quantity === '0' ||
-                parseFloat(formData.quantity || '0') <= 0 ||
-                isNaN(parseFloat(formData.quantity || '0'))
-              ))
-            } 
+            onClick={handleSubmit}
+            disabled={loading}
             className="bg-primary-600 text-white hover:bg-primary-700"
           >
             {loading ? (

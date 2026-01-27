@@ -19,10 +19,12 @@ interface MaterialUnitSectionProps {
   onUnitChange: (value: string) => void;
   onUnitsReload: () => void;
   hasError?: boolean;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionProps>(
-  ({ unit, units, onUnitChange, onUnitsReload, hasError = false }, ref) => {
+  ({ unit, units, onUnitChange, onUnitsReload, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
   const { toast } = useToast();
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
@@ -172,13 +174,19 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
               setShowAddUnit(true);
             } else {
               onUnitChange(value);
+              markFieldTouched('unit');
+            }
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              markFieldTouched('unit');
             }
           }}
         >
           <SelectTrigger 
             ref={ref}
             id="unit"
-            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            className={(hasError || (touchedFields.has('unit') && !unit.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
           >
             <SelectValue placeholder="Select unit" />
           </SelectTrigger>
@@ -218,6 +226,11 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
             </SelectItem>
           </SelectContent>
         </Select>
+        {touchedFields.has('unit') && !unit.trim() && (
+          <p className="text-xs text-red-500 mt-1">
+            Unit is required
+          </p>
+        )}
         {showAddUnit && (
           <div className="space-y-2">
             <div className="flex gap-2">

@@ -106,18 +106,14 @@ body.modal-open[data-scroll-locked] {
   scrollbar-gutter: stable;
 }
 
-/* When only Radix locks scroll (no modal) */
-body[data-scroll-locked]:not(.modal-open) {
-  padding-right: var(--removed-body-scroll-bar-size, var(--scrollbar-width, 0px)) !important;
-  overflow: hidden !important;
-  scrollbar-gutter: stable;
-}
+/* When only Radix locks scroll (no modal) - don't hide scrollbar or add padding to prevent UI shift */
+/* Dropdowns on main page should not cause UI shift - let them overlay normally */
 
-/* When scroll is locked, add padding to fixed elements to prevent shift */
-body[data-scroll-locked] nav,
-body[data-scroll-locked] header,
-body[data-scroll-locked] [style*="position: fixed"],
-body[data-scroll-locked] .fixed {
+/* When scroll is locked AND modal is open, add padding to fixed elements to prevent shift */
+body.modal-open[data-scroll-locked] nav,
+body.modal-open[data-scroll-locked] header,
+body.modal-open[data-scroll-locked] [style*="position: fixed"],
+body.modal-open[data-scroll-locked] .fixed {
   padding-right: var(--removed-body-scroll-bar-size, var(--scrollbar-width, 0px)) !important;
 }
 

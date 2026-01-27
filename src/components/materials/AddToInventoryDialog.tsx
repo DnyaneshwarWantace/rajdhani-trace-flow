@@ -42,6 +42,13 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   const [colors, setColors] = useState<string[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
+  
+  // Track which fields have been touched for validation messages
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  
+  const markFieldTouched = (fieldName: string) => {
+    setTouchedFields(prev => new Set(prev).add(fieldName));
+  };
 
   const [formData, setFormData] = useState({
     name: '',
@@ -60,6 +67,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   useEffect(() => {
     if (isOpen) {
       loadDropdowns();
+      setTouchedFields(new Set()); // Reset touched fields when dialog opens
     }
   }, [isOpen]);
 
@@ -312,6 +320,24 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       }
 
       if (missingFields.length > 0) {
+        // Mark all missing fields as touched to show validation errors
+        const fieldMap: { [key: string]: string } = {
+          'Material Name': 'name',
+          'Supplier': 'supplier',
+          'Category': 'category',
+          'Unit': 'unit',
+          'Current Stock': 'currentStock',
+          'Current Stock (must be >= 0)': 'currentStock',
+        };
+        setTouchedFields(prev => {
+          const next = new Set(prev);
+          missingFields.forEach(field => {
+            const fieldKey = fieldMap[field] || field.toLowerCase().replace(/\s+/g, '');
+            next.add(fieldKey);
+          });
+          return next;
+        });
+        
         toast({
           title: 'Validation Error',
           description: `Please fill in: ${missingFields.join(', ')}`,
@@ -513,6 +539,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
           <MaterialBasicInfo
             name={formData.name}
             onNameChange={(value) => setFormData({ ...formData, name: value })}
+            touchedFields={touchedFields}
+            markFieldTouched={markFieldTouched}
           />
 
           <div className="grid grid-cols-2 gap-4">
@@ -520,12 +548,16 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
               supplier={formData.supplier}
               suppliers={suppliers}
               onSupplierChange={(value) => setFormData({ ...formData, supplier: value })}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
             <MaterialCategorySection
               category={formData.category}
               categories={categories}
               onCategoryChange={(value) => setFormData({ ...formData, category: value })}
               onCategoriesReload={loadDropdowns}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
           </div>
 
@@ -552,6 +584,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
               units={units}
               onUnitChange={(value) => setFormData({ ...formData, unit: value })}
               onUnitsReload={loadDropdowns}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
           </div>
 
@@ -564,6 +598,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
             onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
             onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
             onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
+            touchedFields={touchedFields}
+            markFieldTouched={markFieldTouched}
           />
 
           {/* Reorder Point and Cost/Unit on same line */}
@@ -588,6 +624,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
             <MaterialCostSection
               costPerUnit={formData.costPerUnit}
               onCostPerUnitChange={(value: string) => setFormData({ ...formData, costPerUnit: value })}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
             />
           </div>
         </form>
@@ -599,19 +637,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
           </Button>
           <Button 
             type="submit" 
-            onClick={handleSubmit} 
-            disabled={
-              loading ||
-              !formData.name ||
-              !formData.supplier ||
-              !formData.category ||
-              !formData.unit ||
-              (isAdmin && (
-                formData.currentStock === '' ||
-                parseFloat(formData.currentStock || '0') < 0 ||
-                isNaN(parseFloat(formData.currentStock || '0'))
-              ))
-            } 
+            onClick={handleSubmit}
+            disabled={loading}
             className="bg-primary-600 text-white hover:bg-primary-700"
           >
             {loading ? (

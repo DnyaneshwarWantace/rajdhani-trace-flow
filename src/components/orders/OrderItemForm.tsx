@@ -49,6 +49,14 @@ export default function OrderItemForm({
 
   // State for individual product count
   const [individualProductCount, setIndividualProductCount] = useState<number | null>(null);
+  
+  // State for tracking touched fields for validation
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+  // Reset touched fields when item changes
+  useEffect(() => {
+    setTouchedFields(new Set());
+  }, [item.id]);
 
   // Load individual products count if product has individual tracking
   useEffect(() => {
@@ -238,16 +246,26 @@ export default function OrderItemForm({
           <Label>Quantity</Label>
           <Input
             type="number"
-            value={item.quantity || ''}
+            value={item.quantity || 0}
             onChange={e => {
               const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
-              onUpdate(item.id, 'quantity', validation.value === '' ? '' : parseInt(validation.value) || '');
+              onUpdate(item.id, 'quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
+            }}
+            onBlur={() => {
+              setTouchedFields(prev => new Set(prev).add('quantity'));
+            }}
+            onFocus={() => {
+              setTouchedFields(prev => new Set(prev).add('quantity'));
             }}
             min="1"
             max="99999"
             step="1"
             placeholder="Enter quantity"
+            className={touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
           />
+          {touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) && (
+            <p className="text-xs text-red-500 mt-1">Quantity is required</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -292,10 +310,20 @@ export default function OrderItemForm({
               const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
               onUpdate(item.id, 'unit_price', validation.value === '' ? 0 : parseFloat(validation.value) || 0);
             }}
+            onBlur={() => {
+              setTouchedFields(prev => new Set(prev).add('unit_price'));
+            }}
+            onFocus={() => {
+              setTouchedFields(prev => new Set(prev).add('unit_price'));
+            }}
             min="0"
             max="9999999.99"
             step="0.01"
+            className={touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
           />
+          {touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) && (
+            <p className="text-xs text-red-500 mt-1">Unit price is required</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -306,22 +334,34 @@ export default function OrderItemForm({
             onChange={e => {
               const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
               const inputValue = validation.value;
+              
               // Allow empty string - user can clear the field completely
               if (inputValue === '') {
-                // When field is empty, keep it empty (don't set to 0 yet)
-                // Only set to 0 when user explicitly types 0 or unchecks checkbox
                 onUpdate(item.id, 'gst_rate', undefined);
                 onUpdate(item.id, 'gst_included', false);
                 return;
               }
+              
               const numValue = parseFloat(inputValue);
               if (!isNaN(numValue)) {
-                onUpdate(item.id, 'gst_rate', numValue);
-                // If GST rate is set to 0, automatically uncheck the checkbox
-                if (numValue === 0) {
+                // Validate range: 5 to 18 only
+                if (numValue < 5) {
+                  // If less than 5, set to 0 and uncheck GST included
+                  onUpdate(item.id, 'gst_rate', 0);
                   onUpdate(item.id, 'gst_included', false);
-                } else if (numValue > 0 && !item.gst_included) {
-                  // If GST rate is > 0 and checkbox is unchecked, check it
+                  return;
+                }
+                if (numValue > 18) {
+                  // If greater than 18, cap at 18
+                  onUpdate(item.id, 'gst_rate', 18);
+                  onUpdate(item.id, 'gst_included', true);
+                  return;
+                }
+                
+                // Valid range: 5-18
+                onUpdate(item.id, 'gst_rate', numValue);
+                // If GST rate is between 5-18, automatically check the checkbox
+                if (numValue >= 5 && numValue <= 18) {
                   onUpdate(item.id, 'gst_included', true);
                 }
               }
@@ -330,13 +370,20 @@ export default function OrderItemForm({
               // When field loses focus and is empty, set to 0
               if (e.target.value === '' && (item.gst_rate === undefined || item.gst_rate === null)) {
                 onUpdate(item.id, 'gst_rate', 0);
+                onUpdate(item.id, 'gst_included', false);
               }
             }}
-            min="0"
-            max="100"
+            min="5"
+            max="18"
             step="0.01"
-            placeholder=""
+            placeholder={item.gst_included ? "5-18" : "0"}
           />
+          {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 0 && item.gst_rate < 5 && item.gst_included && (
+            <p className="text-xs text-red-500 mt-1">GST rate must be between 5% and 18%</p>
+          )}
+          {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 18 && item.gst_included && (
+            <p className="text-xs text-red-500 mt-1">GST rate cannot exceed 18%</p>
+          )}
         </div>
 
         <div className="space-y-2 flex items-end">
@@ -346,12 +393,21 @@ export default function OrderItemForm({
               checked={item.gst_included === true}
               onCheckedChange={(checked) => {
                 onUpdate(item.id, 'gst_included', checked);
-                // If checkbox is unchecked, clear GST rate (set to undefined so field is empty, not 0)
+                // If checkbox is unchecked, set GST rate to 0
                 if (!checked) {
-                  onUpdate(item.id, 'gst_rate', undefined);
+                  onUpdate(item.id, 'gst_rate', 0);
                 } else if (checked && (item.gst_rate === undefined || item.gst_rate === null || item.gst_rate === 0)) {
                   // If checkbox is checked and rate is empty/0, set to 18
                   onUpdate(item.id, 'gst_rate', 18);
+                } else if (checked) {
+                  const currentRate = item.gst_rate ?? 0;
+                  if (currentRate > 0 && currentRate < 5) {
+                    // If checkbox is checked but rate is less than 5, set to 18
+                    onUpdate(item.id, 'gst_rate', 18);
+                  } else if (currentRate > 18) {
+                    // If checkbox is checked but rate is greater than 18, cap at 18
+                    onUpdate(item.id, 'gst_rate', 18);
+                  }
                 }
               }}
             />

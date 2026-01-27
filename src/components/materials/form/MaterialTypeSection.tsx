@@ -170,7 +170,7 @@ export default function MaterialTypeSection({
   return (
     <>
       <div>
-        <Label htmlFor="type">Material Type *</Label>
+        <Label htmlFor="type">Material Type</Label>
         <div className="space-y-2">
           <Select
             value={type || ''}
@@ -253,7 +253,7 @@ export default function MaterialTypeSection({
       </div>
       {type === 'color' && (
         <div>
-          <Label htmlFor="color">Color *</Label>
+          <Label htmlFor="color">Color</Label>
           <Select value={color || ''} onValueChange={onColorChange}>
             <SelectTrigger id="color">
               <SelectValue placeholder="Select color" />

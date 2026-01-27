@@ -248,14 +248,8 @@ export default function MaterialList() {
               return (a.name || '').localeCompare(b.name || '') * dir;
           }
         });
-      } else {
-        // Apply pagination for non-search results
-        const page = filters.page || 1;
-        const limit = filters.limit || 50;
-        const startIdx = (page - 1) * limit;
-        const endIdx = startIdx + limit;
-        data = data.slice(startIdx, endIdx);
       }
+      // Note: When there's no search, API already handles pagination, so no need to slice again
 
       setMaterials(data);
       setTotalMaterials(total || data.length);

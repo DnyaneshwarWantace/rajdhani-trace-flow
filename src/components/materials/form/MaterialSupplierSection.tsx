@@ -18,18 +18,31 @@ interface MaterialSupplierSectionProps {
   suppliers: Supplier[];
   onSupplierChange: (value: string) => void;
   hasError?: boolean;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 const MaterialSupplierSection = forwardRef<HTMLButtonElement, MaterialSupplierSectionProps>(
-  ({ supplier, suppliers, onSupplierChange, hasError = false }, ref) => {
+  ({ supplier, suppliers, onSupplierChange, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
     return (
       <div>
         <Label htmlFor="supplier">Supplier Name *</Label>
-        <Select value={supplier || undefined} onValueChange={onSupplierChange}>
+        <Select 
+          value={supplier || undefined} 
+          onValueChange={(value) => {
+            onSupplierChange(value);
+            markFieldTouched('supplier');
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              markFieldTouched('supplier');
+            }
+          }}
+        >
           <SelectTrigger 
             ref={ref}
             id="supplier"
-            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            className={(hasError || (touchedFields.has('supplier') && !supplier.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
           >
             <SelectValue placeholder="Select supplier" />
           </SelectTrigger>
@@ -47,6 +60,11 @@ const MaterialSupplierSection = forwardRef<HTMLButtonElement, MaterialSupplierSe
           )}
         </SelectContent>
       </Select>
+      {touchedFields.has('supplier') && !supplier.trim() && (
+        <p className="text-xs text-red-500 mt-1">
+          Supplier is required
+        </p>
+      )}
     </div>
   );
 });

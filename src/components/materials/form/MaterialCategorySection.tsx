@@ -19,10 +19,12 @@ interface MaterialCategorySectionProps {
   onCategoryChange: (value: string) => void;
   onCategoriesReload: () => void;
   hasError?: boolean;
+  touchedFields?: Set<string>;
+  markFieldTouched?: (fieldName: string) => void;
 }
 
 const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySectionProps>(
-  ({ category, categories, onCategoryChange, onCategoriesReload, hasError = false }, ref) => {
+  ({ category, categories, onCategoryChange, onCategoriesReload, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
   const { toast } = useToast();
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -172,13 +174,19 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
               setShowAddCategory(true);
             } else {
               onCategoryChange(value);
+              markFieldTouched('category');
+            }
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              markFieldTouched('category');
             }
           }}
         >
           <SelectTrigger 
             ref={ref}
             id="category"
-            className={hasError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+            className={(hasError || (touchedFields.has('category') && !category.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
           >
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
@@ -218,6 +226,11 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
             </SelectItem>
           </SelectContent>
         </Select>
+        {touchedFields.has('category') && !category.trim() && (
+          <p className="text-xs text-red-500 mt-1">
+            Category is required
+          </p>
+        )}
         {showAddCategory && (
           <div className="space-y-2">
             <div className="flex gap-2">

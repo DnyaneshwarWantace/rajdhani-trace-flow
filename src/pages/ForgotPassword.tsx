@@ -11,12 +11,14 @@ import { getApiUrl } from '@/utils/apiConfig';
 const validatePassword = (password: string) => {
   const errors: string[] = [];
 
-  if (!password || password.length < 8) {
-    errors.push('At least 8 characters long');
+  // Check for spaces
+  if (/\s/.test(password)) {
+    errors.push('Cannot contain spaces');
   }
 
-  if (password && password.length > 128) {
-    errors.push('Less than 128 characters');
+  // Exact length: 15 characters
+  if (!password || password.length !== 15) {
+    errors.push('Exactly 15 characters long');
   }
 
   if (!/[A-Z]/.test(password)) {
@@ -43,7 +45,8 @@ const validatePassword = (password: string) => {
 
 // Password requirements list
 const passwordRequirements = [
-  { id: 'length', label: 'At least 8 characters long', test: (pwd: string) => pwd.length >= 8 },
+  { id: 'length', label: 'Exactly 15 characters long', test: (pwd: string) => pwd.length === 15 },
+  { id: 'spaces', label: 'Cannot contain spaces', test: (pwd: string) => !/\s/.test(pwd) },
   { id: 'uppercase', label: 'At least one uppercase letter (A-Z)', test: (pwd: string) => /[A-Z]/.test(pwd) },
   { id: 'lowercase', label: 'At least one lowercase letter (a-z)', test: (pwd: string) => /[a-z]/.test(pwd) },
   { id: 'number', label: 'At least one number (0-9)', test: (pwd: string) => /[0-9]/.test(pwd) },
@@ -208,14 +211,17 @@ export default function ForgotPassword() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${error ? 'text-red-500' : 'text-gray-400'}`} />
                   <Input
                     id="email"
                     type="email"
                     placeholder="your@email.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10"
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError(''); // Clear error when user starts typing
+                    }}
+                    className={`pl-10 ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500' : ''}`}
                     required
                     disabled={isLoading}
                   />
@@ -302,13 +308,18 @@ export default function ForgotPassword() {
                   <Input
                     id="newPassword"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Enter 15 characters"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      // Remove spaces and limit to 15 characters
+                      const value = e.target.value.replace(/\s/g, '').slice(0, 15);
+                      setNewPassword(value);
+                    }}
                     className={`pl-10 pr-10 ${newPassword && !isPasswordValid ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : newPassword && isPasswordValid ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}`}
                     required
                     disabled={isLoading}
-                    minLength={8}
+                    minLength={15}
+                    maxLength={15}
                   />
                   <button
                     type="button"
@@ -352,13 +363,18 @@ export default function ForgotPassword() {
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Enter 15 characters"
                     value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onChange={(e) => {
+                      // Remove spaces and limit to 15 characters
+                      const value = e.target.value.replace(/\s/g, '').slice(0, 15);
+                      setConfirmPassword(value);
+                    }}
                     className={`pl-10 pr-10 ${confirmPassword && !passwordsMatch ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : confirmPassword && passwordsMatch ? 'border-green-300 focus:border-green-500 focus:ring-green-500' : ''}`}
                     required
                     disabled={isLoading}
-                    minLength={8}
+                    minLength={15}
+                    maxLength={15}
                   />
                   <button
                     type="button"
