@@ -131,7 +131,7 @@ export default function ProductSelectionCard({
                   id={`quantity-${index}`}
                   type="text"
                   value={item.quantity === 0 ? '' : item.quantity.toString()}
-                  placeholder="1"
+                  placeholder={item.unit || 'Roll'}
                   onChange={(e) => {
                     const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
                     const numValue = validation.value === '' ? 0 : parseInt(validation.value, 10) || 0;
@@ -205,7 +205,7 @@ export default function ProductSelectionCard({
             calculationItems.length === 0 || 
             calculationItems.some(item => !item.productId || item.quantity <= 0)
           } 
-          className="w-full"
+          className="w-full text-white"
         >
           {isCalculating ? (
             <>
