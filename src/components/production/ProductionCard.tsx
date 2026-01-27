@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Copy } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Copy, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -17,6 +17,17 @@ interface ProductionCardProps {
 
 export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete, allBatches = [] }: ProductionCardProps) {
   const navigate = useNavigate();
+
+  const isOverdue = (batch: ProductionBatch): boolean => {
+    if (!batch.completion_date || batch.status === 'completed' || batch.status === 'cancelled') {
+      return false;
+    }
+    const completionDate = new Date(batch.completion_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completionDate.setHours(0, 0, 0, 0);
+    return completionDate < today;
+  };
 
   const handleView = () => {
     navigate(`/production/${batch.id}`);
@@ -202,9 +213,29 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
             </div>
           )}
           {batch.completion_date && (
-            <div className="flex justify-between gap-2">
-              <span className="text-gray-600 flex-shrink-0">Completed:</span>
-              <span className="font-medium text-gray-900 truncate">{formatDate(batch.completion_date)}</span>
+            <div className="flex flex-col gap-1">
+              {batch.status === 'completed' ? (
+                <>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-gray-600 flex-shrink-0 text-xs">Expected:</span>
+                    <span className="text-gray-500 text-xs truncate">{formatDate(batch.completion_date)}</span>
+                  </div>
+                  {batch.final_stage?.completed_at && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-600 flex-shrink-0 text-xs">Actual:</span>
+                      <span className="font-medium text-gray-900 text-xs truncate">{formatDate(batch.final_stage.completed_at)}</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className={`flex justify-between gap-2 ${isOverdue(batch) ? 'items-start' : ''}`}>
+                  <span className="text-gray-600 flex-shrink-0">Expected:</span>
+                  <div className={`flex items-center gap-1 ${isOverdue(batch) ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                    {isOverdue(batch) && <AlertTriangle className="w-3 h-3 flex-shrink-0" />}
+                    <span className="truncate">{formatDate(batch.completion_date)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           {batch.operator && (

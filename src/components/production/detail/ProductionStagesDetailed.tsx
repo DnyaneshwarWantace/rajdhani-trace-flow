@@ -25,6 +25,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   const [materialConsumption, setMaterialConsumption] = useState<any[]>([]);
   const [flowSteps, setFlowSteps] = useState<any[]>([]);
   const [wastageRecords, setWastageRecords] = useState<any[]>([]);
+  const [individualProductsCount, setIndividualProductsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<{
     planning: boolean;
@@ -122,6 +123,23 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       } catch (error) {
         console.error('Error loading wastage records:', error);
         setWastageRecords([]);
+      }
+
+      // Load individual products count for this batch
+      try {
+        const { IndividualProductService } = await import('@/services/individualProductService');
+        const { products: individualProducts } = await IndividualProductService.getIndividualProducts({
+          product_id: batch.product_id
+        });
+        // Filter by batch_number
+        const batchProducts = individualProducts.filter(
+          (p: any) => p.batch_number === batch.batch_number
+        );
+        setIndividualProductsCount(batchProducts.length);
+        console.log('📦 Individual products count loaded:', batchProducts.length);
+      } catch (error) {
+        console.error('Error loading individual products count:', error);
+        setIndividualProductsCount(0);
       }
 
     } catch (error) {
@@ -894,9 +912,47 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                   <Package className="w-4 h-4" />
                   Total Products
                 </div>
-                <div className="font-medium text-lg">{finalStage.products_count || 0}</div>
+                <div className="font-medium text-lg">{finalStage.products_count || individualProductsCount || 0}</div>
               </div>
             </div>
+
+            {/* Planned vs Created Summary */}
+            {batch.status === 'completed' && (
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Package className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-blue-900 mb-2">Production Summary</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-blue-700 font-medium">Planned Quantity:</span>
+                        <span className="ml-2 text-blue-900">{batch.planned_quantity || 0} product(s)</span>
+                      </div>
+                      <div>
+                        <span className="text-blue-700 font-medium">Created Quantity:</span>
+                        <span className={`ml-2 font-semibold ${
+                          individualProductsCount < (batch.planned_quantity || 0) 
+                            ? 'text-orange-600' 
+                            : individualProductsCount > (batch.planned_quantity || 0)
+                            ? 'text-green-600'
+                            : 'text-blue-900'
+                        }`}>
+                          {individualProductsCount} product(s)
+                        </span>
+                      </div>
+                    </div>
+                    {individualProductsCount !== (batch.planned_quantity || 0) && (
+                      <div className="mt-2 text-xs text-blue-600">
+                        {individualProductsCount < (batch.planned_quantity || 0) 
+                          ? `⚠️ ${(batch.planned_quantity || 0) - individualProductsCount} product(s) less than planned`
+                          : `ℹ️ ${individualProductsCount - (batch.planned_quantity || 0)} product(s) more than planned`
+                        }
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="text-center py-4 text-gray-500">
               Final products will be displayed here

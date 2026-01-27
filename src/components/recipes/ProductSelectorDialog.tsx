@@ -44,6 +44,7 @@ export default function ProductSelectorDialog({
 }: ProductSelectorDialogProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [filteredAndSortedProducts, setFilteredAndSortedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -83,8 +84,17 @@ export default function ProductSelectorDialog({
       setExpandedGroups(new Set());
       setCurrentPage(1);
       setIsSelecting(false);
+      setSortBy('name');
+      setSortOrder('asc');
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    // Reset to page 1 when sorting changes
+    if (isOpen) {
+      setCurrentPage(1);
+    }
+  }, [sortBy, sortOrder, isOpen]);
 
   useEffect(() => {
     if (
@@ -112,9 +122,14 @@ export default function ProductSelectorDialog({
   ]);
 
   useEffect(() => {
-    // Apply pagination to filtered products
+    // Filter and sort all products first
+    filterAndSortProducts();
+  }, [allProducts, searchTerm, sortBy, sortOrder]);
+
+  useEffect(() => {
+    // Apply pagination to filtered and sorted products
     applyPagination();
-  }, [allProducts, currentPage, itemsPerPage, searchTerm]);
+  }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
 
   const loadProducts = async () => {
     try {
@@ -196,9 +211,9 @@ export default function ProductSelectorDialog({
     }
   };
 
-  const applyPagination = () => {
+  const filterAndSortProducts = () => {
     // Filter products by search term
-    const filtered = searchTerm.trim()
+    let filtered = searchTerm.trim()
       ? allProducts.filter(
           (product) =>
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,10 +222,38 @@ export default function ProductSelectorDialog({
         )
       : allProducts;
 
-    // Apply pagination
+    // Apply sorting to ALL filtered products
+    const sorted = [...filtered].sort((a, b) => {
+      let compareValue = 0;
+
+      switch (sortBy) {
+        case 'name':
+          compareValue = (a.name || '').localeCompare(b.name || '');
+          break;
+        case 'stock':
+          compareValue = (a.current_stock || 0) - (b.current_stock || 0);
+          break;
+        case 'category':
+          compareValue = (a.category || '').localeCompare(b.category || '');
+          break;
+        case 'recent':
+          compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+          break;
+        default:
+          compareValue = 0;
+      }
+
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+
+    setFilteredAndSortedProducts(sorted);
+  };
+
+  const applyPagination = () => {
+    // Apply pagination to already filtered and sorted products
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const paginatedProducts = filtered.slice(startIndex, endIndex);
+    const paginatedProducts = filteredAndSortedProducts.slice(startIndex, endIndex);
 
     setProducts(paginatedProducts);
   };
@@ -264,45 +307,13 @@ export default function ProductSelectorDialog({
     }
   };
 
-  // Get filtered products count for pagination
-  const getFilteredProducts = () => {
-    return searchTerm.trim()
-      ? allProducts.filter(
-          (product) =>
-            product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      : allProducts;
-  };
 
-  const filteredProducts = products;
-  const totalFiltered = getFilteredProducts().length;
+  // Use paginated products for grouping (already sorted and paginated)
+  const sortedProducts = products;
+  const totalFiltered = filteredAndSortedProducts.length;
   const totalPages = Math.ceil(totalFiltered / itemsPerPage);
 
-  // Apply sorting
-  const sortedProducts = [...filteredProducts].sort((a, b) => {
-    let compareValue = 0;
-
-    switch (sortBy) {
-      case 'name':
-        compareValue = (a.name || '').localeCompare(b.name || '');
-        break;
-      case 'stock':
-        compareValue = (a.current_stock || 0) - (b.current_stock || 0);
-        break;
-      case 'category':
-        compareValue = (a.category || '').localeCompare(b.category || '');
-        break;
-      case 'recent':
-        compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        break;
-    }
-
-    return sortOrder === 'asc' ? compareValue : -compareValue;
-  });
-
-  // Group products by name
+  // Group products by name while preserving sort order
   const groupedProducts = sortedProducts.reduce((acc, product) => {
     const key = product.name.trim().toLowerCase();
     if (!acc[key]) {
@@ -312,19 +323,25 @@ export default function ProductSelectorDialog({
     return acc;
   }, {} as Record<string, Product[]>);
 
-  // Sort groups: products with recipes first, then products without recipes
-  const sortedGroupKeys = Object.keys(groupedProducts).sort((a, b) => {
-    const aHasRecipe = groupedProducts[a].some(p => p.has_recipe);
-    const bHasRecipe = groupedProducts[b].some(p => p.has_recipe);
-
-    // If both have recipe or both don't have recipe, sort alphabetically
-    if (aHasRecipe === bHasRecipe) {
-      return a.localeCompare(b);
+  // Get group keys in the order they appear in sortedProducts (preserving user's sort order)
+  const seenKeys = new Set<string>();
+  const sortedGroupKeys: string[] = [];
+  
+  // First, add groups in the order they appear in sortedProducts
+  for (const product of sortedProducts) {
+    const key = product.name.trim().toLowerCase();
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      sortedGroupKeys.push(key);
     }
-
-    // Products with recipes come first
-    return bHasRecipe ? 1 : -1;
-  });
+  }
+  
+  // Then add any remaining groups (shouldn't happen, but just in case)
+  for (const key of Object.keys(groupedProducts)) {
+    if (!seenKeys.has(key)) {
+      sortedGroupKeys.push(key);
+    }
+  }
 
   const handleDialogClose = (open: boolean) => {
     // Prevent closing if we're in the middle of selecting
@@ -339,14 +356,14 @@ export default function ProductSelectorDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogClose} modal={true}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle>Select Product</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col space-y-4">
+        <div className="flex-1 overflow-hidden flex flex-col space-y-4 min-h-0 px-6 pt-4">
           {/* Search and Filters */}
-          <div className="space-y-3">
+          <div className="space-y-3 flex-shrink-0">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input
@@ -456,7 +473,7 @@ export default function ProductSelectorDialog({
           </div>
 
           {/* Products List - Grouped Table */}
-          <div className="flex-1 overflow-y-auto border rounded-lg">
+          <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
@@ -464,7 +481,7 @@ export default function ProductSelectorDialog({
                   <p className="text-sm text-gray-600">Loading products...</p>
                 </div>
               </div>
-            ) : filteredProducts.length === 0 ? (
+            ) : sortedProducts.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <Package className="w-12 h-12 mx-auto mb-2 opacity-50 text-gray-400" />
@@ -617,7 +634,7 @@ export default function ProductSelectorDialog({
           </div>
 
           {/* Pagination */}
-          {!loading && filteredProducts.length > 0 && totalPages > 1 && (
+          {!loading && sortedProducts.length > 0 && totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
               <div className="text-sm text-gray-600">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalFiltered)} of {totalFiltered} products
@@ -695,7 +712,7 @@ export default function ProductSelectorDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t mt-auto">
           <Button type="button" variant="outline" onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();

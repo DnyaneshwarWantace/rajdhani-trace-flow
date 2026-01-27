@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
@@ -42,15 +42,33 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
   const [loading, setLoading] = useState(true);
   const [sortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
   const [sortOrder] = useState<'asc' | 'desc'>('asc');
+  const scrollPositionRef = useRef<number>(0);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   useEffect(() => {
     loadAllOrders();
   }, []);
 
+  // Preserve scroll position when orders update
+  useEffect(() => {
+    if (!isInitialLoadRef.current && scrollPositionRef.current > 0 && allOrders.length > 0) {
+      // Restore scroll position after orders are rendered
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: scrollPositionRef.current,
+          behavior: 'instant' as ScrollBehavior,
+        });
+      });
+    }
+  }, [allOrders]);
+
   // Sort orders when sortBy or sortOrder changes
   useEffect(() => {
     if (allOrders.length === 0) return;
 
+    // Save scroll position before sorting
+    const currentScroll = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+    
     const sorted = [...allOrders].sort((a, b) => {
       let compareValue = 0;
 
@@ -87,9 +105,22 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     });
 
     setAllOrders(sorted);
+    
+    // Restore scroll position after sorting
+    requestAnimationFrame(() => {
+      window.scrollTo({
+        top: currentScroll,
+        behavior: 'instant' as ScrollBehavior,
+      });
+    });
   }, [sortBy, sortOrder]);
 
   const loadAllOrders = async () => {
+    // Save scroll position before loading (only if not initial load)
+    if (!isInitialLoadRef.current) {
+      scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
+    }
+    
     setLoading(true);
     try {
       console.log('🔍 Loading ALL orders...');
@@ -165,8 +196,20 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
       }
     } catch (error) {
       console.error('❌ Error loading orders:', error);
+    } finally {
+      setLoading(false);
+      isInitialLoadRef.current = false;
+      
+      // Restore scroll position after a short delay to ensure DOM is updated
+      if (scrollPositionRef.current > 0) {
+        requestAnimationFrame(() => {
+          window.scrollTo({
+            top: scrollPositionRef.current,
+            behavior: 'instant' as ScrollBehavior,
+          });
+        });
+      }
     }
-    setLoading(false);
   };
 
   const getPriorityColor = (priority: string) => {

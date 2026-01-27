@@ -16,6 +16,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Search, Package, Loader2, Check, Filter } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface RecipeMaterialSelectionDialogProps {
   isOpen: boolean;
@@ -49,6 +56,10 @@ export default function RecipeMaterialSelectionDialog({
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
 
+  // Sorting states
+  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
   useEffect(() => {
     if (isOpen) {
       // Clear materials immediately to avoid showing stale data
@@ -63,6 +74,9 @@ export default function RecipeMaterialSelectionDialog({
       setSelectedPatterns([]);
       setSelectedTypes([]);
       setSelectedSuppliers([]);
+      // Reset sorting
+      setSortBy('name');
+      setSortOrder('asc');
       // Load new materials
       loadMaterials();
     }
@@ -153,6 +167,35 @@ export default function RecipeMaterialSelectionDialog({
     return true;
   });
 
+  // Apply sorting
+  const sortedMaterials = [...filteredMaterials].sort((a, b) => {
+    let compareValue = 0;
+
+    switch (sortBy) {
+      case 'name':
+        compareValue = (a.name || '').localeCompare(b.name || '');
+        break;
+      case 'stock': {
+        const stockA = a.current_stock || 0;
+        const stockB = b.current_stock || 0;
+        compareValue = stockA - stockB;
+        break;
+      }
+      case 'category':
+        compareValue = (a.category || '').localeCompare(b.category || '');
+        break;
+      case 'recent':
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        compareValue = dateB - dateA; // Most recent first
+        break;
+      default:
+        compareValue = 0;
+    }
+
+    return sortOrder === 'asc' ? compareValue : -compareValue;
+  });
+
   const toggleMaterialSelection = (material: any) => {
     const isSelected = selectedMaterials.some((m) => m.id === material.id);
     if (isSelected) {
@@ -167,10 +210,10 @@ export default function RecipeMaterialSelectionDialog({
   };
 
   // Pagination
-  const totalPages = Math.ceil(filteredMaterials.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedMaterials.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedMaterials = filteredMaterials.slice(startIndex, endIndex);
+  const paginatedMaterials = sortedMaterials.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -242,14 +285,41 @@ export default function RecipeMaterialSelectionDialog({
 
         {/* Search and Filters */}
         <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder={`Search ${materialType === 'product' ? 'products' : 'materials'}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder={`Search ${materialType === 'product' ? 'products' : 'materials'}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Sort Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort:</span>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[140px] h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                <SelectTrigger className="w-[110px] h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Filters */}
@@ -543,7 +613,7 @@ export default function RecipeMaterialSelectionDialog({
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             </div>
-          ) : filteredMaterials.length === 0 ? (
+          ) : sortedMaterials.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               No {materialType === 'product' ? 'products' : 'materials'} found
             </div>

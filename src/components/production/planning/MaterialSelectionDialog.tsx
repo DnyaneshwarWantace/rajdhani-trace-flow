@@ -173,7 +173,7 @@ export default function MaterialSelectionDialog({
         const categories = Array.from(new Set(allMaterials.map((m: any) => m.category).filter(Boolean))).sort();
         setRawMaterialCategories(categories);
 
-        const types = Array.from(new Set(allMaterials.map((m: any) => m.material_type).filter(Boolean))).sort();
+        const types = Array.from(new Set(allMaterials.map((m: any) => m.type || m.material_type).filter(Boolean))).sort();
         setMaterialTypes(types);
 
         const colors = Array.from(new Set(allMaterials.map((m: any) => m.color).filter((c) => c && c !== 'N/A'))).sort();
@@ -252,7 +252,7 @@ export default function MaterialSelectionDialog({
 
         // Apply other client-side filters (for filters not supported by backend)
         if (materialTypeFilter.length > 0) {
-          materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.material_type));
+          materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.type || m.material_type));
         }
         if (colorFilter.length > 0) {
           materialsData = materialsData.filter((m: any) => colorFilter.includes(m.color));
@@ -279,7 +279,7 @@ export default function MaterialSelectionDialog({
             unit: m.unit || 'kg',
             type: 'raw_material' as const,
             category: m.category,
-            material_type: m.material_type,
+            material_type: m.type || m.material_type,
             supplier: m.supplier_name,
             cost: m.cost_per_unit,
             color: m.color,
@@ -749,7 +749,7 @@ export default function MaterialSelectionDialog({
 
                 {/* Material Type Filter - Multi-select */}
                 <MultiSelect
-                  options={materialTypes.map(type => ({ label: type, value: type }))}
+                  options={materialTypes.filter(Boolean).map(type => ({ label: type, value: type }))}
                   selected={materialTypeFilter}
                   onChange={(values) => { setMaterialTypeFilter(values); setCurrentPage(1); }}
                   placeholder="All Material Types"

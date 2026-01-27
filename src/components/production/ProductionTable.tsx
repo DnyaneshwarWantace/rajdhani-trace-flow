@@ -1,7 +1,7 @@
 import type { ProductionBatch } from '@/services/productionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { formatDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
@@ -24,6 +24,17 @@ export default function ProductionTable({
   allBatches = [],
 }: ProductionTableProps) {
   const navigate = useNavigate();
+
+  const isOverdue = (batch: ProductionBatch): boolean => {
+    if (!batch.completion_date || batch.status === 'completed' || batch.status === 'cancelled') {
+      return false;
+    }
+    const completionDate = new Date(batch.completion_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completionDate.setHours(0, 0, 0, 0);
+    return completionDate < today;
+  };
 
   // Check if a batch can be duplicated
   const canDuplicate = (batch: ProductionBatch) => {
@@ -271,8 +282,28 @@ export default function ProductionTable({
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                   {batch.start_date ? formatDate(batch.start_date) : '-'}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {batch.completion_date ? formatDate(batch.completion_date) : '-'}
+                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                  {batch.completion_date ? (
+                    <div className="flex flex-col gap-1">
+                      {batch.status === 'completed' ? (
+                        <>
+                          <div className="text-gray-500">
+                            <span className="text-xs">Expected:</span> {formatDate(batch.completion_date)}
+                          </div>
+                          {batch.final_stage?.completed_at && (
+                            <div className="text-gray-900 font-medium">
+                              <span className="text-xs">Actual:</span> {formatDate(batch.final_stage.completed_at)}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className={`flex items-center gap-1 ${isOverdue(batch) ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                          {isOverdue(batch) && <AlertTriangle className="w-3 h-3" />}
+                          {formatDate(batch.completion_date)}
+                        </div>
+                      )}
+                    </div>
+                  ) : '-'}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   {getStageButton(batch)}

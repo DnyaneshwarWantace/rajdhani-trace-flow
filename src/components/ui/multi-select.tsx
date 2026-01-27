@@ -44,7 +44,7 @@ export function MultiSelect({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={true}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -62,7 +62,12 @@ export function MultiSelect({
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 z-[9999]" align="start" sideOffset={4}>
+      <PopoverContent 
+        className="w-[var(--radix-popover-trigger-width)] p-0 z-[10000]" 
+        align="start" 
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="max-h-64 overflow-auto">
           {/* Clear All Button */}
           {selected.length > 0 && (
@@ -84,31 +89,41 @@ export function MultiSelect({
 
           {/* Options List */}
           <div className="p-1">
-            {options.map((option) => {
-              const isSelected = selected.includes(option.value)
-              return (
-                <div
-                  key={option.value}
-                  onClick={() => handleSelect(option.value)}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-accent",
-                    isSelected && "bg-accent"
-                  )}
-                >
+            {options.length === 0 ? (
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                No options available
+              </div>
+            ) : (
+              options.map((option) => {
+                const isSelected = selected.includes(option.value)
+                return (
                   <div
+                    key={option.value}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleSelect(option.value)
+                    }}
                     className={cn(
-                      "flex h-4 w-4 items-center justify-center rounded border border-primary",
-                      isSelected
-                        ? "bg-primary text-primary-foreground"
-                        : "opacity-50"
+                      "flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-accent",
+                      isSelected && "bg-accent"
                     )}
                   >
-                    {isSelected && <Check className="h-3 w-3" />}
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border border-primary",
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : "opacity-50"
+                      )}
+                    >
+                      {isSelected && <Check className="h-3 w-3" />}
+                    </div>
+                    <span className="text-sm">{option.label}</span>
                   </div>
-                  <span className="text-sm">{option.label}</span>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
       </PopoverContent>
