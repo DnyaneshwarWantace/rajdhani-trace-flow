@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Upload, Image, Eye } from 'lucide-react';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface ImageUploadSectionProps {
   imagePreview: string;
@@ -10,19 +11,40 @@ interface ImageUploadSectionProps {
 
 export default function ImageUploadSection({ imagePreview, onImageUpload, onImageRemove }: ImageUploadSectionProps) {
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
+  const { toast } = useToast();
+
+  const isValidImageFile = (file: File): boolean => {
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidType = validImageTypes.includes(file.type);
+    const isValidExtension = validExtensions.includes(fileExtension);
+    
+    return isValidType || isValidExtension;
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file');
+      if (!isValidImageFile(file)) {
+        toast({
+          title: 'Invalid File Type',
+          description: 'Please select an image file (JPEG, PNG, GIF, WebP, BMP, or SVG)',
+          variant: 'destructive',
+        });
+        event.target.value = '';
         return;
       }
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB');
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: 'File Too Large',
+          description: 'Image size should be less than 10MB',
+          variant: 'destructive',
+        });
+        event.target.value = '';
         return;
       }
 

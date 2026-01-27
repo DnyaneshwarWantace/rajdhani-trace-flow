@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Image, X, Eye } from 'lucide-react';
 import React from 'react';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface MaterialImageUploadProps {
   imagePreview: string;
@@ -17,10 +18,45 @@ export default function MaterialImageUpload({
   onRemove,
 }: MaterialImageUploadProps) {
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
+  const { toast } = useToast();
+
+  const isValidImageFile = (file: File): boolean => {
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    const isValidType = validImageTypes.includes(file.type);
+    const isValidExtension = validExtensions.includes(fileExtension);
+    
+    return isValidType || isValidExtension;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      onImageChange(e.target.files[0]);
+      const file = e.target.files[0];
+      
+      if (!isValidImageFile(file)) {
+        toast({
+          title: 'Invalid File Type',
+          description: 'Please select an image file (JPEG, PNG, GIF, WebP, BMP, or SVG)',
+          variant: 'destructive',
+        });
+        e.target.value = '';
+        return;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: 'File Too Large',
+          description: 'Image size should be less than 10MB',
+          variant: 'destructive',
+        });
+        e.target.value = '';
+        return;
+      }
+      
+      onImageChange(file);
     } else {
       onImageChange(null);
     }
