@@ -17,13 +17,31 @@ const DialogOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
   React.useEffect(() => {
+    // Calculate scrollbar width BEFORE hiding scrollbar
+    // This must be done before adding modal-open class
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    
+    // Set CSS variable for scrollbar width (will be used by CSS)
+    // Use a more persistent storage method
+    const storedWidth = scrollbarWidth > 0 ? `${scrollbarWidth}px` : '0px';
+    document.documentElement.style.setProperty('--scrollbar-width', storedWidth);
+    document.documentElement.setAttribute('data-scrollbar-width', storedWidth);
+    
     // Add modal-open class to body and html to trigger CSS scroll lock
     document.body.classList.add('modal-open');
     document.documentElement.classList.add('modal-open');
+    
+    // Ensure body has the padding immediately
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = storedWidth;
+    }
 
     return () => {
       document.body.classList.remove('modal-open');
       document.documentElement.classList.remove('modal-open');
+      document.body.style.paddingRight = '';
+      // Don't remove scrollbar-width immediately - dropdowns might still need it
+      // It will be cleaned up when all modals close
     };
   }, []);
 

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import { validateEmail } from '@/utils/formValidation';
 
 interface SupplierFormDialogProps {
@@ -96,7 +97,6 @@ export default function SupplierFormDialog({
 
   // Handler for GST number (exactly 15 chars, auto uppercase, with autofill)
   const [fetchingGST, setFetchingGST] = useState(false);
-  const [gstError, setGstError] = useState<string | null>(null);
 
   const handleGSTChange = async (value: string) => {
     // Remove any non-alphanumeric characters
@@ -109,25 +109,14 @@ export default function SupplierFormDialog({
     gstValue = gstValue.slice(0, 15);
 
     onFormDataChange({ ...formData, gst_number: gstValue });
-    setGstError(null);
 
-    // Auto-fetch details when GST number is complete (15 characters)
-    // Only validate format if it's a new entry (not editing existing)
+    // Try to auto-fill from GST API if 15 characters, but don't block if it fails
     if (gstValue.length === 15) {
       setFetchingGST(true);
       try {
-        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
-
-        if (error) {
-          // Only show error if it's not a format validation error (allow manual entry)
-          // Format errors are shown but don't block submission
-          if (error.includes('Invalid GST number format')) {
-            // Don't set error for format issues when editing - allow manual entry
-            setGstError(null);
-          } else {
-            setGstError(error);
-          }
-        } else if (data) {
+        const { data } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
+        // Don't show any errors - allow manual entry even if API fails or format is invalid
+        if (data) {
           // Auto-fill supplier details from GST data
           onFormDataChange({
             ...formData,
@@ -140,10 +129,10 @@ export default function SupplierFormDialog({
             pincode: data.pincode || formData.pincode,
           });
         }
+        // Silently ignore errors - user can manually enter all details
       } catch (error) {
-        console.error('Error fetching GST details:', error);
-        // Don't show error for API failures - allow manual entry
-        setGstError(null);
+        // Silently ignore API errors - allow manual entry
+        console.log('GST API not available or failed - allowing manual entry');
       } finally {
         setFetchingGST(false);
       }
@@ -317,6 +306,45 @@ export default function SupplierFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <Label>Phone *</Label>
+              <div onBlur={() => markFieldTouched('phone')}>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={formData.phone || '+91'}
+                  onChange={handlePhoneChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              {(() => {
+                const isJustCountryCode = formData.phone && /^\+\d{1,4}$/.test(formData.phone.trim());
+                const isEmpty = !formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91';
+                const isValid = formData.phone && isValidPhoneNumber(formData.phone);
+                const showError = touchedFields.has('phone') && (isEmpty || isJustCountryCode || !isValid);
+                
+                if (showError) {
+                  if (isEmpty || isJustCountryCode) {
+                    return (
+                      <p className="text-xs text-red-500 mt-1">
+                        Phone number is required
+                      </p>
+                    );
+                  }
+                  if (!isValid) {
+                    return (
+                      <p className="text-xs text-red-500 mt-1">
+                        Please enter a valid phone number for the selected country
+                      </p>
+                    );
+                  }
+                }
+                return (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select country and enter number
+                  </p>
+                );
+              })()}
+            </div>
+            <div>
               <Label>Email</Label>
               <Input
                 type="email"
@@ -344,33 +372,6 @@ export default function SupplierFormDialog({
                 </p>
               )}
             </div>
-            <div>
-              <Label>Phone</Label>
-              <div onBlur={() => markFieldTouched('phone')}>
-                <PhoneInput
-                  defaultCountry="in"
-                  value={formData.phone || '+91'}
-                  onChange={handlePhoneChange}
-                  placeholder="Enter phone number"
-                />
-              </div>
-              {(() => {
-                const isJustCountryCode = formData.phone && /^\+\d{1,4}$/.test(formData.phone.trim());
-                const showError = touchedFields.has('phone') && isJustCountryCode;
-                if (showError) {
-                  return (
-                    <p className="text-xs text-red-500 mt-1">
-                      Please enter a complete phone number
-                    </p>
-                  );
-                }
-                return (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select country and enter number
-                  </p>
-                );
-              })()}
-            </div>
           </div>
 
           <div>
@@ -387,19 +388,14 @@ export default function SupplierFormDialog({
                 <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
               )}
             </div>
-            {formData.gst_number && formData.gst_number.length !== 15 && !gstError && (
+            {formData.gst_number && formData.gst_number.length !== 15 && (
               <p className="text-xs text-red-500 mt-1">
                 GST must be exactly 15 characters ({formData.gst_number.length}/15)
               </p>
             )}
-            {gstError && (
-              <p className="text-xs text-amber-600 mt-1">
-                {gstError}
-              </p>
-            )}
-            {formData.gst_number && formData.gst_number.length === 15 && !gstError && !fetchingGST && (
-              <p className="text-xs text-green-600 mt-1">
-                ✓ Auto-filled from GST
+            {formData.gst_number && formData.gst_number.length === 15 && !fetchingGST && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {formData.gst_number.length}/15 characters
               </p>
             )}
           </div>
@@ -464,7 +460,15 @@ export default function SupplierFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={
+                submitting ||
+                !formData.name.trim() ||
+                !formData.phone ||
+                formData.phone.trim() === '' ||
+                formData.phone.trim() === '+91' ||
+                /^\+\d{1,4}$/.test(formData.phone.trim()) ||
+                !isValidPhoneNumber(formData.phone)
+              }
               className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white"
             >
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}

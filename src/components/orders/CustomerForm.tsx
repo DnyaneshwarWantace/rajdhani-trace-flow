@@ -46,6 +46,68 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     companyName: '',
   });
 
+  // Handler for address fields with different limits based on field type
+  const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+    let inputValue = value;
+
+    // For city and state, reject numbers
+    if (field === 'city' || field === 'state') {
+      // Remove any digits from city and state
+      inputValue = inputValue.replace(/\d/g, '');
+    }
+
+    // Different limits for different fields
+    const limits = {
+      address: { maxWords: 100, maxCharsPerWord: 20 },
+      city: { maxWords: 3, maxCharsPerWord: 25 },
+      state: { maxWords: 3, maxCharsPerWord: 25 }
+    };
+
+    const { maxWords, maxCharsPerWord } = limits[field];
+
+    // Split by spaces to get words (preserve all spaces)
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to max words
+    if (words.length > maxWords) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === maxWords) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to max characters (preserve spaces)
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > maxCharsPerWord ? part.slice(0, maxCharsPerWord) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setNewCustomer({ ...newCustomer, [field]: inputValue });
+  };
+
+  // Calculate word counts for validation messages
+  const addressWordCount = newCustomer.address.split(/\s+/).filter(w => w.length > 0).length;
+  const cityWordCount = newCustomer.city.split(/\s+/).filter(w => w.length > 0).length;
+  const stateWordCount = newCustomer.state.split(/\s+/).filter(w => w.length > 0).length;
+
   // Handler for name validation (max 8 words, max 20 chars per word)
   const handleNameChange = (value: string) => {
     let inputValue = value;
@@ -101,31 +163,29 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     setNewCustomer({ ...newCustomer, gstNumber: gstValue });
     setGstAutoFilled(false);
 
+    // Try to auto-fill from GST API if 15 characters, but don't block if it fails
     if (gstValue.length === 15) {
       setIsFetchingGST(true);
       try {
         const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
-        if (error) {
-          toast({
-            title: 'Error',
-            description: error,
-            variant: 'destructive',
-          });
-        } else if (data) {
+        // Don't show error toast - allow manual entry even if API fails
+        if (data) {
           setNewCustomer({
             ...newCustomer,
             gstNumber: data.gstNumber,
-            name: data.companyName,
-            companyName: data.companyName,
-            address: data.address,
-            city: data.city,
-            state: data.state,
-            pincode: data.pincode,
+            name: data.companyName || newCustomer.name,
+            companyName: data.companyName || newCustomer.companyName,
+            address: data.address || newCustomer.address,
+            city: data.city || newCustomer.city,
+            state: data.state || newCustomer.state,
+            pincode: data.pincode || newCustomer.pincode,
           });
           setGstAutoFilled(true);
         }
+        // Silently ignore errors - user can manually enter all details
       } catch (error) {
-        console.error('Error fetching GST details:', error);
+        // Silently ignore API errors - allow manual entry
+        console.log('GST API not available or failed - allowing manual entry');
       } finally {
         setIsFetchingGST(false);
       }
@@ -385,10 +445,14 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           <Label>Address</Label>
           <Textarea
             value={newCustomer.address}
-            onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })}
+            onChange={e => handleAddressChange(e.target.value, 'address')}
+            onBlur={() => markFieldTouched('address')}
             placeholder="Enter address"
             rows={2}
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            {addressWordCount}/100 words • Max 20 characters per word
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -396,25 +460,25 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             <Label>City</Label>
             <Input
               value={newCustomer.city}
-              onChange={e => {
-                // Only allow letters and spaces
-                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                setNewCustomer({ ...newCustomer, city: value });
-              }}
+              onChange={e => handleAddressChange(e.target.value, 'city')}
+              onBlur={() => markFieldTouched('city')}
               placeholder="Enter city"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {cityWordCount}/3 words • Max 25 characters per word
+            </p>
           </div>
           <div className="space-y-2">
             <Label>State</Label>
             <Input
               value={newCustomer.state}
-              onChange={e => {
-                // Only allow letters and spaces
-                const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                setNewCustomer({ ...newCustomer, state: value });
-              }}
+              onChange={e => handleAddressChange(e.target.value, 'state')}
+              onBlur={() => markFieldTouched('state')}
               placeholder="Enter state"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {stateWordCount}/3 words • Max 25 characters per word
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Pincode</Label>
@@ -422,14 +486,15 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
               <Input
                 value={newCustomer.pincode}
                 onChange={e => handlePincodeChange(e.target.value)}
+                onBlur={() => markFieldTouched('pincode')}
                 placeholder="Enter 6-digit pincode"
                 maxLength={6}
-                className={newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 ? 'border-red-500' : ''}
+                className={touchedFields.has('pincode') && newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 ? 'border-red-500' : ''}
               />
               {fetchingLocation && (
                 <p className="text-xs text-gray-500 mt-1">Fetching location...</p>
               )}
-              {newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 && (
+              {touchedFields.has('pincode') && newCustomer.pincode && newCustomer.pincode.length > 0 && newCustomer.pincode.length < 6 && (
                 <p className="text-xs text-red-600 mt-1">Pincode must be 6 digits</p>
               )}
             </div>
@@ -443,7 +508,12 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!newCustomer.name.trim() || !newCustomer.email.trim() || !newCustomer.phone.trim()}
+            disabled={Boolean(
+              !newCustomer.name.trim() || 
+              !newCustomer.phone.trim() || 
+              newCustomer.phone.trim() === '+91' || 
+              (newCustomer.phone.trim() && !isValidPhoneNumber(newCustomer.phone))
+            )}
             className="flex-1"
           >
             <Save className="w-4 h-4 mr-2" />

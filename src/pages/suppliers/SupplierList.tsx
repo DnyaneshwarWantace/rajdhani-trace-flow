@@ -177,19 +177,23 @@ export default function SupplierList() {
       return;
     }
 
-    // Phone validation - check if it's just a country code
-    if (formData.phone && formData.phone.trim()) {
-      const isJustCountryCode = /^\+\d{1,4}$/.test(formData.phone.trim());
-      if (isJustCountryCode) {
-        toast({ title: 'Validation Error', description: 'Please enter a complete phone number', variant: 'destructive' });
-        return;
-      }
+    // Phone validation - REQUIRED FIELD
+    if (!formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91') {
+      toast({ title: 'Validation Error', description: 'Please fill in required field: Phone Number', variant: 'destructive' });
+      return;
+    }
 
-      // Phone validation using libphonenumber-js (validates according to country code)
-      if (!isValidPhoneNumber(formData.phone)) {
-        toast({ title: 'Validation Error', description: 'Please enter a valid phone number for the selected country', variant: 'destructive' });
-        return;
-      }
+    // Phone validation - check if it's just a country code
+    const isJustCountryCode = /^\+\d{1,4}$/.test(formData.phone.trim());
+    if (isJustCountryCode) {
+      toast({ title: 'Validation Error', description: 'Please enter a complete phone number', variant: 'destructive' });
+      return;
+    }
+
+    // Phone validation using libphonenumber-js (validates according to country code)
+    if (!isValidPhoneNumber(formData.phone)) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid phone number for the selected country', variant: 'destructive' });
+      return;
     }
 
     // Validate GST number if provided (only check length, not format pattern)

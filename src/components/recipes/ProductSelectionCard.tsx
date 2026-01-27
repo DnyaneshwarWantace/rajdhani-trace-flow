@@ -209,7 +209,7 @@ export default function ProductSelectionCard({
         >
           {isCalculating ? (
             <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              <RefreshCw className="w-4 h-4 mr-2 animate-snn" />
               Calculating...
             </>
           ) : (
