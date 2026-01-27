@@ -146,8 +146,8 @@ export default function ProductSearchSection({
         filters.search = searchTerm.trim();
       }
 
-      if (selectedCategories.length > 0) {
-        filters.category = selectedCategories;
+      if (category) {
+        filters.category = category;
       }
 
       if (selectedSubcategories.length > 0) {

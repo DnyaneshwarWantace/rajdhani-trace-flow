@@ -129,7 +129,7 @@ export default function SupplierCard({ supplier, orders, onEdit }: SupplierCardP
                       <p className="font-medium">{formatCurrency(order.totalCost)}</p>
                       <Badge className={`text-xs ${
                         order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        order.status === 'in-transit' || order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                        order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
                         order.status === 'approved' ? 'bg-blue-100 text-blue-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>

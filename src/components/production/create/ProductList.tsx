@@ -131,12 +131,11 @@ export default function ProductList({
                   {/* Table Header for Variants */}
                   <div className="bg-white border-b border-gray-200 px-2 py-1.5">
                     <div className="flex gap-3 text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
-                      {!shouldGroup && <div className="w-[20%] pl-3">Product Name</div>}
-                      <div className={`${shouldGroup ? 'w-[22%] pl-5' : 'w-[18%]'}`}>Category</div>
-                      <div className={`${shouldGroup ? 'w-[22%]' : 'w-[18%]'}`}>Dimensions</div>
-                      <div className={`${shouldGroup ? 'w-[18%]' : 'w-[15%]'}`}>Weight</div>
-                      <div className={`${shouldGroup ? 'w-[25%]' : 'w-[20%]'}`}>Color / Pattern</div>
-                      <div className={`${shouldGroup ? 'w-[13%]' : 'w-[12%]'}`}>Stock</div>
+                      <div className="w-[22%] pl-5">Category</div>
+                      <div className="w-[22%]">Dimensions</div>
+                      <div className="w-[18%]">Weight</div>
+                      <div className="w-[25%]">Color / Pattern</div>
+                      <div className="w-[13%]">Stock</div>
                     </div>
                   </div>
 

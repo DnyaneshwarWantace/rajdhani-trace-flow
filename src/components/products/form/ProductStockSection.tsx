@@ -61,14 +61,14 @@ export default function ProductStockSection({
                 max="99999"
                 step="1"
               />
-              {touchedFields.has('base_quantity') && (formData.base_quantity === null || formData.base_quantity === undefined || formData.base_quantity === 0 || formData.base_quantity === '' || String(formData.base_quantity).trim() === '') && (
+              {touchedFields.has('base_quantity') && (formData.base_quantity === null || formData.base_quantity === undefined || formData.base_quantity === 0 || String(formData.base_quantity).trim() === '') && (
                 <p className="text-xs text-red-500 mt-1">
                   Base quantity is required
                 </p>
               )}
             </>
           )}
-          {!touchedFields.has('base_quantity') || (formData.base_quantity !== null && formData.base_quantity !== undefined && formData.base_quantity !== 0 && formData.base_quantity !== '' && String(formData.base_quantity).trim() !== '') ? (
+          {!touchedFields.has('base_quantity') || (formData.base_quantity !== null && formData.base_quantity !== undefined && formData.base_quantity !== 0 && String(formData.base_quantity).trim() !== '') ? (
             <p className="text-xs text-gray-500 mt-1">
               {isQuantityDisabled
                 ? 'Quantity cannot be edited. Use inventory management to update stock.'
