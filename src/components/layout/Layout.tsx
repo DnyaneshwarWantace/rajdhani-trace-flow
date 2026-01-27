@@ -13,25 +13,39 @@ export default function Layout({ children }: LayoutProps) {
   // Initialize sidebar state: use localStorage to persist user preference
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
     if (typeof window !== 'undefined') {
-      // Check localStorage first
+      const isDesktop = window.innerWidth >= 1024;
+      // On mobile, always start closed regardless of localStorage
+      if (!isDesktop) {
+        return false;
+      }
+      // On desktop, check localStorage for saved preference
       const savedState = localStorage.getItem('sidebarOpen');
       if (savedState !== null) {
         return savedState === 'true';
       }
-      // Default: open on desktop, closed on mobile
-      return window.innerWidth >= 1024;
+      // Default: open on desktop
+      return true;
     }
     return false; // Default to closed on SSR
   });
+
+  // Ensure sidebar is closed on mobile on mount
+  useEffect(() => {
+    const isDesktop = window.innerWidth >= 1024;
+    if (!isDesktop && isSidebarOpen) {
+      setIsSidebarOpen(false);
+      localStorage.setItem('sidebarOpen', 'false');
+    }
+  }, []);
 
   // Update sidebar state when window is resized
   useEffect(() => {
     const handleResize = () => {
       const isDesktop = window.innerWidth >= 1024;
       // On mobile (< 1024px), close sidebar if open
-      // On desktop, don't auto-open - let user control it
       if (!isDesktop && isSidebarOpen) {
         setIsSidebarOpen(false);
+        localStorage.setItem('sidebarOpen', 'false');
       }
     };
 

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Package, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Package, CheckCircle, XCircle } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
 interface IndividualProductStatsProps {

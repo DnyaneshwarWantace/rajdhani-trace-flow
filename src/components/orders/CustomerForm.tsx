@@ -167,7 +167,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     if (gstValue.length === 15) {
       setIsFetchingGST(true);
       try {
-        const { data, error } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
+        const { data } = await GSTApiService.getCustomerDetailsFromGST(gstValue);
         // Don't show error toast - allow manual entry even if API fails
         if (data) {
           setNewCustomer({
