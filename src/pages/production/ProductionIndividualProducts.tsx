@@ -252,8 +252,6 @@ export default function ProductionIndividualProducts() {
       p.id && !p.id.startsWith('temp-')
     );
 
-    const plannedQty = batch?.planned_quantity || 0;
-
     setIsCompleting(true);
 
     // Update batch status to completed with actual completion date
@@ -294,12 +292,6 @@ export default function ProductionIndividualProducts() {
   const createdProductsCountFinal = createdProductsCount > 0 ? createdProductsCount : createdProductsCountFromState;
 
   const plannedQty = batch?.planned_quantity || 0;
-  const createdProducts = individualProducts.filter(p => 
-    p.id && !p.id.startsWith('temp-')
-  );
-  const completeProducts = createdProducts.filter(p => 
-    p.final_weight && p.final_width && p.final_length
-  );
 
   // Can complete only if all existing rows have required fields filled (no empty rows)
   // This is calculated in IndividualProductsTable and passed via callback

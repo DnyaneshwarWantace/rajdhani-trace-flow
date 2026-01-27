@@ -12,7 +12,7 @@ interface MaterialCostSectionProps {
 }
 
 const MaterialCostSection = forwardRef<HTMLInputElement, MaterialCostSectionProps>(
-  ({ costPerUnit, onCostPerUnitChange, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
+  ({ costPerUnit, onCostPerUnitChange, hasError = false, touchedFields: _touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
     return (
       <div>
         <Label htmlFor="costPerUnit">Cost/Unit (₹)</Label>

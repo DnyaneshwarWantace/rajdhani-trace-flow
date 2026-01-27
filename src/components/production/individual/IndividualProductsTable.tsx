@@ -37,7 +37,7 @@ interface IndividualProductsTableProps {
 
 export default function IndividualProductsTable({
   individualProducts,
-  onUpdate,
+  onUpdate: _onUpdate,
   product,
   plannedQuantity = 0,
   batchId,
@@ -55,7 +55,6 @@ export default function IndividualProductsTable({
   const [localProducts, setLocalProducts] = useState<IndividualProduct[]>(individualProducts);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string} | null>(null);
-  const [copiedField, setCopiedField] = useState<{field: 'final_length' | 'final_width' | 'final_weight'; value: string} | null>(null);
 
   // Common warehouse locations
   const locationOptions = [
@@ -505,32 +504,6 @@ export default function IndividualProductsTable({
     });
   };
 
-  const handleCopyField = (index: number, field: 'final_length' | 'final_width' | 'final_weight') => {
-    const productToCopy = localProducts[index];
-    const rawValue = productToCopy[field];
-    
-    // Ensure we get a clean string value
-    let value = '';
-    if (rawValue) {
-      value = String(rawValue).trim();
-    }
-    
-    if (!value || value === '') {
-      toast({
-        title: 'No Value',
-        description: `This row has no ${field.replace('final_', '')} value to copy.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Store clean value
-    setCopiedField({ field, value });
-    toast({
-      title: 'Copied',
-      description: `${field.replace('final_', '').charAt(0).toUpperCase() + field.replace('final_', '').slice(1)} (${value}) copied. Click "Fill Down" arrow to paste to next row.`,
-    });
-  };
 
   const handleFillDownField = async (index: number, field: 'final_length' | 'final_width' | 'final_weight') => {
     const sourceRow = localProducts[index];
