@@ -202,7 +202,6 @@ export default function ProductSelectorDialog({
       ? allProducts.filter(
           (product) =>
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
             product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -271,7 +270,6 @@ export default function ProductSelectorDialog({
       ? allProducts.filter(
           (product) =>
             product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
             product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             product.subcategory?.toLowerCase().includes(searchTerm.toLowerCase())
         )

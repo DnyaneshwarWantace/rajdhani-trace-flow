@@ -66,7 +66,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
 
     // Different limits for different fields
     const limits = {
-      address: { maxWords: 100, maxCharsPerWord: 20 },
+      address: { maxWords: 20, maxCharsPerWord: 20 },
       city: { maxWords: 3, maxCharsPerWord: 25 },
       state: { maxWords: 3, maxCharsPerWord: 25 }
     };
@@ -459,7 +459,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             rows={2}
           />
           <p className="text-xs text-muted-foreground mt-1">
-            {addressWordCount}/100 words • Max 20 characters per word
+            {addressWordCount}/20 words • Max 20 characters per word
           </p>
         </div>
 

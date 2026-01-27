@@ -198,7 +198,7 @@ export default function CustomerFormDialog({
 
     // Different limits for different fields
     const limits = {
-      address: { maxWords: 100, maxCharsPerWord: 20 },
+      address: { maxWords: 20, maxCharsPerWord: 20 },
       city: { maxWords: 3, maxCharsPerWord: 25 },
       state: { maxWords: 3, maxCharsPerWord: 25 }
     };
@@ -240,16 +240,31 @@ export default function CustomerFormDialog({
     });
 
     inputValue = processedParts.join('');
-    onFormDataChange({ ...formData, [field]: inputValue });
     return inputValue;
+  };
+
+  // Handler specifically for permanent address
+  const handlePermanentAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+    const processedValue = handleAddressChange(value, field);
+    onFormDataChange({
+      ...formData,
+      permanentAddress: { ...formData.permanentAddress!, [field]: processedValue }
+    });
+  };
+
+  // Handler specifically for delivery address
+  const handleDeliveryAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+    const processedValue = handleAddressChange(value, field);
+    onFormDataChange({
+      ...formData,
+      deliveryAddress: { ...formData.deliveryAddress!, [field]: processedValue }
+    });
   };
 
   const nameWordCount = formData.name.trim() ? formData.name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const companyWordCount = formData.company_name?.trim() ? formData.company_name.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  // Future word-count validation (currently unused)
-  // const addressWordCount = ...
-  // const cityWordCount = ...
-  // const stateWordCount = ...
+  const addressWordCount = formData.permanentAddress?.address?.trim() ? formData.permanentAddress.address.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+  const deliveryAddressWordCount = formData.deliveryAddress?.address?.trim() ? formData.deliveryAddress.address.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
 
   // Handler for pincode (max 10 digits) with auto-fill
   const [fetchingLocation, setFetchingLocation] = useState(false);
@@ -411,17 +426,10 @@ export default function CustomerFormDialog({
               <Label>Address</Label>
               <Input
                 value={formData.permanentAddress?.address || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  handleAddressChange(value, 'address');
-                  onFormDataChange({
-                    ...formData,
-                    permanentAddress: { ...formData.permanentAddress!, address: value }
-                  });
-                }}
+                onChange={(e) => handlePermanentAddressChange(e.target.value, 'address')}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Max 100 words • Max 20 characters per word
+                {addressWordCount}/20 words • Max 20 characters per word
               </p>
             </div>
 
@@ -430,13 +438,7 @@ export default function CustomerFormDialog({
                 <Label>City</Label>
                 <Input
                   value={formData.permanentAddress?.city || ''}
-                  onChange={(e) => {
-                    const cleaned = handleAddressChange(e.target.value, 'city');
-                    onFormDataChange({
-                      ...formData,
-                      permanentAddress: { ...formData.permanentAddress!, city: cleaned }
-                    });
-                  }}
+                  onChange={(e) => handlePermanentAddressChange(e.target.value, 'city')}
                   placeholder="e.g., Mumbai"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -447,13 +449,7 @@ export default function CustomerFormDialog({
                 <Label>State</Label>
                 <Input
                   value={formData.permanentAddress?.state || ''}
-                  onChange={(e) => {
-                    const cleaned = handleAddressChange(e.target.value, 'state');
-                    onFormDataChange({
-                      ...formData,
-                      permanentAddress: { ...formData.permanentAddress!, state: cleaned }
-                    });
-                  }}
+                  onChange={(e) => handlePermanentAddressChange(e.target.value, 'state')}
                   placeholder="e.g., Maharashtra"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -538,17 +534,10 @@ export default function CustomerFormDialog({
                   <Label>Address</Label>
                   <Input
                     value={formData.deliveryAddress?.address || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      handleAddressChange(value, 'address');
-                      onFormDataChange({
-                        ...formData,
-                        deliveryAddress: { ...formData.deliveryAddress!, address: value }
-                      });
-                    }}
+                    onChange={(e) => handleDeliveryAddressChange(e.target.value, 'address')}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Max 100 words • Max 20 characters per word
+                    {deliveryAddressWordCount}/20 words • Max 20 characters per word
                   </p>
                 </div>
 
@@ -557,14 +546,7 @@ export default function CustomerFormDialog({
                     <Label>City</Label>
                     <Input
                       value={formData.deliveryAddress?.city || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        handleAddressChange(value, 'city');
-                        onFormDataChange({
-                          ...formData,
-                          deliveryAddress: { ...formData.deliveryAddress!, city: value }
-                        });
-                      }}
+                      onChange={(e) => handleDeliveryAddressChange(e.target.value, 'city')}
                       placeholder="e.g., Mumbai"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
@@ -575,14 +557,7 @@ export default function CustomerFormDialog({
                     <Label>State</Label>
                     <Input
                       value={formData.deliveryAddress?.state || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        handleAddressChange(value, 'state');
-                        onFormDataChange({
-                          ...formData,
-                          deliveryAddress: { ...formData.deliveryAddress!, state: value }
-                        });
-                      }}
+                      onChange={(e) => handleDeliveryAddressChange(e.target.value, 'state')}
                       placeholder="e.g., Maharashtra"
                     />
                     <p className="text-xs text-muted-foreground mt-1">

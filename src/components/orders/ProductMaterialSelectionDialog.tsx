@@ -119,7 +119,6 @@ export default function ProductMaterialSelectionDialog({
       // Common fields for both products and materials
       matchesSearch =
         item.name?.toLowerCase().includes(searchLower) ||
-        item.id?.toLowerCase().includes(searchLower) ||
         item.category?.toLowerCase().includes(searchLower) ||
         item.color?.toLowerCase().includes(searchLower);
 

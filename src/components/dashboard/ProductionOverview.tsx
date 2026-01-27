@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Factory, ArrowRight, Clock, Play, CheckCircle, AlertCircle } from 'lucide-react';
+import { Factory, ArrowRight, Clock, Play, CheckCircle, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
 
 interface ProductionBatch {
   id: string;
@@ -36,6 +36,17 @@ const priorityConfig: Record<string, { color: string }> = {
 export default function ProductionOverview({ batches, loading }: ProductionOverviewProps) {
   const navigate = useNavigate();
 
+  const isOverdue = (batch: ProductionBatch): boolean => {
+    if (!batch.completion_date || batch.status === 'completed' || batch.status === 'cancelled') {
+      return false;
+    }
+    const completionDate = new Date(batch.completion_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    completionDate.setHours(0, 0, 0, 0);
+    return completionDate < today;
+  };
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -71,12 +82,15 @@ export default function ProductionOverview({ batches, loading }: ProductionOverv
             const status = statusConfig[batch.status] || statusConfig.planned;
             const priority = priorityConfig[batch.priority] || priorityConfig.medium;
             const StatusIcon = status.icon;
+            const overdue = isOverdue(batch);
 
             return (
               <div
                 key={batch.id}
                 onClick={() => navigate(`/production/${batch.id}`)}
-                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                className={`flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ${
+                  overdue ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-10 h-10 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -84,9 +98,26 @@ export default function ProductionOverview({ batches, loading }: ProductionOverv
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {batch.batch_number}
+                      {batch.product_name || 'Product'}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">{batch.product_name || 'Product'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-gray-500 truncate">{batch.batch_number}</p>
+                      {batch.completion_date && (
+                        <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                          <Calendar className={`w-3 h-3 ${overdue ? 'text-red-600' : ''}`} />
+                          <span className="whitespace-nowrap">
+                            {new Date(batch.completion_date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </span>
+                          {overdue && (
+                            <AlertTriangle className="w-3 h-3 text-red-600 ml-1" />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

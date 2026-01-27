@@ -139,6 +139,8 @@ export const formatIndianDateTime = (dateStr: string | Date): string => {
 };
 
 // Relative date formatting with Indian date fallback
+// Only shows "today" or "yesterday" for current day and yesterday
+// Shows actual date for all other dates
 export const formatDate = (dateStr: string): string => {
   if (!dateStr) return 'N/A';
   
@@ -147,17 +149,22 @@ export const formatDate = (dateStr: string): string => {
     if (isNaN(date.getTime())) return 'N/A';
     
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    // Fallback to Indian date format
+    // Check if date is today
+    if (dateOnly.getTime() === today.getTime()) {
+      return 'Today';
+    }
+    
+    // Check if date is yesterday
+    if (dateOnly.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
+    }
+    
+    // For all other dates, show the actual date
     return formatIndianDate(date);
   } catch {
     return 'N/A';

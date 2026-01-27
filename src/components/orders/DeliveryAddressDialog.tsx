@@ -45,6 +45,53 @@ export default function DeliveryAddressDialog({
     }
   }, [address, isOpen]);
 
+  // Handler for address field with 20 word limit
+  const handleAddressChange = (value: string) => {
+    let inputValue = value;
+    const maxWords = 20;
+    const maxCharsPerWord = 20;
+
+    // Split by spaces to get words (preserve all spaces)
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+
+    // Limit to max words
+    if (words.length > maxWords) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === maxWords) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') {
+              endPos++;
+            }
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+
+    // Limit each word to max characters (preserve spaces)
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) {
+        return part;
+      } else if (part.trim().length > 0) {
+        return part.length > maxCharsPerWord ? part.slice(0, maxCharsPerWord) : part;
+      }
+      return part;
+    });
+
+    inputValue = processedParts.join('');
+    setLocalAddress({ ...localAddress, address: inputValue });
+  };
+
+  // Calculate word count for display
+  const addressWordCount = localAddress.address.split(/\s+/).filter(w => w.length > 0).length;
+
   const handleSave = () => {
     if (!localAddress.address || !localAddress.city || !localAddress.state || !localAddress.pincode) {
       toast({
@@ -75,10 +122,13 @@ export default function DeliveryAddressDialog({
             <Label>Address</Label>
             <Textarea
               value={localAddress.address}
-              onChange={e => setLocalAddress({ ...localAddress, address: e.target.value })}
+              onChange={e => handleAddressChange(e.target.value)}
               placeholder="Enter delivery address"
               rows={2}
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              {addressWordCount}/20 words • Max 20 characters per word
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

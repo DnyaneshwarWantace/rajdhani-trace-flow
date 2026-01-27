@@ -159,7 +159,7 @@ export default function SupplierFormDialog({
 
     // Different limits for different fields
     const limits = {
-      address: { maxWords: 100, maxCharsPerWord: 20 },
+      address: { maxWords: 20, maxCharsPerWord: 20 },
       city: { maxWords: 3, maxCharsPerWord: 25 },
       state: { maxWords: 3, maxCharsPerWord: 25 }
     };
@@ -416,7 +416,7 @@ export default function SupplierFormDialog({
               placeholder="e.g., Building name, Street"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              {addressWordCount}/100 words • Max 20 characters per word
+              {addressWordCount}/20 words • Max 20 characters per word
             </p>
           </div>
 

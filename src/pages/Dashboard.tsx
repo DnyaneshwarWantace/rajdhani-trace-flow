@@ -125,6 +125,29 @@ export default function Dashboard() {
         batch.status === 'in_progress' || batch.status === 'planned'
       );
 
+      // Enrich batches with product names if missing
+      const enrichedBatches = await Promise.all(
+        activeBatches.map(async (batch: any) => {
+          // If product_name is missing, fetch it from product_id
+          if (!batch.product_name && batch.product_id) {
+            try {
+              const product = await ProductService.getProductById(batch.product_id);
+              return {
+                ...batch,
+                product_name: product.name || batch.product_name || 'Product',
+              };
+            } catch (error) {
+              console.error(`Error fetching product ${batch.product_id}:`, error);
+              return {
+                ...batch,
+                product_name: batch.product_name || 'Product',
+              };
+            }
+          }
+          return batch;
+        })
+      );
+
       // Get suppliers
       const suppliers = suppliersResponse.data || [];
 
@@ -168,7 +191,7 @@ export default function Dashboard() {
         recentOrders: orders.slice(0, 10).sort((a: any, b: any) => {
           return new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime();
         }),
-        productionBatches: activeBatches.slice(0, 10),
+        productionBatches: enrichedBatches.slice(0, 10),
         lowStockProducts: lowStockProducts.slice(0, 10),
         topCustomers: customers,
         topSuppliers: Array.from(supplierStatsMap.values()),
