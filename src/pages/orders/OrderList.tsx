@@ -189,7 +189,7 @@ export default function OrderList() {
             </div>
 
             {/* New Order Button */}
-            <Button onClick={() => navigate('/orders/new')} className="text-white">
+            <Button onClick={() => navigate('/orders/new')} className="bg-primary-600 hover:bg-primary-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               New Order
             </Button>

@@ -145,7 +145,6 @@ export default function ProductSelectionCard({
                   max="99999"
                   className="mt-1 h-10 text-base"
                 />
-                <p className="text-xs text-gray-500 mt-1">Max: 99,999</p>
               </div>
 
               {/* Unit - Larger input field */}
