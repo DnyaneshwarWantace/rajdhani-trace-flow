@@ -41,11 +41,15 @@ export default function PlanningDetailsForm({ formData, onChange }: PlanningDeta
           id="planned_quantity"
           type="number"
           min="1"
+          max="99999"
+          step="1"
           value={formData.planned_quantity || ''}
-          onChange={(e) => handleChange('planned_quantity', parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+            handleChange('planned_quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
+          }}
           required
           className="mt-1"
-          placeholder="Enter quantity to produce"
         />
       </div>
 

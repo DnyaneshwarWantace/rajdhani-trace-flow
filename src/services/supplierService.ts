@@ -49,13 +49,11 @@ export class SupplierService {
 
   static async getSuppliers(filters?: {
     search?: string;
-    status?: string;
   }): Promise<{ data: Supplier[] | null; error: string | null }> {
     try {
       const params = new URLSearchParams();
 
       if (filters?.search) params.append('search', filters.search);
-      if (filters?.status) params.append('status', filters.status);
 
       const response = await fetch(`${API_URL}/suppliers?${params}`, {
         headers: this.getHeaders(),

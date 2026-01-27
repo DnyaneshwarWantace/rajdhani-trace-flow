@@ -21,7 +21,7 @@ export interface StockOrder {
   totalCost: number;
   orderDate: string;
   expectedDelivery: string;
-  status: 'ordered' | 'pending' | 'approved' | 'shipped' | 'in-transit' | 'delivered' | 'cancelled';
+  status: 'pending' | 'approved' | 'shipped' | 'delivered';
   notes?: string;
   actualDelivery?: string;
   minThreshold?: number;
@@ -37,7 +37,7 @@ export interface CreateStockOrderData {
   order_date: string;
   expected_delivery: string;
   total_amount: number;
-  status: 'pending' | 'approved' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'approved' | 'shipped' | 'delivered';
   material_details: {
     materialName: string;
     materialCategory?: string;
@@ -81,7 +81,7 @@ export class ManageStockService {
    */
   static async getOrders(filters?: {
     search?: string;
-    status?: string;
+    status?: string | string[];
     supplier_id?: string;
     limit?: number;
     offset?: number;
@@ -90,7 +90,14 @@ export class ManageStockService {
       const params = new URLSearchParams();
 
       if (filters?.search) params.append('search', filters.search);
-      if (filters?.status && filters.status !== 'all') params.append('status', filters.status === 'ordered' ? 'pending' : filters.status);
+      if (filters?.status && filters.status !== 'all') {
+        const statusArray = Array.isArray(filters.status) ? filters.status : [filters.status];
+        const cleanedStatuses = statusArray.filter(s => s && s !== 'all');
+        if (cleanedStatuses.length > 0) {
+          // Send as comma-separated string for reliable parsing
+          params.append('status', cleanedStatuses.join(','));
+        }
+      }
       if (filters?.supplier_id) params.append('supplier_id', filters.supplier_id);
       if (filters?.limit) params.append('limit', filters.limit.toString());
       if (filters?.offset) params.append('offset', filters.offset.toString());
@@ -160,7 +167,7 @@ export class ManageStockService {
           totalCost: order.total_amount || order.pricing?.total_amount || 0,
           orderDate: order.order_date,
           expectedDelivery: order.expected_delivery,
-          status: order.status === 'pending' ? 'ordered' : (order.status === 'shipped' ? 'in-transit' : order.status),
+          status: order.status,
           notes: materialDetails.userNotes || materialDetails.notes || order.notes || '',
           actualDelivery: order.actual_delivery,
           minThreshold: materialDetails.minThreshold || 100,
@@ -231,7 +238,7 @@ export class ManageStockService {
         totalCost: order.total_amount || order.pricing?.total_amount || 0,
         orderDate: order.order_date,
         expectedDelivery: order.expected_delivery,
-        status: order.status === 'pending' ? 'ordered' : order.status,
+        status: order.status,
         notes: materialDetails.userNotes || order.notes || '',
         actualDelivery: order.actual_delivery,
         minThreshold: materialDetails.minThreshold,
@@ -253,9 +260,8 @@ export class ManageStockService {
    */
   static async updateOrderStatus(orderId: string, newStatus: StockOrder['status']): Promise<{ success: boolean; error?: string }> {
     try {
-      // Map frontend status to backend status (same as old code)
-      const backendStatus = newStatus === 'ordered' ? 'pending' : 
-                           newStatus === 'in-transit' ? 'shipped' : newStatus;
+      // Use status as-is (backend and frontend use same status values)
+      const backendStatus = newStatus;
 
       const response = await fetch(`${API_URL}/purchase-orders/${orderId}/status`, {
         method: 'PUT',
@@ -309,11 +315,9 @@ export class ManageStockService {
       const totalOrders = orders.length;
       const totalValue = orders.reduce((sum, order) => sum + order.totalCost, 0);
       const pendingOrders = orders.filter(order => 
-        order.status === 'ordered' || 
         order.status === 'pending' || 
         order.status === 'approved' || 
-        order.status === 'shipped' || 
-        order.status === 'in-transit'
+        order.status === 'shipped'
       ).length;
       const deliveredOrders = orders.filter(order => order.status === 'delivered').length;
 

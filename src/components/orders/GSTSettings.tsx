@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface GSTSettingsProps {
   rate: number;
@@ -32,7 +33,10 @@ export default function GSTSettings({
             <Input
               type="number"
               value={rate}
-              onChange={e => onRateChange(parseFloat(e.target.value) || 0)}
+              onChange={e => {
+                const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
+                onRateChange(parseFloat(validation.value) || 0);
+              }}
               min="0"
               max="100"
               step="0.01"

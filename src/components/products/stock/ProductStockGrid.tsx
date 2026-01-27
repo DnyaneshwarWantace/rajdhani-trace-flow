@@ -9,7 +9,7 @@ interface ProductStockGridProps {
   product: Product;
   productId: string;
   searchTerm: string;
-  statusFilter: string;
+  statusFilter: string[];
   onView: (product: IndividualProduct) => void;
   onEdit: (product: IndividualProduct) => void;
   onQRCodeClick: (product: IndividualProduct) => void;
@@ -29,7 +29,7 @@ export default function ProductStockGrid({
 }: ProductStockGridProps) {
   const navigate = useNavigate();
 
-  const hasFilters = searchTerm !== '' || statusFilter !== 'all';
+  const hasFilters = searchTerm !== '' || statusFilter.length > 0;
 
   if (loading && products.length === 0) {
     return (

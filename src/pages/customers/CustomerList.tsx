@@ -42,7 +42,7 @@ export default function CustomerList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -100,7 +100,7 @@ export default function CustomerList() {
         customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer.phone?.includes(searchTerm);
-      const matchesType = typeFilter === 'all' || customer.customer_type === typeFilter;
+      const matchesType = typeFilter.length === 0 || typeFilter.includes(customer.customer_type);
       return matchesSearch && matchesType;
     });
 
@@ -131,7 +131,10 @@ export default function CustomerList() {
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await CustomerService.getCustomers({});
+      const { data, error } = await CustomerService.getCustomers({
+        search: searchTerm || undefined,
+        customer_type: typeFilter.length > 0 ? typeFilter : undefined,
+      });
 
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
@@ -458,7 +461,7 @@ export default function CustomerList() {
               customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
               customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
               customer.phone?.includes(searchTerm);
-            const matchesType = typeFilter === 'all' || customer.customer_type === typeFilter;
+            const matchesType = typeFilter.length === 0 || typeFilter.includes(customer.customer_type);
             return matchesSearch && matchesType;
           });
           const totalCustomers = filtered.length;

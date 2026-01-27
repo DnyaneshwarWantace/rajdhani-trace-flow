@@ -191,10 +191,9 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
                         <div className="flex items-center gap-2 mb-1">
                           <Badge className={`text-xs ${
                             historyItem.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                            historyItem.status === 'shipped' || historyItem.status === 'in-transit' ? 'bg-orange-100 text-orange-800' :
+                            historyItem.status === 'shipped' ? 'bg-yellow-100 text-yellow-800' :
                             historyItem.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                            historyItem.status === 'pending' || historyItem.status === 'ordered' ? 'bg-gray-100 text-gray-800' :
-                            historyItem.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            historyItem.status === 'pending' ? 'bg-gray-100 text-gray-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
                             {historyItem.status}
@@ -235,7 +234,7 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
         {/* Footer with Actions */}
         <div className="p-6 border-t border-gray-200 flex items-center justify-between gap-4">
           <div className="flex-1">
-            {(order.status === 'ordered' || order.status === 'pending') && onStatusUpdate && (
+            {order.status === 'pending' && onStatusUpdate && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -250,14 +249,14 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
               <Button
                 variant="outline"
                 onClick={() => {
-                  onStatusUpdate(order.id, 'in-transit');
+                  onStatusUpdate(order.id, 'shipped');
                   onClose();
                 }}
               >
                 Mark as Shipped
               </Button>
             )}
-            {(order.status === 'shipped' || order.status === 'in-transit') && onStatusUpdate && (
+            {order.status === 'shipped' && onStatusUpdate && (
               <Button
                 className="bg-primary-600 text-white hover:bg-primary-700"
                 onClick={() => {

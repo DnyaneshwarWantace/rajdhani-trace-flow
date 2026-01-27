@@ -91,8 +91,8 @@ export default function ManageStock() {
     setFilters({ ...filters, search: value, page: 1 });
   };
 
-  const handleStatusChange = (value: string) => {
-    setFilters({ ...filters, status: value, page: 1 });
+  const handleStatusChange = (values: string[]) => {
+    setFilters({ ...filters, status: values.length > 0 ? values : 'all', page: 1 });
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: StockOrder['status']) => {
@@ -135,7 +135,9 @@ export default function ManageStock() {
     const matchesSearch =
       order.materialName.toLowerCase().includes(filters.search.toLowerCase()) ||
       order.supplier.toLowerCase().includes(filters.search.toLowerCase());
-    const matchesStatus = filters.status === 'all' || order.status === filters.status;
+    const matchesStatus =
+      filters.status === 'all' ||
+      (Array.isArray(filters.status) ? filters.status.includes(order.status) : order.status === filters.status);
     return matchesSearch && matchesStatus;
   });
 

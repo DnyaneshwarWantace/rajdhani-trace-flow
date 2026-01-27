@@ -1,4 +1,4 @@
-import { Package, Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle } from 'lucide-react';
+import { Package, Building2, Calendar, CheckCircle, Clock, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { formatNotes } from '@/utils/formatNotes';
@@ -12,17 +12,14 @@ interface OrderCardProps {
 }
 
 const statusConfig = {
-  ordered: { label: 'Ordered', icon: Clock, color: 'bg-gray-100 text-gray-800' },
   pending: { label: 'Pending', icon: Clock, color: 'bg-gray-100 text-gray-800' },
   approved: { label: 'Approved', icon: CheckCircle, color: 'bg-blue-100 text-blue-800' },
   shipped: { label: 'Shipped', icon: Truck, color: 'bg-yellow-100 text-yellow-800' },
-  'in-transit': { label: 'In Transit', icon: Truck, color: 'bg-yellow-100 text-yellow-800' },
   delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
-  cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
 export default function OrderCard({ order, onStatusUpdate, onViewDetails }: OrderCardProps) {
-  const status = statusConfig[order.status];
+  const status = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = status.icon;
 
   return (
@@ -100,7 +97,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200">
-        {(order.status === 'ordered' || order.status === 'pending') && (
+        {order.status === 'pending' && (
           <Button
             size="sm"
             variant="outline"
@@ -114,13 +111,13 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           <Button
             size="sm"
             variant="outline"
-            onClick={() => onStatusUpdate(order.id, 'in-transit')}
+            onClick={() => onStatusUpdate(order.id, 'shipped')}
             className="text-xs"
           >
             Mark Shipped
           </Button>
         )}
-        {(order.status === 'shipped' || order.status === 'in-transit') && (
+        {order.status === 'shipped' && (
           <Button
             size="sm"
             variant="outline"
@@ -128,16 +125,6 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             className="text-xs"
           >
             Mark Delivered
-          </Button>
-        )}
-        {(order.status === 'ordered' || order.status === 'pending' || order.status === 'approved' || order.status === 'shipped' || order.status === 'in-transit') && (
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => onStatusUpdate(order.id, 'cancelled')}
-            className="text-xs"
-          >
-            Cancel Order
           </Button>
         )}
         <Button

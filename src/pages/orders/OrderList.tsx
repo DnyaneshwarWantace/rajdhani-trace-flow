@@ -21,8 +21,8 @@ export default function OrderList() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [filters, setFilters] = useState({
     search: '',
-    status: 'all',
-    customer_id: 'all',
+    status: [] as string[],
+    customer_id: [] as string[],
     page: 1,
     limit: 50,
     sortBy: 'order_date',
@@ -53,8 +53,8 @@ export default function OrderList() {
       setLoading(true);
       const { data, error, count } = await OrderService.getOrders({
         search: filters.search || undefined,
-        status: filters.status !== 'all' ? filters.status : undefined,
-        customer_id: filters.customer_id !== 'all' ? filters.customer_id : undefined,
+        status: filters.status.length > 0 ? filters.status : undefined,
+        customer_id: filters.customer_id.length > 0 ? filters.customer_id : undefined,
         limit: filters.limit,
         offset: (filters.page - 1) * filters.limit,
         sortBy: filters.sortBy,
@@ -204,8 +204,8 @@ export default function OrderList() {
           <OrderFilters
             filters={filters}
             onSearchChange={(value) => handleFilterChange('search', value)}
-            onStatusChange={(value) => handleFilterChange('status', value)}
-            onCustomerChange={(value) => handleFilterChange('customer_id', value)}
+            onStatusChange={(values) => handleFilterChange('status', values)}
+            onCustomerChange={(values) => handleFilterChange('customer_id', values)}
             onSortChange={(sortBy, sortOrder) => {
               setFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }));
             }}
@@ -222,11 +222,11 @@ export default function OrderList() {
             <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Orders Found</h3>
             <p className="text-gray-600 mb-6">
-              {filters.search || filters.status !== 'all' || filters.customer_id !== 'all'
+              {filters.search || filters.status.length > 0 || filters.customer_id.length > 0
                 ? 'Try adjusting your search or filters'
                 : 'Get started by creating your first order'}
             </p>
-            {(!filters.search && filters.status === 'all' && filters.customer_id === 'all') && (
+            {(!filters.search && filters.status.length === 0 && filters.customer_id.length === 0) && (
               <Button onClick={() => navigate('/orders/new')}>
                 <Plus className="w-4 h-4 mr-2" />
                 Create Order

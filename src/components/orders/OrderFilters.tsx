@@ -2,19 +2,20 @@ import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { CustomerService, type Customer } from '@/services/customerService';
 
 interface OrderFiltersProps {
   filters: {
     search: string;
-    status: string;
-    customer_id: string;
+    status: string[];
+    customer_id: string[];
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   };
   onSearchChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
-  onCustomerChange: (value: string) => void;
+  onStatusChange: (values: string[]) => void;
+  onCustomerChange: (values: string[]) => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
 }
 
@@ -54,35 +55,34 @@ export default function OrderFilters({
         </div>
       </div>
 
-      {/* Status Filter - Fixed width */}
-      <Select value={filters.status} onValueChange={onStatusChange}>
-        <SelectTrigger className="w-full sm:w-[160px] h-9 text-sm flex-shrink-0">
-          <SelectValue placeholder="All Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="accepted">Accepted</SelectItem>
-          <SelectItem value="dispatched">Dispatched</SelectItem>
-          <SelectItem value="delivered">Delivered</SelectItem>
-          <SelectItem value="cancelled">Cancelled</SelectItem>
-        </SelectContent>
-      </Select>
+      {/* Status Filter - Multi-select */}
+      <div className="w-full sm:w-64 flex-shrink-0">
+        <MultiSelect
+          options={[
+            { label: 'Pending', value: 'pending' },
+            { label: 'Accepted', value: 'accepted' },
+            { label: 'Dispatched', value: 'dispatched' },
+            { label: 'Delivered', value: 'delivered' },
+            { label: 'Cancelled', value: 'cancelled' },
+          ]}
+          selected={filters.status}
+          onChange={onStatusChange}
+          placeholder="All Status"
+        />
+      </div>
 
-      {/* Customer Filter - Fixed width */}
-      <Select value={filters.customer_id} onValueChange={onCustomerChange}>
-        <SelectTrigger className="w-full sm:w-[200px] h-9 text-sm flex-shrink-0">
-          <SelectValue placeholder="All Customers" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Customers</SelectItem>
-          {customers.map((customer) => (
-            <SelectItem key={customer.id} value={customer.id}>
-              {customer.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Customer Filter - Multi-select */}
+      <div className="w-full sm:w-64 flex-shrink-0">
+        <MultiSelect
+          options={customers.map((customer) => ({
+            label: customer.name,
+            value: customer.id,
+          }))}
+          selected={filters.customer_id}
+          onChange={onCustomerChange}
+          placeholder="All Customers"
+        />
+      </div>
 
       {/* Sorting Controls - Fixed width */}
       {onSortChange && (

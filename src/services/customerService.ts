@@ -92,15 +92,25 @@ export class CustomerService {
 
   static async getCustomers(filters?: {
     search?: string;
-    status?: string;
-    customer_type?: string;
+    status?: string | string[];
+    customer_type?: string | string[];
   }): Promise<{ data: Customer[] | null; error: string | null }> {
     try {
       const params = new URLSearchParams();
 
       if (filters?.search) params.append('search', filters.search);
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.customer_type) params.append('customer_type', filters.customer_type);
+      // Handle status as array (multi-select)
+      if (filters?.status) {
+        const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+        const cleanedStatuses = statuses.filter(s => s && s !== 'all');
+        cleanedStatuses.forEach(status => params.append('status', status));
+      }
+      // Handle customer_type as array (multi-select)
+      if (filters?.customer_type) {
+        const types = Array.isArray(filters.customer_type) ? filters.customer_type : [filters.customer_type];
+        const cleanedTypes = types.filter(t => t && t !== 'all');
+        cleanedTypes.forEach(type => params.append('customer_type', type));
+      }
 
       const response = await fetch(`${API_URL}/customers?${params}`, {
         headers: this.getHeaders(),

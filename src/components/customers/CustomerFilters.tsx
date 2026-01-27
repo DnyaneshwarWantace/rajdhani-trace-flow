@@ -1,18 +1,12 @@
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 
 interface CustomerFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  typeFilter: string;
-  onTypeFilterChange: (value: string) => void;
+  typeFilter: string[];
+  onTypeFilterChange: (values: string[]) => void;
 }
 
 export default function CustomerFilters({
@@ -34,17 +28,16 @@ export default function CustomerFilters({
             className="flex-1"
             showCounter={true}
           />
-          <div className="w-full lg:w-40">
-            <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="business">Business</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="w-full lg:w-64">
+            <MultiSelect
+              options={[
+                { label: 'Individual', value: 'individual' },
+                { label: 'Business', value: 'business' },
+              ]}
+              selected={typeFilter}
+              onChange={onTypeFilterChange}
+              placeholder="All Types"
+            />
           </div>
         </div>
       </CardContent>

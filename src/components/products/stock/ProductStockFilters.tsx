@@ -8,16 +8,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
+import { MultiSelect } from '@/components/ui/multi-select';
 
 interface ProductStockFiltersProps {
   searchTerm: string;
-  statusFilter: string;
+  statusFilter: string[];
   startDate: string;
   endDate: string;
   sortBy: 'qr_code' | 'status' | 'created_at';
   sortOrder: 'asc' | 'desc';
   onSearchChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
+  onStatusChange: (values: string[]) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onSortChange: (sortBy: 'qr_code' | 'status' | 'created_at', sortOrder: 'asc' | 'desc') => void;
@@ -52,18 +53,22 @@ export default function ProductStockFilters({
             showCounter={true}
           />
 
-          {/* Status Filter */}
-          <Select value={statusFilter} onValueChange={onStatusChange}>
-            <SelectTrigger className="w-full lg:w-48">
-              <SelectValue placeholder="Filter by Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="available">Available</SelectItem>
-              <SelectItem value="sold">Sold</SelectItem>
-              <SelectItem value="damaged">Damaged</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Status Filter - Multi-select */}
+          <div className="w-full lg:w-64">
+            <MultiSelect
+              options={[
+                { label: 'Available', value: 'available' },
+                { label: 'In Production', value: 'in_production' },
+                { label: 'Used', value: 'used' },
+                { label: 'Reserved', value: 'reserved' },
+                { label: 'Sold', value: 'sold' },
+                { label: 'Damaged', value: 'damaged' },
+              ]}
+              selected={statusFilter}
+              onChange={onStatusChange}
+              placeholder="All Status"
+            />
+          </div>
         </div>
 
         {/* Second Row: Date Filters */}

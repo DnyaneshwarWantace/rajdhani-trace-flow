@@ -77,9 +77,10 @@ export default function MaterialSelectorDialog({
   const [selectedMaterialColors, setSelectedMaterialColors] = useState<string[]>([]);
 
   // Product filters - now support multi-select (arrays)
+  const [selectedProductCategory, setSelectedProductCategory] = useState<string[]>([]);
   const [selectedColor, setSelectedColor] = useState<string[]>([]);
   const [selectedPattern, setSelectedPattern] = useState<string[]>([]);
-  const [selectedSubcategory, setSelectedSubcategory] = useState('all');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string[]>([]);
   const [selectedLength, setSelectedLength] = useState<string[]>([]);
   const [selectedWidth, setSelectedWidth] = useState<string[]>([]);
   const [selectedWeight, setSelectedWeight] = useState<string[]>([]);
@@ -105,6 +106,10 @@ export default function MaterialSelectorDialog({
   const [productsPage, setProductsPage] = useState(1);
   const itemsPerPage = 12;
 
+  // Sorting state
+  const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
+
   // Helper to fully reset local state when dialog closes
   const resetState = () => {
     setSelectionStep('type');
@@ -114,15 +119,18 @@ export default function MaterialSelectorDialog({
     setSelectedSupplier([]);
     setSelectedMaterialTypes([]);
     setSelectedMaterialColors([]);
+    setSelectedProductCategory([]);
     setSelectedColor([]);
     setSelectedPattern([]);
-    setSelectedSubcategory('all');
+    setSelectedSubcategory([]);
     setSelectedLength([]);
     setSelectedWidth([]);
     setSelectedWeight([]);
     setSelectedItems([]);
     setMaterialsPage(1);
     setProductsPage(1);
+    setMaterialSortBy('name');
+    setMaterialSortOrder('asc');
     setRawMaterials([]);
     setAllProducts([]);
   };
@@ -142,6 +150,8 @@ export default function MaterialSelectorDialog({
         supplier: selectedSupplier.length > 0 ? selectedSupplier : undefined,
         page: materialsPage,
         limit: materialSearchTerm ? 1000 : itemsPerPage, // Fetch all if searching
+        sortBy: materialSortBy,
+        sortOrder: materialSortOrder,
       };
       let { materials, total } = await MaterialService.getMaterials(filters);
 
@@ -186,7 +196,7 @@ export default function MaterialSelectorDialog({
       setProductsLoading(true);
       const filters: ProductFilters = {
         search: materialSearchTerm || undefined,
-        category: selectedCategory.length > 0 ? selectedCategory : undefined,
+        category: selectedProductCategory.length > 0 ? selectedProductCategory : undefined,
         page: 1,
         // Limit the number of products loaded for filtering to improve performance
         // We still filter client-side for color/pattern/length/width/weight
@@ -206,6 +216,11 @@ export default function MaterialSelectorDialog({
   const getFilteredProducts = () => {
     let filtered = [...allProducts];
 
+    // Filter by category (multi-select)
+    if (selectedProductCategory.length > 0) {
+      filtered = filtered.filter(p => selectedProductCategory.includes(p.category || ''));
+    }
+
     // Filter by color (multi-select)
     if (selectedColor.length > 0) {
       filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
@@ -219,11 +234,11 @@ export default function MaterialSelectorDialog({
       });
     }
 
-    // Filter by subcategory
-    if (selectedSubcategory !== 'all') {
+    // Filter by subcategory (multi-select)
+    if (selectedSubcategory.length > 0) {
       filtered = filtered.filter(p => {
         const productSubcategory = p.subcategory || '';
-        return productSubcategory === selectedSubcategory;
+        return selectedSubcategory.includes(productSubcategory);
       });
     }
 
@@ -261,6 +276,10 @@ export default function MaterialSelectorDialog({
   const getFilteredProductsTotal = () => {
     let filtered = [...allProducts];
 
+    if (selectedProductCategory.length > 0) {
+      filtered = filtered.filter(p => selectedProductCategory.includes(p.category || ''));
+    }
+
     if (selectedColor.length > 0) {
       filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
     }
@@ -272,10 +291,10 @@ export default function MaterialSelectorDialog({
       });
     }
 
-    if (selectedSubcategory !== 'all') {
+    if (selectedSubcategory.length > 0) {
       filtered = filtered.filter(p => {
         const productSubcategory = p.subcategory || '';
-        return productSubcategory === selectedSubcategory;
+        return selectedSubcategory.includes(productSubcategory);
       });
     }
 
@@ -332,21 +351,21 @@ export default function MaterialSelectorDialog({
     } else if (isOpen && chosenType === 'product') {
       loadProducts();
     }
-  }, [isOpen, chosenType, materialSearchTerm, selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, materialsPage, productsPage, itemsPerPage]);
+  }, [isOpen, chosenType, materialSearchTerm, selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, selectedProductCategory, materialSortBy, materialSortOrder, materialsPage, productsPage, itemsPerPage]);
 
   // Reset materials page when filters change (for materials)
   useEffect(() => {
     if (chosenType === 'material') {
       setMaterialsPage(1);
     }
-  }, [selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, materialSearchTerm, chosenType]);
+  }, [selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, materialSearchTerm, materialSortBy, materialSortOrder, chosenType]);
 
   // Reset products page when filters change (for products)
   useEffect(() => {
     if (chosenType === 'product') {
       setProductsPage(1);
     }
-  }, [selectedColor, selectedPattern, selectedSubcategory, selectedLength, selectedWidth, selectedWeight, chosenType]);
+  }, [selectedProductCategory, selectedColor, selectedPattern, selectedSubcategory, selectedLength, selectedWidth, selectedWeight, chosenType]);
 
   // Get unique values for filters (from all loaded data)
   const getUniqueCategories = () => {
@@ -382,6 +401,10 @@ export default function MaterialSelectorDialog({
           .filter((c): c is string => Boolean(c && c !== 'N/A'))
       ),
     ];
+  };
+
+  const getUniqueProductCategories = () => {
+    return [...new Set(allProducts.map(p => p.category).filter((c): c is string => Boolean(c)))];
   };
 
   const getUniqueProductColors = () => {
@@ -660,8 +683,62 @@ export default function MaterialSelectorDialog({
                 </div>
               )}
 
+              {/* Sorting Controls for Materials */}
+              {chosenType === 'material' && (
+                <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
+                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+                  <Select
+                    value={materialSortBy}
+                    onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => {
+                      setMaterialSortBy(value);
+                      setMaterialsPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[160px] h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="stock">Stock</SelectItem>
+                      <SelectItem value="category">Category</SelectItem>
+                      <SelectItem value="recent">Recently Added</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={materialSortOrder}
+                    onValueChange={(value: 'asc' | 'desc') => {
+                      setMaterialSortOrder(value);
+                      setMaterialsPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-[130px] h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                      <SelectItem value="desc">Descending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {chosenType === 'product' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Category</Label>
+                    <MultiSelect
+                      options={getUniqueProductCategories()
+                        .filter((category) => category && category.trim() !== '')
+                        .map((category) => ({ label: category, value: category }))}
+                      selected={selectedProductCategory}
+                      onChange={(values) => {
+                        setSelectedProductCategory(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Categories"
+                    />
+                  </div>
+
                   <div>
                     <Label className="text-sm font-medium">Color</Label>
                     <MultiSelect
@@ -694,21 +771,17 @@ export default function MaterialSelectorDialog({
 
                   <div>
                     <Label className="text-sm font-medium">Subcategory</Label>
-                    <Select value={selectedSubcategory} onValueChange={setSelectedSubcategory}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Subcategories</SelectItem>
-                        {getUniqueProductSubcategories()
-                          .filter((subcategory) => subcategory && subcategory.trim() !== '')
-                          .map((subcategory) => (
-                            <SelectItem key={subcategory} value={subcategory}>
-                              {subcategory}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelect
+                      options={getUniqueProductSubcategories()
+                        .filter((subcategory) => subcategory && subcategory.trim() !== '')
+                        .map((subcategory) => ({ label: subcategory, value: subcategory }))}
+                      selected={selectedSubcategory}
+                      onChange={(values) => {
+                        setSelectedSubcategory(values);
+                        setProductsPage(1);
+                      }}
+                      placeholder="All Subcategories"
+                    />
                   </div>
 
                   <div>

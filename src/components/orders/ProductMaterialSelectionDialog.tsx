@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Package, Grid3x3, List, Check, AlertCircle, Filter, ArrowUpDown } from 'lucide-react';
+import { Search, Package, Grid3x3, List, Check, AlertCircle, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Popover,
   PopoverContent,
@@ -38,6 +45,12 @@ interface ProductMaterialSelectionDialogProps {
   materialItemsPerPage: number;
   onProductPageChange: (page: number) => void;
   onMaterialPageChange: (page: number) => void;
+  productSortBy?: 'name' | 'stock' | 'category' | 'recent';
+  productSortOrder?: 'asc' | 'desc';
+  materialSortBy?: 'name' | 'stock' | 'category' | 'recent';
+  materialSortOrder?: 'asc' | 'desc';
+  onProductSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent', sortOrder: 'asc' | 'desc') => void;
+  onMaterialSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent', sortOrder: 'asc' | 'desc') => void;
 }
 
 export default function ProductMaterialSelectionDialog({
@@ -55,6 +68,12 @@ export default function ProductMaterialSelectionDialog({
   materialItemsPerPage,
   onProductPageChange,
   onMaterialPageChange,
+  productSortBy = 'name',
+  productSortOrder = 'asc',
+  materialSortBy = 'name',
+  materialSortOrder = 'asc',
+  onProductSortChange,
+  onMaterialSortChange,
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -65,9 +84,26 @@ export default function ProductMaterialSelectionDialog({
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
   const [selectedStockFilters, setSelectedStockFilters] = useState<string[]>([]);
 
-  // Sorting state
-  const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  // Use props for sorting or local state as fallback
+  const isProduct = currentItem?.product_type !== 'raw_material';
+  const sortBy = isProduct ? productSortBy : materialSortBy;
+  const sortOrder = isProduct ? productSortOrder : materialSortOrder;
+  
+  const handleSortByChange = (value: 'name' | 'stock' | 'category' | 'recent') => {
+    if (isProduct && onProductSortChange) {
+      onProductSortChange(value, sortOrder);
+    } else if (!isProduct && onMaterialSortChange) {
+      onMaterialSortChange(value, sortOrder);
+    }
+  };
+
+  const handleSortOrderChange = (value: 'asc' | 'desc') => {
+    if (isProduct && onProductSortChange) {
+      onProductSortChange(sortBy, value);
+    } else if (!isProduct && onMaterialSortChange) {
+      onMaterialSortChange(sortBy, value);
+    }
+  };
 
   const allItems = currentItem?.product_type === 'raw_material' ? materials : products;
 
@@ -142,35 +178,8 @@ export default function ProductMaterialSelectionDialog({
     return true;
   });
 
-  // Apply sorting
-  const sortedItems = [...items].sort((a, b) => {
-    let compareValue = 0;
-
-    switch (sortBy) {
-      case 'name':
-        compareValue = (a.name || '').localeCompare(b.name || '');
-        break;
-      case 'stock': {
-        const isProduct = currentItem?.product_type !== 'raw_material';
-        const stockA = isProduct
-          ? (a.current_stock || a.stock || 0)
-          : (a.available_stock !== undefined ? a.available_stock : (a.current_stock || a.stock || 0));
-        const stockB = isProduct
-          ? (b.current_stock || b.stock || 0)
-          : (b.available_stock !== undefined ? b.available_stock : (b.current_stock || b.stock || 0));
-        compareValue = stockA - stockB;
-        break;
-      }
-      case 'category':
-        compareValue = (a.category || '').localeCompare(b.category || '');
-        break;
-      case 'recent':
-        compareValue = new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-        break;
-    }
-
-    return sortOrder === 'asc' ? compareValue : -compareValue;
-  });
+  // Items are already sorted by backend, no need for client-side sorting
+  const sortedItems = items;
 
   const totalCount = sortedItems.length;
   const perPage = currentItem?.product_type === 'raw_material' ? materialItemsPerPage : productItemsPerPage;
@@ -597,58 +606,35 @@ export default function ProductMaterialSelectionDialog({
 
           {/* Filters and Sorting Row */}
           <div className="flex flex-wrap gap-3 flex-shrink-0">
-            {/* Sort By */}
+            {/* Sorting Controls */}
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort:</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="h-8 w-[140px] text-xs justify-between">
-                    {sortBy === 'name' ? 'Name' : sortBy === 'stock' ? 'Stock' : sortBy === 'category' ? 'Category' : 'Recent'}
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[180px] p-2" align="start">
-                  <div className="space-y-2">
-                    {[
-                      { value: 'name', label: 'Name' },
-                      { value: 'stock', label: 'Stock' },
-                      { value: 'category', label: 'Category' },
-                      { value: 'recent', label: 'Recently Added' }
-                    ].map(option => (
-                      <div
-                        key={option.value}
-                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                          sortBy === option.value ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => setSortBy(option.value as any)}
-                      >
-                        <div className="flex-1 text-sm">{option.label}</div>
-                        {sortBy === option.value && <Check className="h-4 w-4 text-blue-600" />}
-                      </div>
-                    ))}
-                    <div className="border-t pt-2 mt-2">
-                      <div
-                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                          sortOrder === 'asc' ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => setSortOrder('asc')}
-                      >
-                        <div className="flex-1 text-sm">Ascending</div>
-                        {sortOrder === 'asc' && <Check className="h-4 w-4 text-blue-600" />}
-                      </div>
-                      <div
-                        className={`flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-gray-100 ${
-                          sortOrder === 'desc' ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => setSortOrder('desc')}
-                      >
-                        <div className="flex-1 text-sm">Descending</div>
-                        {sortOrder === 'desc' && <Check className="h-4 w-4 text-blue-600" />}
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+              <Select
+                value={sortBy}
+                onValueChange={(value) => handleSortByChange(value as 'name' | 'stock' | 'category' | 'recent')}
+              >
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={sortOrder}
+                onValueChange={(value: 'asc' | 'desc') => handleSortOrderChange(value)}
+              >
+                <SelectTrigger className="w-[110px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Stock Filter */}

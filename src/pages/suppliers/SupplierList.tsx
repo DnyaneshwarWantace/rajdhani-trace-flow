@@ -104,7 +104,9 @@ export default function SupplierList() {
   const loadSuppliers = async () => {
     try {
       setLoading(true);
-      const { data, error } = await SupplierService.getSuppliers({});
+      const { data, error } = await SupplierService.getSuppliers({
+        search: searchTerm || undefined,
+      });
 
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });

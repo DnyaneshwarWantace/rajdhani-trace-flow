@@ -19,6 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 const API_URL = getApiUrl();
 
@@ -250,9 +251,12 @@ export default function AddWasteDialog({
                 type="number"
                 step="0.01"
                 min="0"
+                max="99999.99"
                 value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-                placeholder="0.00"
+                onChange={(e) => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
+                  setFormData({ ...formData, quantity: validation.value });
+                }}
                 required
               />
             </div>

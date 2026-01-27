@@ -54,7 +54,7 @@ export class IndividualProductService {
   static async getIndividualProductsByProductId(
     productId: string,
     filters?: {
-      status?: string;
+      status?: string | string[];
       search?: string;
       start_date?: string;
       end_date?: string;
@@ -66,8 +66,13 @@ export class IndividualProductService {
   ): Promise<{ products: IndividualProduct[]; total: number }> {
     const queryParams = new URLSearchParams();
     
+    // Handle status as array (multi-select) - send as comma-separated string
     if (filters?.status && filters.status !== 'all') {
-      queryParams.append('status', filters.status);
+      const statusArray = Array.isArray(filters.status) ? filters.status : [filters.status];
+      const cleanedStatuses = statusArray.filter(s => s && s !== 'all');
+      if (cleanedStatuses.length > 0) {
+        queryParams.append('status', cleanedStatuses.join(','));
+      }
     }
     
     if (filters?.search) {

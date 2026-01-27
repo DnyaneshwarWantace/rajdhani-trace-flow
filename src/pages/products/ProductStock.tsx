@@ -33,7 +33,7 @@ export default function ProductStock() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -182,8 +182,8 @@ export default function ProductStock() {
     handleFilterChange();
   };
 
-  const handleStatusChange = (value: string) => {
-    setStatusFilter(value);
+  const handleStatusChange = (values: string[]) => {
+    setStatusFilter(values);
     handleFilterChange();
   };
 

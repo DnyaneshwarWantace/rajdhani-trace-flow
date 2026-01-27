@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 
 interface OrderDetailsFormProps {
   expectedDelivery: string;
@@ -44,10 +45,13 @@ export default function OrderDetailsForm({
           <Input
             type="number"
             value={paidAmount || ''}
-            onChange={e => onPaidAmountChange(parseFloat(e.target.value) || 0)}
+            onChange={e => {
+              const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
+              onPaidAmountChange(parseFloat(validation.value) || 0);
+            }}
             min="0"
+            max="9999999.99"
             step="0.01"
-            placeholder="Enter advance payment"
           />
         </div>
         <div className="md:col-span-2 space-y-2">

@@ -9,6 +9,8 @@ body {
   overflow-x: hidden; /* Prevent horizontal scroll on body */
   width: 100%;
   max-width: 100%;
+  /* Always reserve space for scrollbar to prevent layout shift */
+  scrollbar-gutter: stable;
 }
 
 /* Prevent accidental text selection on mobile (single tap) */
@@ -87,12 +89,32 @@ html.modal-open {
   overflow: hidden !important;
 }
 
+/* Fix layout shift when Radix locks scroll (dialog/dropdown open) */
+body[data-scroll-locked] {
+  padding-right: var(--removed-body-scroll-bar-size, 0px) !important;
+  overflow: hidden !important;
+}
+
+/* When scroll is locked, add padding to fixed elements to prevent shift */
+body[data-scroll-locked] nav,
+body[data-scroll-locked] header,
+body[data-scroll-locked] [style*="position: fixed"],
+body[data-scroll-locked] .fixed {
+  padding-right: var(--removed-body-scroll-bar-size, 0px) !important;
+}
+
+/* Prevent layout shift on dialog content */
+[data-radix-dialog-content] {
+  transition: none !important;
+}
+
 #root {
   background-color: #f9fafb; /* gray-50 */
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden; /* Prevent horizontal scroll */
+  transition: none !important;
 }
 
 /* Force Select dropdown to have solid white background */

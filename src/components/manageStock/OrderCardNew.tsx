@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle, Eye } from 'lucide-react';
+import { Building2, Calendar, CheckCircle, Clock, Truck, Eye } from 'lucide-react';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/types/manageStock';
 
@@ -12,17 +12,14 @@ interface OrderCardNewProps {
 }
 
 const statusConfig = {
-  ordered: { label: 'Ordered', icon: Clock, color: 'bg-gray-100 text-gray-700 border-gray-200' },
   pending: { label: 'Pending', icon: Clock, color: 'bg-gray-100 text-gray-700 border-gray-200' },
   approved: { label: 'Approved', icon: CheckCircle, color: 'bg-blue-100 text-blue-700 border-blue-200' },
   shipped: { label: 'Shipped', icon: Truck, color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  'in-transit': { label: 'In Transit', icon: Truck, color: 'bg-orange-100 text-orange-700 border-orange-200' },
   delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
-  cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-700 border-red-200' },
 };
 
 export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: OrderCardNewProps) {
-  const status = statusConfig[order.status];
+  const status = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = status.icon;
 
   return (
@@ -82,7 +79,7 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
         <div className="flex flex-col gap-1.5 pt-2 border-t border-gray-100">
           {/* Quick Actions */}
           <div className="flex gap-1.5">
-            {(order.status === 'ordered' || order.status === 'pending') && (
+            {order.status === 'pending' && (
               <Button
                 size="sm"
                 variant="outline"
@@ -97,14 +94,14 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onStatusUpdate(order.id, 'in-transit')}
-                className="flex-1 text-[10px] py-1 h-auto text-orange-600 hover:bg-orange-50 border-orange-200"
+                onClick={() => onStatusUpdate(order.id, 'shipped')}
+                className="flex-1 text-[10px] py-1 h-auto text-yellow-600 hover:bg-yellow-50 border-yellow-200"
               >
                 <Truck className="w-3 h-3 mr-1" />
                 Ship
               </Button>
             )}
-            {(order.status === 'shipped' || order.status === 'in-transit') && (
+            {order.status === 'shipped' && (
               <Button
                 size="sm"
                 variant="outline"
@@ -125,19 +122,6 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
               Details
             </Button>
           </div>
-
-          {/* Cancel Button - Only show before approval */}
-          {(order.status === 'ordered' || order.status === 'pending') && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onStatusUpdate(order.id, 'cancelled')}
-              className="w-full text-[10px] py-1 h-auto text-red-600 hover:bg-red-50 border-red-200"
-            >
-              <AlertTriangle className="w-3 h-3 mr-1" />
-              Cancel Order
-            </Button>
-          )}
         </div>
       </CardContent>
     </Card>

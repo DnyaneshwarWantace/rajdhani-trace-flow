@@ -50,11 +50,17 @@ export default function NewOrder() {
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
   const [productColorFilter, setProductColorFilter] = useState('all');
 
-  // Pagination
+  // Pagination - Use higher limit to support backend sorting across all pages
   const [productPage, setProductPage] = useState(1);
-  const [productItemsPerPage] = useState(50);
+  const [productItemsPerPage] = useState(500);
   const [materialPage, setMaterialPage] = useState(1);
-  const [materialItemsPerPage] = useState(50);
+  const [materialItemsPerPage] = useState(500);
+
+  // Sorting
+  const [productSortBy, setProductSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [productSortOrder, setProductSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Order details
   const [orderDetails, setOrderDetails] = useState({
@@ -80,15 +86,16 @@ export default function NewOrder() {
     loadRawMaterialsWithFilters();
   }, []);
 
-  // Reload products when page/filters change
+  // Reload products when filters/sorting change (always fetch page 1 with high limit for backend sorting)
   useEffect(() => {
     loadProductsWithFilters();
-  }, [productPage, productSearchTerm, productCategoryFilter, productColorFilter]);
+  }, [productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder]);
 
-  // Reload materials when page changes (not search - search is handled in dialog)
+  // Reload materials when sorting changes (not search - search is handled in dialog)
+  // Always fetch page 1 with high limit for backend sorting
   useEffect(() => {
     loadRawMaterialsWithFilters();
-  }, [materialPage]);
+  }, [materialSortBy, materialSortOrder]);
 
   const loadCustomers = async () => {
     try {
@@ -105,9 +112,13 @@ export default function NewOrder() {
 
   const loadProductsWithFilters = async () => {
     try {
+      // When using backend sorting, fetch page 1 with higher limit to support client-side filtering
+      // This ensures sorting works across all items, not just current page
       const filters: any = {
-        page: productPage,
+        page: 1,
         limit: productItemsPerPage,
+        sortBy: productSortBy === 'recent' ? 'created_at' : productSortBy,
+        sortOrder: productSortOrder,
       };
       if (productSearchTerm) filters.search = productSearchTerm;
       if (productCategoryFilter !== 'all') filters.category = [productCategoryFilter];
@@ -163,9 +174,13 @@ export default function NewOrder() {
 
   const loadRawMaterialsWithFilters = async () => {
     try {
+      // When using backend sorting, fetch page 1 with higher limit to support client-side filtering
+      // This ensures sorting works across all items, not just current page
       const filters: any = {
-        page: materialPage,
+        page: 1,
         limit: materialItemsPerPage,
+        sortBy: materialSortBy === 'recent' ? 'created_at' : materialSortBy,
+        sortOrder: materialSortOrder,
       };
       // Don't send search to API - handle search in dialog for more flexibility
       // if (productSearchTerm) filters.search = productSearchTerm;
@@ -629,6 +644,20 @@ export default function NewOrder() {
           materialItemsPerPage={materialItemsPerPage}
           onProductPageChange={setProductPage}
           onMaterialPageChange={setMaterialPage}
+          productSortBy={productSortBy}
+          productSortOrder={productSortOrder}
+          materialSortBy={materialSortBy}
+          materialSortOrder={materialSortOrder}
+          onProductSortChange={(sortBy, sortOrder) => {
+            setProductSortBy(sortBy);
+            setProductSortOrder(sortOrder);
+            setProductPage(1);
+          }}
+          onMaterialSortChange={(sortBy, sortOrder) => {
+            setMaterialSortBy(sortBy);
+            setMaterialSortOrder(sortOrder);
+            setMaterialPage(1);
+          }}
         />
       </div>
     </Layout>

@@ -1,17 +1,11 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import type { OrderFilters } from '@/types/manageStock';
 
 interface OrderFiltersProps {
   filters: OrderFilters;
   onSearchChange: (value: string) => void;
-  onStatusChange: (value: string) => void;
+  onStatusChange: (values: string[]) => void;
 }
 
 export default function OrderFilters({
@@ -33,25 +27,20 @@ export default function OrderFilters({
           showCounter={true}
         />
 
-        {/* Status Filter */}
-        <Select
-          value={filters.status || 'all'}
-          onValueChange={onStatusChange}
-        >
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="ordered">Ordered</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="approved">Approved</SelectItem>
-            <SelectItem value="shipped">Shipped</SelectItem>
-            <SelectItem value="in-transit">In Transit</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Status Filter - Multi-select */}
+        <div className="w-full sm:w-64 flex-shrink-0">
+          <MultiSelect
+            options={[
+              { label: 'Pending', value: 'pending' },
+              { label: 'Approved', value: 'approved' },
+              { label: 'Shipped', value: 'shipped' },
+              { label: 'Delivered', value: 'delivered' },
+            ]}
+            selected={Array.isArray(filters.status) ? filters.status : filters.status === 'all' ? [] : [filters.status]}
+            onChange={onStatusChange}
+            placeholder="All Status"
+          />
+        </div>
       </div>
     </div>
   );

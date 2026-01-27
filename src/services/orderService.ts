@@ -77,8 +77,8 @@ export class OrderService {
 
   static async getOrders(filters?: {
     search?: string;
-    status?: string;
-    customer_id?: string;
+    status?: string | string[];
+    customer_id?: string | string[];
     limit?: number;
     offset?: number;
     sortBy?: string;
@@ -87,8 +87,18 @@ export class OrderService {
     try {
       const params = new URLSearchParams();
       if (filters?.search) params.append('search', filters.search);
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.customer_id) params.append('customer_id', filters.customer_id);
+      // Handle status as array (multi-select)
+      if (filters?.status) {
+        const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
+        const cleanedStatuses = statuses.filter(s => s && s !== 'all');
+        cleanedStatuses.forEach(status => params.append('status', status));
+      }
+      // Handle customer_id as array (multi-select)
+      if (filters?.customer_id) {
+        const customers = Array.isArray(filters.customer_id) ? filters.customer_id : [filters.customer_id];
+        const cleanedCustomers = customers.filter(c => c && c !== 'all');
+        cleanedCustomers.forEach(customerId => params.append('customer_id', customerId));
+      }
       if (filters?.limit) params.append('limit', filters.limit.toString());
       if (filters?.offset) params.append('offset', filters.offset.toString());
       if (filters?.sortBy) params.append('sortBy', filters.sortBy);

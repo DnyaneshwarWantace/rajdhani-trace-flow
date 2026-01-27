@@ -1,4 +1,4 @@
-import { Package, Building2, Calendar, CheckCircle, Clock, Truck, AlertTriangle } from 'lucide-react';
+import { Package, Building2, Calendar, CheckCircle, Clock, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/types/manageStock';
@@ -11,13 +11,10 @@ interface OrderTableProps {
 }
 
 const statusConfig = {
-  ordered: { label: 'Ordered', icon: Clock, color: 'bg-gray-100 text-gray-800' },
   pending: { label: 'Pending', icon: Clock, color: 'bg-gray-100 text-gray-800' },
   approved: { label: 'Approved', icon: CheckCircle, color: 'bg-blue-100 text-blue-800' },
   shipped: { label: 'Shipped', icon: Truck, color: 'bg-yellow-100 text-yellow-800' },
-  'in-transit': { label: 'In Transit', icon: Truck, color: 'bg-yellow-100 text-yellow-800' },
   delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
-  cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
 export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: OrderTableProps) {
@@ -52,7 +49,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {orders.map((order) => {
-              const status = statusConfig[order.status];
+              const status = statusConfig[order.status] || statusConfig.pending;
               const StatusIcon = status.icon;
 
               return (
@@ -99,37 +96,27 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-2 flex-wrap">
-                      {(order.status === 'ordered' || order.status === 'pending') && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onStatusUpdate(order.id, 'approved')}
-                            className="text-xs"
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onStatusUpdate(order.id, 'cancelled')}
-                            className="text-xs text-red-600 hover:bg-red-50 border-red-200"
-                          >
-                            Cancel
-                          </Button>
-                        </>
+                      {order.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onStatusUpdate(order.id, 'approved')}
+                          className="text-xs"
+                        >
+                          Approve
+                        </Button>
                       )}
                       {order.status === 'approved' && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => onStatusUpdate(order.id, 'in-transit')}
+                          onClick={() => onStatusUpdate(order.id, 'shipped')}
                           className="text-xs"
                         >
                           Ship
                         </Button>
                       )}
-                      {(order.status === 'shipped' || order.status === 'in-transit') && (
+                      {order.status === 'shipped' && (
                         <Button
                           size="sm"
                           variant="outline"

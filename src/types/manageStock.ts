@@ -12,7 +12,7 @@ export interface StockOrder {
   totalCost: number;
   orderDate: string;
   expectedDelivery: string;
-  status: 'ordered' | 'pending' | 'approved' | 'shipped' | 'in-transit' | 'delivered' | 'cancelled';
+  status: 'pending' | 'approved' | 'shipped' | 'delivered';
   notes?: string;
   actualDelivery?: string;
   minThreshold?: number;
@@ -38,7 +38,7 @@ export interface OrderStats {
 
 export interface OrderFilters {
   search: string;
-  status: string;
+  status: string | string[];
   page: number;
   limit: number;
 }
