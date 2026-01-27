@@ -158,12 +158,13 @@ export default function OrderDetails() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
+        const errorMessage = result.error || 'Failed to update payment';
         toast({
           title: 'Error',
-          description: result.error || 'Failed to update payment',
+          description: errorMessage,
           variant: 'destructive',
         });
-        return;
+        throw new Error(errorMessage);
       }
 
       toast({

@@ -3,12 +3,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrderDetailsFormProps {
   expectedDelivery: string;
   paidAmount: number;
   notes: string;
   remarks?: string;
+  totalAmount?: number;
   onExpectedDeliveryChange: (value: string) => void;
   onPaidAmountChange: (value: number) => void;
   onNotesChange: (value: string) => void;
@@ -20,11 +22,13 @@ export default function OrderDetailsForm({
   paidAmount,
   notes,
   remarks = '',
+  totalAmount,
   onExpectedDeliveryChange,
   onPaidAmountChange,
   onNotesChange,
   onRemarksChange,
 }: OrderDetailsFormProps) {
+  const { toast } = useToast();
   return (
     <Card>
       <CardHeader>
@@ -44,13 +48,34 @@ export default function OrderDetailsForm({
           <Label>Advance Payment (Optional)</Label>
           <Input
             type="number"
-            value={paidAmount || ''}
+            value={paidAmount > 0 ? paidAmount.toString() : ''}
+            placeholder=""
             onChange={e => {
-              const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
-              onPaidAmountChange(parseFloat(validation.value) || 0);
+              const inputValue = e.target.value;
+              
+              // Allow empty string
+              if (inputValue === '') {
+                onPaidAmountChange(0);
+                return;
+              }
+              
+              const validation = validateNumberInput(inputValue, ValidationPresets.PRICE);
+              const newPaidAmount = parseFloat(validation.value) || 0;
+              
+              // Validate that paid amount doesn't exceed total amount
+              if (totalAmount && newPaidAmount > totalAmount) {
+                toast({
+                  title: 'Validation Error',
+                  description: `Paid amount cannot exceed total amount of ${totalAmount.toLocaleString()}`,
+                  variant: 'destructive',
+                });
+                return;
+              }
+              
+              onPaidAmountChange(newPaidAmount);
             }}
             min="0"
-            max="9999999.99"
+            max={totalAmount || "9999999.99"}
             step="0.01"
           />
         </div>

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { DollarSign, Edit, Check, X } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { useToast } from '@/hooks/use-toast';
 
 interface PaymentHistory {
   amount: number;
@@ -38,17 +39,34 @@ export function EditablePaymentCard({
   paymentHistory,
   onUpdatePayment,
 }: EditablePaymentCardProps) {
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedPaidAmount, setEditedPaidAmount] = useState(paidAmount);
   const [isSaving, setIsSaving] = useState(false);
+  const [paidAmountInput, setPaidAmountInput] = useState(paidAmount > 0 ? paidAmount.toString() : '');
 
   const handleSave = async () => {
+    // Validate that paid amount doesn't exceed total amount
+    if (editedPaidAmount > totalAmount) {
+      toast({
+        title: 'Validation Error',
+        description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount)}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       await onUpdatePayment(editedPaidAmount);
       setIsEditing(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating payment:', error);
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to update payment',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -59,7 +77,7 @@ export function EditablePaymentCard({
     setIsEditing(false);
   };
 
-  const calculatedOutstanding = totalAmount - editedPaidAmount;
+  const calculatedOutstanding = totalAmount - (editedPaidAmount || 0);
 
   return (
     <Card>
@@ -73,7 +91,11 @@ export function EditablePaymentCard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setIsEditing(true)}
+              onClick={() => {
+                setIsEditing(true);
+                setPaidAmountInput(paidAmount > 0 ? paidAmount.toString() : '');
+                setEditedPaidAmount(paidAmount);
+              }}
             >
               <Edit className="w-4 h-4" />
             </Button>
@@ -111,13 +133,39 @@ export function EditablePaymentCard({
               <Label>Paid Amount</Label>
               <Input
                 type="number"
-                value={editedPaidAmount}
+                value={paidAmountInput}
+                placeholder=""
                 onChange={(e) => {
-                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
-                  setEditedPaidAmount(parseFloat(validation.value) || 0);
+                  const inputValue = e.target.value;
+                  
+                  // Allow empty string
+                  if (inputValue === '') {
+                    setPaidAmountInput('');
+                    setEditedPaidAmount(0);
+                    return;
+                  }
+                  
+                  const validation = validateNumberInput(inputValue, ValidationPresets.PRICE);
+                  const newPaidAmount = parseFloat(validation.value) || 0;
+                  
+                  // Validate that paid amount doesn't exceed total amount
+                  if (newPaidAmount > totalAmount) {
+                    toast({
+                      title: 'Validation Error',
+                      description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount)}`,
+                      variant: 'destructive',
+                    });
+                    // Cap the value at totalAmount
+                    setPaidAmountInput(totalAmount.toString());
+                    setEditedPaidAmount(totalAmount);
+                    return;
+                  }
+                  
+                  setPaidAmountInput(validation.value);
+                  setEditedPaidAmount(newPaidAmount);
                 }}
                 min="0"
-                max="9999999.99"
+                max={totalAmount}
                 step="0.01"
               />
             </div>

@@ -411,6 +411,16 @@ export default function NewOrder() {
       const totalAmount = calculateTotal();
       const paidAmount = orderDetails.paidAmount || 0;
 
+      // Validate that paid amount doesn't exceed total amount
+      if (paidAmount > totalAmount) {
+        toast({
+          title: 'Validation Error',
+          description: `Paid amount (${formatCurrency(paidAmount)}) cannot exceed total amount (${formatCurrency(totalAmount)})`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const orderData = {
         customer_id: selectedCustomer?.id,
         customer_name: selectedCustomer?.name || '',
@@ -594,6 +604,7 @@ export default function NewOrder() {
           paidAmount={orderDetails.paidAmount}
           notes={orderDetails.notes}
           remarks={orderDetails.remarks}
+          totalAmount={calculateOrderBreakdown().total}
           onExpectedDeliveryChange={value => setOrderDetails(prev => ({ ...prev, expectedDelivery: value }))}
           onPaidAmountChange={value => setOrderDetails(prev => ({ ...prev, paidAmount: value }))}
           onNotesChange={value => setOrderDetails(prev => ({ ...prev, notes: value }))}
