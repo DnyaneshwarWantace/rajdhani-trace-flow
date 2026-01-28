@@ -293,7 +293,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
               <span>Order Pending - Awaiting Acceptance</span>
             </div>
             <Button
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
               size="sm"
               onClick={(e) => {
                 e.stopPropagation();
@@ -314,7 +314,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             </div>
             {canDispatchOrder(order) ? (
               <Button
-                className="w-full bg-orange-600 hover:bg-orange-700"
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
                 size="sm"
                 onClick={handleDispatch}
               >
@@ -324,7 +324,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             ) : (
               <>
                 <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                   size="sm"
                   onClick={handleDispatch}
                 >

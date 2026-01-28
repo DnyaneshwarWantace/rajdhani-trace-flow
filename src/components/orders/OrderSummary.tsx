@@ -59,7 +59,11 @@ export default function OrderSummary({
           <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} className="flex-1" disabled={!canSubmit || isSubmitting}>
+          <Button
+            onClick={onSubmit}
+            className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
+            disabled={!canSubmit || isSubmitting}
+          >
             <CheckCircle className="w-4 h-4 mr-2" />
             {isSubmitting ? 'Creating Order...' : 'Create Order'}
           </Button>

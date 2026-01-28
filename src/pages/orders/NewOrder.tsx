@@ -554,14 +554,22 @@ export default function NewOrder() {
             <div className="flex gap-4">
               <Button
                 variant={!showNewCustomerForm ? "default" : "outline"}
-                className={`flex-1 ${!showNewCustomerForm ? "text-white" : ""}`}
+                className={`flex-1 ${
+                  !showNewCustomerForm
+                    ? "bg-primary-600 hover:bg-primary-700 text-white"
+                    : ""
+                }`}
                 onClick={() => setShowNewCustomerForm(false)}
               >
                 Select Existing Customer
               </Button>
               <Button
                 variant={showNewCustomerForm ? "default" : "outline"}
-                className={`flex-1 ${showNewCustomerForm ? "text-white" : ""}`}
+                className={`flex-1 ${
+                  showNewCustomerForm
+                    ? "bg-primary-600 hover:bg-primary-700 text-white"
+                    : ""
+                }`}
                 onClick={() => setShowNewCustomerForm(true)}
               >
                 <UserPlus className="w-4 h-4 mr-2" />

@@ -36,7 +36,11 @@ export default function CustomerSelection({
     <div className="space-y-4">
       {showToggleButtons && (
         <div className="flex gap-4">
-          <Button variant="default" className="flex-1" disabled>
+          <Button
+            variant="default"
+            className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
+            disabled
+          >
             Select Existing Customer
           </Button>
           <Button variant="outline" onClick={onShowNewCustomerForm} className="flex-1">

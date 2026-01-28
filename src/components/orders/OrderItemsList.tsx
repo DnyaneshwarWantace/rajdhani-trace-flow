@@ -27,7 +27,10 @@ export default function OrderItemsList({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Order Items</CardTitle>
-        <Button onClick={onAddItem}>
+        <Button
+          onClick={onAddItem}
+          className="bg-primary-600 hover:bg-primary-700 text-white"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Item
         </Button>
