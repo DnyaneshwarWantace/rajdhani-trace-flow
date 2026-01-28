@@ -82,13 +82,17 @@ export class AnalyticsService {
   }
 
   static async getMostProducedProducts(limit: number = 10, months?: number): Promise<ProducedProduct[]> {
-    const url = new URL(`${API_URL}/analytics/most-produced`);
-    url.searchParams.append('limit', limit.toString());
+    // Build query string manually to avoid URL constructor issues with relative paths
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
     if (months) {
-      url.searchParams.append('months', months.toString());
+      params.append('months', months.toString());
     }
 
-    const response = await fetch(url.toString(), {
+    const queryString = params.toString();
+    const url = `${API_URL}/analytics/most-produced${queryString ? `?${queryString}` : ''}`;
+
+    const response = await fetch(url, {
       headers: this.getHeaders(),
     });
 
