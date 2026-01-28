@@ -219,13 +219,11 @@ export default function MaterialSelectionDialog({
     try {
       if (activeTab === 'raw_materials') {
 
-        // Fetch all materials (no search sent to API - handled client-side for better flexibility)
+        // Always fetch a large page so we can sort & paginate client-side
         const response = await MaterialService.getMaterials({
-          // Don't send search to API - handle search client-side for more fields
-          // search: searchQuery || undefined,
           category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
-          page: currentPage,
-          limit: categoryFilter.length > 1 || searchQuery ? 1000 : itemsPerPage, // Fetch all if search or multiple categories
+          page: 1,
+          limit: 1000,
         });
 
         let materialsData = response.materials || [];
@@ -263,11 +261,6 @@ export default function MaterialSelectionDialog({
 
         // Paginate client-side if search or multiple filters selected
         const totalFilteredCount = materialsData.length;
-        if (searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1) {
-          const startIdx = (currentPage - 1) * itemsPerPage;
-          const endIdx = startIdx + itemsPerPage;
-          materialsData = materialsData.slice(startIdx, endIdx);
-        }
 
         setRawMaterials(
           materialsData.map((m: any) => ({
@@ -286,9 +279,9 @@ export default function MaterialSelectionDialog({
           }))
         );
 
-        setTotalPages(Math.ceil((searchQuery || categoryFilter.length > 1 || materialTypeFilter.length > 1 || colorFilter.length > 1 || supplierFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
+        setTotalPages(Math.ceil(totalFilteredCount / itemsPerPage));
       } else {
-        // Fetch filtered products for display
+        // Always fetch a large page so we can sort & paginate client-side
         const response = await ProductService.getProducts({
           search: searchQuery || undefined,
           category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
@@ -298,8 +291,8 @@ export default function MaterialSelectionDialog({
           length: lengthFilter.length > 0 ? lengthFilter : undefined,
           width: widthFilter.length > 0 ? widthFilter : undefined,
           weight: weightFilter.length > 0 ? weightFilter : undefined,
-          page: currentPage,
-          limit: categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? 1000 : itemsPerPage,
+          page: 1,
+          limit: 1000,
         });
 
         let productsData = response.products || [];
@@ -336,14 +329,6 @@ export default function MaterialSelectionDialog({
             const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
             return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
           });
-        }
-
-        // Paginate client-side if multiple filters selected
-        const totalFilteredCount = productsData.length;
-        if (categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1) {
-          const startIdx = (currentPage - 1) * itemsPerPage;
-          const endIdx = startIdx + itemsPerPage;
-          productsData = productsData.slice(startIdx, endIdx);
         }
 
         // Fetch available stock for products with individual tracking
@@ -388,7 +373,7 @@ export default function MaterialSelectionDialog({
 
         setProducts(productsWithStock);
 
-        setTotalPages(Math.ceil((categoryFilter.length > 1 || colorFilter.length > 1 || patternFilter.length > 1 || subcategoryFilter.length > 1 || lengthFilter.length > 1 || widthFilter.length > 1 || weightFilter.length > 1 ? totalFilteredCount : (response.total || 0)) / itemsPerPage));
+        setTotalPages(Math.ceil(productsWithStock.length / itemsPerPage));
       }
     } catch (error) {
       console.error('Error loading materials:', error);
@@ -616,6 +601,11 @@ export default function MaterialSelectionDialog({
 
     return sortOrder === 'asc' ? compareValue : -compareValue;
   });
+
+  // Apply client-side pagination AFTER sorting so ordering is global across all pages
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedMaterials = sortedMaterials.slice(startIdx, endIdx);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose} modal={true}>
@@ -879,7 +869,7 @@ export default function MaterialSelectionDialog({
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-4">
-              {sortedMaterials.map((material) => (
+              {paginatedMaterials.map((material) => (
                 <MaterialCard key={material.id} material={material} />
               ))}
             </div>
@@ -908,7 +898,7 @@ export default function MaterialSelectionDialog({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {sortedMaterials.map((material) => {
+                    {paginatedMaterials.map((material) => {
                       const isSelected = selectedMaterials.has(material.id);
 
                       return (
