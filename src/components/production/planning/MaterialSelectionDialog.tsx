@@ -683,29 +683,44 @@ export default function MaterialSelectionDialog({
             </div>
           </div>
 
-          {/* Sort Controls */}
-          <div className="flex items-center gap-2 mt-3">
-            <span className="text-xs font-medium text-gray-700">Sort:</span>
-            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-              <SelectTrigger className="w-[140px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="stock">Stock</SelectItem>
-                <SelectItem value="category">Category</SelectItem>
-                <SelectItem value="recent">Recently Added</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-              <SelectTrigger className="w-[110px] h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="asc">Ascending</SelectItem>
-                <SelectItem value="desc">Descending</SelectItem>
-              </SelectContent>
-            </Select>
+          {/* Search and Sort Controls - In One Row */}
+          <div className="flex items-center gap-3 mt-3">
+            <div className="flex-1">
+              <DebouncedSearchInput
+                value={searchQuery}
+                onChange={(value) => {
+                  setSearchQuery(value);
+                  setCurrentPage(1);
+                }}
+                placeholder={activeTab === 'raw_materials' ? 'Search materials (min 3 characters)...' : 'Search products (min 3 characters)...'}
+                minCharacters={3}
+                debounceMs={500}
+                showCounter={true}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort:</span>
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[140px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+                <SelectTrigger className="w-[110px] h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                  <SelectItem value="desc">Descending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -714,21 +729,8 @@ export default function MaterialSelectionDialog({
           {activeTab === 'raw_materials' ? (
             // RAW MATERIALS: Only 4 filters - Category, Material Type, Color, Supplier
             <>
-              {/* First Row: Search, Category, Material Type */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                {/* Search */}
-                <DebouncedSearchInput
-                  value={searchQuery}
-                  onChange={(value) => {
-                    setSearchQuery(value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Search materials (min 3 characters)..."
-                  minCharacters={3}
-                  debounceMs={500}
-                  showCounter={true}
-                />
-
+              {/* First Row: Category, Material Type */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 {/* Category Filter - Multi-select */}
                 <MultiSelect
                   options={rawMaterialCategories.map(cat => ({ label: cat, value: cat }))}
@@ -747,7 +749,7 @@ export default function MaterialSelectionDialog({
               </div>
 
               {/* Second Row: Color, Supplier */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Color Filter - Multi-select */}
                 <MultiSelect
                   options={materialColors.map(color => ({ label: color, value: color }))}
@@ -768,21 +770,8 @@ export default function MaterialSelectionDialog({
           ) : (
             // PRODUCTS: Category, Subcategory, Color, Pattern, Length, Width, Weight
             <>
-              {/* First Row: Search, Category, Subcategory */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                {/* Search */}
-                <DebouncedSearchInput
-                  value={searchQuery}
-                  onChange={(value) => {
-                    setSearchQuery(value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="Search products (min 3 characters)..."
-                  minCharacters={3}
-                  debounceMs={500}
-                  showCounter={true}
-                />
-
+              {/* First Row: Category, Subcategory */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 {/* Category Filter - Multi-select */}
                 <MultiSelect
                   options={productCategories.map(cat => ({ label: cat, value: cat }))}
@@ -801,7 +790,7 @@ export default function MaterialSelectionDialog({
               </div>
 
               {/* Second Row: Color, Pattern */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 {/* Color Filter - Multi-select */}
                 <MultiSelect
                   options={productColors.map(color => ({ label: color, value: color }))}
