@@ -82,13 +82,13 @@ body.modal-open {
   width: 100% !important;
   height: 100% !important;
   touch-action: none !important; /* Prevent touch scrolling on mobile */
-  /* Reserve space for scrollbar to prevent layout shift - use attribute as fallback */
-  padding-right: var(--scrollbar-width, 0px) !important;
 }
 
-/* When dropdown opens inside modal, maintain the same padding */
-body.modal-open[data-scroll-locked] {
-  padding-right: var(--scrollbar-width, 0px) !important;
+/* Fallback: browsers without stable scrollbar gutter need padding compensation */
+@supports not (scrollbar-gutter: stable) {
+  body.modal-open {
+    padding-right: var(--scrollbar-width, 0px) !important;
+  }
 }
 
 /* Prevent scroll on html when modal is open */
@@ -98,31 +98,14 @@ html.modal-open {
   scrollbar-gutter: stable;
 }
 
-/* Fix layout shift when Radix locks scroll (dialog/dropdown open) */
-/* When modal is already open, keep the same padding when dropdown opens */
-body.modal-open[data-scroll-locked] {
-  padding-right: var(--scrollbar-width, 0px) !important;
-  overflow: hidden !important;
-  scrollbar-gutter: stable;
-}
-
-/* When only Radix locks scroll (no modal) - don't hide scrollbar or add padding to prevent UI shift */
-/* Dropdowns on main page should not cause UI shift - let them overlay normally */
-
-/* When scroll is locked AND modal is open, add padding to fixed elements to prevent shift */
-body.modal-open[data-scroll-locked] nav,
-body.modal-open[data-scroll-locked] header,
-body.modal-open[data-scroll-locked] [style*="position: fixed"],
-body.modal-open[data-scroll-locked] .fixed {
-  padding-right: var(--removed-body-scroll-bar-size, var(--scrollbar-width, 0px)) !important;
-}
-
-/* When modal is open, fixed elements should use modal's scrollbar width */
-body.modal-open nav,
-body.modal-open header,
-body.modal-open [style*="position: fixed"],
-body.modal-open .fixed {
-  padding-right: var(--scrollbar-width, 0px) !important;
+@supports not (scrollbar-gutter: stable) {
+  /* Fallback: keep fixed elements aligned when padding compensation is used */
+  body.modal-open nav,
+  body.modal-open header,
+  body.modal-open [style*="position: fixed"],
+  body.modal-open .fixed {
+    padding-right: var(--scrollbar-width, 0px) !important;
+  }
 }
 
 /* Ensure dialog content doesn't shift when dropdown opens inside */

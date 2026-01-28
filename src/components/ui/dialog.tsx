@@ -17,6 +17,11 @@ const DialogOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
   React.useEffect(() => {
+    const supportsStableScrollbarGutter =
+      typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+        ? CSS.supports('scrollbar-gutter: stable')
+        : false;
+
     // Calculate scrollbar width BEFORE hiding scrollbar
     // This must be done before adding modal-open class
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -31,8 +36,9 @@ const DialogOverlay = React.forwardRef<
     document.body.classList.add('modal-open');
     document.documentElement.classList.add('modal-open');
     
-    // Ensure body has the padding immediately
-    if (scrollbarWidth > 0) {
+    // Only apply padding compensation if stable gutter is not supported.
+    // Otherwise we'd double-compensate and cause layout shift.
+    if (!supportsStableScrollbarGutter && scrollbarWidth > 0) {
       document.body.style.paddingRight = storedWidth;
     }
 

@@ -427,16 +427,33 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     }
   };
 
-  // Lock body scroll when dialog is open - robust approach to prevent scroll when dropdowns open
+  // Lock body scroll when dialog is open - use same approach as global Dialog component
   useEffect(() => {
     if (isOpen) {
+      const supportsStableScrollbarGutter =
+        typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+          ? CSS.supports('scrollbar-gutter: stable')
+          : false;
+
       // Store current scroll position
       const scrollY = window.scrollY;
       
-      // Prevent scrolling on body
+      // Calculate scrollbar width BEFORE hiding scrollbar
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      // Set CSS variable for scrollbar width (consistent with global Dialog)
+      const storedWidth = scrollbarWidth > 0 ? `${scrollbarWidth}px` : '0px';
+      document.documentElement.style.setProperty('--scrollbar-width', storedWidth);
+      document.documentElement.setAttribute('data-scrollbar-width', storedWidth);
+      
+      // Prevent scrolling on body
       document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      // Only apply padding compensation if stable gutter is not supported
+      // Otherwise we'd double-compensate and cause layout shift
+      if (!supportsStableScrollbarGutter && scrollbarWidth > 0) {
+        document.body.style.paddingRight = storedWidth;
+      }
       
       // Prevent touch move on iOS and lock position
       document.body.style.position = 'fixed';
