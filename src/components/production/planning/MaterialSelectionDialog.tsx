@@ -701,7 +701,7 @@ export default function MaterialSelectionDialog({
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort:</span>
               <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectTrigger className="w-[200px] h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -712,7 +712,7 @@ export default function MaterialSelectionDialog({
                 </SelectContent>
               </Select>
               <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-                <SelectTrigger className="w-[110px] h-8 text-xs">
+                <SelectTrigger className="w-[140px] h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

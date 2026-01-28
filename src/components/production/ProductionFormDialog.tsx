@@ -42,8 +42,6 @@ export default function ProductionFormDialog({
     product_id: '',
     planned_quantity: 0,
     priority: 'medium',
-    operator: '',
-    supervisor: '',
     notes: '',
     completion_date: '',
   });
@@ -56,14 +54,16 @@ export default function ProductionFormDialog({
     if (isOpen) {
       loadProducts();
       if (selectedBatch) {
+        const completionDate = selectedBatch.completion_date
+          ? selectedBatch.completion_date.split('T')[0]
+          : '';
+
         setFormData({
           product_id: selectedBatch.product_id,
           planned_quantity: selectedBatch.planned_quantity,
           priority: selectedBatch.priority,
-          operator: selectedBatch.operator || '',
-          supervisor: selectedBatch.supervisor || '',
           notes: selectedBatch.notes || '',
-          completion_date: selectedBatch.completion_date || '',
+          completion_date: completionDate,
         });
         // Load product name
         loadProductName(selectedBatch.product_id, selectedBatch.product_name);
@@ -72,8 +72,6 @@ export default function ProductionFormDialog({
           product_id: '',
           planned_quantity: 0,
           priority: 'medium',
-          operator: '',
-          supervisor: '',
           notes: '',
           completion_date: '',
         });
@@ -235,27 +233,6 @@ export default function ProductionFormDialog({
               <p className="text-xs text-gray-500 mt-1">
                 Target date for completing this production batch
               </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="operator">Operator</Label>
-                <Input
-                  id="operator"
-                  value={formData.operator}
-                  onChange={(e) => setFormData({ ...formData, operator: e.target.value })}
-                  placeholder="Operator name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="supervisor">Supervisor</Label>
-                <Input
-                  id="supervisor"
-                  value={formData.supervisor}
-                  onChange={(e) => setFormData({ ...formData, supervisor: e.target.value })}
-                  placeholder="Supervisor name"
-                />
-              </div>
             </div>
 
             <div>

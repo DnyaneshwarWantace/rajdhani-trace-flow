@@ -232,10 +232,13 @@ export default function PlanningStage() {
       setSelectedProduct(product);
       setCurrentBatchId(batch.id); // Store the batch ID
       setCurrentBatch(batch); // Store the batch object
+      const completionDate =
+        batch.completion_date ? batch.completion_date.split('T')[0] : '';
+
       setFormData({
         planned_quantity: batch.planned_quantity,
         priority: batch.priority as 'low' | 'medium' | 'high' | 'urgent',
-        completion_date: batch.completion_date || '',
+        completion_date: completionDate,
         notes: batch.notes || '',
       });
 

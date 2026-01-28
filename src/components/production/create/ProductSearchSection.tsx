@@ -229,60 +229,63 @@ export default function ProductSearchSection({
       </CardHeader>
 
       <CardContent className="space-y-3 px-3 py-0 pb-3">
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            type="text"
-            placeholder="Search products..."
-            className="pl-10 pr-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={handleClearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        {/* Search + Sort in one row */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search products..."
+              className="pl-10 pr-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
-        {/* Sort */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-700">Sort by:</span>
-          <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="stock">Stock</SelectItem>
-              <SelectItem value="category">Category</SelectItem>
-              <SelectItem value="recent">Recently Added</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
-            <SelectTrigger className="w-[120px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-3 h-3" />
-                  Ascending
-                </div>
-              </SelectItem>
-              <SelectItem value="desc">
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="w-3 h-3 rotate-180" />
-                  Descending
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Sort */}
+          <div className="flex items-center gap-2 sm:w-auto">
+            <span className="text-xs font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-[120px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="stock">Stock</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="recent">Recently Added</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={(value: any) => setSortOrder(value)}>
+              <SelectTrigger className="w-[140px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-3 h-3" />
+                    Ascending
+                  </div>
+                </SelectItem>
+                <SelectItem value="desc">
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="w-3 h-3 rotate-180" />
+                    Descending
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Filters */}

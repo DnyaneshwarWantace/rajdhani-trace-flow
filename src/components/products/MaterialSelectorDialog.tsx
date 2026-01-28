@@ -109,6 +109,8 @@ export default function MaterialSelectorDialog({
   // Sorting state
   const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
   const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [productSortBy, setProductSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
+  const [productSortOrder, setProductSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Helper to fully reset local state when dialog closes
   const resetState = () => {
@@ -131,6 +133,8 @@ export default function MaterialSelectorDialog({
     setProductsPage(1);
     setMaterialSortBy('name');
     setMaterialSortOrder('asc');
+    setProductSortBy('name');
+    setProductSortOrder('asc');
     setRawMaterials([]);
     setAllProducts([]);
   };
@@ -186,7 +190,7 @@ export default function MaterialSelectorDialog({
     }
   };
 
-  // Load products for filters and listing (limited to avoid loading all products at once)
+  // Load products for filters and listing (fetch large batch, then filter/sort/paginate client-side)
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   
   const loadProducts = async () => {
@@ -195,15 +199,23 @@ export default function MaterialSelectorDialog({
     try {
       setProductsLoading(true);
       const filters: ProductFilters = {
+        // Use backend pagination and sorting like main product page
+        // Backend supports arrays for multi-select filters
         search: materialSearchTerm || undefined,
         category: selectedProductCategory.length > 0 ? selectedProductCategory : undefined,
-        page: 1,
-        // Limit the number of products loaded for filtering to improve performance
-        // We still filter client-side for color/pattern/length/width/weight
-        limit: 200,
+        color: selectedColor.length > 0 ? selectedColor : undefined,
+        pattern: selectedPattern.length > 0 ? selectedPattern : undefined,
+        subcategory: selectedSubcategory.length > 0 ? selectedSubcategory : undefined,
+        length: selectedLength.length > 0 ? selectedLength : undefined,
+        width: selectedWidth.length > 0 ? selectedWidth : undefined,
+        weight: selectedWeight.length > 0 ? selectedWeight : undefined,
+        page: productsPage,
+        limit: itemsPerPage,
+        sortBy: productSortBy,
+        sortOrder: productSortOrder,
       };
       const { products: data, total } = await ProductService.getProducts(filters);
-      setAllProducts(data);
+      setAllProducts(data || []);
       setProductsTotal(total);
     } catch (err) {
       console.error('Failed to load products:', err);
@@ -212,114 +224,15 @@ export default function MaterialSelectorDialog({
     }
   };
 
-  // Filter products client-side based on selected filters
+  // Backend handles filtering, sorting, and pagination - just return current page
   const getFilteredProducts = () => {
-    let filtered = [...allProducts];
-
-    // Filter by category (multi-select)
-    if (selectedProductCategory.length > 0) {
-      filtered = filtered.filter(p => selectedProductCategory.includes(p.category || ''));
-    }
-
-    // Filter by color (multi-select)
-    if (selectedColor.length > 0) {
-      filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
-    }
-
-    // Filter by pattern (multi-select)
-    if (selectedPattern.length > 0) {
-      filtered = filtered.filter(p => {
-        const productPattern = p.pattern || '';
-        return selectedPattern.includes(productPattern);
-      });
-    }
-
-    // Filter by subcategory (multi-select)
-    if (selectedSubcategory.length > 0) {
-      filtered = filtered.filter(p => {
-        const productSubcategory = p.subcategory || '';
-        return selectedSubcategory.includes(productSubcategory);
-      });
-    }
-
-    // Filter by length (format: "value unit", multi-select)
-    if (selectedLength.length > 0) {
-      filtered = filtered.filter(p => {
-        const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-        return selectedLength.includes(productLength);
-      });
-    }
-
-    // Filter by width (format: "value unit", multi-select)
-    if (selectedWidth.length > 0) {
-      filtered = filtered.filter(p => {
-        const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-        return selectedWidth.includes(productWidth);
-      });
-    }
-
-    // Filter by weight (format: "value unit", multi-select)
-    if (selectedWeight.length > 0) {
-      filtered = filtered.filter(p => {
-        const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-        return selectedWeight.includes(productWeight);
-      });
-    }
-
-    // Apply pagination
-    const startIndex = (productsPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filtered.slice(startIndex, endIndex);
+    // Backend already filtered, sorted, and paginated - just return the current page
+    return allProducts;
   };
 
-  // Calculate pagination for filtered products
+  // Backend provides total count - use it directly
   const getFilteredProductsTotal = () => {
-    let filtered = [...allProducts];
-
-    if (selectedProductCategory.length > 0) {
-      filtered = filtered.filter(p => selectedProductCategory.includes(p.category || ''));
-    }
-
-    if (selectedColor.length > 0) {
-      filtered = filtered.filter(p => selectedColor.includes(p.color || ''));
-    }
-
-    if (selectedPattern.length > 0) {
-      filtered = filtered.filter(p => {
-        const productPattern = p.pattern || '';
-        return selectedPattern.includes(productPattern);
-      });
-    }
-
-    if (selectedSubcategory.length > 0) {
-      filtered = filtered.filter(p => {
-        const productSubcategory = p.subcategory || '';
-        return selectedSubcategory.includes(productSubcategory);
-      });
-    }
-
-    if (selectedLength.length > 0) {
-      filtered = filtered.filter(p => {
-        const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-        return selectedLength.includes(productLength);
-      });
-    }
-
-    if (selectedWidth.length > 0) {
-      filtered = filtered.filter(p => {
-        const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-        return selectedWidth.includes(productWidth);
-      });
-    }
-
-    if (selectedWeight.length > 0) {
-      filtered = filtered.filter(p => {
-        const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-        return selectedWeight.includes(productWeight);
-      });
-    }
-
-    return filtered.length;
+    return productsTotal;
   };
 
   // Load initial counts when dialog opens
@@ -351,7 +264,29 @@ export default function MaterialSelectorDialog({
     } else if (isOpen && chosenType === 'product') {
       loadProducts();
     }
-  }, [isOpen, chosenType, materialSearchTerm, selectedCategory, selectedMaterialTypes, selectedMaterialColors, selectedSupplier, selectedProductCategory, materialSortBy, materialSortOrder, materialsPage, productsPage, itemsPerPage]);
+  }, [
+    isOpen,
+    chosenType,
+    materialSearchTerm,
+    selectedCategory,
+    selectedMaterialTypes,
+    selectedMaterialColors,
+    selectedSupplier,
+    selectedProductCategory,
+    selectedColor,
+    selectedPattern,
+    selectedSubcategory,
+    selectedLength,
+    selectedWidth,
+    selectedWeight,
+    materialSortBy,
+    materialSortOrder,
+    productSortBy,
+    productSortOrder,
+    materialsPage,
+    productsPage,
+    itemsPerPage,
+  ]);
 
   // Reset materials page when filters change (for materials)
   useEffect(() => {
@@ -365,7 +300,7 @@ export default function MaterialSelectorDialog({
     if (chosenType === 'product') {
       setProductsPage(1);
     }
-  }, [selectedProductCategory, selectedColor, selectedPattern, selectedSubcategory, selectedLength, selectedWidth, selectedWeight, chosenType]);
+  }, [selectedProductCategory, selectedColor, selectedPattern, selectedSubcategory, selectedLength, selectedWidth, selectedWeight, productSortBy, productSortOrder, materialSearchTerm, chosenType]);
 
   // Get unique values for filters (from all loaded data)
   const getUniqueCategories = () => {
@@ -603,15 +538,65 @@ export default function MaterialSelectorDialog({
                 </Badge>
               </div>
 
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  placeholder={`Search ${chosenType === 'product' ? 'products' : 'materials'} by name or category...`}
-                  value={materialSearchTerm}
-                  onChange={(e) => setMaterialSearchTerm(e.target.value)}
-                  className="pl-10 h-11 border-gray-300 focus:border-primary-500 focus:ring-primary-500"
-                />
+              {/* Search + Sort */}
+              <div className="flex flex-col md:flex-row md:items-center gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Input
+                    placeholder={`Search ${chosenType === 'product' ? 'products' : 'materials'} by name or category...`}
+                    value={materialSearchTerm}
+                    onChange={(e) => setMaterialSearchTerm(e.target.value)}
+                    className="pl-10 h-11 border-gray-300 focus:border-primary-500 focus:ring-primary-500"
+                  />
+                </div>
+
+                {chosenType && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
+                    <Select
+                      value={chosenType === 'material' ? materialSortBy : productSortBy}
+                      onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => {
+                        if (chosenType === 'material') {
+                          setMaterialSortBy(value);
+                          setMaterialsPage(1);
+                        } else {
+                          setProductSortBy(value);
+                          setProductsPage(1);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[160px] h-10 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="stock">Stock</SelectItem>
+                        <SelectItem value="category">Category</SelectItem>
+                        <SelectItem value="recent">Recently Added</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={chosenType === 'material' ? materialSortOrder : productSortOrder}
+                      onValueChange={(value: 'asc' | 'desc') => {
+                        if (chosenType === 'material') {
+                          setMaterialSortOrder(value);
+                          setMaterialsPage(1);
+                        } else {
+                          setProductSortOrder(value);
+                          setProductsPage(1);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[130px] h-10 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="asc">Ascending</SelectItem>
+                        <SelectItem value="desc">Descending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               {/* Type-specific Filters */}
@@ -680,45 +665,6 @@ export default function MaterialSelectorDialog({
                       placeholder="All Suppliers"
                     />
                   </div>
-                </div>
-              )}
-
-              {/* Sorting Controls for Materials */}
-              {chosenType === 'material' && (
-                <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
-                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
-                  <Select
-                    value={materialSortBy}
-                    onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => {
-                      setMaterialSortBy(value);
-                      setMaterialsPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-[160px] h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="stock">Stock</SelectItem>
-                      <SelectItem value="category">Category</SelectItem>
-                      <SelectItem value="recent">Recently Added</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={materialSortOrder}
-                    onValueChange={(value: 'asc' | 'desc') => {
-                      setMaterialSortOrder(value);
-                      setMaterialsPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px] h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="asc">Ascending</SelectItem>
-                      <SelectItem value="desc">Descending</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               )}
 
