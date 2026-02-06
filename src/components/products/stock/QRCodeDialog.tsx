@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { QrCode, Download } from 'lucide-react';
 import type { IndividualProduct, Product } from '@/types/product';
+import { getAppBaseUrl } from '@/lib/utils';
 
 interface QRCodeDialogProps {
   open: boolean;
@@ -33,7 +34,7 @@ export default function QRCodeDialog({
   });
 
   const qrCodeURL = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-    `${window.location.origin}/qr-result?data=${encodeURIComponent(qrCodeData)}`
+    `${getAppBaseUrl()}/qr-result?data=${encodeURIComponent(qrCodeData)}`
   )}`;
 
   const handleDownload = async () => {

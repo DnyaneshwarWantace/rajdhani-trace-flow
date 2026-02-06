@@ -14,6 +14,11 @@ interface ProductStockGridProps {
   onEdit: (product: IndividualProduct) => void;
   onQRCodeClick: (product: IndividualProduct) => void;
   loading?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onSelectAllOnPage?: () => void;
+  onSelectAll?: () => void;
+  allSelected?: boolean;
 }
 
 export default function ProductStockGrid({
@@ -26,6 +31,11 @@ export default function ProductStockGrid({
   onEdit,
   onQRCodeClick,
   loading = false,
+  selectedIds,
+  onToggleSelect,
+  onSelectAllOnPage,
+  onSelectAll,
+  allSelected = false,
 }: ProductStockGridProps) {
   const navigate = useNavigate();
 
@@ -41,10 +51,32 @@ export default function ProductStockGrid({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 className="text-lg font-semibold text-gray-900">
           Individual Products ({products.length})
         </h2>
+        {(onSelectAll || onSelectAllOnPage) && products.length > 0 && (
+          <div className="flex items-center gap-3">
+            {onSelectAll && (
+              <button
+                type="button"
+                onClick={onSelectAll}
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                {allSelected ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+            {onSelectAllOnPage && (
+              <button
+                type="button"
+                onClick={onSelectAllOnPage}
+                className="text-sm text-gray-600 hover:text-gray-800"
+              >
+                {products.every((p) => selectedIds?.has(p.id)) ? 'Deselect all on page' : 'Select all on page'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {products.length === 0 ? (
@@ -60,6 +92,11 @@ export default function ProductStockGrid({
                 onView={onView}
                 onEdit={onEdit}
                 onQRCodeClick={onQRCodeClick}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
+                onSelectAllOnPage={onSelectAllOnPage}
+                onSelectAll={onSelectAll}
+                allSelected={allSelected}
               />
             </div>
           </div>
@@ -75,6 +112,8 @@ export default function ProductStockGrid({
                   lengthUnit={product?.length_unit}
                   widthUnit={product?.width_unit}
                   weightUnit={product?.weight_unit}
+                  selected={selectedIds?.has(item.id)}
+                  onToggleSelect={onToggleSelect ? () => onToggleSelect(item.id) : undefined}
                 />
               ))}
             </div>

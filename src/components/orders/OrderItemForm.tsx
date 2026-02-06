@@ -144,7 +144,11 @@ export default function OrderItemForm({
             </div>
             <div>
               <span className="font-medium text-gray-700">Your Price:</span>
-              <span className="ml-2 text-gray-900">{item.unit_price > 0 ? `₹${item.unit_price.toFixed(2)}` : 'Not set'}</span>
+              <span className="ml-2 text-gray-900">
+                {item.unit_price > 0
+                  ? `₹${item.unit_price.toFixed(2)} / ${item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : item.product_type === 'product' ? (selectedProduct?.count_unit || 'roll') : (selectedProduct?.unit || 'unit')}`
+                  : 'Not set'}
+              </span>
             </div>
             {productWithUnits.width && (
               <div>
@@ -279,17 +283,17 @@ export default function OrderItemForm({
             </SelectTrigger>
             <SelectContent>
               {item.product_type === 'raw_material' ? (
-                // For raw materials, show per unit
-                selectedProduct && selectedProduct.unit && (
+                // For raw materials, show per unit (always show so Select has a matching option when value is "unit")
+                selectedProduct && (
                   <SelectItem value="unit">
-                    Per {selectedProduct.unit}
+                    Per {selectedProduct.unit || 'units'}
                   </SelectItem>
                 )
               ) : (
-                // For products, show count_unit + all calculation units
+                // For products, show count_unit + all calculation units (always show "unit" so it auto-selects when product has count_unit from backend)
                 <>
-                  {selectedProduct && selectedProduct.count_unit && (
-                    <SelectItem value="unit">Per {selectedProduct.count_unit}</SelectItem>
+                  {selectedProduct && (
+                    <SelectItem value="unit">Per {selectedProduct.count_unit || 'rolls'}</SelectItem>
                   )}
                   <SelectItem value="sqm">SQM</SelectItem>
                   <SelectItem value="sqft">SQFT</SelectItem>

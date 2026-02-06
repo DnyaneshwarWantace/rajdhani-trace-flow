@@ -23,10 +23,12 @@ interface MaterialRequirementsTableProps {
   totalSQM: number;
   onAddMaterial?: () => void;
   onRemoveMaterial?: (materialId: string) => void;
+  onRemoveMaterialFromDraft?: (materialId: string) => void;
   onUpdateQuantity?: (materialId: string, quantityPerSqm: number) => void;
   onSelectIndividualProducts?: (materialId: string) => void;
   selectedIndividualProducts?: Record<string, any[]>;
   recipeBased?: boolean;
+  consumedMaterialIds?: string[]; // IDs of materials that are in consumption
 }
 
 export default function MaterialRequirementsTable({
@@ -35,10 +37,12 @@ export default function MaterialRequirementsTable({
   totalSQM,
   onAddMaterial,
   onRemoveMaterial,
+  onRemoveMaterialFromDraft,
   onUpdateQuantity,
   onSelectIndividualProducts,
   selectedIndividualProducts = {},
   recipeBased = false,
+  consumedMaterialIds = [],
 }: MaterialRequirementsTableProps) {
   // Local state to track input values as strings (allows typing "0", "0.", "0.3")
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
@@ -180,9 +184,23 @@ export default function MaterialRequirementsTable({
                             variant="ghost"
                             size="sm"
                             onClick={() => onRemoveMaterial(material.material_id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
+                            title={recipeBased ? "Remove from recipe only (does not change current batch consumption)" : "Remove from consumption only (recipe unchanged)"}
                           >
                             <Trash2 className="w-4 h-4" />
+                            <span className="text-[11px] font-medium">{recipeBased ? "Recipe only" : "Consumption only"}</span>
+                          </Button>
+                        )}
+                        {onRemoveMaterialFromDraft && recipeBased && consumedMaterialIds.includes(material.material_id) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onRemoveMaterialFromDraft(material.material_id)}
+                            className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 flex items-center gap-1"
+                            title="Remove from this batch consumption only (recipe stays same)"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="text-[11px] font-medium">Consumption only</span>
                           </Button>
                         )}
                       </div>

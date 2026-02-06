@@ -128,29 +128,41 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                 </td>
                 <td className="px-4 py-4">
                   <div className="min-w-0 max-w-[180px] space-y-0.5">
-                    <p className="text-sm font-medium text-gray-900 line-clamp-1 break-words">
-                      {product.category}
-                    </p>
+                    <TruncatedText
+                      text={product.category || ''}
+                      maxLength={25}
+                      className="text-sm font-medium text-gray-900 block break-words"
+                      as="p"
+                    />
                     {product.subcategory && (
-                      <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                        {product.subcategory}
-                      </p>
+                      <TruncatedText
+                        text={product.subcategory}
+                        maxLength={25}
+                        className="text-xs text-gray-500 block break-words"
+                        as="p"
+                      />
                     )}
                     {/* Color - only if present and not N/A */}
                     {product.color &&
                       product.color.trim() !== '' &&
                       product.color.toLowerCase() !== 'n/a' && (
-                        <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                          Color: {product.color}
-                        </p>
+                        <TruncatedText
+                          text={`Color: ${product.color}`}
+                          maxLength={25}
+                          className="text-xs text-gray-500 block break-words"
+                          as="p"
+                        />
                       )}
                     {/* Pattern - only if present and not N/A */}
                     {product.pattern &&
                       product.pattern.trim() !== '' &&
                       product.pattern.toLowerCase() !== 'n/a' && (
-                        <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                          Pattern: {product.pattern}
-                        </p>
+                        <TruncatedText
+                          text={`Pattern: ${product.pattern}`}
+                          maxLength={25}
+                          className="text-xs text-gray-500 block break-words"
+                          as="p"
+                        />
                       )}
                   </div>
                 </td>

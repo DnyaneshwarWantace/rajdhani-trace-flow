@@ -21,6 +21,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import type { ProductionBatch, CreateProductionBatchData } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
+import { OrderService } from '@/services/orderService';
 import type { Product } from '@/types/product';
 
 interface ProductionFormDialogProps {
@@ -49,6 +50,8 @@ export default function ProductionFormDialog({
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productName, setProductName] = useState<string>('');
+  // When editing: earliest order delivery date for this product (completion must be 2 days before)
+  const [orderEarliestDelivery, setOrderEarliestDelivery] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,6 +70,21 @@ export default function ProductionFormDialog({
         });
         // Load product name
         loadProductName(selectedBatch.product_id, selectedBatch.product_name);
+        // Load pending orders for this product to enforce completion date ≤ (order delivery - 2 days)
+        (async () => {
+          const { data: pendingOrders } = await OrderService.getPendingOrdersForProduct(selectedBatch.product_id);
+          if (pendingOrders && pendingOrders.length > 0) {
+            const dates = pendingOrders.map((o) => o.expected_delivery).filter(Boolean);
+            if (dates.length > 0) {
+              const earliest = dates.reduce((a, b) => (a <= b ? a : b));
+              setOrderEarliestDelivery(earliest);
+            } else {
+              setOrderEarliestDelivery(null);
+            }
+          } else {
+            setOrderEarliestDelivery(null);
+          }
+        })();
       } else {
         setFormData({
           product_id: '',
@@ -76,6 +94,7 @@ export default function ProductionFormDialog({
           completion_date: '',
         });
         setProductName('');
+        setOrderEarliestDelivery(null);
       }
     }
   }, [isOpen, selectedBatch]);
@@ -131,10 +150,26 @@ export default function ProductionFormDialog({
     }
   };
 
+  // When editing and there are pending orders: completion must be at least 2 days before order delivery
+  const maxCompletionDate = orderEarliestDelivery
+    ? (() => {
+        const d = new Date(orderEarliestDelivery);
+        d.setDate(d.getDate() - 2);
+        return d.toISOString().split('T')[0];
+      })()
+    : undefined;
+  const isCompletionAfterOrderConstraint =
+    selectedBatch && maxCompletionDate && formData.completion_date
+      ? formData.completion_date > maxCompletionDate
+      : false;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.product_id || formData.planned_quantity <= 0) {
       return;
+    }
+    if (selectedBatch && maxCompletionDate && formData.completion_date && formData.completion_date > maxCompletionDate) {
+      return; // Blocked by validation below (button disabled + toast if they bypass)
     }
     await onSubmit(formData);
   };
@@ -228,11 +263,25 @@ export default function ProductionFormDialog({
                 value={formData.completion_date || ''}
                 onChange={(e) => setFormData({ ...formData, completion_date: e.target.value })}
                 min={new Date().toISOString().split('T')[0]}
+                max={maxCompletionDate}
                 required
+                className={isCompletionAfterOrderConstraint ? 'border-red-500 focus:border-red-500' : ''}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Target date for completing this production batch
-              </p>
+              {selectedBatch && orderEarliestDelivery ? (
+                isCompletionAfterOrderConstraint ? (
+                  <p className="text-xs text-red-600 font-semibold mt-1 flex items-center gap-1">
+                    ⚠️ Production must complete at least 2 days before order delivery date ({new Date(orderEarliestDelivery).toLocaleDateString()})
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Order delivery: {new Date(orderEarliestDelivery).toLocaleDateString()} — completion must be 2 days before this date.
+                  </p>
+                )
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  Target date for completing this production batch
+                </p>
+              )}
             </div>
 
             <div>
@@ -250,7 +299,7 @@ export default function ProductionFormDialog({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting || !formData.product_id || formData.planned_quantity <= 0 || !formData.completion_date}>
+            <Button type="submit" className="text-white" disabled={submitting || !formData.product_id || formData.planned_quantity <= 0 || !formData.completion_date || isCompletionAfterOrderConstraint}>
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

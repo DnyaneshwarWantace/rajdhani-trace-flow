@@ -35,8 +35,9 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterModule, setFilterModule] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'type' | 'status' | 'priority'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeLogCategory, setActiveLogCategory] = useState<string>('all');
   const [activeNotificationCategory, setActiveNotificationCategory] = useState<string>('all');
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
@@ -271,12 +272,37 @@ export default function Notifications() {
     baseNotifications.filter(n => {
       if (filterType !== 'all' && n.type !== filterType) return false;
       if (filterStatus !== 'all' && n.status !== filterStatus) return false;
-      if (filterModule !== 'all' && n.module !== filterModule) return false;
       if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
       return true;
     }),
-    [baseNotifications, filterType, filterStatus, filterModule, filterPriority]
+    [baseNotifications, filterType, filterStatus, filterPriority]
   );
+
+  // Sort filtered notifications - memoized
+  const sortedNotifications = useMemo(() => {
+    const list = [...filteredNotifications];
+    const mult = sortOrder === 'asc' ? 1 : -1;
+    const getDateTs = (n: Notification): number => {
+      const raw = n.created_at || (n as any).createdAt || n.related_data?.created_at || (n.related_data as any)?.createdAt || '';
+      if (!raw) return 0;
+      const ts = new Date(raw).getTime();
+      return Number.isNaN(ts) ? 0 : ts;
+    };
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'date') {
+        cmp = getDateTs(a) - getDateTs(b);
+      } else if (sortBy === 'type') {
+        cmp = (a.type || '').localeCompare(b.type || '');
+      } else if (sortBy === 'status') {
+        cmp = (a.status || '').localeCompare(b.status || '');
+      } else if (sortBy === 'priority') {
+        cmp = (a.priority || '').localeCompare(b.priority || '');
+      }
+      return mult * cmp;
+    });
+    return list;
+  }, [filteredNotifications, sortBy, sortOrder]);
 
   const unreadCount = useMemo(() =>
     notifications.filter(n => n.status === 'unread').length,
@@ -409,11 +435,11 @@ export default function Notifications() {
         {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
           <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">Type</label>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Type</label>
                   <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs">
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
@@ -423,18 +449,14 @@ export default function Notifications() {
                       <SelectItem value="out_of_stock">Out of Stock</SelectItem>
                       <SelectItem value="production_request">Production Request</SelectItem>
                       <SelectItem value="order_alert">Order Alert</SelectItem>
-                      <SelectItem value="info">Info</SelectItem>
                       <SelectItem value="warning">Warning</SelectItem>
-                      <SelectItem value="error">Error</SelectItem>
-                      <SelectItem value="success">Success</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">Status</label>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Status</label>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -445,35 +467,43 @@ export default function Notifications() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">Module</label>
-                  <Select value={filterModule} onValueChange={setFilterModule}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Modules" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Modules</SelectItem>
-                      <SelectItem value="products">Products</SelectItem>
-                      <SelectItem value="materials">Materials</SelectItem>
-                      <SelectItem value="orders">Orders</SelectItem>
-                      <SelectItem value="production">Production</SelectItem>
-                    </SelectContent>
-                  </Select>
-        </div>
-
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-1 block">Priority</label>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Priority</label>
                   <Select value={filterPriority} onValueChange={setFilterPriority}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-8 text-xs">
                       <SelectValue placeholder="All Priorities" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
                       <SelectItem value="high">High</SelectItem>
                       <SelectItem value="medium">Medium</SelectItem>
                       <SelectItem value="low">Low</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Sort by</label>
+                  <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status' | 'priority') => setSortBy(v)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date">Date</SelectItem>
+                      <SelectItem value="type">Type</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                      <SelectItem value="priority">Priority</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Order</label>
+                  <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Descending</SelectItem>
+                      <SelectItem value="asc">Ascending</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -497,7 +527,7 @@ export default function Notifications() {
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
           </div>
-        ) : filteredNotifications.length === 0 ? (
+        ) : sortedNotifications.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <Bell className="w-16 h-16 mx-auto text-gray-400 mb-4" />
@@ -509,9 +539,9 @@ export default function Notifications() {
           // Activity Logs Tab - Show activity log notifications
           <div>
             {/* Activity Logs List */}
-            {filteredNotifications.length > 0 ? (
+            {sortedNotifications.length > 0 ? (
           <div className="space-y-3">
-            {filteredNotifications.map((notification) => (
+            {sortedNotifications.map((notification) => (
                   <div key={notification.id} id={`notification-${notification.id}`}>
                     <ActivityNotificationCard
                       notification={notification}
@@ -536,7 +566,7 @@ export default function Notifications() {
         ) : (
           // All Notifications Tab - Show regular notifications in sections
           <div className="space-y-6">
-            {categorizeNotifications(filteredNotifications).map((section) => (
+            {categorizeNotifications(sortedNotifications).map((section) => (
               <Card key={section.category} className="overflow-hidden">
                 <CardContent className="p-0">
                   <NotificationSectionComponent

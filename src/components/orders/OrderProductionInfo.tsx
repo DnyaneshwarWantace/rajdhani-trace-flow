@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Factory, Calendar, Clock, AlertCircle } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { formatIndianDate } from '@/utils/formatHelpers';
@@ -12,19 +14,27 @@ interface OrderProductionInfoProps {
 }
 
 export default function OrderProductionInfo({ order, compact = false }: OrderProductionInfoProps) {
+  const navigate = useNavigate();
   const [productionBatches, setProductionBatches] = useState<ProductionBatch[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // First order item that is a product (for "Go to Production" pre-fill)
+  const firstProductItem = order.items?.find(item => item.productType === 'product' && item.productId);
+
+  // Depend only on order id and status so we don't refetch when parent re-renders with new object reference
+  const orderId = order?.id;
+  const orderStatus = order?.status;
+  const shouldLoad = order && (orderStatus === 'pending' || orderStatus === 'accepted');
+
   useEffect(() => {
-    if (order && (order.status === 'pending' || order.status === 'accepted')) {
+    if (orderId && shouldLoad) {
       loadProductionInfo();
     }
-  }, [order]);
+  }, [orderId, shouldLoad]);
 
   const loadProductionInfo = async () => {
     setLoading(true);
     try {
-      // Get product IDs from order items
       const productIds = order.items
         ?.filter(item => item.productType === 'product' && item.productId)
         .map(item => item.productId!)
@@ -35,34 +45,27 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
         return;
       }
 
-      // Fetch production batches for each product
+      // Fetch batches for all products and for order in parallel (not sequential)
+      const [productBatchesResults, orderBatchesResult] = await Promise.all([
+        Promise.all(productIds.map(productId =>
+          ProductionService.getBatches({ product_id: productId, status: 'all' })
+        )),
+        ProductionService.getBatches({ order_id: order.id })
+      ]);
+
       const allBatches: ProductionBatch[] = [];
-      for (const productId of productIds) {
-        const { data } = await ProductionService.getBatches({ 
-          product_id: productId,
-          status: 'all' // Get all statuses to show if production has started
-        });
+      productBatchesResults.forEach(({ data }) => {
         if (data) {
-          // Filter to only show active batches (not cancelled or completed)
-          const activeBatches = data.filter(batch => 
-            batch.status !== 'cancelled' && batch.status !== 'completed'
-          );
-          allBatches.push(...activeBatches);
+          const active = data.filter(b => b.status !== 'cancelled' && b.status !== 'completed');
+          allBatches.push(...active);
         }
-      }
-
-      // Also check for batches linked to this order
-      const { data: orderBatches } = await ProductionService.getBatches({ 
-        order_id: order.id 
       });
+      const { data: orderBatches } = orderBatchesResult;
       if (orderBatches) {
-        const activeOrderBatches = orderBatches.filter(batch => 
-          batch.status !== 'cancelled' && batch.status !== 'completed'
-        );
-        allBatches.push(...activeOrderBatches);
+        const active = orderBatches.filter(b => b.status !== 'cancelled' && b.status !== 'completed');
+        allBatches.push(...active);
       }
 
-      // Remove duplicates and sort by completion date
       const uniqueBatches = allBatches.filter((batch, index, self) =>
         index === self.findIndex(b => b.id === batch.id)
       );
@@ -134,21 +137,63 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
     );
   }
 
+  const handleGoToProduction = () => {
+    if (!firstProductItem) return;
+    navigate('/production/create', {
+      state: {
+        fromOrder: true,
+        orderId: order.id,
+        productId: firstProductItem.productId,
+        productName: firstProductItem.productName,
+        planned_quantity: firstProductItem.quantity ?? 0,
+        expected_delivery: order.expectedDelivery,
+        order_number: order.orderNumber || order.id,
+        customer_name: order.customerName || '',
+      },
+    });
+  };
+
   if (productionBatches.length === 0) {
     if (compact) {
       return (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
           <AlertCircle className="w-3 h-3 text-gray-500" />
           <span className="text-gray-600">Production not started</span>
+          {firstProductItem && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 text-xs ml-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleGoToProduction();
+              }}
+            >
+              <Factory className="w-3 h-3 mr-1" />
+              Go to Production
+            </Button>
+          )}
         </div>
       );
     }
     return (
       <Card>
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-sm">
-            <AlertCircle className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-600">Production not started</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertCircle className="w-4 h-4 text-gray-500" />
+              <span className="text-gray-600">Production not started</span>
+            </div>
+            {firstProductItem && (
+              <Button
+                size="sm"
+                className="bg-blue-600 text-white hover:bg-blue-700"
+                onClick={handleGoToProduction}
+              >
+                <Factory className="w-4 h-4 mr-2" />
+                Go to Production
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -179,9 +224,22 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Factory className="w-5 h-5 text-blue-600" />
-          <h3 className="font-semibold text-base">Production Information</h3>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <Factory className="w-5 h-5 text-blue-600" />
+            <h3 className="font-semibold text-base">Production Information</h3>
+          </div>
+          {firstProductItem && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={handleGoToProduction}
+            >
+              <Factory className="w-4 h-4 mr-2" />
+              New batch
+            </Button>
+          )}
         </div>
         <div className="space-y-3">
           {productionBatches.map((batch) => (

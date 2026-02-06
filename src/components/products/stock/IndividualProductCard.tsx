@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { QrCode, Ruler, Weight, MapPin, User } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
@@ -9,6 +10,8 @@ interface IndividualProductCardProps {
   lengthUnit?: string;
   widthUnit?: string;
   weightUnit?: string;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export default function IndividualProductCard({
@@ -17,6 +20,8 @@ export default function IndividualProductCard({
   lengthUnit = '',
   widthUnit = '',
   weightUnit = '',
+  selected,
+  onToggleSelect,
 }: IndividualProductCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -34,11 +39,20 @@ export default function IndividualProductCard({
   return (
     <Card
       onClick={onClick}
-      className="hover:shadow-md transition-all cursor-pointer hover:border-primary-500"
+      className={`hover:shadow-md transition-all cursor-pointer hover:border-primary-500 ${selected ? 'ring-2 ring-primary-500 border-primary-500' : ''}`}
     >
       <CardContent className="p-3">
-        {/* Header: QR Code & Status */}
-        <div className="flex items-start justify-between mb-2">
+        {/* Header: Checkbox (when selection enabled) + QR Code & Status */}
+        <div className="flex items-start justify-between mb-2 gap-2">
+          {onToggleSelect && (
+            <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 pt-0.5">
+              <Checkbox
+                checked={selected}
+                onCheckedChange={() => onToggleSelect?.()}
+                aria-label={`Select ${individualProduct.qr_code || individualProduct.id}`}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-8 h-8 bg-primary-50 rounded flex items-center justify-center flex-shrink-0">
               <QrCode className="w-4 h-4 text-primary-600" />

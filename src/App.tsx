@@ -36,6 +36,7 @@ import ProductionIndividualProducts from '@/pages/production/ProductionIndividua
 import OrderList from '@/pages/orders/OrderList';
 import NewOrder from '@/pages/orders/NewOrder';
 import OrderDetails from '@/pages/orders/OrderDetails';
+import QrResult from '@/pages/QrResult';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -56,6 +57,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/qr-result" element={<QrResult />} />
       <Route
         path="/dashboard"
         element={

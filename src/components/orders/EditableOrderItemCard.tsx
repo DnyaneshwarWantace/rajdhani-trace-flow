@@ -22,6 +22,12 @@ interface ProductDetails {
   supplier?: string;
 }
 
+// Display label for price-per-X (e.g. "sqm", "roll", "rolls")
+function getPriceUnitLabel(pricingUnit?: string, unit?: string): string {
+  if (!pricingUnit || pricingUnit === 'unit') return unit || 'roll';
+  return pricingUnit; // sqm, sqft, gsm, kg
+}
+
 interface EditableOrderItemCardProps {
   item: {
     id: string;
@@ -30,6 +36,7 @@ interface EditableOrderItemCardProps {
     product_type: 'product' | 'raw_material';
     quantity: number;
     unit: string;
+    pricing_unit?: string;
     unit_price: string;
     gst_rate: string;
     gst_amount: string;
@@ -165,7 +172,7 @@ export function EditableOrderItemCard({
         </div>
         <div className="text-right ml-4">
           <p className="text-xl font-bold">{formatCurrency(parseFloat(item.total_price))}</p>
-          <p className="text-xs text-gray-500">@ {formatCurrency(parseFloat(item.unit_price))} / {item.unit}</p>
+          <p className="text-xs text-gray-500">@ {formatCurrency(parseFloat(item.unit_price))} / {getPriceUnitLabel(item.pricing_unit, item.unit)}</p>
         </div>
       </div>
 

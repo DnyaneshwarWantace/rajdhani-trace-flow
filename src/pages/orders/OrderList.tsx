@@ -89,15 +89,14 @@ export default function OrderList() {
   const loadStats = async () => {
     try {
       setStatsLoading(true);
-      const { data } = await OrderService.getOrders({ limit: 10000 });
-      const ordersData = data || [];
-      
+      const { data, error } = await OrderService.getOrderStats();
+      if (error || !data) return;
       setStats({
-        total: ordersData.length,
-        pending: ordersData.filter((o: Order) => o.status === 'pending').length,
-        accepted: ordersData.filter((o: Order) => o.status === 'accepted').length,
-        dispatched: ordersData.filter((o: Order) => o.status === 'dispatched').length,
-        delivered: ordersData.filter((o: Order) => o.status === 'delivered').length,
+        total: data.total,
+        pending: data.pending,
+        accepted: data.accepted,
+        dispatched: data.dispatched,
+        delivered: data.delivered,
       });
     } catch (error) {
       console.error('Error loading stats:', error);

@@ -94,8 +94,11 @@ export default function ProductCard({
 
       {/* Content Section - Clean and Compact */}
       <div className="p-3">
-        {/* Title */}
-        <h3 className="font-semibold text-gray-900 text-xs mb-2 leading-tight line-clamp-2">
+        {/* Title - show full name on hover when truncated */}
+        <h3
+          className="font-semibold text-gray-900 text-xs mb-2 leading-tight line-clamp-2"
+          title={product.name}
+        >
           {product.name}
         </h3>
 
@@ -117,17 +120,17 @@ export default function ProductCard({
               </button>
             </div>
           )}
-          {/* Category */}
+          {/* Category - show full text on hover when truncated */}
           <div className="flex items-center justify-between text-[10px] gap-1">
             <span className="text-gray-500 flex-shrink-0">Cat</span>
-            <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.category}</span>
+            <span className="font-medium text-gray-900 text-right truncate min-w-0" title={product.category || ''}>{product.category}</span>
           </div>
 
           {/* Color - Only show if available and not N/A */}
           {product.color && product.color.trim() !== '' && product.color.toLowerCase() !== 'n/a' && (
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Color</span>
-              <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.color}</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0" title={product.color}>{product.color}</span>
             </div>
           )}
 
@@ -135,7 +138,7 @@ export default function ProductCard({
           {product.pattern && product.pattern.trim() !== '' && product.pattern.toLowerCase() !== 'n/a' && (
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Pattern</span>
-              <span className="font-medium text-gray-900 text-right truncate min-w-0">{product.pattern}</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0" title={product.pattern}>{product.pattern}</span>
             </div>
           )}
 
@@ -152,24 +155,27 @@ export default function ProductCard({
             </span>
           </div>
 
-          {/* Dimensions with SQM and Weight */}
+          {/* Dimensions with SQM and Weight - show full text on hover when truncated */}
           <div className="space-y-0.5">
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Dim</span>
-              <span className="font-medium text-gray-900 text-right truncate min-w-0">
+              <span
+                className="font-medium text-gray-900 text-right truncate min-w-0"
+                title={product.dimensions_display || `${product.length}${product.length_unit} × ${product.width}${product.width_unit}`}
+              >
                 {product.dimensions_display || `${product.length}${product.length_unit} × ${product.width}${product.width_unit}`}
               </span>
             </div>
             {product.sqm && (
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">SQM</span>
-                <span className="font-medium text-gray-900 truncate">{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
+                <span className="font-medium text-gray-900 truncate" title={String(formatIndianNumberWithDecimals(product.sqm, 2))}>{formatIndianNumberWithDecimals(product.sqm, 2)}</span>
               </div>
             )}
             {product.weight && (
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-gray-500">Weight</span>
-                <span className="font-medium text-gray-900 truncate">{product.weight} {product.weight_unit}</span>
+                <span className="font-medium text-gray-900 truncate" title={`${product.weight} ${product.weight_unit || ''}`.trim()}>{product.weight} {product.weight_unit}</span>
               </div>
             )}
           </div>

@@ -110,6 +110,11 @@ export default function MaterialSelectionDialog({
   const [materialSuppliers, setMaterialSuppliers] = useState<string[]>([]);
   const [materialColors, setMaterialColors] = useState<string[]>([]);
 
+  // Sync selectedMaterials with existingMaterials prop whenever it changes
+  useEffect(() => {
+    setSelectedMaterials(new Map(existingMaterials.map((m) => [m.material_id, m])));
+  }, [existingMaterials]);
+
   // Lock body scroll when dialog is open
   useEffect(() => {
     if (isOpen) {

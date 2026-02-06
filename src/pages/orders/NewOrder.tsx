@@ -161,7 +161,7 @@ export default function NewOrder() {
         weight_unit: product.weight_unit,
         gsm: parseFloat(String(product.weight || '0').replace(/[^\d.-]/g, '')) || 0,
         unit: product.unit || 'units',
-        count_unit: product.count_unit || 'units',
+        count_unit: product.count_unit || 'rolls',
         individual_stock_tracking: product.individual_stock_tracking !== false,
         individualStockTracking: product.individual_stock_tracking !== false,
         imageUrl: product.image_url || '',

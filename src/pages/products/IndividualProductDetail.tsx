@@ -135,7 +135,7 @@ export default function IndividualProductDetail() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 w-full max-w-full">
         {/* Header */}
         <IndividualProductHeader
           individualProduct={individualProduct}
@@ -148,8 +148,8 @@ export default function IndividualProductDetail() {
         {/* Stats Cards */}
         <IndividualProductStats individualProduct={individualProduct} />
 
-        {/* Main Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Main Content - full width like Order Details / other detail pages */}
+        <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-8">
           {/* Product Context Card */}
           <Card className="mb-6 shadow-sm">
             <CardContent className="pt-6">

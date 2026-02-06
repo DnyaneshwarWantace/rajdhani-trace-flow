@@ -36,6 +36,7 @@ interface OrderItem {
   product_type: 'product' | 'raw_material';
   quantity: number;
   unit: string;
+  pricing_unit?: string;
   unit_price: string;
   gst_rate: string;
   gst_amount: string;

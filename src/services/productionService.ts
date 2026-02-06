@@ -387,9 +387,12 @@ export class ProductionService {
     }
   }
 
-  static async getDraftPlanningState(productId: string): Promise<{ data: any | null; error: string | null }> {
+  static async getDraftPlanningState(productId: string, batchId?: string): Promise<{ data: any | null; error: string | null }> {
     try {
-      const response = await fetch(`${API_URL}/production/planning-draft/${productId}`, {
+      const url = batchId
+        ? `${API_URL}/production/planning-draft/${productId}?batchId=${encodeURIComponent(batchId)}`
+        : `${API_URL}/production/planning-draft/${productId}`;
+      const response = await fetch(url, {
         headers: this.getHeaders(),
       });
 

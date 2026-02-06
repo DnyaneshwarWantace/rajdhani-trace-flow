@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { QrCode, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { IndividualProduct } from '@/types/product';
+import { getAppBaseUrl } from '@/lib/utils';
 
 interface IndividualProductQRCodeProps {
   individualProduct: IndividualProduct;
@@ -17,7 +18,7 @@ export default function IndividualProductQRCode({ individualProduct, productId }
   });
 
   const qrCodeURL = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-    `${window.location.origin}/qr-result?data=${encodeURIComponent(qrCodeData)}`
+    `${getAppBaseUrl()}/qr-result?data=${encodeURIComponent(qrCodeData)}`
   )}`;
 
   const handleDownload = async () => {

@@ -88,49 +88,54 @@ export default function ProductionList() {
     setPage(1);
   }, [activeSection, searchTerm, priorityFilter, categoryFilter, subcategoryFilter, colorFilter, patternFilter]);
 
+  // Backend now bulk-enriches batches with product details; only fetch when still missing
   const enrichBatchesWithProductNames = async (batches: ProductionBatch[]): Promise<ProductionBatch[]> => {
-    const enrichedBatches = await Promise.all(
-      batches.map(async (batch) => {
-        // If product_name or other details are missing, fetch them from product_id
-        if (!batch.product_name || !batch.category || !batch.length) {
-          try {
-            const product = await ProductService.getProductById(batch.product_id);
-            return {
-              ...batch,
-              product_name: product.name,
-              category: product.category,
-              subcategory: product.subcategory,
-              length: product.length,
-              width: product.width,
-              length_unit: product.length_unit,
-              width_unit: product.width_unit,
-              weight: product.weight,
-              weight_unit: product.weight_unit,
-              color: product.color,
-              pattern: product.pattern,
-            };
-          } catch (error) {
-            console.error(`Error fetching product ${batch.product_id}:`, error);
-            return {
-              ...batch,
-              product_name: 'Product Not Found',
-              category: 'N/A',
-              subcategory: 'N/A',
-              length: 'N/A',
-              width: 'N/A',
-              length_unit: '',
-              width_unit: '',
-              weight: 'N/A',
-              weight_unit: '',
-              color: 'N/A',
-              pattern: 'N/A',
-            };
-          }
+    const needsEnrichment = batches.filter(
+      (b) => b.product_id && (!b.product_name || !b.category || !b.length)
+    );
+    if (needsEnrichment.length === 0) return batches;
+
+    const enriched = await Promise.all(
+      needsEnrichment.map(async (batch) => {
+        try {
+          const product = await ProductService.getProductById(batch.product_id);
+          return {
+            ...batch,
+            product_name: product.name,
+            category: product.category,
+            subcategory: product.subcategory,
+            length: product.length,
+            width: product.width,
+            length_unit: product.length_unit,
+            width_unit: product.width_unit,
+            weight: product.weight,
+            weight_unit: product.weight_unit,
+            color: product.color,
+            pattern: product.pattern,
+          };
+        } catch (error) {
+          console.error(`Error fetching product ${batch.product_id}:`, error);
+          return {
+            ...batch,
+            product_name: batch.product_name || 'Product Not Found',
+            category: batch.category ?? 'N/A',
+            subcategory: batch.subcategory ?? 'N/A',
+            length: batch.length ?? 'N/A',
+            width: batch.width ?? 'N/A',
+            length_unit: batch.length_unit ?? '',
+            width_unit: batch.width_unit ?? '',
+            weight: batch.weight ?? 'N/A',
+            weight_unit: batch.weight_unit ?? '',
+            color: batch.color ?? 'N/A',
+            pattern: batch.pattern ?? 'N/A',
+          };
         }
-        return batch;
       })
     );
-    return enrichedBatches;
+    const enrichedIds = new Set(needsEnrichment.map((b) => b.id));
+    return batches.map((b) =>
+      enrichedIds.has(b.id) ? enriched.find((e) => e.id === b.id)! : b
+    );
   };
 
   const loadBatches = async () => {

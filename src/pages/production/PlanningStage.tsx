@@ -22,6 +22,7 @@ import MaterialSelectionDialog from '@/components/production/planning/MaterialSe
 import MachineSelectionDialog from '@/components/production/planning/MachineSelectionDialog';
 import IndividualProductSelectionDialog from '@/components/production/planning/IndividualProductSelectionDialog';
 import ProductionFormDialog from '@/components/production/ProductionFormDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function PlanningStage() {
   const navigate = useNavigate();
@@ -53,6 +54,8 @@ export default function PlanningStage() {
   const [currentBatch, setCurrentBatch] = useState<ProductionBatch | null>(null); // Track current batch object
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showRemoveMaterialDialog, setShowRemoveMaterialDialog] = useState(false);
+  const [materialToRemove, setMaterialToRemove] = useState<{id: string, name: string} | null>(null);
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -289,8 +292,8 @@ export default function PlanningStage() {
           setMaterials([]);
         }
       } else {
-        // Batch is still in planning, load recipe
-        loadRecipeAndCalculate(product, batch.planned_quantity);
+        // Batch is still in planning, load recipe and this batch's draft (consumed materials per batch)
+        loadRecipeAndCalculate(product, batch.planned_quantity, true, batch.id);
       }
     } catch (error) {
       console.error('Error loading batch:', error);
@@ -301,11 +304,11 @@ export default function PlanningStage() {
     }
   };
 
-  const loadRecipeAndCalculate = async (product: Product, quantity?: number) => {
+  const loadRecipeAndCalculate = async (product: Product, quantity?: number, forExistingBatch = false, batchId?: string) => {
     setLoading(true);
     try {
-      // Attempt to restore draft state (materials + form data)
-      const { data: draft } = await ProductionService.getDraftPlanningState(product.id);
+      // When batchId provided: load that batch's draft. Otherwise load product-level draft (new batch: form/recipe only).
+      const { data: draft } = await ProductionService.getDraftPlanningState(product.id, batchId);
 
       if (draft?.form_data) {
         setFormData({
@@ -315,10 +318,11 @@ export default function PlanningStage() {
           notes: draft.form_data.notes || '',
         });
       }
-      if (draft?.materials) {
-        setMaterials(draft.materials);
-      }
-      if (draft?.consumed_materials) {
+      // Recipe (top section) always comes from product recipe below — never from draft. Same product = same recipe for all batches.
+      // Only consumed materials (bottom section) are per batch and restored from draft when editing that batch.
+      // Only restore consumed materials from draft when editing an existing batch.
+      // For a NEW batch (same product), start with empty consumption so we don't show previous batch's materials.
+      if (forExistingBatch && draft?.consumed_materials) {
         setConsumedMaterials(draft.consumed_materials);
 
         // Load individual products for consumed materials
@@ -344,6 +348,9 @@ export default function PlanningStage() {
           }
         }
         setConsumedIndividualProducts(individualProductsMap);
+      } else {
+        setConsumedMaterials([]);
+        setConsumedIndividualProducts({});
       }
 
       const recipeData = await RecipeService.getRecipeByProductId(product.id);
@@ -700,9 +707,99 @@ export default function PlanningStage() {
   };
 
   const handleRemoveMaterial = (materialId: string) => {
+    const material = materials.find((m) => m.material_id === materialId);
+    
+    if (!material) return;
+    
+    // If recipe exists, check if this is the last material
+    if (recipe && recipe.materials && recipe.materials.length <= 1) {
+      toast({
+        title: 'Cannot Remove',
+        description: 'Recipe must have at least one material',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Check if material exists in saved recipe
+    const isInSavedRecipe = recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialId);
+    
+    // Store material info and show confirmation dialog
+    setMaterialToRemove({ id: materialId, name: material.material_name });
+    setShowRemoveMaterialDialog(true);
+  };
+
+  const confirmRemoveMaterial = async () => {
+    if (!materialToRemove) return;
+    
+    const materialId = materialToRemove.id;
+    
+    // Remove from local materials state
     const updatedMaterials = materials.filter((m) => m.material_id !== materialId);
     setMaterials(updatedMaterials);
+    
+    // If recipe exists, update it to remove this material from the saved recipe
+    if (recipe && selectedProduct) {
+      try {
+        const currentRecipeMaterials = recipe.materials || [];
+        const updatedRecipeMaterials = currentRecipeMaterials.filter(
+          (m: any) => m.material_id !== materialId
+        );
+        
+        // Update recipe in database
+        await RecipeService.updateRecipe(recipe.id, { 
+          materials: updatedRecipeMaterials.map((m: any) => ({
+            material_id: m.material_id,
+            material_name: m.material_name,
+            material_type: m.material_type,
+            quantity_per_sqm: m.quantity_per_sqm,
+            unit: m.unit,
+          }))
+        });
+        
+        // Update local recipe state
+        setRecipe({
+          ...recipe,
+          materials: updatedRecipeMaterials,
+        });
+        
+        toast({
+          title: 'Material Removed',
+          description: `"${materialToRemove.name}" removed from recipe and section`,
+        });
+      } catch (error) {
+        console.error('Error updating recipe after removal:', error);
+        toast({
+          title: 'Material Removed from Section',
+          description: 'Material removed from section, but recipe update failed. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      // No recipe exists, just remove from section
+      toast({
+        title: 'Material Removed',
+        description: `"${materialToRemove.name}" removed from section`,
+      });
+    }
+    
     setRecipeModified(true); // mark for save on Add to Production
+    setShowRemoveMaterialDialog(false);
+    setMaterialToRemove(null);
+  };
+
+  const handleRemoveMaterialFromDraft = (materialId: string) => {
+    // Remove only from consumed/draft materials for this batch (consumption),
+    // do NOT touch the recipe materials list.
+    const updatedConsumed = consumedMaterials.filter((m) => m.material_id !== materialId);
+    setConsumedMaterials(updatedConsumed);
+
+    // Clear any selected individual products for this material
+    setSelectedIndividualProducts((prev) => {
+      const next = { ...prev };
+      delete next[materialId];
+      return next;
+    });
   };
 
   const handleUpdateQuantity = (materialId: string, quantityPerSqm: number) => {
@@ -1024,8 +1121,10 @@ export default function PlanningStage() {
             totalSQM={totalSQM}
             recipeBased={recipe ? true : false}
             selectedIndividualProducts={selectedIndividualProducts}
+            consumedMaterialIds={consumedMaterials.map(m => m.material_id)}
             onAddMaterial={() => setShowMaterialDialog(true)}
             onRemoveMaterial={handleRemoveMaterial}
+            onRemoveMaterialFromDraft={handleRemoveMaterialFromDraft}
             onUpdateQuantity={handleUpdateQuantity}
             onSelectIndividualProducts={(materialId: string) => {
               const material = materials.find(m => m.material_id === materialId);
@@ -1119,73 +1218,14 @@ export default function PlanningStage() {
                     }
                   }
 
+                  // Remove only from consumed materials (consumption), do NOT touch recipe
                   const updatedConsumed = consumedMaterials.filter((m) => m.material_id !== materialId);
                   setConsumedMaterials(updatedConsumed);
-
-                  // Also update recipe to remove this material
-                  if (materialToRemove && selectedProduct) {
-                    try {
-                      if (recipe) {
-                        // Recipe exists - update it
-                        const currentMaterials = recipe.materials || [];
-                        const updatedRecipeMaterials = currentMaterials.filter(
-                          (m) => m.material_id !== materialId
-                        );
-                        await RecipeService.updateRecipe(recipe.id, { materials: updatedRecipeMaterials });
-                        
-                        // Update local recipe state
-                        setRecipe({
-                          ...recipe,
-                          materials: updatedRecipeMaterials,
-                        });
-                      } else {
-                        // Recipe doesn't exist - create it with remaining materials
-                        const remainingMaterials = updatedConsumed.map((m) => ({
-                          material_id: m.material_id,
-                          material_name: m.material_name,
-                          material_type: m.material_type,
-                          quantity_per_sqm: m.quantity_per_sqm,
-                          unit: m.unit,
-                          cost_per_unit: m.cost_per_unit ?? 0,
-                          specifications: m.specifications ?? '',
-                          quality_requirements: m.quality_requirements ?? '',
-                          is_optional: m.is_optional ?? false,
-                          waste_factor: m.waste_factor ?? 0,
-                        }));
-
-                        if (remainingMaterials.length > 0) {
-                          await RecipeService.createRecipe(selectedProduct.id, {
-                            materials: remainingMaterials,
-                            description: `Recipe for ${selectedProduct.name}`,
-                            created_by: 'system',
-                          });
-                          
-                          // Reload the recipe to get full data with materials
-                          const loadedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
-                          if (loadedRecipe) {
-                            setRecipe(loadedRecipe);
-                          }
-                        }
-                      }
                       
-                      toast({
-                        title: 'Material Removed',
-                        description: 'Material removed from production and recipe updated',
-                      });
-                    } catch (error) {
-                      console.error('Error updating recipe after removal:', error);
-                      toast({
-                        title: 'Material Removed',
-                        description: 'Material removed from production, but recipe update failed',
-                        variant: 'destructive',
-                      });
-                    }
-                  } else {
-                    toast({
-                      title: 'Material Removed',
-                      description: 'Material removed from production',
-                    });
-                  }
+                  toast({
+                    title: 'Material Removed',
+                    description: 'Material removed from consumption only (recipe unchanged)',
+                  });
                 }}
               />
 
@@ -1862,6 +1902,25 @@ export default function PlanningStage() {
           submitting={isEditing}
         />
       )}
+
+      {/* Remove Material Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRemoveMaterialDialog}
+        onClose={() => {
+          setShowRemoveMaterialDialog(false);
+          setMaterialToRemove(null);
+        }}
+        onConfirm={confirmRemoveMaterial}
+        title="Remove Material from Recipe"
+        description={
+          recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialToRemove?.id)
+            ? `⚠️ Warning: "${materialToRemove?.name}" is saved in the recipe.\n\nRemoving it will:\n• Delete it from the saved recipe in the backend\n• Remove it from this section\n\nThis action cannot be undone. Are you sure you want to continue?`
+            : `Are you sure you want to remove "${materialToRemove?.name}" from this section?`
+        }
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant={recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialToRemove?.id) ? "danger" : "warning"}
+      />
     </Layout>
   );
 }

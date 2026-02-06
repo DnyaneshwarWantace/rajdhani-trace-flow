@@ -11,12 +11,115 @@ import QRCodeDialog from '@/components/products/stock/QRCodeDialog';
 import EditIndividualProductDialog from '@/components/products/stock/EditIndividualProductDialog';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
+import { useToast } from '@/hooks/use-toast';
+import { getAppBaseUrl } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 import type {
   Product,
   IndividualProduct,
   IndividualProductFormData,
   StockStats,
 } from '@/types/product';
+
+/** Sanitize string for use in file names */
+function sanitizeFileName(s: string): string {
+  return s.replace(/[^a-zA-Z0-9\-_.]/g, '_').replace(/_+/g, '_').slice(0, 100);
+}
+
+/** Build CSV content from individual products */
+function buildIndividualProductsCSV(products: IndividualProduct[], productName: string): string {
+  const headers = [
+    'Individual Product ID',
+    'QR Code',
+    'Product Name',
+    'Status',
+    'Serial Number',
+    'Location',
+    'Inspector',
+    'Production Date',
+    'Batch Number',
+    'Final Length',
+    'Final Width',
+    'Final Weight',
+    'Notes',
+    'Created At',
+    'Updated At',
+  ];
+  const rows = products.map((p) => [
+    p.id,
+    p.qr_code || '',
+    p.product_name || productName,
+    p.status,
+    p.serial_number || '',
+    p.location || '',
+    p.inspector || '',
+    p.production_date || '',
+    p.batch_number || '',
+    p.final_length || '',
+    p.final_width || '',
+    p.final_weight || '',
+    (p.notes || '').replace(/"/g, '""'),
+    p.created_at || '',
+    p.updated_at || '',
+  ]);
+  const escape = (val: string) => (val.includes(',') || val.includes('"') || val.includes('\n') ? `"${val}"` : val);
+  const csvRows = [headers.map(escape).join(','), ...rows.map((r) => r.map(escape).join(','))];
+  return '\uFEFF' + csvRows.join('\r\n'); // BOM for Excel
+}
+
+/** Build Excel workbook from individual products (same columns as CSV) */
+function buildIndividualProductsExcel(products: IndividualProduct[], productName: string): XLSX.WorkBook {
+  const headers = [
+    'Individual Product ID',
+    'QR Code',
+    'Product Name',
+    'Status',
+    'Serial Number',
+    'Location',
+    'Inspector',
+    'Production Date',
+    'Batch Number',
+    'Final Length',
+    'Final Width',
+    'Final Weight',
+    'Notes',
+    'Created At',
+    'Updated At',
+  ];
+  const rows = products.map((p) => [
+    p.id,
+    p.qr_code || '',
+    p.product_name || productName,
+    p.status,
+    p.serial_number || '',
+    p.location || '',
+    p.inspector || '',
+    p.production_date || '',
+    p.batch_number || '',
+    p.final_length || '',
+    p.final_width || '',
+    p.final_weight || '',
+    p.notes || '',
+    p.created_at || '',
+    p.updated_at || '',
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Individual Products');
+  return wb;
+}
+
+/** Get QR code image URL for an individual product (same as QRCodeDialog) */
+function getQRCodeImageURL(individualProduct: IndividualProduct): string {
+  const qrCodeData = JSON.stringify({
+    type: 'individual',
+    individualProductId: individualProduct.id,
+    productId: individualProduct.product_id,
+  });
+  const dataUrl = `${getAppBaseUrl()}/qr-result?data=${encodeURIComponent(qrCodeData)}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(dataUrl)}`;
+}
 
 export default function ProductStock() {
   const { productId } = useParams<{ productId: string }>();
@@ -52,6 +155,13 @@ export default function ProductStock() {
   // Edit Dialog
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<IndividualProduct | null>(null);
+
+  // Export / Download all QR
+  const [downloadingAllQR, setDownloadingAllQR] = useState(false);
+  const { toast } = useToast();
+
+  // Selection for "Download selected QR codes"
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (productId) {
@@ -204,6 +314,119 @@ export default function ProductStock() {
     setCurrentPage(1);
   };
 
+  const handleExportCSV = () => {
+    if (allIndividualProducts.length === 0) {
+      toast({ title: 'No data', description: 'No individual products to export', variant: 'destructive' });
+      return;
+    }
+    const productName = product?.name || 'Product';
+    const csv = buildIndividualProductsCSV(allIndividualProducts, productName);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${sanitizeFileName(productName)}-individual-products.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast({ title: 'Exported', description: `${allIndividualProducts.length} individual products exported to CSV` });
+  };
+
+  const handleExportExcel = () => {
+    if (allIndividualProducts.length === 0) {
+      toast({ title: 'No data', description: 'No individual products to export', variant: 'destructive' });
+      return;
+    }
+    const productName = product?.name || 'Product';
+    const wb = buildIndividualProductsExcel(allIndividualProducts, productName);
+    XLSX.writeFile(wb, `${sanitizeFileName(productName)}-individual-products.xlsx`);
+    toast({ title: 'Exported', description: `${allIndividualProducts.length} individual products exported to Excel` });
+  };
+
+  const downloadQRCodesForProducts = async (list: IndividualProduct[]) => {
+    if (list.length === 0) return;
+    const productName = product?.name || 'Product';
+    const baseName = sanitizeFileName(productName);
+    setDownloadingAllQR(true);
+    toast({ title: 'Preparing ZIP…', description: `Adding ${list.length} QR code(s) to zip. Please wait.` });
+    try {
+      const zip = new JSZip();
+      for (let i = 0; i < list.length; i++) {
+        const ip = list[i];
+        const url = getQRCodeImageURL(ip);
+        const res = await fetch(url);
+        const blob = await res.blob();
+        zip.file(`${baseName}-${ip.id}.png`, blob);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const objectUrl = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${baseName}-qr-codes.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+      toast({ title: 'Done', description: `Downloaded ${list.length} QR code(s) in ${baseName}-qr-codes.zip` });
+    } catch (err) {
+      console.error('Error downloading QR codes:', err);
+      toast({ title: 'Error', description: 'Failed to create zip. Try again.', variant: 'destructive' });
+    } finally {
+      setDownloadingAllQR(false);
+    }
+  };
+
+  const handleDownloadAllQRCodes = async () => {
+    if (allIndividualProducts.length === 0) {
+      toast({ title: 'No data', description: 'No individual products to download QR codes for', variant: 'destructive' });
+      return;
+    }
+    await downloadQRCodesForProducts(allIndividualProducts);
+  };
+
+  const handleDownloadSelectedQRCodes = async () => {
+    if (selectedIds.size === 0) return;
+    const list = allIndividualProducts.filter((p) => selectedIds.has(p.id));
+    if (list.length === 0) {
+      toast({ title: 'No data', description: 'Selected items could not be found. Try refreshing.', variant: 'destructive' });
+      return;
+    }
+    await downloadQRCodesForProducts(list);
+  };
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  /** Select/deselect all items on the current page */
+  const handleSelectAllOnPage = () => {
+    const pageIds = individualProducts.map((p) => p.id);
+    const allSelected = pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
+  /** Select/deselect all items across all pages (uses allIndividualProducts) */
+  const handleSelectAll = () => {
+    const allIds = allIndividualProducts.map((p) => p.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+
+  const allSelected = allIndividualProducts.length > 0 && allIndividualProducts.every((p) => selectedIds.has(p.id));
+
+  const handleClearSelection = () => setSelectedIds(new Set());
+
   if (loading && !individualProducts.length) {
     return (
       <Layout>
@@ -225,7 +448,18 @@ export default function ProductStock() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        <ProductStockHeader product={product} productId={productId} />
+        <ProductStockHeader
+          product={product}
+          productId={productId}
+          onExportCSV={handleExportCSV}
+          onExportExcel={handleExportExcel}
+          onDownloadAllQRCodes={handleDownloadAllQRCodes}
+          onDownloadSelectedQRCodes={handleDownloadSelectedQRCodes}
+          onClearSelection={handleClearSelection}
+          downloadingAllQR={downloadingAllQR}
+          individualProductCount={allIndividualProducts.length}
+          selectedCount={selectedIds.size}
+        />
 
         <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
           <StockStatsCards stats={stats} />
@@ -254,6 +488,11 @@ export default function ProductStock() {
             onEdit={handleEdit}
             onQRCodeClick={handleQRCodeClick}
             loading={loading}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onSelectAllOnPage={handleSelectAllOnPage}
+            onSelectAll={handleSelectAll}
+            allSelected={allSelected}
           />
 
           <IndividualProductPagination

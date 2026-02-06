@@ -132,9 +132,9 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
     try {
       // Navigate to new batch page with the product data
-      navigate('/production/new-batch', {
+      navigate('/production/create', {
         state: {
-          selectedProduct: {
+          product: {
             id: productId,
             name: notification.related_data.productName,
             category: notification.related_data.category,
@@ -545,18 +545,18 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                                 className="bg-blue-600 text-white hover:bg-blue-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate('/production/new-batch', {
+                                  navigate('/production/create', {
                                     state: {
-                                      selectedProduct: {
+                                      product: {
                                         id: notification.related_data.product_id,
                                         name: notification.related_data.product_name,
                                         ...notification.related_data.product_details
                                       },
                                       fromNotification: true,
                                       requiredQuantity: notification.related_data.shortfall,
-                                      orderNumber: notification.related_data.order_number,
-                                      customerName: notification.related_data.customer_name,
-                                      expectedDelivery: notification.related_data.expected_delivery
+                                      order_number: notification.related_data.order_number,
+                                      customer_name: notification.related_data.customer_name,
+                                      expected_delivery: notification.related_data.expected_delivery
                                     }
                                   });
                                 }}

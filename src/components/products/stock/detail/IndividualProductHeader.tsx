@@ -32,8 +32,8 @@ export default function IndividualProductHeader({
   };
 
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <div className="bg-white border-b border-gray-200 w-full">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
             <Button variant="ghost" size="sm" onClick={onBack} className="p-2 flex-shrink-0">

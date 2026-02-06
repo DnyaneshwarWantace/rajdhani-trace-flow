@@ -130,9 +130,9 @@ export default function ProductionWastage() {
           console.log('✅ Consumed materials set:', consumed.length);
           setConsumedMaterials(consumed);
         } else {
-          // Try to load from PlanningDraftState if no consumption records yet
+          // Try to load from PlanningDraftState (this batch's draft) if no consumption records yet
           try {
-            const { data: draftState } = await ProductionService.getDraftPlanningState(batchData.product_id);
+            const { data: draftState } = await ProductionService.getDraftPlanningState(batchData.product_id, id);
             if (draftState?.consumed_materials && draftState.consumed_materials.length > 0) {
               setConsumedMaterials(draftState.consumed_materials);
             }

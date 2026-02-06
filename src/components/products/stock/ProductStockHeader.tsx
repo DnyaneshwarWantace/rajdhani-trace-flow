@@ -1,29 +1,81 @@
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { Product } from '@/types/product';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileDown, FileSpreadsheet, QrCode, Loader2, ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-interface ProductStockHeaderProps {
+export interface ProductStockHeaderProps {
   product: Product;
   productId: string;
+  onExportCSV?: () => void;
+  onExportExcel?: () => void;
+  onDownloadAllQRCodes?: () => void;
+  onDownloadSelectedQRCodes?: () => void;
+  onClearSelection?: () => void;
+  downloadingAllQR?: boolean;
+  individualProductCount?: number;
+  selectedCount?: number;
 }
 
-export default function ProductStockHeader({ product, productId }: ProductStockHeaderProps) {
+export default function ProductStockHeader({
+  product,
+  productId,
+  onExportCSV,
+  onExportExcel,
+  onDownloadAllQRCodes,
+  onDownloadSelectedQRCodes,
+  onClearSelection,
+  downloadingAllQR = false,
+  individualProductCount = 0,
+  selectedCount = 0,
+}: ProductStockHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [downloadQROpen, setDownloadQROpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportTriggerRef = useRef<HTMLButtonElement>(null);
+  const downloadQRTriggerRef = useRef<HTMLButtonElement>(null);
+  const [exportTriggerWidth, setExportTriggerWidth] = useState<number | null>(null);
+  const [downloadQRTriggerWidth, setDownloadQRTriggerWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const measure = () => {
+      if (exportTriggerRef.current) setExportTriggerWidth(exportTriggerRef.current.offsetWidth);
+      if (downloadQRTriggerRef.current) setDownloadQRTriggerWidth(downloadQRTriggerRef.current.offsetWidth);
+    };
+    if (exportOpen || downloadQROpen) {
+      measure();
+      const ro = new ResizeObserver(measure);
+      if (exportTriggerRef.current) ro.observe(exportTriggerRef.current);
+      if (downloadQRTriggerRef.current) ro.observe(downloadQRTriggerRef.current);
+      return () => ro.disconnect();
+    }
+  }, [exportOpen, downloadQROpen]);
+
   const handleBack = () => {
-    // Check where we came from based on location state
     const fromPage = location.state?.from;
-    
     if (fromPage === 'product-detail') {
-      // If we came from product detail page, go back to product detail
-      navigate(`/products/${productId}`, {
-        state: { from: 'stock-page' }
-      });
+      navigate(`/products/${productId}`, { state: { from: 'stock-page' } });
     } else {
-      // Default: go back to product list
       navigate('/products');
     }
+  };
+
+  const handleDownloadAll = () => {
+    onDownloadAllQRCodes?.();
+    setDownloadQROpen(false);
+  };
+
+  const handleDownloadSelected = () => {
+    onDownloadSelectedQRCodes?.();
+    setDownloadQROpen(false);
+  };
+
+  const handleClearSelection = () => {
+    onClearSelection?.();
+    setDownloadQROpen(false);
   };
 
   return (
@@ -45,14 +97,121 @@ export default function ProductStockHeader({ product, productId }: ProductStockH
             </div>
           </div>
         </div>
-        <button
-          onClick={() => navigate(`/products/${productId}`, {
-            state: { from: 'stock-page' }
-          })}
-          className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap flex-shrink-0 w-full sm:w-auto"
-        >
-          View Product Details
-        </button>
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {(onExportCSV || onExportExcel) && (
+            <Popover open={exportOpen} onOpenChange={setExportOpen}>
+              <PopoverTrigger asChild>
+                <div ref={exportTriggerRef} className="inline-flex flex-1 sm:flex-initial">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 w-full"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    <span className="hidden sm:inline">Export details</span>
+                    <ChevronDown className="w-4 h-4 opacity-70" />
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                className="p-2"
+                align="end"
+                style={exportTriggerWidth != null ? { width: exportTriggerWidth } : undefined}
+              >
+                <div className="flex flex-col gap-0.5">
+                  {onExportCSV && (
+                    <button
+                      type="button"
+                      onClick={() => { onExportCSV(); setExportOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Export as CSV
+                    </button>
+                  )}
+                  {onExportExcel && (
+                    <button
+                      type="button"
+                      onClick={() => { onExportExcel(); setExportOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 flex items-center gap-2"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Export as Excel
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          {onDownloadAllQRCodes && (
+            <Popover open={downloadQROpen} onOpenChange={setDownloadQROpen}>
+              <PopoverTrigger asChild>
+                <div ref={downloadQRTriggerRef} className="inline-flex flex-1 sm:flex-initial">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadingAllQR || individualProductCount === 0}
+                    className="gap-2 w-full"
+                  >
+                    {downloadingAllQR ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <QrCode className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">Download QR</span>
+                    <ChevronDown className="w-4 h-4 opacity-70" />
+                  </Button>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                className="p-2"
+                align="end"
+                style={downloadQRTriggerWidth != null ? { width: downloadQRTriggerWidth } : undefined}
+              >
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={handleDownloadAll}
+                    disabled={downloadingAllQR || individualProductCount === 0}
+                    className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    Download all
+                  </button>
+                  {onDownloadSelectedQRCodes && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadSelected}
+                      disabled={downloadingAllQR || selectedCount === 0}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      Download selected {selectedCount > 0 ? `(${selectedCount})` : ''}
+                    </button>
+                  )}
+                  {onClearSelection && selectedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearSelection}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 text-gray-600"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/products/${productId}`, { state: { from: 'stock-page' } })}
+            className="flex-1 sm:flex-initial"
+          >
+            View Product Details
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ interface InvoiceItem {
   product_type?: 'product' | 'raw_material';
   quantity: number;
   unit: string;
+  pricing_unit?: string; // sqm, sqft, gsm, kg, unit (per roll)
   unit_price: string;
   gst_rate: string;
   gst_amount: string;
@@ -136,7 +137,7 @@ export const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                           {item.weight && <p>Weight: {item.weight}{item.weight_unit}</p>}
                         </div>
                       )}
-                      <p className="text-xs text-gray-500 mt-1">Unit: {item.unit}</p>
+                      <p className="text-xs text-gray-500 mt-1">Price per: {item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : item.unit}</p>
                     </td>
                     <td className="py-2 px-2 text-xs text-center border-b align-top">{item.quantity}</td>
                     <td className="py-2 px-2 text-xs text-right border-b align-top">{formatCurrency(item.unit_price)}</td>

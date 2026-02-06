@@ -75,6 +75,34 @@ export class OrderService {
     };
   }
 
+  /** Lightweight stats (counts by status) – use instead of getOrders for stats. */
+  static async getOrderStats(): Promise<{
+    data: { total: number; pending: number; accepted: number; dispatched: number; delivered: number } | null;
+    error: string | null;
+  }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/stats`, { headers: this.getHeaders() });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        return { data: null, error: result.error || 'Failed to fetch order stats' };
+      }
+      const d = result.data || {};
+      return {
+        data: {
+          total: d.total_orders ?? 0,
+          pending: d.pending_orders ?? 0,
+          accepted: d.accepted_orders ?? 0,
+          dispatched: d.dispatched_orders ?? 0,
+          delivered: d.delivered_orders ?? 0,
+        },
+        error: null,
+      };
+    } catch (error) {
+      console.error('Error fetching order stats:', error);
+      return { data: null, error: 'Failed to fetch order stats' };
+    }
+  }
+
   static async getOrders(filters?: {
     search?: string;
     status?: string | string[];
@@ -220,6 +248,7 @@ export class OrderService {
         product_type: item.product_type || 'product',
         quantity: item.quantity || 0,
         unit: item.unit || 'piece',
+        pricing_unit: item.pricing_unit || 'unit', // sqm, sqft, gsm, kg, or unit (per roll/unit)
         unit_price: item.unit_price || '0.00',
         gst_rate: item.gst_rate || '18.00',
         gst_amount: item.gst_amount || '0.00',

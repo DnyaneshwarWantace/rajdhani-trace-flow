@@ -1,6 +1,7 @@
 import { QrCode, Hash, Eye, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { IndividualProduct, Product } from '@/types/product';
 
 interface ProductStockTableProps {
@@ -9,6 +10,11 @@ interface ProductStockTableProps {
   onView: (product: IndividualProduct) => void;
   onEdit: (product: IndividualProduct) => void;
   onQRCodeClick: (product: IndividualProduct) => void;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+  onSelectAllOnPage?: () => void;
+  onSelectAll?: () => void;
+  allSelected?: boolean;
 }
 
 export default function ProductStockTable({
@@ -17,7 +23,16 @@ export default function ProductStockTable({
   onView,
   onEdit,
   onQRCodeClick,
+  selectedIds,
+  onToggleSelect,
+  onSelectAllOnPage,
+  onSelectAll,
+  allSelected = false,
 }: ProductStockTableProps) {
+  const allSelectedOnPage = products.length > 0 && products.every((p) => selectedIds?.has(p.id));
+  const headerSelectAll = onSelectAll ?? onSelectAllOnPage;
+  const headerChecked = onSelectAll ? allSelected : allSelectedOnPage;
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'available':
@@ -36,6 +51,15 @@ export default function ProductStockTable({
       <table className="w-full">
         <thead>
           <tr className="border-b">
+            {onToggleSelect && headerSelectAll && (
+              <th className="w-10 p-3">
+                <Checkbox
+                  checked={headerChecked}
+                  onCheckedChange={() => headerSelectAll()}
+                  aria-label={onSelectAll ? 'Select all' : 'Select all on page'}
+                />
+              </th>
+            )}
             <th className="text-left p-3 font-medium text-gray-600">ID</th>
             <th className="text-left p-3 font-medium text-gray-600">QR Code</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden md:table-cell">
@@ -51,6 +75,15 @@ export default function ProductStockTable({
         <tbody>
           {products.map((item) => (
             <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
+              {onToggleSelect && (
+                <td className="p-3 w-10" onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds?.has(item.id) ?? false}
+                    onCheckedChange={() => onToggleSelect(item.id)}
+                    aria-label={`Select ${item.qr_code || item.id}`}
+                  />
+                </td>
+              )}
               <td className="p-3">
                 <div className="flex items-center gap-2">
                   <Hash className="w-4 h-4 text-gray-400" />

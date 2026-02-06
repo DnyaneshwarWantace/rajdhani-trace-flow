@@ -59,34 +59,81 @@ export default function ProductionCreate() {
     }
   }, [location.state, user]);
 
+  // Pre-fill from order page "Go to Production" (order details: product, qty, completion date)
+  useEffect(() => {
+    const state = location.state as any;
+    if (!state?.fromOrder || !state?.productId) return;
+
+    const productId = state.productId as string;
+    const plannedQuantity = Number(state.planned_quantity) || 0;
+    const expectedDelivery = state.expected_delivery || state.expectedDelivery;
+    const orderNumber = state.order_number || state.orderNumber || '';
+    const customerName = state.customer_name || state.customerName || '';
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const product = await ProductService.getProductById(productId);
+        if (cancelled || !product) return;
+
+        setSelectedProduct(product);
+
+        let completionDate = '';
+        if (expectedDelivery) {
+          const d = new Date(expectedDelivery);
+          d.setDate(d.getDate() - 2);
+          completionDate = d.toISOString().split('T')[0];
+        }
+
+        setSelectedOrderDeliveryDate(expectedDelivery || null);
+        setFormData((prev) => ({
+          ...prev,
+          product_id: productId,
+          planned_quantity: plannedQuantity,
+          completion_date: completionDate,
+          notes: orderNumber && customerName ? `Order ${orderNumber} for ${customerName}` : prev.notes,
+          operator: user?.full_name || user?.email || prev.operator,
+          supervisor: user?.full_name || user?.email || prev.supervisor,
+        }));
+      } catch (e) {
+        console.error('Error pre-filling from order:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [location.state?.fromOrder, location.state?.productId, user]);
+
   // Handle back navigation based on where user came from
   const handleBack = () => {
-    const from = location.state?.from as string | undefined;
-    const productId = location.state?.productId as string | undefined;
-    const batchId = location.state?.batchId as string | undefined;
+    const state = location.state as any;
+    const from = state?.from as string | undefined;
+    const productId = state?.productId as string | undefined;
+    const batchId = state?.batchId as string | undefined;
+    const orderId = state?.orderId as string | undefined;
 
-    if (from === 'product-detail' && productId) {
-      // Return to product detail page
+    if (state?.fromOrder && orderId) {
+      navigate(`/orders/${orderId}`);
+    } else if (from === 'product-detail' && productId) {
       navigate(`/products/${productId}`);
     } else if (from === 'product-list') {
-      // Return to product list page
       navigate('/products');
     } else if (from === 'production-detail' && batchId) {
-      // Return to production detail page
       navigate(`/production/${batchId}`);
     } else {
-      // Default: go to production list
       navigate('/production');
     }
   };
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
+    // Clear any order-based delivery constraint when user picks a product manually
+    setSelectedOrderDeliveryDate(null);
     setFormData((prev) => ({ ...prev, product_id: product.id }));
   };
 
   const handleProductClear = () => {
     setSelectedProduct(null);
+    // Also clear any order-based delivery constraint
+    setSelectedOrderDeliveryDate(null);
     setFormData((prev) => ({ ...prev, product_id: '' }));
   };
 
