@@ -29,9 +29,10 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
 
-  // Handler for unit name (max 2 words, max 10 chars per word)
+  // Handler for unit name: letters and spaces only (no numbers/special chars), max 2 words, max 10 chars per word
   const handleUnitNameChange = (value: string) => {
-    let inputValue = value;
+    // Allow only letters (a-z, A-Z) and spaces
+    let inputValue = value.replace(/[^a-zA-Z\s]/g, '');
 
     // Split by spaces to get words
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);

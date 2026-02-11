@@ -21,6 +21,9 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
   // First order item that is a product (for "Go to Production" pre-fill)
   const firstProductItem = order.items?.find(item => item.productType === 'product' && item.productId);
 
+  // Reserve fixed height for compact block so "Go to Production" button never causes layout shift
+  const compactMinHeight = 'min-h-[3.5rem]';
+
   // Depend only on order id and status so we don't refetch when parent re-renders with new object reference
   const orderId = order?.id;
   const orderStatus = order?.status;
@@ -119,9 +122,15 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
   if (loading) {
     if (compact) {
       return (
-        <div className="flex items-center gap-2 text-xs text-gray-600">
-          <Clock className="w-3 h-3 animate-spin" />
-          <span>Loading...</span>
+        <div className={`${compactMinHeight} flex flex-col justify-center`}>
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            <Clock className="w-3 h-3 animate-spin shrink-0" />
+            <span>Loading production…</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>Complete: —</span>
+          </div>
         </div>
       );
     }
@@ -156,23 +165,29 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
   if (productionBatches.length === 0) {
     if (compact) {
       return (
-        <div className="flex items-center gap-2 text-xs flex-wrap">
-          <AlertCircle className="w-3 h-3 text-gray-500" />
-          <span className="text-gray-600">Production not started</span>
-          {firstProductItem && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 text-xs ml-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleGoToProduction();
-              }}
-            >
-              <Factory className="w-3 h-3 mr-1" />
-              Go to Production
-            </Button>
-          )}
+        <div className={`${compactMinHeight} flex flex-col justify-center`}>
+          <div className="flex items-center gap-2 text-xs flex-wrap">
+            <AlertCircle className="w-3 h-3 text-gray-500 shrink-0" />
+            <span className="text-gray-600">Production not started</span>
+            {firstProductItem && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 text-xs ml-1 shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGoToProduction();
+                }}
+              >
+                <Factory className="w-3 h-3 mr-1" />
+                Go to Production
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+            <Calendar className="w-3 h-3 shrink-0" />
+            <span>Complete: —</span>
+          </div>
         </div>
       );
     }
@@ -201,21 +216,21 @@ export default function OrderProductionInfo({ order, compact = false }: OrderPro
   }
 
   if (compact) {
-    // Compact view for cards/tables
+    // Compact view for cards/tables - fixed layout so completion date and "Go to Production" never cause shift
     const earliestBatch = productionBatches[0];
+    const completionDate = earliestBatch?.completion_date
+      ? formatIndianDate(earliestBatch.completion_date)
+      : '—';
     return (
-      <div className="flex items-center gap-2 text-xs">
-        <Factory className="w-3 h-3 text-blue-600" />
-        <span className="text-gray-700 font-medium">Production Started</span>
-        {earliestBatch.completion_date && (
-          <>
-            <span className="text-gray-500">•</span>
-            <Calendar className="w-3 h-3 text-gray-500" />
-            <span className="text-gray-600">
-              Complete: {formatIndianDate(earliestBatch.completion_date)}
-            </span>
-          </>
-        )}
+      <div className={`${compactMinHeight} flex flex-col justify-center`}>
+        <div className="flex items-center gap-2 text-xs">
+          <Factory className="w-3 h-3 text-blue-600 shrink-0" />
+          <span className="text-gray-700 font-medium">Production Started</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5">
+          <Calendar className="w-3 h-3 text-gray-500 shrink-0" />
+          <span>Complete: {completionDate}</span>
+        </div>
       </div>
     );
   }

@@ -11,12 +11,20 @@ import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
 import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
+import { exportProductsToCSV, exportProductsToExcel } from '@/utils/exportProductUtils';
+import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
 export default function ProductList() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabValue>('inventory');
+  const [exporting, setExporting] = useState<'csv' | 'excel' | null>(null);
+  const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,6 +253,37 @@ export default function ProductList() {
     setIsFormOpen(true);
   };
 
+  const handleExport = async (format: 'csv' | 'excel') => {
+    setExportPopoverOpen(false);
+    setExporting(format);
+    try {
+      const { products: toExport } = await ProductService.getProducts({
+        ...filters,
+        limit: 10000,
+        page: 1,
+      });
+      if (!toExport?.length) {
+        toast({ title: 'No Data', description: 'No products to export', variant: 'destructive' });
+        return;
+      }
+      if (format === 'csv') {
+        exportProductsToCSV(toExport);
+        toast({ title: 'Export Successful', description: `Exported ${toExport.length} products to CSV` });
+      } else {
+        exportProductsToExcel(toExport);
+        toast({ title: 'Export Successful', description: `Exported ${toExport.length} products to Excel` });
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+      toast({
+        title: 'Export Failed',
+        description: err instanceof Error ? err.message : 'Failed to export products',
+        variant: 'destructive',
+      });
+    } finally {
+      setExporting(null);
+    }
+  };
 
   // Calculate unread notifications count
 
@@ -293,6 +332,41 @@ export default function ProductList() {
                     Grouped
                   </button>
                 </div>
+
+                {/* Export Dropdown */}
+                <Popover open={exportPopoverOpen} onOpenChange={setExportPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-gray-300"
+                      disabled={!!exporting}
+                    >
+                      {exporting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                      <span className="hidden sm:inline">Export</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-2" align="end">
+                    <button
+                      onClick={() => handleExport('csv')}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Export as CSV
+                    </button>
+                    <button
+                      onClick={() => handleExport('excel')}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Export as Excel
+                    </button>
+                  </PopoverContent>
+                </Popover>
 
                 {/* Add Product Button */}
                 <button

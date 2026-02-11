@@ -57,7 +57,14 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/qr-result" element={<QrResult />} />
+      <Route
+        path="/qr-result"
+        element={
+          <PrivateRoute>
+            <QrResult />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/dashboard"
         element={

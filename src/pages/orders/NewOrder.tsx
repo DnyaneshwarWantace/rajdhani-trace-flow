@@ -630,7 +630,7 @@ export default function NewOrder() {
           onAddressChange={setOrderDeliveryAddress}
         />
 
-        {/* Order Summary */}
+        {/* Full Order Summary – review items and totals before creating order */}
         <OrderSummary
           subtotal={calculateOrderBreakdown().subtotal}
           gstAmount={calculateOrderBreakdown().gstAmount}
@@ -640,6 +640,8 @@ export default function NewOrder() {
           onSubmit={handleSubmit}
           canSubmit={orderItems.length > 0}
           isSubmitting={isSubmitting}
+          items={orderItems}
+          customer={selectedCustomer ?? undefined}
         />
 
         {/* Product/Material Selection Dialog */}

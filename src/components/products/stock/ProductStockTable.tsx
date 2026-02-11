@@ -69,7 +69,7 @@ export default function ProductStockTable({
             <th className="text-left p-3 font-medium text-gray-600">Final Width</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">Inspector</th>
             <th className="text-left p-3 font-medium text-gray-600">Status</th>
-            <th className="text-left p-3 font-medium text-gray-600">Actions</th>
+            <th className="text-right p-3 font-medium text-gray-600">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -143,8 +143,8 @@ export default function ProductStockTable({
                   <Badge variant={getStatusVariant(item.status)}>{item.status}</Badge>
                 )}
               </td>
-              <td className="p-3">
-                <div className="flex gap-2">
+              <td className="p-3 text-right">
+                <div className="flex items-center justify-end gap-2">
                   <Button variant="outline" size="sm" onClick={() => onView(item)}>
                     <Eye className="w-4 h-4" />
                   </Button>

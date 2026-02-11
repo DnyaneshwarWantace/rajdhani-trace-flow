@@ -120,6 +120,9 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const handleNameChange = (value: string) => {
     let inputValue = value;
 
+    // Only allow alphabets and spaces (reject numbers and special characters)
+    inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
+
     // Split by spaces to get words
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);
 

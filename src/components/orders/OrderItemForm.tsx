@@ -1,4 +1,4 @@
-import { Package, Trash2, Search, Box } from 'lucide-react';
+import { Package, Trash2, Search, Box, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { calculateSQM } from '@/utils/sqmCalculator';
 import { useState, useEffect } from 'react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { formatCurrency } from '@/utils/formatHelpers';
 
 interface OrderItemFormProps {
   item: ExtendedOrderItem;
@@ -20,6 +21,8 @@ interface OrderItemFormProps {
   onSelectProduct: (item: ExtendedOrderItem) => void;
   products?: any[];
   rawMaterials?: any[];
+  onCollapse?: () => void;
+  isCollapsible?: boolean;
 }
 
 export default function OrderItemForm({
@@ -30,6 +33,8 @@ export default function OrderItemForm({
   onSelectProduct,
   products = [],
   rawMaterials = [],
+  onCollapse,
+  isCollapsible = false,
 }: OrderItemFormProps) {
   // Get the selected product/material details
   const selectedProduct = item.product_id
@@ -117,15 +122,29 @@ export default function OrderItemForm({
           <h3 className="font-medium text-lg flex-shrink-0">Order Item #{index + 1}</h3>
           {item.product_name && <Badge variant="secondary" className="truncate max-w-md" title={item.product_name}>{item.product_name}</Badge>}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onRemove(item.id)}
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-        >
-          <Trash2 className="w-4 h-4 mr-2" />
-          Remove
-        </Button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {isCollapsible && onCollapse && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCollapse}
+              className="text-gray-600"
+              title="Collapse"
+            >
+              <ChevronUp className="w-4 h-4 mr-2" />
+              Close
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onRemove(item.id)}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Remove
+          </Button>
+        </div>
       </div>
 
       {/* Selected Product Details */}
@@ -388,6 +407,9 @@ export default function OrderItemForm({
           {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 18 && item.gst_included && (
             <p className="text-xs text-red-500 mt-1">GST rate cannot exceed 18%</p>
           )}
+          <p className="text-xs text-gray-500 mt-1">
+            GST rate can be between 5% and 18% when included. Leave unchecked for no GST on this item.
+          </p>
         </div>
 
         <div className="space-y-2 flex items-end">
@@ -449,7 +471,7 @@ export default function OrderItemForm({
             readOnly
             className="bg-gray-50 font-semibold"
           />
-        </div>
+     </div>
       </div>
 
       {item.errorMessage && (
@@ -457,6 +479,13 @@ export default function OrderItemForm({
           {item.errorMessage}
         </div>
       )}
+
+      {/* This item summary only – at bottom of card */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 py-2 px-3 rounded-md bg-gray-100 border border-gray-200 text-sm">
+        <span><span className="text-gray-600">Subtotal:</span> <span className="font-medium">{formatCurrency(item.subtotal ?? 0)}</span></span>
+        <span><span className="text-gray-600">GST:</span> <span className="font-medium">{formatCurrency(item.gst_amount ?? 0)}</span></span>
+        <span><span className="text-gray-600">This item total:</span> <span className="font-semibold text-primary">{formatCurrency(item.total_price ?? 0)}</span></span>
+      </div>
     </div>
   );
 }

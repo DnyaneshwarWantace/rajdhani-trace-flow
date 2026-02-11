@@ -49,7 +49,8 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
   const handleStageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     const stage = getCurrentStage();
-    if (stage === 'planning') navigate(`/production/planning?batchId=${batch.id}`);
+    if (stage === 'cancelled') navigate(`/production/${batch.id}`);
+    else if (stage === 'planning') navigate(`/production/planning?batchId=${batch.id}`);
     else if (stage === 'machine') navigate(`/production/${batch.id}/machine`);
   };
 
@@ -71,7 +72,13 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
 
     if (stage === 'cancelled') {
       return (
-        <Badge className="bg-red-100 text-red-700 border-red-300 px-2 py-1 w-full justify-center">
+        <Badge
+          role="button"
+          tabIndex={0}
+          className="bg-red-100 text-red-700 border-red-300 px-2 py-1 w-full justify-center cursor-pointer hover:bg-red-200 transition-colors"
+          onClick={handleStageClick}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStageClick(e as unknown as React.MouseEvent); } }}
+        >
           <X className="w-3 h-3 mr-1 inline" />
           Cancelled
         </Badge>

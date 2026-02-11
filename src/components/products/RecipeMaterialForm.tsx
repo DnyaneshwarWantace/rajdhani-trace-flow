@@ -7,7 +7,7 @@ import MaterialSelectorDialog from './MaterialSelectorDialog';
 import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface RecipeMaterial {
   materialId: string;
@@ -178,6 +178,7 @@ export default function RecipeMaterialForm({
                 onMaterialChange({ ...newMaterial, quantity: validation.value });
               }}
               onKeyDown={(e) => {
+                preventInvalidNumberKeys(e);
                 // Prevent form submission on Enter key
                 if (e.key === 'Enter') {
                   e.preventDefault();

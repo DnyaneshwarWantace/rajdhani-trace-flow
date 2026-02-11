@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle } from 'lucide-react';
+import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import { getApiUrl } from '@/utils/apiConfig';
@@ -40,6 +40,7 @@ interface Props {
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false); // collapsed by default when page loads
   const [sortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
   const [sortOrder] = useState<'asc' | 'desc'>('asc');
   const scrollPositionRef = useRef<number>(0);
@@ -238,48 +239,57 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     return days <= 7;
   };
 
-  if (loading) {
-    return (
-      <Card className="p-8 border-2 border-blue-300">
-        <div className="flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-3" />
-          <span className="text-lg text-gray-700">Loading all pending orders...</span>
-        </div>
-      </Card>
-    );
-  }
-
-  if (allOrders.length === 0) {
-    return (
-      <Card className="p-8 bg-green-50 border-2 border-green-300">
-        <div className="flex items-center gap-4">
-          <ShoppingCart className="h-8 w-8 text-green-600" />
-          <div>
-            <h3 className="text-xl font-bold text-green-900">All Orders Completed!</h3>
-            <p className="text-green-700">No pending orders at the moment. Create a batch for any product below.</p>
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const header = (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((e) => !e)}
+      onKeyDown={(ev) => ev.key === 'Enter' && setExpanded((e) => !e)}
+      className="flex items-center justify-between gap-4 cursor-pointer hover:bg-orange-100/70 rounded-lg p-3 -m-1 transition-colors"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        {expanded ? (
+          <ChevronDown className="h-6 w-6 text-orange-700 flex-shrink-0" />
+        ) : (
+          <ChevronRight className="h-6 w-6 text-orange-700 flex-shrink-0" />
+        )}
+        <h2 className="text-xl sm:text-2xl font-bold text-orange-900 flex items-center gap-2 truncate">
+          <ShoppingCart className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
+          ALL PENDING ORDERS - CREATE PRODUCTION BATCH
+        </h2>
+      </div>
+      <Badge variant="secondary" className="text-lg px-4 py-1.5 bg-orange-600 text-white flex-shrink-0">
+        {loading ? '...' : `${allOrders.length} Orders`}
+      </Badge>
+    </div>
+  );
 
   return (
     <Card className="p-6 border-4 border-orange-500 bg-orange-50">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-orange-900 flex items-center gap-2">
-              <ShoppingCart className="h-7 w-7" />
-              ALL PENDING ORDERS - CREATE PRODUCTION BATCH
-            </h2>
-            <p className="text-orange-700 font-semibold mt-1">Click on any order below to create a production batch for that product</p>
-          </div>
-          <Badge variant="secondary" className="text-xl px-5 py-2 bg-orange-600 text-white">
-            {allOrders.length} Orders
-          </Badge>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {header}
+        {!expanded && (
+          <p className="text-sm text-orange-600 pl-8">Click above to expand and see pending orders</p>
+        )}
+        {expanded && (
+          <>
+            {loading ? (
+              <div className="flex items-center justify-center py-12 border-2 border-orange-200 rounded-lg bg-white">
+                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-3" />
+                <span className="text-lg text-gray-700">Loading all pending orders...</span>
+              </div>
+            ) : allOrders.length === 0 ? (
+              <div className="flex items-center gap-4 py-8 px-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                <ShoppingCart className="h-8 w-8 text-green-600 flex-shrink-0" />
+                <div>
+                  <h3 className="text-xl font-bold text-green-900">All Orders Completed!</h3>
+                  <p className="text-green-700">No pending orders at the moment. Create a batch for any product below.</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-orange-700 font-semibold">Click on any order below to create a production batch for that product</p>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {allOrders.map((order, index) => (
             <Card
               key={`${order.order_id}-${index}`}
@@ -355,7 +365,11 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
               </div>
             </Card>
           ))}
-        </div>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
     </Card>
   );

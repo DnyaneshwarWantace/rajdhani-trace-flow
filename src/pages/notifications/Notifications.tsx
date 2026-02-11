@@ -9,6 +9,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -33,10 +34,9 @@ export default function Notifications() {
   const [activeTab, setActiveTab] = useState<TabValue>('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterPriority, setFilterPriority] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'type' | 'status' | 'priority'>('date');
+  const [filterTypes, setFilterTypes] = useState<string[]>([]);
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'date' | 'type' | 'status'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeLogCategory, setActiveLogCategory] = useState<string>('all');
   const [activeNotificationCategory, setActiveNotificationCategory] = useState<string>('all');
@@ -267,15 +267,14 @@ export default function Notifications() {
     [activeTab, getFilteredActivityLogs, getFilteredNotifications]
   );
 
-  // Filter notifications - keep original order, don't re-sort by status - memoized
+  // Filter notifications (multi-select: empty = all) - memoized
   const filteredNotifications = useMemo(() =>
     baseNotifications.filter(n => {
-      if (filterType !== 'all' && n.type !== filterType) return false;
-      if (filterStatus !== 'all' && n.status !== filterStatus) return false;
-      if (filterPriority !== 'all' && n.priority !== filterPriority) return false;
+      if (filterTypes.length > 0 && !filterTypes.includes(n.type)) return false;
+      if (filterStatuses.length > 0 && !filterStatuses.includes(n.status)) return false;
       return true;
     }),
-    [baseNotifications, filterType, filterStatus, filterPriority]
+    [baseNotifications, filterTypes, filterStatuses]
   );
 
   // Sort filtered notifications - memoized
@@ -296,8 +295,6 @@ export default function Notifications() {
         cmp = (a.type || '').localeCompare(b.type || '');
       } else if (sortBy === 'status') {
         cmp = (a.status || '').localeCompare(b.status || '');
-      } else if (sortBy === 'priority') {
-        cmp = (a.priority || '').localeCompare(b.priority || '');
       }
       return mult * cmp;
     });
@@ -435,55 +432,45 @@ export default function Notifications() {
         {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
           <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-0.5 block">Type</label>
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="All Types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="low_stock">Low Stock</SelectItem>
-                      <SelectItem value="restock_request">Restock Request</SelectItem>
-                      <SelectItem value="out_of_stock">Out of Stock</SelectItem>
-                      <SelectItem value="production_request">Production Request</SelectItem>
-                      <SelectItem value="order_alert">Order Alert</SelectItem>
-                      <SelectItem value="warning">Warning</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <MultiSelect
+                    options={[
+                      { label: 'Low Stock', value: 'low_stock' },
+                      { label: 'Restock Request', value: 'restock_request' },
+                      { label: 'Out of Stock', value: 'out_of_stock' },
+                      { label: 'Production Request', value: 'production_request' },
+                      { label: 'Order Alert', value: 'order_alert' },
+                      { label: 'Warning', value: 'warning' },
+                      { label: 'Activity Log', value: 'activity_log' },
+                      { label: 'Info', value: 'info' },
+                      { label: 'Success', value: 'success' },
+                      { label: 'Error', value: 'error' },
+                    ]}
+                    selected={filterTypes}
+                    onChange={setFilterTypes}
+                    placeholder="All Types"
+                    className="h-8 text-xs"
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-0.5 block">Status</label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="All Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="unread">Unread</SelectItem>
-                      <SelectItem value="read">Read</SelectItem>
-                      <SelectItem value="dismissed">Dismissed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Priority</label>
-                  <Select value={filterPriority} onValueChange={setFilterPriority}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue placeholder="All Priorities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Priorities</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <MultiSelect
+                    options={[
+                      { label: 'Unread', value: 'unread' },
+                      { label: 'Read', value: 'read' },
+                      { label: 'Dismissed', value: 'dismissed' },
+                    ]}
+                    selected={filterStatuses}
+                    onChange={setFilterStatuses}
+                    placeholder="All Status"
+                    className="h-8 text-xs"
+                  />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-0.5 block">Sort by</label>
-                  <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status' | 'priority') => setSortBy(v)}>
+                  <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status') => setSortBy(v)}>
                     <SelectTrigger className="h-8 text-xs">
                       <SelectValue />
                     </SelectTrigger>
@@ -491,7 +478,6 @@ export default function Notifications() {
                       <SelectItem value="date">Date</SelectItem>
                       <SelectItem value="type">Type</SelectItem>
                       <SelectItem value="status">Status</SelectItem>
-                      <SelectItem value="priority">Priority</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

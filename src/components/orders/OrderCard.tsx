@@ -18,7 +18,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   accepted: { label: 'Accepted', icon: CheckCircle, color: 'bg-blue-100 text-blue-800' },
   in_production: { label: 'In Production', icon: Factory, color: 'bg-purple-100 text-purple-800' },
   ready: { label: 'Ready', icon: Package, color: 'bg-indigo-100 text-indigo-800' },
-  dispatched: { label: 'Dispatched', icon: Truck, color: 'bg-orange-100 text-orange-800' },
+  dispatched: { label: 'Shipped', icon: Truck, color: 'bg-orange-100 text-orange-800' },
   delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
@@ -106,7 +106,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                     ? 'bg-orange-500'
                     : 'bg-gray-200'
                 }`} />
-                <div className="text-xs mt-1">Dispatch</div>
+                <div className="text-xs mt-1">Ship</div>
               </div>
               {/* Delivered */}
               <div className="flex-1 text-center">
@@ -134,12 +134,20 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             <div className="text-gray-600 text-xs">Order Date:</div>
             <div className="font-medium">{formatIndianDate(order.orderDate)}</div>
           </div>
-          {order.expectedDelivery && (
-            <div>
-              <div className="text-gray-600 text-xs">Expected Delivery:</div>
-              <div className="font-medium">{formatIndianDate(order.expectedDelivery)}</div>
-            </div>
-          )}
+          {order.expectedDelivery && (() => {
+            const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            expectedDate.setHours(0, 0, 0, 0);
+            const notDelivered = order.status !== 'delivered';
+            const isOverdue = notDelivered && expectedDate < today;
+            return (
+              <div>
+                <div className="text-gray-600 text-xs">Expected Delivery:</div>
+                <div className={`font-medium ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Items Count and Total */}
@@ -310,7 +318,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           <div className="mt-3 bg-blue-50 p-3 rounded-lg">
             <div className="flex items-center gap-2 text-blue-700 font-medium mb-2 text-xs">
               <CheckCircle className="w-4 h-4" />
-              <span>Order Accepted - Ready for Dispatch</span>
+              <span>Order Accepted - Ready to Ship</span>
             </div>
             {canDispatchOrder(order) ? (
               <Button
@@ -319,7 +327,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                 onClick={handleDispatch}
               >
                 <Package className="w-4 h-4 mr-2" />
-                Dispatch Order
+                Ship
               </Button>
             ) : (
               <>
@@ -343,7 +351,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           <div className="mt-3 bg-orange-50 p-3 rounded-lg">
             <div className="flex items-center gap-2 text-orange-700 font-medium mb-2 text-xs">
               <Package className="w-4 h-4" />
-              <span>Order Dispatched - Ready to Deliver</span>
+              <span>Order Shipped - Ready to Deliver</span>
             </div>
             <Button
               className="w-full bg-green-600 hover:bg-green-700"

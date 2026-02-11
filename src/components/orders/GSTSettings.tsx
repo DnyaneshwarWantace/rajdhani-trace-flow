@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface GSTSettingsProps {
   rate: number;
@@ -37,6 +37,7 @@ export default function GSTSettings({
                 const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
                 onRateChange(parseFloat(validation.value) || 0);
               }}
+              onKeyDown={(e) => preventInvalidNumberKeys(e)}
               min="0"
               max="100"
               step="0.01"

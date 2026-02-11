@@ -1,23 +1,12 @@
 /**
  * Get the API URL based on the current environment
- * Handles both localhost and network IP access
+ * Handles both localhost and network IP access so testers on same WiFi can use your machine's IP
  */
 export const getApiUrl = (): string => {
-  // If explicitly set via env variable, use that
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
-    // If accessing via localhost or 127.0.0.1, use localhost:8000
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'https://rajdhani.wantace.com/api';
-    }
-    
-    // If accessing via network IP (192.168.x.x, 10.x.x.x, etc.), use the same IP with port 8000
-    // Match common private IP ranges
+
+    // If opened via network IP, always use that host for API (so testers hit your backend)
     if (
       hostname.match(/^192\.168\./) ||
       hostname.match(/^10\./) ||
@@ -25,33 +14,27 @@ export const getApiUrl = (): string => {
     ) {
       return `http://${hostname}:8000/api`;
     }
-    
-    // For production/other cases, use relative path (will be proxied by Nginx)
-    return '/api';
+
+    // Localhost: use env or default local backend
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    }
+
+    // Production / other: relative or env
+    return import.meta.env.VITE_API_URL || '/api';
   }
 
-  // Fallback for SSR or other cases
-  return 'https://rajdhani.wantace.com/api';
+  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 };
 
 /**
  * Get the Socket.IO URL based on the current environment
  */
 export const getSocketUrl = (): string => {
-  // If explicitly set via env variable, use that
-  if (import.meta.env.VITE_SOCKET_URL) {
-    return import.meta.env.VITE_SOCKET_URL;
-  }
-
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
-    // If accessing via localhost or 127.0.0.1, use localhost:8000
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'https://rajdhani.wantace.com';
-    }
-    
-    // If accessing via network IP, use the same IP with port 8000
+
+    // If opened via network IP, use that host so testers hit your backend
     if (
       hostname.match(/^192\.168\./) ||
       hostname.match(/^10\./) ||
@@ -59,12 +42,14 @@ export const getSocketUrl = (): string => {
     ) {
       return `http://${hostname}:8000`;
     }
-    
-    // For production, use same origin (Nginx will proxy /socket.io/ to backend)
-    return window.location.origin;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+    }
+
+    return import.meta.env.VITE_SOCKET_URL || window.location.origin;
   }
 
-  // Fallback
-  return 'https://rajdhani.wantace.com';
+  return import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
 };
 

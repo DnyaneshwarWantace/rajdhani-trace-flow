@@ -25,7 +25,7 @@ export default function ProductSearchSection({
   selectedProductId,
 }: ProductSearchSectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [category, setCategory] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedPatterns, setSelectedPatterns] = useState<string[]>([]);
@@ -57,7 +57,7 @@ export default function ProductSearchSection({
   useEffect(() => {
     setPage(1);
     loadProducts();
-  }, [searchTerm, category, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
+  }, [searchTerm, selectedCategories, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights, limit, sortBy, sortOrder]);
 
   useEffect(() => {
     loadProducts();
@@ -146,8 +146,8 @@ export default function ProductSearchSection({
         filters.search = searchTerm.trim();
       }
 
-      if (category) {
-        filters.category = category;
+      if (selectedCategories.length > 0) {
+        filters.category = selectedCategories;
       }
 
       if (selectedSubcategories.length > 0) {
@@ -290,17 +290,14 @@ export default function ProductSearchSection({
 
         {/* Filters */}
         <ProductFilters
-          category={category}
+          categoriesSelected={selectedCategories}
           subcategoriesSelected={selectedSubcategories}
           colorsSelected={selectedColors}
           patternsSelected={selectedPatterns}
           lengthsSelected={selectedLengths}
           widthsSelected={selectedWidths}
           weightsSelected={selectedWeights}
-          onCategoryChange={(value) => {
-            setCategory(value);
-            setSelectedSubcategories([]);
-          }}
+          onCategoriesChange={setSelectedCategories}
           onSubcategoriesChange={setSelectedSubcategories}
           onColorsChange={setSelectedColors}
           onPatternsChange={setSelectedPatterns}

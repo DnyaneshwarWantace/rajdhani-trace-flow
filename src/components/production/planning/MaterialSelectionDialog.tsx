@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -84,6 +84,7 @@ export default function MaterialSelectionDialog({
   const [rawMaterials, setRawMaterials] = useState<Material[]>([]);
   const [products, setProducts] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
+  const prevIsOpenRef = useRef(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Map<string, SelectedMaterial>>(
     new Map(existingMaterials.map((m) => [m.material_id, m]))
   );
@@ -145,77 +146,182 @@ export default function MaterialSelectionDialog({
     };
   }, [isOpen]);
 
-  // Load filter options only once when dialog opens or tab changes
+  // When dialog opens: load both materials and products once; keep cache when closed so re-open is instant
   useEffect(() => {
-    if (isOpen) {
-      loadFilterOptions();
+    if (!isOpen) {
+      prevIsOpenRef.current = false;
+      return;
     }
-  }, [isOpen, activeTab]);
+    // If we already have cached data from a previous open, show it immediately (no refetch)
+    if (rawMaterials.length > 0 && products.length > 0) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([loadRawMaterialsOnly(), loadProductsOnly()])
+      .then(() => {
+        if (!cancelled) setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
-  // Load materials when filters change
+  // When user changes search/filters: refetch current tab only (do not refetch on tab switch)
   useEffect(() => {
-    if (isOpen) {
-      setCurrentPage(1);
-      loadMaterials();
+    if (!isOpen) return;
+    if (isOpen && !prevIsOpenRef.current) {
+      prevIsOpenRef.current = true;
+      return;
     }
-  }, [isOpen, activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
+    setCurrentPage(1);
+    loadMaterials();
+  }, [isOpen, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
 
-  // Load filtered materials when page changes
+  // Keep totalPages in sync with cached list when switching tabs (no refetch); reset to page 1
   useEffect(() => {
-    if (isOpen) {
-      loadMaterials();
-    }
-  }, [currentPage]);
+    if (!isOpen) return;
+    const list = activeTab === 'raw_materials' ? rawMaterials : products;
+    setTotalPages(Math.max(1, Math.ceil(list.length / itemsPerPage)));
+    setCurrentPage(1);
+  }, [isOpen, activeTab, rawMaterials.length, products.length]);
 
-  const loadFilterOptions = async () => {
+  const loadRawMaterialsOnly = async (): Promise<void> => {
     try {
-      if (activeTab === 'raw_materials') {
-        // Fetch all materials for filter extraction
-        const allMaterialsResponse = await MaterialService.getMaterials({ limit: 1000 });
-        const allMaterials = allMaterialsResponse.materials || [];
-
-        // Extract unique filter values - ONLY these 4 filters
-        const categories = Array.from(new Set(allMaterials.map((m: any) => m.category).filter(Boolean))).sort();
-        setRawMaterialCategories(categories);
-
-        const types = Array.from(new Set(allMaterials.map((m: any) => m.type || m.material_type).filter(Boolean))).sort();
-        setMaterialTypes(types);
-
-        const colors = Array.from(new Set(allMaterials.map((m: any) => m.color).filter((c) => c && c !== 'N/A'))).sort();
-        setMaterialColors(colors);
-
-        const suppliers = Array.from(new Set(allMaterials.map((m: any) => m.supplier_name).filter(Boolean))).sort();
-        setMaterialSuppliers(suppliers);
-      } else {
-        // Fetch all products for filter extraction
-        const allProductsResponse = await ProductService.getProducts({ limit: 1000 });
-        const allProducts = allProductsResponse.products || [];
-
-        // Extract unique filter values
-        const categories = Array.from(new Set(allProducts.map((p: any) => p.category).filter(Boolean))).sort();
-        setProductCategories(categories);
-
-        const subcategories = Array.from(new Set(allProducts.map((p: any) => p.subcategory).filter(Boolean))).sort();
-        setProductSubcategories(subcategories);
-
-        const colors = Array.from(new Set(allProducts.map((p: any) => p.color).filter((c) => c && c !== 'N/A'))).sort();
-        setProductColors(colors);
-
-        const patterns = Array.from(new Set(allProducts.map((p: any) => p.pattern).filter((p) => p && p !== 'N/A'))).sort();
-        setProductPatterns(patterns);
-
-        // Extract unique lengths, widths, weights
-        const lengths = Array.from(new Set(allProducts.map((p: any) => p.length).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
-        setProductLengths(lengths);
-
-        const widths = Array.from(new Set(allProducts.map((p: any) => p.width).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
-        setProductWidths(widths);
-
-        const weights = Array.from(new Set(allProducts.map((p: any) => p.weight).filter(Boolean))).sort((a, b) => parseFloat(a) - parseFloat(b));
-        setProductWeights(weights);
+      const response = await MaterialService.getMaterials({
+        category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
+        page: 1,
+        limit: 1000,
+      });
+      let materialsData = response.materials || [];
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        materialsData = materialsData.filter((m: any) =>
+          m.name?.toLowerCase().includes(searchLower) ||
+          m.id?.toLowerCase().includes(searchLower) ||
+          m.category?.toLowerCase().includes(searchLower) ||
+          m.type?.toLowerCase().includes(searchLower) ||
+          m.material_type?.toLowerCase().includes(searchLower) ||
+          m.color?.toLowerCase().includes(searchLower) ||
+          m.supplier_name?.toLowerCase().includes(searchLower) ||
+          m.batch_number?.toLowerCase().includes(searchLower)
+        );
       }
+      if (categoryFilter.length > 0) {
+        materialsData = materialsData.filter((m: any) => categoryFilter.includes(m.category));
+      }
+      if (materialTypeFilter.length > 0) {
+        materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.type || m.material_type));
+      }
+      if (colorFilter.length > 0) {
+        materialsData = materialsData.filter((m: any) => colorFilter.includes(m.color));
+      }
+      if (supplierFilter.length > 0) {
+        materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
+      }
+      const list = materialsData.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        current_stock: m.current_stock || 0,
+        available_stock: m.available_stock,
+        in_production: m.in_production,
+        unit: m.unit || 'kg',
+        type: 'raw_material' as const,
+        category: m.category,
+        material_type: m.type || m.material_type,
+        supplier: m.supplier_name,
+        cost: m.cost_per_unit,
+        color: m.color,
+      }));
+      setRawMaterials(list);
+      setTotalPages(Math.ceil(list.length / itemsPerPage));
+      const all = response.materials || [];
+      setRawMaterialCategories(Array.from(new Set(all.map((m: any) => m.category).filter(Boolean))).sort());
+      setMaterialTypes(Array.from(new Set(all.map((m: any) => m.type || m.material_type).filter(Boolean))).sort());
+      setMaterialColors(Array.from(new Set(all.map((m: any) => m.color).filter((c: any) => c && c !== 'N/A'))).sort());
+      setMaterialSuppliers(Array.from(new Set(all.map((m: any) => m.supplier_name).filter(Boolean))).sort());
     } catch (error) {
-      console.error('Error loading filter options:', error);
+      console.error('Error loading raw materials:', error);
+    }
+  };
+
+  const loadProductsOnly = async (): Promise<void> => {
+    try {
+      const response = await ProductService.getProducts({
+        search: searchQuery || undefined,
+        category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
+        color: colorFilter.length > 0 ? colorFilter : undefined,
+        pattern: patternFilter.length > 0 ? patternFilter : undefined,
+        subcategory: subcategoryFilter.length > 0 ? subcategoryFilter : undefined,
+        length: lengthFilter.length > 0 ? lengthFilter : undefined,
+        width: widthFilter.length > 0 ? widthFilter : undefined,
+        weight: weightFilter.length > 0 ? weightFilter : undefined,
+        page: 1,
+        limit: 1000,
+      });
+      let productsData = response.products || [];
+      if (categoryFilter.length > 0) {
+        productsData = productsData.filter((p: any) => categoryFilter.includes(p.category));
+      }
+      if (subcategoryFilter.length > 0) {
+        productsData = productsData.filter((p: any) => subcategoryFilter.includes(p.subcategory));
+      }
+      if (colorFilter.length > 0) {
+        productsData = productsData.filter((p: any) => colorFilter.includes(p.color));
+      }
+      if (patternFilter.length > 0) {
+        productsData = productsData.filter((p: any) => patternFilter.includes(p.pattern));
+      }
+      if (lengthFilter.length > 0) {
+        productsData = productsData.filter((p: any) => {
+          const productLength = `${p.length} ${p.length_unit || ''}`.trim();
+          return lengthFilter.includes(productLength) || lengthFilter.includes(p.length?.toString());
+        });
+      }
+      if (widthFilter.length > 0) {
+        productsData = productsData.filter((p: any) => {
+          const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
+          return widthFilter.includes(productWidth) || widthFilter.includes(p.width?.toString());
+        });
+      }
+      if (weightFilter.length > 0) {
+        productsData = productsData.filter((p: any) => {
+          const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
+          return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
+        });
+      }
+      // Use current_stock from API only (no per-product API calls) so load is as fast as product page
+      const productsWithStock = productsData.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        current_stock: p.current_stock ?? 0,
+        unit: p.unit || 'pcs',
+        type: 'product' as const,
+        category: p.category,
+        subcategory: p.subcategory,
+        length: p.length,
+        width: p.width,
+        length_unit: p.length_unit,
+        width_unit: p.width_unit,
+        weight: p.weight,
+        weight_unit: p.weight_unit,
+        color: p.color,
+        pattern: p.pattern,
+      }));
+      setProducts(productsWithStock);
+      setTotalPages(Math.ceil(productsWithStock.length / itemsPerPage));
+      const all = response.products || [];
+      setProductCategories(Array.from(new Set(all.map((p: any) => p.category).filter(Boolean))).sort());
+      setProductSubcategories(Array.from(new Set(all.map((p: any) => p.subcategory).filter(Boolean))).sort());
+      setProductColors(Array.from(new Set(all.map((p: any) => p.color).filter((c: any) => c && c !== 'N/A'))).sort());
+      setProductPatterns(Array.from(new Set(all.map((p: any) => p.pattern).filter((p: any) => p && p !== 'N/A'))).sort());
+      setProductLengths(Array.from(new Set(all.map((p: any) => p.length).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
+      setProductWidths(Array.from(new Set(all.map((p: any) => p.width).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
+      setProductWeights(Array.from(new Set(all.map((p: any) => p.weight).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
+    } catch (error) {
+      console.error('Error loading products:', error);
     }
   };
 
@@ -223,165 +329,10 @@ export default function MaterialSelectionDialog({
     setLoading(true);
     try {
       if (activeTab === 'raw_materials') {
-
-        // Always fetch a large page so we can sort & paginate client-side
-        const response = await MaterialService.getMaterials({
-          category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
-          page: 1,
-          limit: 1000,
-        });
-
-        let materialsData = response.materials || [];
-
-        // Apply search filter client-side (searches more fields than backend)
-        if (searchQuery) {
-          const searchLower = searchQuery.toLowerCase();
-          materialsData = materialsData.filter((m: any) =>
-            m.name?.toLowerCase().includes(searchLower) ||
-            m.id?.toLowerCase().includes(searchLower) ||
-            m.category?.toLowerCase().includes(searchLower) ||
-            m.type?.toLowerCase().includes(searchLower) ||
-            m.material_type?.toLowerCase().includes(searchLower) ||
-            m.color?.toLowerCase().includes(searchLower) ||
-            m.supplier_name?.toLowerCase().includes(searchLower) ||
-            m.batch_number?.toLowerCase().includes(searchLower)
-          );
-        }
-
-        // Apply multi-select category filter client-side if multiple selected
-        if (categoryFilter.length > 0) {
-          materialsData = materialsData.filter((m: any) => categoryFilter.includes(m.category));
-        }
-
-        // Apply other client-side filters (for filters not supported by backend)
-        if (materialTypeFilter.length > 0) {
-          materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.type || m.material_type));
-        }
-        if (colorFilter.length > 0) {
-          materialsData = materialsData.filter((m: any) => colorFilter.includes(m.color));
-        }
-        if (supplierFilter.length > 0) {
-          materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
-        }
-
-        // Paginate client-side if search or multiple filters selected
-        const totalFilteredCount = materialsData.length;
-
-        setRawMaterials(
-          materialsData.map((m: any) => ({
-            id: m.id,
-            name: m.name,
-            current_stock: m.current_stock || 0,
-            available_stock: m.available_stock,
-            in_production: m.in_production,
-            unit: m.unit || 'kg',
-            type: 'raw_material' as const,
-            category: m.category,
-            material_type: m.type || m.material_type,
-            supplier: m.supplier_name,
-            cost: m.cost_per_unit,
-            color: m.color,
-          }))
-        );
-
-        setTotalPages(Math.ceil(totalFilteredCount / itemsPerPage));
+        await loadRawMaterialsOnly();
       } else {
-        // Always fetch a large page so we can sort & paginate client-side
-        const response = await ProductService.getProducts({
-          search: searchQuery || undefined,
-          category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
-          color: colorFilter.length > 0 ? colorFilter : undefined,
-          pattern: patternFilter.length > 0 ? patternFilter : undefined,
-          subcategory: subcategoryFilter.length > 0 ? subcategoryFilter : undefined,
-          length: lengthFilter.length > 0 ? lengthFilter : undefined,
-          width: widthFilter.length > 0 ? widthFilter : undefined,
-          weight: weightFilter.length > 0 ? weightFilter : undefined,
-          page: 1,
-          limit: 1000,
-        });
-
-        let productsData = response.products || [];
-
-        // Apply multi-select category filter client-side if multiple selected
-        if (categoryFilter.length > 0) {
-          productsData = productsData.filter((p: any) => categoryFilter.includes(p.category));
-        }
-
-        // Apply client-side filters (for filters not fully supported by backend or multi-select)
-        if (subcategoryFilter.length > 0) {
-          productsData = productsData.filter((p: any) => subcategoryFilter.includes(p.subcategory));
-        }
-        if (colorFilter.length > 0) {
-          productsData = productsData.filter((p: any) => colorFilter.includes(p.color));
-        }
-        if (patternFilter.length > 0) {
-          productsData = productsData.filter((p: any) => patternFilter.includes(p.pattern));
-        }
-        if (lengthFilter.length > 0) {
-          productsData = productsData.filter((p: any) => {
-            const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-            return lengthFilter.includes(productLength) || lengthFilter.includes(p.length?.toString());
-          });
-        }
-        if (widthFilter.length > 0) {
-          productsData = productsData.filter((p: any) => {
-            const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-            return widthFilter.includes(productWidth) || widthFilter.includes(p.width?.toString());
-          });
-        }
-        if (weightFilter.length > 0) {
-          productsData = productsData.filter((p: any) => {
-            const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-            return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
-          });
-        }
-
-        // Fetch available stock for products with individual tracking
-        const productsWithStock = await Promise.all(
-          productsData.map(async (p: any) => {
-            let availableStock = p.current_stock || 0;
-
-            // For products with individual stock tracking, get count of available individual products
-            if (p.individual_stock_tracking) {
-              try {
-                const { IndividualProductService } = await import('@/services/individualProductService');
-                const { total: availableCount } = await IndividualProductService.getIndividualProductsByProductId(
-                  p.id,
-                  { status: 'available' }
-                );
-                availableStock = availableCount || 0;
-              } catch (error) {
-                console.error(`Error fetching individual products for ${p.id}:`, error);
-                availableStock = 0;
-              }
-            }
-
-            return {
-              id: p.id,
-              name: p.name,
-              current_stock: availableStock,
-              unit: p.unit || 'pcs',
-              type: 'product' as const,
-              category: p.category,
-              subcategory: p.subcategory,
-              length: p.length,
-              width: p.width,
-              length_unit: p.length_unit,
-              width_unit: p.width_unit,
-              weight: p.weight,
-              weight_unit: p.weight_unit,
-              color: p.color,
-              pattern: p.pattern,
-            };
-          })
-        );
-
-        setProducts(productsWithStock);
-
-        setTotalPages(Math.ceil(productsWithStock.length / itemsPerPage));
+        await loadProductsOnly();
       }
-    } catch (error) {
-      console.error('Error loading materials:', error);
     } finally {
       setLoading(false);
     }
@@ -413,16 +364,7 @@ export default function MaterialSelectionDialog({
   const handleTabChange = (value: string) => {
     setActiveTab(value as 'raw_materials' | 'products');
     setCurrentPage(1);
-    setCategoryFilter([]); // Reset to empty array for multi-select
-    setSubcategoryFilter([]);
-    setMaterialTypeFilter([]);
-    setColorFilter([]);
-    setPatternFilter([]);
-    setSupplierFilter([]);
-    setLengthFilter([]);
-    setWidthFilter([]);
-    setWeightFilter([]);
-    setSearchQuery('');
+    // Do not reset filters so switching tabs uses cached data and does not refetch
   };
 
   const getStockStatusBadge = (stock: number) => {

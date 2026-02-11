@@ -185,10 +185,10 @@ export default function MaterialRequirementsTable({
                             size="sm"
                             onClick={() => onRemoveMaterial(material.material_id)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1"
-                            title={recipeBased ? "Remove from recipe only (does not change current batch consumption)" : "Remove from consumption only (recipe unchanged)"}
+                            title={recipeBased ? "Remove from recipe (and this section)" : "Remove from this section"}
                           >
                             <Trash2 className="w-4 h-4" />
-                            <span className="text-[11px] font-medium">{recipeBased ? "Recipe only" : "Consumption only"}</span>
+                            <span className="text-[11px] font-medium">{recipeBased ? "Recipe only" : "Remove"}</span>
                           </Button>
                         )}
                         {onRemoveMaterialFromDraft && recipeBased && consumedMaterialIds.includes(material.material_id) && (

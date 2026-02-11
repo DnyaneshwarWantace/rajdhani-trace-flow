@@ -104,7 +104,7 @@ export default function CustomerDetailOrderStats({ customer, orders }: CustomerD
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-              <span>Dispatched</span>
+              <span>Shipped</span>
             </div>
             <span className="font-medium">{statusStats.dispatched}</span>
           </div>

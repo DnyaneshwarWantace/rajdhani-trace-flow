@@ -75,7 +75,7 @@ export function OrderStatusCard({ orderNumber, customerName, status, workflowSte
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
             <span className={status === 'accepted' ? 'text-blue-600 font-medium' : ''}>Accept</span>
-            <span className={status === 'dispatched' ? 'text-orange-600 font-medium' : ''}>Dispatch</span>
+            <span className={status === 'dispatched' ? 'text-orange-600 font-medium' : ''}>Shipped</span>
             <span className={status === 'delivered' ? 'text-green-600 font-medium' : ''}>Delivered</span>
           </div>
         </div>

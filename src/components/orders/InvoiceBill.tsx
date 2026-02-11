@@ -159,15 +159,23 @@ export const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
               <p className="font-semibold text-gray-700">Order Date:</p>
               <p className="text-gray-900">{formatDate(order.createdAt || order.orderDate)}</p>
             </div>
-            {order.expectedDelivery && (
-              <div className="text-xs">
-                <p className="font-semibold text-gray-700">Expected Delivery:</p>
-                <p className="text-gray-900">{formatDate(order.expectedDelivery)}</p>
-              </div>
-            )}
+            {order.expectedDelivery && (() => {
+              const expectedDate = new Date(String(order.expectedDelivery).split('T')[0]);
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              expectedDate.setHours(0, 0, 0, 0);
+              const notDelivered = order.status !== 'delivered';
+              const isOverdue = notDelivered && expectedDate < today;
+              return (
+                <div className="text-xs">
+                  <p className="font-semibold text-gray-700">Expected Delivery:</p>
+                  <p className={isOverdue ? 'text-red-600 font-semibold' : 'text-gray-900'}>{formatDate(order.expectedDelivery)}</p>
+                </div>
+              );
+            })()}
             {order.dispatchedAt && (
               <div className="text-xs">
-                <p className="font-semibold text-blue-700">Dispatched On:</p>
+                <p className="font-semibold text-blue-700">Shipped On:</p>
                 <p className="text-blue-900">{formatDate(order.dispatchedAt)}</p>
               </div>
             )}

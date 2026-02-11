@@ -78,10 +78,10 @@ export function OrderTimelineCard({
     });
   }
 
-  // Order Dispatched
+  // Order Shipped
   if (currentStatus === 'dispatched' || currentStatus === 'delivered') {
     timelineData.push({
-      stage: 'Order Dispatched',
+      stage: 'Order Shipped',
       date: formatDate(dispatchedAt),
       performedBy: getPerformedBy('order_dispatched'),
       color: 'orange',

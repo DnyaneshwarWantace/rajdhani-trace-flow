@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 import { useToast } from '@/hooks/use-toast';
 
 interface OrderDetailsFormProps {
@@ -52,16 +52,16 @@ export default function OrderDetailsForm({
             placeholder=""
             onChange={e => {
               const inputValue = e.target.value;
-              
+
               // Allow empty string
               if (inputValue === '') {
                 onPaidAmountChange(0);
                 return;
               }
-              
+
               const validation = validateNumberInput(inputValue, ValidationPresets.PRICE);
               const newPaidAmount = parseFloat(validation.value) || 0;
-              
+
               // Validate that paid amount doesn't exceed total amount
               if (totalAmount && newPaidAmount > totalAmount) {
                 toast({
@@ -71,9 +71,10 @@ export default function OrderDetailsForm({
                 });
                 return;
               }
-              
+
               onPaidAmountChange(newPaidAmount);
             }}
+            onKeyDown={(e) => preventInvalidNumberKeys(e)}
             min="0"
             max={totalAmount || "9999999.99"}
             step="0.01"

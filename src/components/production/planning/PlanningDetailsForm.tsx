@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Calendar, AlertCircle } from 'lucide-react';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface PlanningDetailsFormProps {
   formData: {
@@ -48,6 +48,7 @@ export default function PlanningDetailsForm({ formData, onChange }: PlanningDeta
             const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
             handleChange('planned_quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
           }}
+          onKeyDown={(e) => preventInvalidNumberKeys(e)}
           required
           className="mt-1"
         />

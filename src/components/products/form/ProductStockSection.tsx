@@ -2,7 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProductDropdownField from './ProductDropdownField';
 import type { ProductFormData } from '@/types/product';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface ProductStockSectionProps {
   formData: ProductFormData;
@@ -56,6 +56,7 @@ export default function ProductStockSection({
                   const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
                   onFormDataChange({ base_quantity: validation.value === '' ? '' as any : parseInt(validation.value) || 0 });
                 }}
+                onKeyDown={(e) => preventInvalidNumberKeys(e)}
                 onBlur={() => markFieldTouched('base_quantity')}
                 min="0"
                 max="99999"

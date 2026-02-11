@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, Save, AlertCircle } from 'lucide-react';
@@ -56,6 +56,7 @@ export default function PlanningStage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showRemoveMaterialDialog, setShowRemoveMaterialDialog] = useState(false);
   const [materialToRemove, setMaterialToRemove] = useState<{id: string, name: string} | null>(null);
+  const skipRecalcAfterRemoveRef = useRef(false);
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -72,8 +73,12 @@ export default function PlanningStage() {
     }
   }, [location.state, searchParams, navigate]);
 
-  // Recalculate materials when quantity changes
+  // Recalculate materials when quantity changes (skip once after remove so we don't overwrite)
   useEffect(() => {
+    if (skipRecalcAfterRemoveRef.current) {
+      skipRecalcAfterRemoveRef.current = false;
+      return;
+    }
     if (selectedProduct && recipe && formData.planned_quantity > 0) {
       calculateMaterialRequirements(selectedProduct, recipe, formData.planned_quantity);
     }
@@ -711,8 +716,10 @@ export default function PlanningStage() {
     
     if (!material) return;
     
-    // If recipe exists, check if this is the last material
-    if (recipe && recipe.materials && recipe.materials.length <= 1) {
+    // Only block if this material is IN the saved recipe AND it's the last one (recipe must have at least one)
+    const isInSavedRecipe = recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialId);
+    const remainingInRecipe = recipe?.materials?.filter((m: any) => m.material_id !== materialId).length ?? 0;
+    if (isInSavedRecipe && remainingInRecipe === 0) {
       toast({
         title: 'Cannot Remove',
         description: 'Recipe must have at least one material',
@@ -721,8 +728,7 @@ export default function PlanningStage() {
       return;
     }
     
-    // Check if material exists in saved recipe
-    const isInSavedRecipe = recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialId);
+    // Check if material exists in saved recipe (for dialog copy)
     
     // Store material info and show confirmation dialog
     setMaterialToRemove({ id: materialId, name: material.material_name });
@@ -757,6 +763,8 @@ export default function PlanningStage() {
           }))
         });
         
+        // Skip next recalc effect so it doesn't overwrite materials (removing one would otherwise clear all)
+        skipRecalcAfterRemoveRef.current = true;
         // Update local recipe state
         setRecipe({
           ...recipe,
@@ -1119,7 +1127,7 @@ export default function PlanningStage() {
             materials={materials}
             targetQuantity={formData.planned_quantity}
             totalSQM={totalSQM}
-            recipeBased={recipe ? true : false}
+            recipeBased={Boolean(recipe?.materials?.length)}
             selectedIndividualProducts={selectedIndividualProducts}
             consumedMaterialIds={consumedMaterials.map(m => m.material_id)}
             onAddMaterial={() => setShowMaterialDialog(true)}
@@ -1911,7 +1919,11 @@ export default function PlanningStage() {
           setMaterialToRemove(null);
         }}
         onConfirm={confirmRemoveMaterial}
-        title="Remove Material from Recipe"
+        title={
+          recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialToRemove?.id)
+            ? "Remove Material from Recipe"
+            : "Remove Material"
+        }
         description={
           recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialToRemove?.id)
             ? `⚠️ Warning: "${materialToRemove?.name}" is saved in the recipe.\n\nRemoving it will:\n• Delete it from the saved recipe in the backend\n• Remove it from this section\n\nThis action cannot be undone. Are you sure you want to continue?`

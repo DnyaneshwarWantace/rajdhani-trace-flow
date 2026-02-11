@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Calculator, Plus, Minus, RefreshCw, Search } from 'lucide-react';
 import type { Product } from '@/types/product';
 import ProductSelectorDialog from './ProductSelectorDialog';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface RecipeCalculationItem {
   productId: string;
@@ -137,6 +137,7 @@ export default function ProductSelectionCard({
                     const numValue = validation.value === '' ? 0 : parseInt(validation.value, 10) || 0;
                     onUpdateItem(index, 'quantity', numValue);
                   }}
+                  onKeyDown={(e) => preventInvalidNumberKeys(e)}
                   onFocus={(e) => {
                     // Select all text when focused to make it easy to replace
                     e.target.select();

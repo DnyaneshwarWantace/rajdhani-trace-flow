@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface MaterialCostSectionProps {
   costPerUnit: string;
@@ -25,6 +25,7 @@ const MaterialCostSection = forwardRef<HTMLInputElement, MaterialCostSectionProp
             const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
             onCostPerUnitChange(validation.value);
           }}
+          onKeyDown={(e) => preventInvalidNumberKeys(e)}
           onBlur={() => markFieldTouched('costPerUnit')}
           min="0"
           max="9999999.99"

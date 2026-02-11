@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Eye, ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface MaterialTableProps {
   materials: RawMaterial[];
@@ -21,6 +29,7 @@ export default function MaterialTable({
 }: MaterialTableProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -40,6 +49,7 @@ export default function MaterialTable({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <TooltipProvider delayDuration={300}>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left text-gray-500">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -63,7 +73,8 @@ export default function MaterialTable({
                         src={material.image_url}
                         alt={material.name}
                         loading="lazy"
-                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        onClick={() => setSelectedImage({ url: material.image_url!, alt: material.name })}
+                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
@@ -76,21 +87,38 @@ export default function MaterialTable({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-gray-900 truncate" title={material.name}>
-                        {material.name.split(' ').slice(0, 4).join(' ')}
-                        {material.name.split(' ').length > 4 && '...'}
-                      </p>
+                      {material.name.split(' ').length > 4 ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <p className="font-medium text-gray-900 truncate cursor-help">
+                              {material.name.split(' ').slice(0, 4).join(' ')}...
+                            </p>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs break-words">
+                            <p>{material.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <p className="font-medium text-gray-900 truncate">{material.name}</p>
+                      )}
                       <p className="text-sm text-gray-500 truncate">{material.id}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-4 py-4">
-                  <div className="min-w-0 max-w-xs">
-                    <p className="text-sm font-medium text-gray-900 line-clamp-2 break-words">{material.category}</p>
-                    {material.type && (
-                      <p className="text-xs text-gray-500 line-clamp-1">{material.type}</p>
-                    )}
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="min-w-0 max-w-xs cursor-help">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2 break-words">{material.category}</p>
+                        {material.type && (
+                          <p className="text-xs text-gray-500 line-clamp-1">{material.type}</p>
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs break-words">
+                      <p>{material.category}{material.type ? ` • ${material.type}` : ''}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </td>
                 <td className="px-4 py-4">
                   <div>
@@ -164,6 +192,13 @@ export default function MaterialTable({
           </tbody>
         </table>
       </div>
+      </TooltipProvider>
+      <ImageViewDialog
+        isOpen={!!selectedImage}
+        onClose={() => setSelectedImage(null)}
+        imageUrl={selectedImage?.url ?? ''}
+        alt={selectedImage?.alt ?? 'Material image'}
+      />
     </div>
   );
 }

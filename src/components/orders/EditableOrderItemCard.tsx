@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Package, Edit, Check, X, QrCode, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface ProductDetails {
   color?: string;
@@ -187,6 +187,7 @@ export function EditableOrderItemCard({
                 const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
                 setEditedQuantity(validation.value);
               }}
+              onKeyDown={(e) => preventInvalidNumberKeys(e)}
               min="1"
               max="99999"
               step="1"
@@ -326,7 +327,7 @@ export function EditableOrderItemCard({
                             : 'bg-green-50 text-green-700 border-green-300'
                         }`}
                       >
-                        {orderStatus === 'dispatched' || orderStatus === 'delivered' ? 'Dispatched' : 'Reserved'}
+                        {orderStatus === 'dispatched' || orderStatus === 'delivered' ? 'Shipped' : 'Reserved'}
                       </Badge>
                     </td>
                   </tr>
@@ -342,12 +343,12 @@ export function EditableOrderItemCard({
         <>
           {needsIndividualProductSelection && (
             <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-              ⚠️ Please select individual products before dispatch
+              ⚠️ Please select individual products before shipping
             </div>
           )}
           {item.selected_individual_products && item.selected_individual_products.length > 0 && item.selected_individual_products.length < item.quantity && (
             <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-              ℹ️ Partial selection: {item.selected_individual_products.length} of {item.quantity} products reserved. Select {item.quantity - item.selected_individual_products.length} more to dispatch.
+              ℹ️ Partial selection: {item.selected_individual_products.length} of {item.quantity} products reserved. Select {item.quantity - item.selected_individual_products.length} more to ship.
             </div>
           )}
         </>

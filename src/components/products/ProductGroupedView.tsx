@@ -132,7 +132,7 @@ export default function ProductGroupedView({
                             src={product.image_url}
                             alt={product.name}
                             onClick={() => setSelectedImage({ url: product.image_url!, alt: product.name })}
-                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                            className="w-10 h-10 rounded-lg object-contain object-center flex-shrink-0 bg-white border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -327,7 +327,7 @@ export default function ProductGroupedView({
                                 src={product.image_url}
                                 alt={product.name}
                                 onClick={() => setSelectedImage({ url: product.image_url!, alt: product.name })}
-                                className="w-10 h-10 rounded-lg object-cover flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                                className="w-10 h-10 rounded-lg object-contain object-center flex-shrink-0 bg-white border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
                               />
                             ) : (
                               <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">

@@ -144,6 +144,14 @@ export interface IndividualProduct {
   production_date?: string;
   completion_date?: string;
   batch_number?: string;
+  added_date?: string;
+
+  // Sale / order context (when sold or reserved)
+  sold_date?: string;
+  sold_to?: string;
+  order_id?: string;
+  customer_id?: string;
+  sale_price?: number;
 
   // Timestamps
   created_at: string;

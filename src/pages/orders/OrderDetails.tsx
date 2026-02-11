@@ -456,7 +456,7 @@ export default function OrderDetails() {
       if (!result.ok || !data.success) {
         toast({
           title: 'Error',
-          description: data.error || 'Failed to dispatch order',
+          description: data.error || 'Failed to ship order',
           variant: 'destructive',
         });
         return;
@@ -464,7 +464,7 @@ export default function OrderDetails() {
 
       toast({
         title: 'Success',
-        description: 'Order dispatched! Individual products marked as sold.',
+        description: 'Order shipped! Individual products marked as sold.',
       });
 
       await loadOrderDetails();
@@ -472,7 +472,7 @@ export default function OrderDetails() {
       console.error('Error dispatching order:', error);
       toast({
         title: 'Error',
-        description: 'Failed to dispatch order',
+        description: 'Failed to ship order',
         variant: 'destructive',
       });
     }
@@ -571,7 +571,7 @@ export default function OrderDetails() {
                   {allProductsSelected && (
                     <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
                       <Package className="w-4 h-4 mr-2" />
-                      Dispatch Order
+                      Shipped
                     </Button>
                   )}
                   {allProductsSelected && (
@@ -640,7 +640,7 @@ export default function OrderDetails() {
               </CardContent>
             </Card>
 
-            {/* Dispatch/Delivery Information */}
+            {/* Shipping/Delivery Information */}
             {(order.status === 'dispatched' || order.status === 'delivered') && (
               <Card className={order.status === 'dispatched' ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'}>
                 <CardHeader>
@@ -648,7 +648,7 @@ export default function OrderDetails() {
                     order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'
                   }`}>
                     <Package className="w-5 h-5" />
-                    {order.status === 'dispatched' ? 'Dispatch Information' : 'Delivery Information'}
+                    {order.status === 'dispatched' ? 'Shipping Information' : 'Delivery Information'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -656,7 +656,7 @@ export default function OrderDetails() {
                     {order.status === 'dispatched' && (
                       <>
                         <div className="text-orange-700">
-                          <span className="font-medium">Dispatched on:</span> {order.dispatchedAt ? new Date(order.dispatchedAt).toLocaleString() : 'N/A'}
+                          <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? new Date(order.dispatchedAt).toLocaleString() : 'N/A'}
                         </div>
                         <div className="text-orange-700">
                           <span className="font-medium">Status:</span> Ready for Delivery
@@ -824,12 +824,20 @@ export default function OrderDetails() {
                   <p className="text-sm text-gray-600">Order Date</p>
                   <p className="font-semibold">{formatIndianDate(order.orderDate)}</p>
                 </div>
-                {order.expectedDelivery && (
-                  <div>
-                    <p className="text-sm text-gray-600">Expected Delivery</p>
-                    <p className="font-semibold">{formatIndianDate(order.expectedDelivery)}</p>
-                  </div>
-                )}
+                {order.expectedDelivery && (() => {
+                  const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  expectedDate.setHours(0, 0, 0, 0);
+                  const notDelivered = order.status !== 'delivered';
+                  const isOverdue = notDelivered && expectedDate < today;
+                  return (
+                    <div>
+                      <p className="text-sm text-gray-600">Expected Delivery</p>
+                      <p className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</p>
+                    </div>
+                  );
+                })()}
                 {order.acceptedAt && (
                   <div>
                     <p className="text-sm text-gray-600">Accepted On</p>
@@ -838,7 +846,7 @@ export default function OrderDetails() {
                 )}
                 {order.dispatchedAt && (
                   <div>
-                    <p className="text-sm text-gray-600">Dispatched On</p>
+                    <p className="text-sm text-gray-600">Shipped On</p>
                     <p className="font-semibold text-orange-600">{formatIndianDate(order.dispatchedAt)}</p>
                   </div>
                 )}

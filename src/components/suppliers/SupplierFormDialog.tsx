@@ -57,6 +57,9 @@ export default function SupplierFormDialog({
   const handleNameChange = (value: string, field: 'name' | 'contact_person') => {
     let inputValue = value;
 
+    // For both supplier name and contact person, only allow alphabets and spaces (reject numbers and special characters)
+    inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
+
     // Different limits for different fields
     const limits = {
       name: { maxWords: 8, maxCharsPerWord: 20 },
@@ -291,6 +294,7 @@ export default function SupplierFormDialog({
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value, 'name')}
                 onBlur={() => markFieldTouched('name')}
+                placeholder="e.g., Acme Corporation"
               />
               {touchedFields.has('name') && !formData.name.trim() ? (
                 <p className="text-xs text-red-500 mt-1">
@@ -298,7 +302,7 @@ export default function SupplierFormDialog({
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {nameWordCount}/8 words • Max 20 characters per word
+                  {nameWordCount}/8 words • Max 20 characters per word • Alphabets only
                 </p>
               )}
             </div>
@@ -310,7 +314,7 @@ export default function SupplierFormDialog({
                 placeholder="e.g., John Doe"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {contactWordCount}/5 words • Max 25 characters per word
+                {contactWordCount}/5 words • Max 25 characters per word • Alphabets only
               </p>
             </div>
           </div>

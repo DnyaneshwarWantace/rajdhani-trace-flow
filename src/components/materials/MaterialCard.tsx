@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { ShoppingCart, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface MaterialCardProps {
   material: RawMaterial;
@@ -27,6 +35,7 @@ export default function MaterialCard({
 }: MaterialCardProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [imageViewOpen, setImageViewOpen] = useState(false);
   
   // Calculate available stock for raw materials
   // For raw materials in recipe selector, always show available stock (not total current_stock)
@@ -85,9 +94,15 @@ export default function MaterialCard({
           : 'border-gray-200'
       } ${onClick ? 'cursor-pointer' : ''}`}
     >
-      {/* Image Section */}
+      {/* Image Section - click to view full size */}
       {material.image_url ? (
-        <div className="w-full h-48 bg-gray-100 overflow-hidden">
+        <div
+          className="w-full h-48 bg-gray-100 overflow-hidden cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            setImageViewOpen(true);
+          }}
+        >
           <img
             src={material.image_url}
             alt={material.name}
@@ -120,12 +135,25 @@ export default function MaterialCard({
       )}
 
       <div className="p-3">
+        <TooltipProvider delayDuration={300}>
         {/* Header Section */}
         <div className="mb-2">
-          <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight" title={material.name}>
-            {material.name.split(' ').slice(0, 4).join(' ')}
-            {material.name.split(' ').length > 4 && '...'}
-          </h3>
+          {material.name.split(' ').length > 4 ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight cursor-help">
+                  {material.name.split(' ').slice(0, 4).join(' ')}...
+                </h3>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs break-words">
+                <p>{material.name}</p>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <h3 className="font-semibold text-xs mb-1 text-gray-900 line-clamp-2 leading-tight">
+              {material.name}
+            </h3>
+          )}
           <p className="text-[10px] text-gray-500 mb-1 line-clamp-1">{material.type || material.category}</p>
           <div className="flex items-center gap-1">
             <div className={`w-1.5 h-1.5 rounded-full ${getStatusColor(material.status)}`} />
@@ -145,7 +173,14 @@ export default function MaterialCard({
           </div>
           <div className="flex justify-between items-start gap-2 min-w-0">
             <span className="text-gray-600 flex-shrink-0">Category:</span>
-            <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.category}</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1 cursor-help block truncate">{material.category}</span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs break-words">
+                <p>{material.category}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
           {material.type && material.type.trim() !== '' && material.type !== 'N/A' && (
             <div className="flex justify-between items-start gap-2 min-w-0">
@@ -162,7 +197,14 @@ export default function MaterialCard({
           {material.supplier_name && (
             <div className="flex justify-between items-start gap-2 min-w-0">
               <span className="text-gray-600 flex-shrink-0">Supplier:</span>
-              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.supplier_name}</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1 cursor-help block truncate">{material.supplier_name}</span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs break-words">
+                  <p>{material.supplier_name}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
           <div className="flex justify-between gap-2">
@@ -172,6 +214,7 @@ export default function MaterialCard({
             </span>
           </div>
         </div>
+        </TooltipProvider>
 
         {/* Actions */}
         {showActions && (
@@ -234,6 +277,15 @@ export default function MaterialCard({
           </div>
         )}
       </div>
+
+      {material.image_url && (
+        <ImageViewDialog
+          isOpen={imageViewOpen}
+          onClose={() => setImageViewOpen(false)}
+          imageUrl={material.image_url}
+          alt={material.name}
+        />
+      )}
     </div>
   );
 }

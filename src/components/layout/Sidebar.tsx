@@ -176,11 +176,12 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
             <button
               onClick={onToggle}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Toggle sidebar"
+              aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
+              title={isOpen ? 'Close sidebar' : 'Open sidebar'}
             >
               <svg
                 className={`w-5 h-5 text-gray-600 transition-transform duration-200 ${
-                  isOpen ? 'rotate-180' : ''
+                  isOpen ? '' : 'rotate-180'
                 }`}
                 fill="none"
                 stroke="currentColor"

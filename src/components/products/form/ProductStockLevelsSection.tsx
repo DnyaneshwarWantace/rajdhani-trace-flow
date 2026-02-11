@@ -1,7 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ProductFormData } from '@/types/product';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface ProductStockLevelsSectionProps {
   formData: ProductFormData;
@@ -23,6 +23,7 @@ export default function ProductStockLevelsSection({
           const validation = validateNumberInput(e.target.value, ValidationPresets.STOCK_LEVEL);
           onFormDataChange({ min_stock_level: validation.value === '' ? 0 : parseInt(validation.value) || 0 });
         }}
+        onKeyDown={(e) => preventInvalidNumberKeys(e)}
         min="0"
         max="99999"
         step="1"

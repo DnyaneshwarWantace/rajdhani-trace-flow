@@ -65,7 +65,7 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
     const statusConfig: Record<string, { label: string; className: string; icon: any }> = {
       pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800 border-yellow-300', icon: Clock },
       accepted: { label: 'Reserved', className: 'bg-blue-100 text-blue-800 border-blue-300', icon: Package },
-      dispatched: { label: 'Dispatched', className: 'bg-orange-100 text-orange-800 border-orange-300', icon: ShoppingCart },
+      dispatched: { label: 'Shipped', className: 'bg-orange-100 text-orange-800 border-orange-300', icon: ShoppingCart },
       delivered: { label: 'Delivered', className: 'bg-green-100 text-green-800 border-green-300', icon: CheckCircle },
     };
 
@@ -161,7 +161,7 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
           <div>
             <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-green-600" />
-              Sold/Dispatched Orders ({soldOrders.length})
+              Sold/Shipped Orders ({soldOrders.length})
             </h4>
             <div className="space-y-3">
               {soldOrders.map((order) => (
@@ -183,7 +183,7 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
                     </div>
                     {order.dispatched_at && (
                       <div>
-                        <span className="font-medium">Dispatched:</span>{' '}
+                        <span className="font-medium">Shipped:</span>{' '}
                         {formatIndianDate(order.dispatched_at)}
                       </div>
                     )}

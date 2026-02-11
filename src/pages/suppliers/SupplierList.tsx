@@ -72,7 +72,7 @@ export default function SupplierList() {
   useEffect(() => {
     loadSuppliers();
     loadOrders();
-  }, [searchTerm]);
+  }, []);
 
   useEffect(() => {
     // Apply pagination to filtered suppliers

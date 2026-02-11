@@ -217,7 +217,7 @@ export default function CustomerDetailOrderHistory({ customer, orders, onOrderUp
                                                 : 'bg-green-50 text-green-700 border-green-300'
                                             }`}
                                           >
-                                            {order.status === 'dispatched' || order.status === 'delivered' ? 'Dispatched' : 'Reserved'}
+                                            {order.status === 'dispatched' || order.status === 'delivered' ? 'Shipped' : 'Reserved'}
                                           </Badge>
                                         </td>
                                       </tr>
@@ -245,7 +245,7 @@ export default function CustomerDetailOrderHistory({ customer, orders, onOrderUp
                       )}
                       {order.dispatchedAt && (
                         <div className="flex justify-between">
-                          <span className="text-orange-600">✓ Dispatched</span>
+                          <span className="text-orange-600">✓ Shipped</span>
                           <span className="text-gray-500">{formatIndianDate(order.dispatchedAt)}</span>
                         </div>
                       )}

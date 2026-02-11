@@ -25,13 +25,13 @@ export default function ProductDetailHeader({ product }: ProductDetailHeaderProp
 
   return (
     <div className="relative">
-      {/* Image Section - Larger for page view */}
-      <div className="relative h-80 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
+      {/* Image: full image, object without background; container adds background so it displays correctly */}
+      <div className="relative h-80 bg-white flex items-center justify-center overflow-hidden border-b border-gray-100">
         {product.image_url ? (
           <img
             src={product.image_url}
             alt={product.name}
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full w-auto h-auto object-contain object-center"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

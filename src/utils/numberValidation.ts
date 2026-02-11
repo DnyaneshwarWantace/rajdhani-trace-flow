@@ -31,27 +31,45 @@ export const validateNumberInput = (
     return { isValid: true, value: '' };
   }
 
-  // Check for scientific notation (e, E, +)
-  if (/[eE+]/.test(value)) {
+  // First, clean the input to remove any invalid characters immediately
+  let cleanedValue = value;
+
+  // Always block + and e/E (scientific notation)
+  cleanedValue = cleanedValue.replace(/[eE+]/g, '');
+
+  // Block negative sign if not allowed
+  if (!allowNegative) {
+    cleanedValue = cleanedValue.replace(/-/g, '');
+  }
+
+  // Only allow numbers, decimal point, and optionally minus sign
+  if (allowNegative) {
+    cleanedValue = cleanedValue.replace(/[^0-9.-]/g, '');
+  } else {
+    cleanedValue = cleanedValue.replace(/[^0-9.]/g, '');
+  }
+
+  // If value was cleaned, return cleaned version immediately
+  if (cleanedValue !== value) {
     return {
       isValid: false,
-      value: value.replace(/[eE+]/g, ''),
-      error: 'Scientific notation not allowed',
+      value: cleanedValue,
+      error: 'Invalid characters removed',
     };
   }
 
-  // Allow only numbers, decimal point, and optionally minus sign
+  // Now validate the cleaned value with regex
   const regex = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
-  if (!regex.test(value)) {
+  if (!regex.test(cleanedValue)) {
     return {
       isValid: false,
-      value: value.replace(/[^0-9.-]/g, ''),
+      value: cleanedValue.replace(/[^0-9.]/g, ''),
       error: 'Invalid characters',
     };
   }
 
   // Check decimal places
-  const parts = value.split('.');
+  const parts = cleanedValue.split('.');
   if (parts.length > 2) {
     return {
       isValid: false,
@@ -69,7 +87,7 @@ export const validateNumberInput = (
   }
 
   // Check range
-  const numValue = parseFloat(value);
+  const numValue = parseFloat(cleanedValue);
   if (!isNaN(numValue)) {
     if (numValue < min) {
       return {
@@ -87,7 +105,7 @@ export const validateNumberInput = (
     }
   }
 
-  return { isValid: true, value };
+  return { isValid: true, value: cleanedValue };
 };
 
 /**
@@ -227,4 +245,23 @@ export const isScientificNotation = (value: string | number): boolean => {
  */
 export const clampNumber = (value: number, min: number, max: number): number => {
   return Math.min(Math.max(value, min), max);
+};
+
+/**
+ * Prevent typing invalid characters in number inputs
+ * Use this in onKeyDown event handler
+ */
+export const preventInvalidNumberKeys = (
+  e: React.KeyboardEvent<HTMLInputElement>,
+  allowNegative: boolean = false
+): void => {
+  // Block +, -, e, E keys
+  if (e.key === '+' || e.key === 'e' || e.key === 'E') {
+    e.preventDefault();
+  }
+
+  // Block minus key if negative not allowed
+  if (!allowNegative && (e.key === '-' || e.key === 'Subtract')) {
+    e.preventDefault();
+  }
 };

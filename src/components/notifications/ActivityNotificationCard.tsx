@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { formatDate, formatIndianDateTime, formatIndianDate, formatCurrency } from '@/utils/formatHelpers';
+import { formatIndianDateTime, formatIndianDate, formatCurrency } from '@/utils/formatHelpers';
 import {
   Package,
   ShoppingCart,
@@ -49,6 +49,16 @@ export default function ActivityNotificationCard({
   const actionCategory = activityData?.action_category || '';
   const userName = notification.related_data?.created_by_user || activityData?.user_name || activityData?.created_by_user || 'User';
   const metadata = activityData?.metadata || {};
+  // Date for display (support snake_case and camelCase from API)
+  const notificationDate =
+    notification.created_at ||
+    (notification as any).createdAt ||
+    notification.updated_at ||
+    (notification as any).updatedAt ||
+    activityData?.created_at;
+  const dateDisplay = notificationDate
+    ? formatIndianDateTime(notificationDate)
+    : '—';
   
   // Check if this is a purchase order notification
   const isPurchaseOrder = actionCategory === 'PURCHASE_ORDER' || action?.includes('PURCHASE_ORDER');
@@ -229,7 +239,10 @@ export default function ActivityNotificationCard({
                   </p>
                 )}
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap" title={dateDisplay !== '—' ? dateDisplay : 'Date'}>
+                  {dateDisplay}
+                </span>
                 <Badge className={`${getBadgeColor()} text-[10px] px-1.5 py-0.5`}>
                   {getActionLabel()}
                 </Badge>
@@ -1052,22 +1065,6 @@ export default function ActivityNotificationCard({
                 <span className="text-xs text-gray-500 capitalize">
                   {notification.module || activityData?.action_category?.toLowerCase() || 'activity'}
                 </span>
-                {(notification.created_at || activityData?.created_at) && (
-                  <>
-                    <span className="text-xs text-gray-300">•</span>
-                    <span className="text-xs text-gray-500">
-                      {formatDate(notification.created_at || activityData?.created_at || '')}
-                    </span>
-                    {formatIndianDateTime(notification.created_at || activityData?.created_at || '') !== 'N/A' && (
-                      <>
-                        <span className="text-xs text-gray-300">•</span>
-                        <span className="text-xs text-gray-500">
-                          {formatIndianDateTime(notification.created_at || activityData?.created_at || '')}
-                        </span>
-                      </>
-                    )}
-                  </>
-                )}
               </div>
             </div>
           </div>

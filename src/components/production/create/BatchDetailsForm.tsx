@@ -12,7 +12,7 @@ import { Tag, Ruler, Weight } from 'lucide-react';
 import type { CreateProductionBatchData } from '@/services/productionService';
 import type { Product } from '@/types/product';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface BatchDetailsFormProps {
   formData: CreateProductionBatchData;
@@ -52,11 +52,6 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
   };
 
   const wordsCount = (formData.notes || '').trim().split(/\s+/).filter(w => w.length > 0).length;
-
-  // Check if completion date is after order delivery date
-  const isCompletionAfterDelivery = orderDeliveryDate && formData.completion_date
-    ? new Date(formData.completion_date) >= new Date(orderDeliveryDate)
-    : false;
 
   return (
     <div className="space-y-4">
@@ -138,6 +133,7 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
             const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
             handleChange('planned_quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
           }}
+          onKeyDown={(e) => preventInvalidNumberKeys(e)}
           required
           className="mt-1"
         />
@@ -172,22 +168,16 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
           type="date"
           value={formData.completion_date || ''}
           onChange={(e) => handleChange('completion_date', e.target.value)}
-          className={`mt-1 ${isCompletionAfterDelivery ? 'border-red-500 focus:border-red-500' : ''}`}
-          min={new Date().toISOString().split('T')[0]}
-          max={orderDeliveryDate ? new Date(orderDeliveryDate).toISOString().split('T')[0] : undefined}
+          className="mt-1"
           required
         />
-        {isCompletionAfterDelivery ? (
-          <p className="text-xs text-red-600 font-semibold mt-1 flex items-center gap-1">
-            ⚠️ Production must complete before order delivery date ({new Date(orderDeliveryDate!).toLocaleDateString()})
+        {orderDeliveryDate && (
+          <p className="text-xs text-red-600 font-medium mt-1">
+            Order delivery: {new Date(orderDeliveryDate).toLocaleDateString()}. Suggested: complete before this date.
           </p>
-        ) : (
-          <p className="text-xs text-gray-500 mt-1">
-            {orderDeliveryDate
-              ? `Must complete before order delivery on ${new Date(orderDeliveryDate).toLocaleDateString()}`
-              : 'Target date for completing this production batch'
-            }
-          </p>
+        )}
+        {!orderDeliveryDate && (
+          <p className="text-xs text-gray-500 mt-1">Target date for completing this production batch</p>
         )}
       </div>
 

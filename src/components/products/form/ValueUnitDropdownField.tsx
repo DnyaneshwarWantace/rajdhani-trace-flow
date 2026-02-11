@@ -12,7 +12,7 @@ import {
 import { Trash2, Plus } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface ValueUnitDropdownFieldProps {
   label: string;
@@ -316,6 +316,7 @@ export default function ValueUnitDropdownField({
                 const validation = validateNumberInput(e.target.value, ValidationPresets.DIMENSION);
                 setNewValueInput(validation.value);
               }}
+              onKeyDown={(e) => preventInvalidNumberKeys(e)}
               placeholder={placeholder || 'e.g., 5'}
               min="0"
               max="9999.99"

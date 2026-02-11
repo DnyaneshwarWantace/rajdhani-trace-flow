@@ -118,20 +118,30 @@ export default function MaterialList() {
 
   // Load materials FIRST, then stats in background
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
+  const notificationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!hasLoadedInitial) {
       // Load suppliers for form - non-blocking
       loadSuppliers();
-      loadNotifications(); // For unread count badge - non-blocking
+      loadNotifications(true); // Initial load silent - no spinner; badge updates when ready
       setHasLoadedInitial(true);
+
+      // Auto-refresh notifications every 60 seconds (silent - no loading spinner)
+      // Only create interval once on initial load
+      if (!notificationIntervalRef.current) {
+        notificationIntervalRef.current = setInterval(() => {
+          loadNotifications(true);
+        }, 60000); // Changed from 30 seconds to 60 seconds
+      }
     }
 
-    // Auto-refresh notifications every 10 seconds
-    const notificationRefreshInterval = setInterval(() => {
-      loadNotifications();
-    }, 10000);
-
-    return () => clearInterval(notificationRefreshInterval);
+    return () => {
+      if (notificationIntervalRef.current) {
+        clearInterval(notificationIntervalRef.current);
+        notificationIntervalRef.current = null;
+      }
+    };
   }, []);
 
   // Load stats AFTER materials are loaded (in background)
@@ -776,12 +786,13 @@ export default function MaterialList() {
   };
 
   const notificationsLoadingRef = useRef(false);
-  const loadNotifications = async () => {
+  /** @param silent - if true, refresh in background without showing loading spinner (e.g. for interval refresh) */
+  const loadNotifications = async (silent = false) => {
     if (notificationsLoadingRef.current) return;
 
     try {
       notificationsLoadingRef.current = true;
-      setNotificationsLoading(true);
+      if (!silent) setNotificationsLoading(true);
       const { NotificationService } = await import('@/services/notificationService');
 
       const materialNotifications = await NotificationService.getNotifications({
@@ -813,7 +824,7 @@ export default function MaterialList() {
       console.error('Error loading notifications:', error);
     } finally {
       notificationsLoadingRef.current = false;
-      setNotificationsLoading(false);
+      if (!silent) setNotificationsLoading(false);
     }
   };
 

@@ -16,7 +16,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   accepted: { label: 'Accepted', icon: CheckCircle, color: 'bg-blue-100 text-blue-800' },
   in_production: { label: 'In Production', icon: Factory, color: 'bg-purple-100 text-purple-800' },
   ready: { label: 'Ready', icon: Package, color: 'bg-indigo-100 text-indigo-800' },
-  dispatched: { label: 'Dispatched', icon: Truck, color: 'bg-orange-100 text-orange-800' },
+  dispatched: { label: 'Shipped', icon: Truck, color: 'bg-orange-100 text-orange-800' },
   delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
@@ -26,25 +26,25 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full table-fixed">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[12%] min-w-[100px]">
                 Order
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[18%] min-w-[120px]">
                 Customer & Total
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[20%] min-w-[140px]">
                 Items
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[12%] min-w-[90px]">
                 Status
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[22%] min-w-[220px]">
                 Date & Production
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[16%] min-w-[120px]">
                 Actions
               </th>
             </tr>
@@ -118,27 +118,37 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
-                    <div className="space-y-1">
+                  <td className="px-4 py-4 w-[22%] min-w-[220px]" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-1 min-w-[200px]">
                       <div className="space-y-0.5 text-sm">
                         <div className="flex items-center gap-1 text-gray-900">
-                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
                           <span className="text-xs text-gray-600">Order:</span>
                           <span>{formatIndianDate(order.orderDate)}</span>
                         </div>
-                        {order.expectedDelivery && (
-                          <div className="flex items-center gap-1 text-gray-900">
-                            <Calendar className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-600">Expected:</span>
-                            <span>{formatIndianDate(order.expectedDelivery)}</span>
-                          </div>
-                        )}
+                        {order.expectedDelivery && (() => {
+                          const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          expectedDate.setHours(0, 0, 0, 0);
+                          const notDelivered = order.status !== 'delivered';
+                          const isOverdue = notDelivered && expectedDate < today;
+                          return (
+                            <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
+                              <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`} />
+                              <span className="text-xs text-gray-600">Expected:</span>
+                              <span>{formatIndianDate(order.expectedDelivery)}</span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       {(order.status === 'pending' || order.status === 'accepted') ? (
                         <div className="text-xs">
                           <OrderProductionInfo order={order} compact />
                         </div>
-                      ) : null}
+                      ) : (
+                        <div className="min-h-[3.5rem]" aria-hidden />
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-4">
@@ -175,7 +185,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                               className="text-xs bg-orange-600 hover:bg-orange-700 text-white"
                             >
                               <Package className="w-3 h-3 mr-1" />
-                              Dispatch
+                              Ship
                             </Button>
                           );
                         } else {

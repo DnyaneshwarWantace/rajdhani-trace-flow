@@ -1,6 +1,6 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface MaterialStockSectionProps {
   currentStock: string;
@@ -43,6 +43,7 @@ export default function MaterialStockSection({
                 onCurrentStockChange(validation.value);
               }
             }}
+            onKeyDown={(e) => preventInvalidNumberKeys(e)}
             onBlur={() => {
               if (isCurrentStockEditable) {
                 markFieldTouched('currentStock');
@@ -53,8 +54,8 @@ export default function MaterialStockSection({
             min="0"
             max="99999.99"
             step="0.01"
-            className={!isCurrentStockEditable 
-              ? 'bg-gray-100 cursor-not-allowed' 
+            className={!isCurrentStockEditable
+              ? 'bg-gray-100 cursor-not-allowed'
               : (touchedFields.has('currentStock') && (!currentStock || currentStock.trim() === '' || (parseFloat(currentStock) < 0 || isNaN(parseFloat(currentStock)))))
                 ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                 : ''
@@ -83,6 +84,7 @@ export default function MaterialStockSection({
             const validation = validateNumberInput(e.target.value, ValidationPresets.STOCK_LEVEL);
             onMinThresholdChange(validation.value);
           }}
+          onKeyDown={(e) => preventInvalidNumberKeys(e)}
           min="0"
           max="99999"
           step="1"
@@ -99,6 +101,7 @@ export default function MaterialStockSection({
             const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
             onMaxCapacityChange(validation.value);
           }}
+          onKeyDown={(e) => preventInvalidNumberKeys(e)}
           min="0"
           max="99999.99"
           step="0.01"

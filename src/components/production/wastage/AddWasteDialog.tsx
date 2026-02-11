@@ -19,7 +19,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
-import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 const API_URL = getApiUrl();
 
@@ -257,6 +257,7 @@ export default function AddWasteDialog({
                   const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
                   setFormData({ ...formData, quantity: validation.value });
                 }}
+                onKeyDown={(e) => preventInvalidNumberKeys(e)}
                 required
               />
             </div>

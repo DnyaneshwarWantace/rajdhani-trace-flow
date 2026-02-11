@@ -70,6 +70,7 @@ export default function ProductSelectorDialog({
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  // Load full product list once when dialog opens (no filters). Filter options stay from this full list.
   useEffect(() => {
     if (isOpen) {
       loadProducts();
@@ -90,83 +91,34 @@ export default function ProductSelectorDialog({
   }, [isOpen]);
 
   useEffect(() => {
-    // Reset to page 1 when sorting changes
     if (isOpen) {
       setCurrentPage(1);
     }
   }, [sortBy, sortOrder, isOpen]);
 
   useEffect(() => {
-    if (
-      isOpen &&
-      (selectedCategories.length > 0 ||
-        selectedSubcategories.length > 0 ||
-        selectedColors.length > 0 ||
-        selectedPatterns.length > 0 ||
-        selectedLengths.length > 0 ||
-        selectedWidths.length > 0 ||
-        selectedWeights.length > 0)
-    ) {
-      setCurrentPage(1);
-      loadProducts();
-    }
-  }, [
-    selectedCategories,
-    selectedSubcategories,
-    selectedColors,
-    selectedPatterns,
-    selectedLengths,
-    selectedWidths,
-    selectedWeights,
-    isOpen,
-  ]);
+    setCurrentPage(1);
+  }, [selectedCategories, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights]);
 
   useEffect(() => {
-    // Filter and sort all products first
     filterAndSortProducts();
-  }, [allProducts, searchTerm, sortBy, sortOrder]);
+  }, [allProducts, searchTerm, sortBy, sortOrder, selectedCategories, selectedSubcategories, selectedColors, selectedPatterns, selectedLengths, selectedWidths, selectedWeights]);
 
   useEffect(() => {
-    // Apply pagination to filtered and sorted products
     applyPagination();
   }, [filteredAndSortedProducts, currentPage, itemsPerPage]);
 
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const filters: any = { limit: 10000 };
-
-      if (selectedCategories.length > 0) {
-        filters.category = selectedCategories;
-      }
-      if (selectedSubcategories.length > 0) {
-        filters.subcategory = selectedSubcategories;
-      }
-      if (selectedColors.length > 0) {
-        filters.color = selectedColors;
-      }
-      if (selectedPatterns.length > 0) {
-        filters.pattern = selectedPatterns;
-      }
-      if (selectedLengths.length > 0) {
-        filters.length = selectedLengths;
-      }
-      if (selectedWidths.length > 0) {
-        filters.width = selectedWidths;
-      }
-      if (selectedWeights.length > 0) {
-        filters.weight = selectedWeights;
-      }
-
-      const result = await ProductService.getProducts(filters);
+      // Always load full list (no filters) so filter dropdowns show ALL options
+      const result = await ProductService.getProducts({ limit: 10000 });
       const loadedProducts = result.products || [];
-
-      // Filter to only show products that have recipes
-      const productsWithRecipes = loadedProducts.filter(p => p.has_recipe);
+      const productsWithRecipes = loadedProducts.filter((p) => p.has_recipe);
 
       setAllProducts(productsWithRecipes);
 
-      // Get unique filter options from the newly loaded products
+      // Filter options from FULL list so category/color etc. always show all options
       const uniqueCategories = Array.from(
         new Set(productsWithRecipes.map((p) => p.category).filter((c): c is string => typeof c === 'string' && c !== ''))
       ).sort();
@@ -212,7 +164,7 @@ export default function ProductSelectorDialog({
   };
 
   const filterAndSortProducts = () => {
-    // Filter products by search term
+    // Filter by search term
     let filtered = searchTerm.trim()
       ? allProducts.filter(
           (product) =>
@@ -222,7 +174,30 @@ export default function ProductSelectorDialog({
         )
       : allProducts;
 
-    // Apply sorting to ALL filtered products
+    // Apply category/color/etc. filters client-side (options always from full list)
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((p) => p.category && selectedCategories.includes(p.category));
+    }
+    if (selectedSubcategories.length > 0) {
+      filtered = filtered.filter((p) => p.subcategory && selectedSubcategories.includes(p.subcategory));
+    }
+    if (selectedColors.length > 0) {
+      filtered = filtered.filter((p) => p.color && selectedColors.includes(p.color));
+    }
+    if (selectedPatterns.length > 0) {
+      filtered = filtered.filter((p) => p.pattern && selectedPatterns.includes(p.pattern));
+    }
+    if (selectedLengths.length > 0) {
+      filtered = filtered.filter((p) => p.length && selectedLengths.includes(p.length));
+    }
+    if (selectedWidths.length > 0) {
+      filtered = filtered.filter((p) => p.width && selectedWidths.includes(p.width));
+    }
+    if (selectedWeights.length > 0) {
+      filtered = filtered.filter((p) => p.weight && selectedWeights.includes(p.weight));
+    }
+
+    // Apply sorting to filtered products
     const sorted = [...filtered].sort((a, b) => {
       let compareValue = 0;
 

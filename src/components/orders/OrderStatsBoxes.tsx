@@ -49,7 +49,7 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
       iconColor: 'text-blue-600',
     },
     {
-      label: 'Dispatched',
+      label: 'Shipped',
       value: stats.dispatched,
       icon: Truck,
       color: 'bg-orange-100 text-orange-700',

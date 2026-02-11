@@ -61,7 +61,7 @@ export default function OrderFilters({
           options={[
             { label: 'Pending', value: 'pending' },
             { label: 'Accepted', value: 'accepted' },
-            { label: 'Dispatched', value: 'dispatched' },
+            { label: 'Shipped', value: 'dispatched' },
             { label: 'Delivered', value: 'delivered' },
             { label: 'Cancelled', value: 'cancelled' },
           ]}
