@@ -571,7 +571,7 @@ export default function OrderDetails() {
                   {allProductsSelected && (
                     <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
                       <Package className="w-4 h-4 mr-2" />
-                      Shipped
+                      Ship
                     </Button>
                   )}
                   {allProductsSelected && (

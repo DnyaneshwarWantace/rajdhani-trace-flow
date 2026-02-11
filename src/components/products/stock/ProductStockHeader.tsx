@@ -35,8 +35,8 @@ export default function ProductStockHeader({
 
   const [downloadQROpen, setDownloadQROpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const exportTriggerRef = useRef<HTMLButtonElement>(null);
-  const downloadQRTriggerRef = useRef<HTMLButtonElement>(null);
+  const exportTriggerRef = useRef<HTMLDivElement>(null);
+  const downloadQRTriggerRef = useRef<HTMLDivElement>(null);
   const [exportTriggerWidth, setExportTriggerWidth] = useState<number | null>(null);
   const [downloadQRTriggerWidth, setDownloadQRTriggerWidth] = useState<number | null>(null);
 
