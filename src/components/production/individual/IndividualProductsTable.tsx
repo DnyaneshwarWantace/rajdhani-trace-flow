@@ -37,7 +37,7 @@ interface IndividualProductsTableProps {
 
 export default function IndividualProductsTable({
   individualProducts,
-  onUpdate: _onUpdate,
+  onUpdate,
   product,
   plannedQuantity = 0,
   batchId,
@@ -291,7 +291,7 @@ export default function IndividualProductsTable({
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
         await IndividualProductService.updateIndividualProduct(productItem.id, updateData);
-        // Don't call onUpdate() - local state is already updated, avoid full page refresh
+        onUpdate?.();
         toast({
           title: 'Saved',
           description: 'Product details saved successfully',
@@ -334,7 +334,7 @@ export default function IndividualProductsTable({
               title: 'Success',
               description: 'Individual product created and added to stock',
             });
-            // Don't call onUpdate() here - it would refresh and lose other temp rows
+            onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
             toast({
@@ -382,7 +382,7 @@ export default function IndividualProductsTable({
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
         await IndividualProductService.updateIndividualProduct(productItem.id, updateData);
-        // Don't call onUpdate() - local state is already updated, avoid full page refresh
+        onUpdate?.();
       } else if (productItem.id && productItem.id.startsWith('temp-')) {
         // For temp products, check if we have enough data to create it
         const tempProduct = updated[row];
@@ -425,7 +425,7 @@ export default function IndividualProductsTable({
               title: 'Success',
               description: 'Individual product created and added to stock',
             });
-            // Don't call onUpdate() here - it would refresh and lose other temp rows
+            onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
             toast({
@@ -555,6 +555,7 @@ export default function IndividualProductsTable({
         await IndividualProductService.updateIndividualProduct(targetRow.id, {
           [field]: cleanValue,
         });
+        onUpdate?.();
         toast({
           title: 'Filled Down',
           description: `${field.replace('final_', '').charAt(0).toUpperCase() + field.replace('final_', '').slice(1)} (${cleanValue}) copied to next row and saved.`,
@@ -595,6 +596,7 @@ export default function IndividualProductsTable({
           title: 'Filled Down & Created',
           description: `${field.replace('final_', '').charAt(0).toUpperCase() + field.replace('final_', '').slice(1)} copied and product created successfully.`,
         });
+        onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
         toast({
@@ -662,6 +664,7 @@ export default function IndividualProductsTable({
     if (targetRow.id && !targetRow.id.startsWith('temp-') && Object.keys(updateData).length > 0) {
       try {
         await IndividualProductService.updateIndividualProduct(targetRow.id, updateData);
+        onUpdate?.();
         toast({
           title: 'Filled Down',
           description: `Copied ${Object.keys(updateData).length} field(s) to next row and saved.`,
@@ -727,6 +730,7 @@ export default function IndividualProductsTable({
     if (productItem.id && !productItem.id.startsWith('temp-')) {
       try {
         await IndividualProductService.updateIndividualProduct(productItem.id, updateData);
+        onUpdate?.();
         toast({
           title: 'Pasted',
           description: 'Values pasted and saved successfully.',
@@ -767,6 +771,7 @@ export default function IndividualProductsTable({
           title: 'Pasted & Created',
           description: 'Values pasted and individual product created successfully.',
         });
+        onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
         toast({
@@ -809,7 +814,7 @@ export default function IndividualProductsTable({
             title: 'Success',
             description: 'Product removed successfully',
           });
-          // Don't call onUpdate() - local state is already updated, avoid full page refresh
+          onUpdate?.();
         })
         .catch((error) => {
           console.error('Error deleting product:', error);

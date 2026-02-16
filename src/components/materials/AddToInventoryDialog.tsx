@@ -388,18 +388,18 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       // Normalize unit to match backend enum
       const normalizedUnit = normalizeUnit(formData.unit);
 
-      // Create material data (with stock for direct inventory addition)
+      // Create material data (with stock for direct inventory addition); round decimals
       const materialData: RawMaterialFormData = {
         name: formData.name,
         type: formData.type,
         category: formData.category,
-        current_stock: parseFloat(formData.currentStock) || 0,
+        current_stock: Math.round(parseFloat(formData.currentStock) * 100) / 100 || 0,
         unit: normalizedUnit,
-        min_threshold: parseFloat(formData.minThreshold) || 10,
-        max_capacity: parseFloat(formData.maxCapacity) || 1000,
-        reorder_point: parseFloat(formData.reorderPoint) || 50,
+        min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
+        max_capacity: Math.round(parseFloat(formData.maxCapacity) || 1000),
+        reorder_point: Math.round(parseFloat(formData.reorderPoint) || 50),
         supplier_name: formData.supplier,
-        cost_per_unit: parseFloat(formData.costPerUnit) || 0,
+        cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
         color: formData.type === 'color' && formData.color ? formData.color : 'NA',
         image_url: imageUrl,
       };

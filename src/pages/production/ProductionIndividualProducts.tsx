@@ -218,17 +218,37 @@ export default function ProductionIndividualProducts() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const handleCompleteClick = () => {
+  const refetchIndividualProducts = async (): Promise<IndividualProduct[]> => {
+    if (!batch?.product_id) return individualProducts;
+    try {
+      const { products } = await IndividualProductService.getIndividualProducts({
+        product_id: batch.product_id,
+      });
+      const batchProducts = products.filter((p: IndividualProduct) =>
+        p.batch_number === id || p.batch_number === batch.batch_number
+      );
+      setIndividualProducts(batchProducts);
+      return batchProducts;
+    } catch (error) {
+      console.error('Error refetching individual products:', error);
+      return individualProducts;
+    }
+  };
+
+  const handleCompleteClick = async () => {
+    // Refetch from backend so we validate against latest saved data (avoids stale state after copy/paste or fill down)
+    const freshProducts = await refetchIndividualProducts();
+
     // Check if products are actually created (not temp IDs)
-    const createdProducts = individualProducts.filter(p => 
+    const createdProducts = freshProducts.filter(p =>
       p.id && !p.id.startsWith('temp-')
     );
 
     // Validate that at least one product has all required fields
     const requiredFields = ['final_weight', 'final_width', 'final_length'];
-    const completeProducts = createdProducts.filter(p => 
-      requiredFields.every(field => p[field as keyof IndividualProduct] && 
-        (typeof p[field as keyof IndividualProduct] === 'string' && 
+    const completeProducts = createdProducts.filter(p =>
+      requiredFields.every(field => p[field as keyof IndividualProduct] &&
+        (typeof p[field as keyof IndividualProduct] === 'string' &&
          (p[field as keyof IndividualProduct] as string).trim() !== ''))
     );
 

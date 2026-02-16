@@ -19,6 +19,7 @@ import MaterialUnitSection from './form/MaterialUnitSection';
 import MaterialStockSection from './form/MaterialStockSection';
 import MaterialCostSection from './form/MaterialCostSection';
 import MaterialImageUpload from './form/MaterialImageUpload';
+import { formatNumberDisplay } from '@/utils/numberValidation';
 
 interface AddMaterialDialogProps {
   isOpen: boolean;
@@ -140,19 +141,22 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         const matchingColor = findMatchingValue(material.color, colors);
         const matchingSupplier = findMatchingSupplier(material.supplier_name);
         
-        // Populate form with material data for edit mode
+        // Populate form with available stock only (exclude in_production) for edit mode; format decimals
+        const availableStock = typeof material.available_stock === 'number'
+          ? material.available_stock
+          : Math.max(0, (material.current_stock || 0) - (material.in_production || 0));
         setFormData({
           name: material.name || '',
           type: matchingType,
           category: matchingCategory,
           unit: matchingUnit,
           quantity: '',
-          currentStock: String(material.current_stock || 0),
-          minThreshold: String(material.min_threshold || 10),
-          maxCapacity: String(material.max_capacity || 1000),
-          reorderPoint: String(material.reorder_point || 50),
+          currentStock: formatNumberDisplay(availableStock, 2),
+          minThreshold: formatNumberDisplay(material.min_threshold ?? 10, 0),
+          maxCapacity: formatNumberDisplay(material.max_capacity ?? 1000, 0),
+          reorderPoint: formatNumberDisplay(material.reorder_point ?? 50, 0),
           supplier: matchingSupplier,
-          costPerUnit: String(material.cost_per_unit || 0),
+          costPerUnit: formatNumberDisplay(material.cost_per_unit ?? 0, 2),
           expectedDelivery: '',
           color: matchingColor || 'NA',
         });
@@ -598,18 +602,21 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       console.log('Unit normalization:', { original: formData.unit, normalized: normalizedUnit, validUnits: units });
 
       if (mode === 'edit' && material) {
-        // Update existing material
+        // Update existing material - form shows available stock, so send total (available + in_production) to backend; round decimals
+        const availableEntered = parseFloat(formData.currentStock) || 0;
+        const inProduction = material.in_production ?? 0;
+        const totalStockToSave = Math.round((availableEntered + inProduction) * 100) / 100;
         const materialData: Partial<RawMaterialFormData> = {
           name: formData.name,
           type: formData.type,
           category: formData.category,
           unit: normalizedUnit,
-          current_stock: isAdmin ? parseFloat(formData.currentStock) || 0 : undefined, // Only update stock if admin
-          min_threshold: parseFloat(formData.minThreshold) || 10,
-          max_capacity: parseFloat(formData.maxCapacity) || 1000,
-          reorder_point: parseFloat(formData.reorderPoint) || 50,
+          current_stock: isAdmin ? totalStockToSave : undefined, // Only update stock if admin; backend expects total
+          min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
+          max_capacity: Math.round(parseFloat(formData.maxCapacity) || 1000),
+          reorder_point: Math.round(parseFloat(formData.reorderPoint) || 50),
           supplier_name: formData.supplier,
-          cost_per_unit: parseFloat(formData.costPerUnit) || 0,
+          cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
           color: formData.type === 'color' ? formData.color : 'NA',
           image_url: imageUrl || material.image_url,
         };
@@ -627,18 +634,18 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         return;
       }
 
-      // Create material data (with 0 stock for orders)
+      // Create material data (with 0 stock for orders); round decimals
       const materialData: RawMaterialFormData = {
         name: formData.name,
         type: formData.type,
         category: formData.category,
         current_stock: 0, // Orders start with 0 stock
         unit: normalizedUnit,
-        min_threshold: parseFloat(formData.minThreshold) || 10,
-        max_capacity: parseFloat(formData.maxCapacity) || 1000,
-        reorder_point: parseFloat(formData.reorderPoint) || 50,
+        min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
+        max_capacity: Math.round(parseFloat(formData.maxCapacity) || 1000),
+        reorder_point: Math.round(parseFloat(formData.reorderPoint) || 50),
         supplier_name: formData.supplier,
-        cost_per_unit: parseFloat(formData.costPerUnit) || 0,
+        cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
         color: formData.type === 'color' ? formData.color : 'NA',
         image_url: imageUrl,
       };
