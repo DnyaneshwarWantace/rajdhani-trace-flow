@@ -49,9 +49,14 @@ export default function ManageStock() {
   const [selectedOrder, setSelectedOrder] = useState<StockOrder | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
+  // Load stats only on mount – cards show overall counts; filtering/sorting does not reload them
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Load orders when filters change (search, status, pagination)
   useEffect(() => {
     loadOrders();
-    loadStats();
   }, [filters]);
 
   const loadOrders = async () => {
