@@ -104,13 +104,11 @@ export default function ProductList() {
       setStatsLoading(true);
       const statsData = await ProductService.getProductStats();
       const total = statsData.total_products || 0;
-      const low = statsData.low_stock_products || 0;
-      const out = statsData.out_of_stock_products || 0;
       setInventoryStats({
         totalProducts: total,
-        inStock: Math.max(0, total - low - out),
-        lowStock: low,
-        outOfStock: out,
+        inStock: statsData.in_stock_products ?? 0,
+        lowStock: statsData.low_stock_products || 0,
+        outOfStock: statsData.out_of_stock_products || 0,
       });
     } catch (err) {
       console.error('Failed to load inventory stats:', err);

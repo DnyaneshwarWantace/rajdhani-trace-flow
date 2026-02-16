@@ -83,6 +83,7 @@ export interface ProductFormData {
 
 export interface ProductStats {
   total_products: number;
+  in_stock_products?: number;
   active_products?: number;
   inactive_products?: number;
   discontinued_products?: number;

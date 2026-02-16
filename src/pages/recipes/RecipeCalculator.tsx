@@ -74,6 +74,14 @@ export default function RecipeCalculator() {
     loadRecipes();
   }, []);
 
+  // Clear calculation results whenever the product selection changes (add/remove/edit)
+  // so the UI never shows stale results after removing a product
+  useEffect(() => {
+    setFinalBreakdown([]);
+    setProductionSteps([]);
+    setExpandedSteps(new Set());
+  }, [calculationItems]);
+
   const loadProducts = async () => {
     try {
       const result = await ProductService.getProducts({
@@ -153,7 +161,10 @@ export default function RecipeCalculator() {
   };
 
   const removeCalculationItem = (index: number) => {
-    setCalculationItems(calculationItems.filter((_, i) => i !== index));
+    setCalculationItems((prev) => prev.filter((_, i) => i !== index));
+    setFinalBreakdown([]);
+    setProductionSteps([]);
+    setExpandedSteps(new Set());
   };
 
   const calculateRecipes = async () => {

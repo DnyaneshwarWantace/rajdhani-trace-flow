@@ -214,23 +214,12 @@ export default function ProductFormSections({
         </div>
       </div>
 
-      {/* Stock Information */}
+      {/* Stock Information - Min Stock Level is fixed at 10 for all products */}
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
           Stock Information
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock Level</label>
-            <input
-              type="number"
-              min="0"
-              value={formData.min_stock_level}
-              onChange={(e) => onChange({ min_stock_level: Number(e.target.value) })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-[#1e40af] outline-none"
-            />
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock Level</label>
             <input
@@ -253,7 +242,7 @@ export default function ProductFormSections({
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

@@ -13,7 +13,6 @@ import { useToast } from '@/hooks/use-toast';
 import ProductBasicInfoSection from './form/ProductBasicInfoSection';
 import ProductStockSection from './form/ProductStockSection';
 import ProductDimensionsSection from './form/ProductDimensionsSection';
-import ProductStockLevelsSection from './form/ProductStockLevelsSection';
 import ProductNotesSection from './form/ProductNotesSection';
 import ImageUploadSection from './ImageUploadSection';
 import RecipeMaterialForm from './RecipeMaterialForm';
@@ -724,11 +723,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                 markFieldTouched={markFieldTouched}
               />
 
-              {/* Stock Levels Section */}
-              <ProductStockLevelsSection
-                formData={formData}
-                onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-              />
+              {/* Min stock level is fixed at 10 - not shown in form */}
 
               {/* Notes Section */}
               <ProductNotesSection
