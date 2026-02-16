@@ -50,26 +50,40 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
     setTouchedFields(prev => new Set(prev).add(fieldName));
   };
 
-  const [formData, setFormData] = useState({
+  const emptyFormData = {
     name: '',
     type: '',
     category: '',
     unit: '',
     currentStock: '0',
-    minThreshold: '', // Optional - will default to 10 if empty
-    maxCapacity: '', // Optional - will default to 1000 if empty
-    reorderPoint: '', // Optional - will default to 50 if empty
+    minThreshold: '',
+    maxCapacity: '',
+    reorderPoint: '',
     supplier: '',
     costPerUnit: '',
     color: '',
-  });
+  };
+
+  const [formData, setFormData] = useState(emptyFormData);
+
+  const resetForm = () => {
+    setFormData(emptyFormData);
+    setImagePreview('');
+    setImageFile(null);
+    setTouchedFields(new Set());
+  };
 
   useEffect(() => {
     if (isOpen) {
       loadDropdowns();
-      setTouchedFields(new Set()); // Reset touched fields when dialog opens
+      resetForm();
     }
   }, [isOpen]);
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const loadDropdowns = async () => {
     try {
@@ -514,10 +528,9 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       onTouchMove={(e) => e.preventDefault()}
       style={{ touchAction: 'none' }}
       onClick={(e) => {
-        // Close dialog if clicking on backdrop
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        // Do not close on backdrop click - only close via X or Cancel (same as Add Material)
+        if (e.target !== e.currentTarget) return;
+        e.stopPropagation();
       }}
     >
       <div
@@ -533,7 +546,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
@@ -645,7 +658,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
 
         {/* Fixed Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button 
