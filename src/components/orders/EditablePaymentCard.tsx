@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,8 @@ interface EditablePaymentCardProps {
   outstandingAmount: number;
   paymentHistory?: PaymentHistory[];
   onUpdatePayment: (paidAmount: number) => Promise<void>;
+  /** When true (e.g. order cancelled), hide Edit button and make card read-only */
+  readOnly?: boolean;
 }
 
 export function EditablePaymentCard({
@@ -38,12 +40,19 @@ export function EditablePaymentCard({
   outstandingAmount,
   paymentHistory,
   onUpdatePayment,
+  readOnly = false,
 }: EditablePaymentCardProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedPaidAmount, setEditedPaidAmount] = useState(paidAmount);
   const [isSaving, setIsSaving] = useState(false);
   const [paidAmountInput, setPaidAmountInput] = useState(paidAmount > 0 ? paidAmount.toString() : '');
+
+  useEffect(() => {
+    if (readOnly) {
+      setIsEditing(false);
+    }
+  }, [readOnly]);
 
   const handleSave = async () => {
     // Validate that paid amount doesn't exceed total amount
@@ -87,7 +96,7 @@ export function EditablePaymentCard({
             <DollarSign className="w-5 h-5" />
             Payment Summary
           </CardTitle>
-          {!isEditing && (
+          {!readOnly && !isEditing && (
             <Button
               variant="ghost"
               size="sm"
@@ -127,7 +136,7 @@ export function EditablePaymentCard({
           <span className="font-bold text-lg">{formatCurrency(totalAmount)}</span>
         </div>
 
-        {isEditing ? (
+        {isEditing && !readOnly ? (
           <div className="space-y-3 pt-3 border-t">
             <div className="space-y-2">
               <Label>Paid Amount</Label>

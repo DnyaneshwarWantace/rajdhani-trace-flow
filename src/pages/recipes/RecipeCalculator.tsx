@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Layout from '@/components/layout/Layout';
 import { ProductService } from '@/services/productService';
@@ -67,6 +67,7 @@ export default function RecipeCalculator() {
   const [productionSteps, setProductionSteps] = useState<ProductionStep[]>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
+  const prevCalculationItemsLengthRef = useRef(0);
 
   useEffect(() => {
     loadProducts();
@@ -74,13 +75,17 @@ export default function RecipeCalculator() {
     loadRecipes();
   }, []);
 
-  // Clear calculation results whenever the product selection changes (add/remove/edit)
-  // so the UI never shows stale results after removing a product
+  // Clear calculation results only when rows are added or removed (not on every edit),
+  // so "Ready to Calculate" and results don't disappear when typing/selecting
   useEffect(() => {
-    setFinalBreakdown([]);
-    setProductionSteps([]);
-    setExpandedSteps(new Set());
-  }, [calculationItems]);
+    const currentLength = calculationItems.length;
+    if (currentLength !== prevCalculationItemsLengthRef.current) {
+      prevCalculationItemsLengthRef.current = currentLength;
+      setFinalBreakdown([]);
+      setProductionSteps([]);
+      setExpandedSteps(new Set());
+    }
+  }, [calculationItems.length]);
 
   const loadProducts = async () => {
     try {

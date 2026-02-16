@@ -228,13 +228,27 @@ export default function OrderDetails() {
   };
 
   const handleDeleteItem = async (itemId: string, productName: string) => {
-    // Show custom confirmation dialog
-    setConfirmDialogConfig({
-      title: 'Remove Item from Order',
-      description: `Are you sure you want to remove "${productName}" from this order?\n\nAny reserved individual products or raw materials will be unreserved and become available again.`,
-      variant: 'danger',
-      onConfirm: () => performDeleteItem(itemId, productName),
-    });
+    if (!order) return;
+
+    const isLastItem = orderItems.length === 1;
+
+    if (isLastItem) {
+      // Single confirmation: removing last item = cancel order
+      setConfirmDialogConfig({
+        title: 'Cancel Order',
+        description: `This is the last item in the order. Removing "${productName}" will cancel the entire order (${order.orderNumber}). Do you want to cancel this order?`,
+        variant: 'danger',
+        onConfirm: () => performOrderCancellation(order.id, order.orderNumber),
+      });
+    } else {
+      // Multiple items: confirm remove item only
+      setConfirmDialogConfig({
+        title: 'Remove Item from Order',
+        description: `Are you sure you want to remove "${productName}" from this order?\n\nAny reserved individual products or raw materials will be unreserved and become available again.`,
+        variant: 'danger',
+        onConfirm: () => performDeleteItem(itemId, productName),
+      });
+    }
     setShowConfirmDialog(true);
   };
 
@@ -536,6 +550,8 @@ export default function OrderDetails() {
       : order.delivery_address
     : null;
 
+  const isCancelled = String(order?.status ?? '').toLowerCase() === 'cancelled';
+
   return (
     <Layout>
       <div className="w-full max-w-full space-y-6">
@@ -630,10 +646,10 @@ export default function OrderDetails() {
                       key={item.id}
                       item={item}
                       index={index}
-                      orderStatus={order.status}
-                      onUpdateQuantity={handleUpdateQuantity}
-                      onSelectIndividualProducts={handleSelectIndividualProducts}
-                      onDeleteItem={handleDeleteItem}
+                      orderStatus={String(order.status || '').toLowerCase()}
+                      onUpdateQuantity={isCancelled ? undefined : handleUpdateQuantity}
+                      onSelectIndividualProducts={isCancelled ? undefined : handleSelectIndividualProducts}
+                      onDeleteItem={isCancelled ? undefined : handleDeleteItem}
                     />
                   ))}
                 </div>
@@ -747,8 +763,9 @@ export default function OrderDetails() {
             {/* Production Information - Show for pending/accepted orders */}
             <OrderProductionInfo order={order} />
 
-            {/* Payment Summary */}
+            {/* Payment Summary - no edit when order is cancelled */}
             <EditablePaymentCard
+              readOnly={isCancelled}
               subtotal={(() => {
                 // Calculate subtotal from items if not set
                 if (order.subtotal && parseFloat(order.subtotal.toString()) > 0) {

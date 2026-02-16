@@ -215,7 +215,7 @@ export function EditableOrderItemCard({
         ) : (
           <div className="flex items-center gap-2 flex-1">
             <span className="text-sm font-medium">Quantity: {Number(item.quantity).toFixed(2)} {item.unit}</span>
-            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && onUpdateQuantity && (
+            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && orderStatus?.toLowerCase() !== 'cancelled' && onUpdateQuantity && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -225,7 +225,7 @@ export function EditableOrderItemCard({
                 <Edit className="w-3 h-3" />
               </Button>
             )}
-            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && onDeleteItem && (
+            {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && orderStatus?.toLowerCase() !== 'cancelled' && onDeleteItem && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -258,7 +258,7 @@ export function EditableOrderItemCard({
           </div>
         )}
 
-        {/* Individual Product Selection */}
+        {/* Individual Product Selection - only when order is accepted */}
         {item.product_type === 'product' && orderStatus === 'accepted' && onSelectIndividualProducts && (
           <>
             <Button
