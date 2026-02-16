@@ -11,7 +11,7 @@ interface CustomerStatsBoxesProps {
 
 export default function CustomerStatsBoxes({ total, business, individual, totalRevenue }: CustomerStatsBoxesProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -45,7 +45,7 @@ export default function CustomerStatsBoxes({ total, business, individual, totalR
           </div>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="hidden">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>

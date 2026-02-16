@@ -11,6 +11,9 @@ interface NotificationSectionProps {
   expandedId?: string | null;
   onExpand?: (id: string | null) => void;
   onMarkAsRead?: (id: string) => Promise<void>;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
 }
 
 export default function NotificationSectionComponent({
@@ -20,6 +23,9 @@ export default function NotificationSectionComponent({
   expandedId,
   onExpand,
   onMarkAsRead,
+  selectable = false,
+  selectedIds,
+  onToggleSelect,
 }: NotificationSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -81,6 +87,9 @@ export default function NotificationSectionComponent({
                 expandedId={expandedId}
                 onExpand={onExpand}
                 onMarkAsRead={onMarkAsRead}
+                selectable={selectable}
+                selected={selectedIds?.has(notification.id)}
+                onToggleSelect={onToggleSelect}
               />
             </div>
           ))}

@@ -31,6 +31,9 @@ interface ActivityNotificationCardProps {
   expandedId?: string | null;
   onExpand?: (id: string | null) => void;
   onMarkAsRead?: (id: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }
 
 export default function ActivityNotificationCard({ 
@@ -38,7 +41,10 @@ export default function ActivityNotificationCard({
   onClick,
   expandedId,
   onExpand,
-  onMarkAsRead
+  onMarkAsRead,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: ActivityNotificationCardProps) {
   const isExpanded = expandedId === notification.id;
   const [orderDetails, setOrderDetails] = useState<StockOrder | null>(null);
@@ -202,11 +208,22 @@ export default function ActivityNotificationCard({
           : notification.status === 'dismissed'
           ? 'bg-gray-50/30 opacity-75'
           : 'bg-white'
-      } ${hasDetails() ? 'cursor-pointer' : ''}`}
+      } ${selected ? 'ring-2 ring-primary-500' : ''} ${hasDetails() ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
     >
       <CardContent className="p-3 sm:p-4">
         <div className="flex gap-2 sm:gap-3">
+          {selectable && onToggleSelect && (
+            <div className="flex-shrink-0 flex items-start pt-0.5" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggleSelect(notification.id)}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                aria-label="Select notification"
+              />
+            </div>
+          )}
           {/* Icon */}
           <div className="flex-shrink-0 mt-0.5">
             <div className="w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center">

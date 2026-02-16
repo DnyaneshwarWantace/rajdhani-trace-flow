@@ -3,6 +3,9 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +30,8 @@ export default function MachineStage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [machineShift, setMachineShift] = useState<'day' | 'night' | undefined>(undefined);
   const [isMachineCompleted, setIsMachineCompleted] = useState(false);
+  const [machineStageRemark, setMachineStageRemark] = useState('');
+  const [navigatingToWastage, setNavigatingToWastage] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -79,6 +84,9 @@ export default function MachineStage() {
         }
 
         setBatch(enrichedBatch);
+        if (enrichedBatch.machine_stage?.remark) {
+          setMachineStageRemark(enrichedBatch.machine_stage.remark);
+        }
         
         // Load production flow
         const { data: flowData } = await ProductionService.getProductionFlowByBatchId(id!);
@@ -334,7 +342,6 @@ export default function MachineStage() {
 
   const handleNavigateToWastage = async () => {
     const validation = await validateMachineStageCompletion();
-    
     if (!validation.valid) {
       toast({
         title: 'Cannot Proceed to Wastage Stage',
@@ -343,43 +350,42 @@ export default function MachineStage() {
       });
       return;
     }
-
-    // Validation passed - mark machine stage as completed and start wastage stage
+    const remark = machineStageRemark.trim();
     try {
-      const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(id!, {
+      setNavigatingToWastage(true);
+      const { error: updateError } = await ProductionService.updateBatch(id!, {
         machine_stage: {
           status: 'completed',
           completed_at: new Date().toISOString(),
-          completed_by: 'User', // You can get this from auth context
+          completed_by: 'User',
+          ...(remark ? { remark } : {}),
         },
         wastage_stage: {
           status: 'in_progress',
           started_at: new Date().toISOString(),
-          started_by: 'User', // You can get this from auth context
+          started_by: 'User',
         },
       });
 
-      if (updateError || !updatedBatch) {
+      if (updateError) {
         console.error('❌ Error updating machine stage:', updateError);
         toast({
           title: 'Warning',
           description: 'Machine stage completion may not have been saved. Proceeding to wastage stage.',
           variant: 'destructive',
         });
-      } else {
-        console.log('✅ Machine stage marked as completed successfully');
       }
+      navigate(`/production/${id}/wastage`);
     } catch (error) {
       console.error('❌ Error updating machine stage:', error);
       toast({
-        title: 'Warning',
-        description: 'Failed to update machine stage status. Proceeding to wastage stage.',
+        title: 'Error',
+        description: 'Failed to proceed to wastage stage. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      setNavigatingToWastage(false);
     }
-
-    // Navigate to wastage stage
-    navigate(`/production/${id}/wastage`);
   };
 
   if (loading) {
@@ -457,16 +463,42 @@ export default function MachineStage() {
           onStepUpdate={checkCompletionOnly}
         />
 
+        {/* Optional remark – shown near start/complete; saved when proceeding to wastage */}
+        <Card>
+          <CardContent className="p-4">
+            <Label htmlFor="machine-stage-remark" className="text-sm font-medium text-gray-700">
+              Remark (optional)
+            </Label>
+            <Textarea
+              id="machine-stage-remark"
+              placeholder="e.g. Machine stage completion delayed due to..."
+              value={machineStageRemark}
+              onChange={(e) => setMachineStageRemark(e.target.value)}
+              rows={2}
+              className="resize-none"
+            />
+          </CardContent>
+        </Card>
+
         {/* Wastage Button at Bottom */}
         <div className="flex justify-end mt-6">
           <Button
             onClick={handleNavigateToWastage}
-            disabled={!isMachineCompleted}
+            disabled={!isMachineCompleted || navigatingToWastage}
             className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
           >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Wastage Stage
+            {navigatingToWastage ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Proceeding to Wastage...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Wastage Stage
+              </>
+            )}
           </Button>
         </div>
       </div>

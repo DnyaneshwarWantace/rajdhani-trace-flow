@@ -578,6 +578,14 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
               </div>
             </div>
 
+            {/* Machine stage remark (optional note from machine stage) */}
+            {batch.machine_stage?.remark && (
+              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm font-medium text-amber-800 mb-1">Machine stage note</p>
+                <p className="text-sm text-amber-900">{batch.machine_stage.remark}</p>
+              </div>
+            )}
+
             {/* Machine Steps Table */}
             <div className="border rounded-lg overflow-hidden">
               <table className="w-full">

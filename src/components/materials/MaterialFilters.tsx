@@ -7,26 +7,22 @@ import type { MaterialFilters } from '@/types/material';
 
 interface MaterialFiltersProps {
   filters: MaterialFilters;
-  viewMode: 'grid' | 'table';
   onSearchChange: (value: string) => void;
   onCategoryChange: (values: string[]) => void;
   onStatusChange: (values: string[]) => void;
   onTypeChange?: (values: string[]) => void;
   onColorChange?: (values: string[]) => void;
   onSupplierChange?: (values: string[]) => void;
-  onViewModeChange: (mode: 'grid' | 'table') => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
 }
 
 export default function MaterialFilters({
   filters,
-  viewMode,
   onSearchChange,
   onStatusChange,
   onTypeChange,
   onColorChange,
   onSupplierChange,
-  onViewModeChange,
   onSortChange,
 }: MaterialFiltersProps) {
   const [types, setTypes] = useState<string[]>([]);
@@ -65,21 +61,23 @@ export default function MaterialFilters({
   };
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      {/* First Row: Search, Status, View */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mb-3">
-        {/* Search */}
-        <DebouncedSearchInput
-          value={filters.search || ''}
-          onChange={onSearchChange}
-          placeholder="Search materials (min 3 characters)..."
-          minCharacters={3}
-          debounceMs={500}
-          className="lg:col-span-6"
-          showCounter={true}
-        />
+      {/* First Row: Search + Status on large only */}
+      <div className="flex flex-wrap items-center gap-3 mb-3 lg:grid lg:grid-cols-12">
+        {/* Search - grows on tablet, 6 cols on lg */}
+        <div className="flex-1 min-w-0 lg:col-span-6">
+          <DebouncedSearchInput
+            value={filters.search || ''}
+            onChange={onSearchChange}
+            placeholder="Search materials (min 3 characters)..."
+            minCharacters={3}
+            debounceMs={500}
+            className="w-full"
+            showCounter={true}
+          />
+        </div>
 
-        {/* Status Filter - Multi-select */}
-        <div className="lg:col-span-4">
+        {/* Status - large screens only */}
+        <div className="hidden lg:block lg:col-span-6">
           <MultiSelect
             options={[
               { label: 'In Stock', value: 'in-stock' },
@@ -92,38 +90,11 @@ export default function MaterialFilters({
             placeholder="All Status"
           />
         </div>
-
-        {/* View Mode Toggle - Only Grid on mobile, both options on desktop */}
-        <div className="lg:col-span-2 flex items-center gap-2">
-          <span className="text-sm text-gray-600 whitespace-nowrap hidden lg:inline">View:</span>
-
-          {/* Desktop: Show both Table and Grid */}
-          <button
-            onClick={() => onViewModeChange('table')}
-            className={`hidden lg:flex flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'table'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Table
-          </button>
-          <button
-            onClick={() => onViewModeChange('grid')}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === 'grid'
-                ? 'bg-primary-100 text-primary-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            Grid
-          </button>
-        </div>
       </div>
 
-      {/* Second Row: Additional Filters (Type, Color, Supplier) */}
+      {/* Second Row: Type, Color, Supplier - large screens only */}
       {(onTypeChange || onColorChange || onSupplierChange) && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
           {/* Type Filter - Multi-select */}
           {onTypeChange && (
             <MultiSelect

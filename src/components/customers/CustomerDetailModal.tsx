@@ -122,7 +122,7 @@ export default function CustomerDetailModal({
                 <p className="text-xs text-blue-600 font-medium">Total Orders</p>
                 <p className="text-2xl font-bold text-blue-900 mt-1">{customer.total_orders || 0}</p>
               </div>
-              <div className="bg-green-50 rounded-lg p-4">
+              <div className="hidden bg-green-50 rounded-lg p-4">
                 <p className="text-xs text-green-600 font-medium">Total Revenue</p>
                 <p className="text-2xl font-bold text-green-900 mt-1">
                   {formatCurrency(parseFloat(customer.total_value || '0'))}

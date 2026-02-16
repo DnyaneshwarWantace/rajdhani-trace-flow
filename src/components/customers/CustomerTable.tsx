@@ -41,7 +41,7 @@ export default function CustomerTable({
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
                 Total Orders
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+              <th className="hidden px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                 Revenue
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
@@ -82,7 +82,7 @@ export default function CustomerTable({
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                   {customer.total_orders || 0}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td className="hidden px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {formatCurrency(parseFloat(customer.total_value || '0'))}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

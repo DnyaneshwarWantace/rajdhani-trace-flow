@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Plus, ShoppingCart, Table, Grid3x3, Loader2 } from 'lucide-react';
+import { Plus, ShoppingCart, List, Grid3x3, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
 import OrderTable from '@/components/orders/OrderTable';
@@ -161,30 +161,26 @@ export default function OrderList() {
             <p className="text-gray-600 mt-1">Manage customer orders and track fulfillment</p>
           </div>
           <div className="flex items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="hidden sm:flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
-              <button
+            {/* View Mode Toggle - same icons as Customers/Suppliers/Materials (List = table, Grid3x3 = grid) */}
+            <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={`hidden lg:inline-flex ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
                 title="Table View"
               >
-                <Table className="w-4 h-4" />
-              </button>
-              <button
+                <List className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
                 onClick={() => setViewMode('grid')}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
+                className={viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}
                 title="Grid View"
               >
                 <Grid3x3 className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             {/* New Order Button */}

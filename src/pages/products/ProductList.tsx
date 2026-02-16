@@ -15,7 +15,7 @@ import { exportProductsToCSV, exportProductsToExcel } from '@/utils/exportProduc
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers } from 'lucide-react';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
@@ -299,38 +299,35 @@ export default function ProductList() {
             </div>
             {activeTab === 'inventory' && (
               <div className="flex items-center gap-3">
-                {/* View Mode Toggle */}
-                <div className="hidden sm:flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
-                  <button
+                {/* View Mode Toggle - same icons as Orders/Customers/Suppliers (List, Grid3x3, Layers for grouped) */}
+                <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+                  <Button
+                    variant={viewMode === 'table' ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setViewMode('table')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      viewMode === 'table'
-                        ? 'bg-primary-100 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`hidden lg:inline-flex ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
+                    title="Table View"
                   >
-                    Table
-                  </button>
-                  <button
+                    <List className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setViewMode('grid')}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-primary-100 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}
+                    title="Grid View"
                   >
-                    Grid
-                  </button>
-                  <button
+                    <Grid3x3 className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'grouped' ? 'default' : 'ghost'}
+                    size="sm"
                     onClick={() => setViewMode('grouped')}
-                    className={`hidden lg:block px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      viewMode === 'grouped'
-                        ? 'bg-primary-100 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
+                    className={`hidden lg:inline-flex ${viewMode === 'grouped' ? 'bg-primary-600 text-white' : ''}`}
+                    title="Grouped View"
                   >
-                    Grouped
-                  </button>
+                    <Layers className="w-4 h-4" />
+                  </Button>
                 </div>
 
                 {/* Export Dropdown */}

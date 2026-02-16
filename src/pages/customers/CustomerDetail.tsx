@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { CustomerService, type Customer, type CreateCustomerData } from '@/services/customerService';
 import { OrderService, type Order } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import CustomerDetailHeader from '@/components/customers/detail/CustomerDetailHeader';
 import CustomerDetailInfo from '@/components/customers/detail/CustomerDetailInfo';
@@ -18,6 +19,8 @@ export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,8 +220,8 @@ export default function CustomerDetail() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b border-gray-200 px-2 sm:px-3 lg:px-4 py-4">
+      <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-gray-50 w-full">
+        <div className="shrink-0 bg-white border-b border-gray-200 px-2 sm:px-3 lg:px-4 py-4">
           <div className="flex items-center justify-between">
             <Button variant="ghost" onClick={handleBack} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
@@ -231,18 +234,20 @@ export default function CustomerDetail() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-2 sm:px-3 lg:px-4 py-6 space-y-6">
-          <CustomerDetailHeader customer={customer} />
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <CustomerDetailInfo customer={customer} />
-              <CustomerDetailFinancial customer={customer} orders={orders} />
-              <CustomerDetailOrderHistory customer={customer} orders={orders} onOrderUpdated={loadOrders} />
-            </div>
+        <div className="flex-1 min-h-0 overflow-y-auto w-full px-2 sm:px-3 lg:px-4 py-6">
+          <div className="w-full max-w-full mx-auto space-y-6">
+            <CustomerDetailHeader customer={customer} />
             
-            <div className="space-y-6">
-              <CustomerDetailOrderStats customer={customer} orders={orders} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <CustomerDetailInfo customer={customer} />
+                {isAdmin && <CustomerDetailFinancial customer={customer} orders={orders} />}
+                <CustomerDetailOrderHistory customer={customer} orders={orders} onOrderUpdated={loadOrders} />
+              </div>
+              
+              <div className="space-y-6">
+                <CustomerDetailOrderStats customer={customer} orders={orders} />
+              </div>
             </div>
           </div>
         </div>

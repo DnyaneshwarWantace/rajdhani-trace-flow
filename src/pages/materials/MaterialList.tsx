@@ -263,8 +263,7 @@ export default function MaterialList() {
 
       setMaterials(data);
       setTotalMaterials(total || data.length);
-      // Also refresh stats
-      loadStats();
+      // Do not reload stats on filter/sort - keep cards stable like Products and Orders pages
     } catch (err) {
       console.error('Error loading materials:', err);
       setError(err instanceof Error ? err.message : 'Failed to load materials');
@@ -861,6 +860,8 @@ export default function MaterialList() {
           onExport={handleExport}
           onAddToInventory={handleAddToInventory}
           onAddMaterial={handleCreate}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
 
         {/* Stats Boxes */}
@@ -883,14 +884,12 @@ export default function MaterialList() {
         {activeTab === 'inventory' && (
           <MaterialFilters
             filters={filters}
-            viewMode={viewMode}
             onSearchChange={handleSearch}
             onCategoryChange={handleCategoryFilter}
             onStatusChange={handleStatusFilter}
             onTypeChange={handleTypeFilter}
             onColorChange={handleColorFilter}
             onSupplierChange={handleSupplierFilter}
-            onViewModeChange={setViewMode}
             onSortChange={handleSortChange}
           />
         )}

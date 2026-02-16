@@ -722,6 +722,16 @@ export default function ProductionWastage() {
           onRefresh={handleRefresh}
         />
 
+        {/* Machine stage remark - why completion was late / any note from machine stage */}
+        {batch?.machine_stage?.remark && (
+          <Card className="bg-amber-50 border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-sm font-medium text-amber-800 mb-1">Machine stage note</p>
+              <p className="text-sm text-amber-900">{batch.machine_stage.remark}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Production Progress Tracker */}
         <ProductionStageProgress currentStage="wastage" />
 

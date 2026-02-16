@@ -270,13 +270,13 @@ export default function SupplierList() {
               <p className="text-sm text-gray-600">Manage your supplier database</p>
             </div>
             <div className="flex items-center gap-2">
-              {/* View Toggle - Hidden on mobile/tablet */}
-              <div className="hidden lg:flex items-center gap-1 border border-gray-300 rounded-lg p-1">
+              {/* View Toggle - Table hidden on small screens (Grid only) */}
+              <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
                 <Button
                   variant={viewMode === 'table' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('table')}
-                  className={viewMode === 'table' ? 'bg-primary-600 text-white' : ''}
+                  className={`hidden lg:inline-flex ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
                 >
                   <List className="w-4 h-4" />
                 </Button>
@@ -314,22 +314,39 @@ export default function SupplierList() {
           </div>
         ) : suppliers.length === 0 ? (
           <SupplierEmptyState onCreate={handleCreate} />
-        ) : viewMode === 'table' ? (
-          <SupplierTable
-            suppliers={suppliers}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            canDelete={user?.role === 'admin' || false}
-          />
         ) : (
-          <SupplierGrid
-            suppliers={suppliers}
-            orders={orders}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            canDelete={user?.role === 'admin' || false}
-          />
+          <>
+            {/* Desktop: table or grid by viewMode */}
+            <div className="hidden lg:block">
+              {viewMode === 'table' ? (
+                <SupplierTable
+                  suppliers={suppliers}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  canDelete={user?.role === 'admin' || false}
+                />
+              ) : (
+                <SupplierGrid
+                  suppliers={suppliers}
+                  orders={orders}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  canDelete={user?.role === 'admin' || false}
+                />
+              )}
+            </div>
+            {/* Small screens: always Grid */}
+            <div className="lg:hidden">
+              <SupplierGrid
+                suppliers={suppliers}
+                orders={orders}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                canDelete={user?.role === 'admin' || false}
+              />
+            </div>
+          </>
         )}
 
         {/* Pagination */}

@@ -13,12 +13,22 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Bell, 
   CheckCircle, 
-  Info
+  Info,
+  Trash2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { categorizeNotifications } from '@/utils/notificationCategories';
 import NotificationSectionComponent from '@/components/notifications/NotificationSection';
 import NotificationTabs from '@/components/notifications/NotificationTabs';
@@ -45,8 +55,14 @@ export default function Notifications() {
   // Category-specific filters for activity logs
   const [materialFilterAction, setMaterialFilterAction] = useState<string>('all');
   const [materialFilterStatus, setMaterialFilterStatus] = useState<string>('all');
+  const [monthFilter, setMonthFilter] = useState<string>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadNotifications();
@@ -267,14 +283,36 @@ export default function Notifications() {
     [activeTab, getFilteredActivityLogs, getFilteredNotifications]
   );
 
-  // Filter notifications (multi-select: empty = all) - memoized
+  // Month options from notifications (unique year-months, newest first)
+  const monthOptions = useMemo(() => {
+    const dates = notifications.map(n => {
+      const raw = n.created_at || (n as any).createdAt || n.related_data?.created_at || '';
+      return raw ? new Date(raw) : null;
+    }).filter((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
+    const set = new Set<string>();
+    dates.forEach(d => set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`));
+    return Array.from(set).sort().reverse().map(ym => {
+      const [y, m] = ym.split('-').map(Number);
+      const label = new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+      return { value: ym, label };
+    });
+  }, [notifications]);
+
+  // Filter notifications (multi-select: empty = all, + month) - memoized
   const filteredNotifications = useMemo(() =>
     baseNotifications.filter(n => {
       if (filterTypes.length > 0 && !filterTypes.includes(n.type)) return false;
       if (filterStatuses.length > 0 && !filterStatuses.includes(n.status)) return false;
+      if (monthFilter !== 'all') {
+        const raw = n.created_at || (n as any).createdAt || n.related_data?.created_at || '';
+        if (!raw) return false;
+        const d = new Date(raw);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (ym !== monthFilter) return false;
+      }
       return true;
     }),
-    [baseNotifications, filterTypes, filterStatuses]
+    [baseNotifications, filterTypes, filterStatuses, monthFilter]
   );
 
   // Sort filtered notifications - memoized
@@ -331,6 +369,55 @@ export default function Notifications() {
   const handleExpand = useCallback((id: string | null) => {
     setExpandedNotificationId(id);
   }, []);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const selectAllOnPage = useCallback(() => {
+    setSelectedIds(new Set(sortedNotifications.map(n => n.id)));
+  }, [sortedNotifications]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleDeleteSelected = useCallback(() => {
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const confirmDeleteSelected = useCallback(async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) {
+      setShowDeleteConfirm(false);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await Promise.all(ids.map(id => NotificationService.deleteNotification(id)));
+      setNotifications(prev => prev.filter(n => !selectedIds.has(n.id)));
+      setSelectedIds(new Set());
+      setShowDeleteConfirm(false);
+      toast({
+        title: 'Deleted',
+        description: `${ids.length} notification(s) deleted permanently.`,
+      });
+    } catch (error) {
+      console.error('Error deleting notifications:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete some notifications.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }, [selectedIds, toast]);
 
   return (
     <Layout>
@@ -432,7 +519,21 @@ export default function Notifications() {
         {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
           <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Month</label>
+                  <Select value={monthFilter} onValueChange={setMonthFilter}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="All time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All time</SelectItem>
+                      {monthOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <label className="text-xs font-medium text-gray-700 mb-0.5 block">Type</label>
                   <MultiSelect
@@ -508,6 +609,34 @@ export default function Notifications() {
           />
         )}
 
+        {/* Admin: Select and Delete toolbar */}
+        {isAdmin && sortedNotifications.length > 0 && (
+          <Card className="mb-4">
+            <CardContent className="p-3 flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={selectAllOnPage}>
+                Select all on page
+              </Button>
+              <Button variant="outline" size="sm" onClick={deselectAll}>
+                Deselect all
+              </Button>
+              <span className="text-sm text-gray-600">
+                {selectedIds.size} selected
+              </span>
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  className="ml-auto bg-red-600 hover:bg-red-700 text-white"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete selected ({selectedIds.size})
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Notifications List */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -535,6 +664,9 @@ export default function Notifications() {
                       expandedId={expandedNotificationId}
                       onExpand={handleExpand}
                       onMarkAsRead={handleMarkAsRead}
+                      selectable={isAdmin}
+                      selected={selectedIds.has(notification.id)}
+                      onToggleSelect={toggleSelect}
                     />
                   </div>
                 ))}
@@ -562,6 +694,9 @@ export default function Notifications() {
                     expandedId={expandedNotificationId}
                     onExpand={handleExpand}
                     onMarkAsRead={handleMarkAsRead}
+                    selectable={isAdmin}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
                   />
                 </CardContent>
               </Card>
@@ -569,6 +704,26 @@ export default function Notifications() {
           </div>
         )}
       </div>
+
+        {/* Delete confirmation (admin only) */}
+        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete selected notifications?</DialogTitle>
+              <DialogDescription>
+                This will permanently delete {selectedIds.size} notification(s) or log(s). This action cannot be undone. Only admins can delete notifications.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDeleteSelected} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+                {deleting ? 'Deleting...' : 'Delete permanently'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </Layout>
   );
 }

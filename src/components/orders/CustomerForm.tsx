@@ -52,6 +52,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     customerType: 'individual' as 'individual' | 'business',
     gstNumber: '',
     companyName: '',
+    sameAsPermanent: true,
+    deliveryAddress: '',
+    deliveryCity: '',
+    deliveryState: '',
+    deliveryPincode: '',
   });
 
   // Handler for address fields with different limits based on field type
@@ -115,6 +120,62 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const addressWordCount = newCustomer.address.split(/\s+/).filter(w => w.length > 0).length;
   const cityWordCount = newCustomer.city.split(/\s+/).filter(w => w.length > 0).length;
   const stateWordCount = newCustomer.state.split(/\s+/).filter(w => w.length > 0).length;
+  const deliveryAddressWordCount = newCustomer.deliveryAddress.split(/\s+/).filter(w => w.length > 0).length;
+
+  const handleDeliveryAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
+    let inputValue = value;
+    if (field === 'city' || field === 'state') inputValue = inputValue.replace(/\d/g, '');
+    const limits = { address: { maxWords: 20, maxCharsPerWord: 20 }, city: { maxWords: 3, maxCharsPerWord: 25 }, state: { maxWords: 3, maxCharsPerWord: 25 } };
+    const { maxWords, maxCharsPerWord } = limits[field];
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > maxWords) {
+      let wordCount = 0, pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === maxWords) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') endPos++;
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) return part;
+      if (part.trim().length > 0) return part.length > maxCharsPerWord ? part.slice(0, maxCharsPerWord) : part;
+      return part;
+    });
+    inputValue = processedParts.join('');
+    if (field === 'address') setNewCustomer({ ...newCustomer, deliveryAddress: inputValue });
+    else if (field === 'city') setNewCustomer({ ...newCustomer, deliveryCity: inputValue });
+    else setNewCustomer({ ...newCustomer, deliveryState: inputValue });
+  };
+
+  const handleDeliveryPincodeChange = async (value: string) => {
+    const numericValue = value.replace(/\D/g, '').slice(0, 6);
+    setNewCustomer({ ...newCustomer, deliveryPincode: numericValue });
+    if (numericValue.length === 6) {
+      setFetchingLocation(true);
+      try {
+        const response = await fetch(`https://api.postalpincode.in/pincode/${numericValue}`);
+        const data = await response.json();
+        if (data?.[0]?.Status === 'Success' && data[0]?.PostOffice?.length > 0) {
+          const postOffice = data[0].PostOffice[0];
+          setNewCustomer(prev => ({
+            ...prev,
+            deliveryPincode: numericValue,
+            deliveryCity: postOffice.District || prev.deliveryCity,
+            deliveryState: postOffice.State || prev.deliveryState,
+          }));
+        }
+      } catch (e) { console.error(e); }
+      finally { setFetchingLocation(false); }
+    }
+  };
 
   // Handler for name validation (max 8 words, max 20 chars per word)
   const handleNameChange = (value: string) => {
@@ -159,6 +220,34 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
 
     inputValue = processedParts.join('');
     setNewCustomer({ ...newCustomer, name: inputValue });
+  };
+
+  const handleCompanyNameChange = (value: string) => {
+    let inputValue = value.replace(/[^a-zA-Z\s]/g, '');
+    const words = inputValue.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 8) {
+      let wordCount = 0;
+      let pos = inputValue.length;
+      for (let i = 0; i < inputValue.length; i++) {
+        if (inputValue[i] !== ' ' && (i === 0 || inputValue[i - 1] === ' ')) {
+          wordCount++;
+          if (wordCount === 8) {
+            let endPos = i;
+            while (endPos < inputValue.length && inputValue[endPos] !== ' ') endPos++;
+            pos = endPos;
+            break;
+          }
+        }
+      }
+      inputValue = inputValue.substring(0, pos);
+    }
+    const parts = inputValue.split(/(\s+)/);
+    const processedParts = parts.map(part => {
+      if (/^\s+$/.test(part)) return part;
+      if (part.trim().length > 0) return part.length > 20 ? part.slice(0, 20) : part;
+      return part;
+    });
+    setNewCustomer({ ...newCustomer, companyName: processedParts.join('') });
   };
 
   const handleGSTNumberChange = async (value: string) => {
@@ -296,6 +385,21 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     }
 
     try {
+      const permanentAddr = {
+        address: newCustomer.address.trim() || '',
+        city: newCustomer.city.trim() || '',
+        state: newCustomer.state.trim() || '',
+        pincode: newCustomer.pincode.trim() || '',
+      };
+      const deliveryAddr = newCustomer.sameAsPermanent
+        ? permanentAddr
+        : {
+            address: newCustomer.deliveryAddress.trim() || '',
+            city: newCustomer.deliveryCity.trim() || '',
+            state: newCustomer.deliveryState.trim() || '',
+            pincode: newCustomer.deliveryPincode.trim() || '',
+          };
+
       const customerData = {
         name: newCustomer.name.trim(),
         email: newCustomer.email.trim() || undefined,
@@ -307,6 +411,8 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
         customer_type: newCustomer.customerType,
         gst_number: newCustomer.gstNumber.trim() || undefined,
         company_name: newCustomer.companyName.trim() || undefined,
+        permanent_address: JSON.stringify(permanentAddr),
+        delivery_address: JSON.stringify(deliveryAddr),
       };
 
       const { data: newCustomerData, error } = await CustomerService.createCustomer(customerData);
@@ -333,6 +439,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           customerType: 'individual',
           gstNumber: '',
           companyName: '',
+          sameAsPermanent: true,
+          deliveryAddress: '',
+          deliveryCity: '',
+          deliveryState: '',
+          deliveryPincode: '',
         });
         toast({
           title: 'Success',
@@ -387,6 +498,20 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
             )}
           </div>
         </div>
+
+        {newCustomer.customerType === 'business' && (
+          <div className="space-y-2">
+            <Label>Company Name</Label>
+            <Input
+              value={newCustomer.companyName}
+              onChange={e => handleCompanyNameChange(e.target.value)}
+              placeholder="Enter company name"
+            />
+            <p className="text-xs text-gray-500">
+              {newCustomer.companyName.trim() ? newCustomer.companyName.trim().split(/\s+/).filter(w => w.length > 0).length : 0}/8 words • Max 20 characters per word
+            </p>
+          </div>
+        )}
 
         {/* Row 2: Phone Number & Email */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -453,7 +578,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
         </div>
 
         <div className="space-y-2">
-          <Label>Address</Label>
+          <Label>Permanent / Current Address</Label>
           <Textarea
             value={newCustomer.address}
             onChange={e => handleAddressChange(e.target.value, 'address')}
@@ -510,6 +635,66 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
               )}
             </div>
           </div>
+        </div>
+
+        {/* Delivery Address */}
+        <div className="pt-4 border-t">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Delivery Address</h3>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newCustomer.sameAsPermanent}
+                onChange={(e) => setNewCustomer({ ...newCustomer, sameAsPermanent: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <span className="text-sm text-gray-600">Same as current address</span>
+            </label>
+          </div>
+          {!newCustomer.sameAsPermanent && (
+            <>
+              <div className="space-y-2">
+                <Label>Address</Label>
+                <Textarea
+                  value={newCustomer.deliveryAddress}
+                  onChange={e => handleDeliveryAddressChange(e.target.value, 'address')}
+                  placeholder="Enter delivery address"
+                  rows={2}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {deliveryAddressWordCount}/20 words • Max 20 characters per word
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <Input
+                    value={newCustomer.deliveryCity}
+                    onChange={e => handleDeliveryAddressChange(e.target.value, 'city')}
+                    placeholder="City"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>State</Label>
+                  <Input
+                    value={newCustomer.deliveryState}
+                    onChange={e => handleDeliveryAddressChange(e.target.value, 'state')}
+                    placeholder="State"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pincode</Label>
+                  <Input
+                    value={newCustomer.deliveryPincode}
+                    onChange={e => handleDeliveryPincodeChange(e.target.value)}
+                    placeholder="6-digit pincode"
+                    maxLength={6}
+                  />
+                  {fetchingLocation && <p className="text-xs text-gray-500 mt-1">Fetching location...</p>}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-2 pt-4 border-t">
