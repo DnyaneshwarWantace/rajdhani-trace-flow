@@ -63,48 +63,48 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const expectedDeliveryRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState({
+  const emptyFormData = {
     name: '',
     type: '',
     category: '',
     unit: '',
     quantity: '',
-    currentStock: '', // Only used in edit mode
-    minThreshold: '', // Optional - will default to 10 if empty
-    maxCapacity: '', // Optional - will default to 1000 if empty
-    reorderPoint: '', // Optional - will default to 50 if empty
+    currentStock: '',
+    minThreshold: '',
+    maxCapacity: '',
+    reorderPoint: '',
     supplier: '',
     costPerUnit: '',
     expectedDelivery: '',
     color: 'NA',
-  });
+  };
+
+  const [formData, setFormData] = useState(emptyFormData);
+
+  const resetCreateForm = () => {
+    setFormData(emptyFormData);
+    setImagePreview('');
+    setImageFile(null);
+    setInvalidFields(new Set());
+    setTouchedFields(new Set());
+  };
 
   useEffect(() => {
     if (isOpen) {
       loadDropdowns();
-      setTouchedFields(new Set()); // Reset touched fields when dialog opens
+      setTouchedFields(new Set());
       if (mode === 'create') {
-        // Reset form for create mode
-        setFormData({
-          name: '',
-          type: '',
-          category: '',
-          unit: '',
-          quantity: '',
-          currentStock: '', // Not used in create mode (orders start with 0 stock)
-          minThreshold: '', // Optional - will default to 10 if empty
-          maxCapacity: '', // Optional - will default to 1000 if empty
-          reorderPoint: '', // Optional - will default to 50 if empty
-          supplier: '',
-          costPerUnit: '',
-          expectedDelivery: '',
-          color: 'NA',
-        });
-        setImagePreview('');
-        setImageFile(null);
+        resetCreateForm();
       }
     }
   }, [isOpen, mode]);
+
+  const handleClose = () => {
+    if (mode === 'create') {
+      resetCreateForm();
+    }
+    onClose();
+  };
 
   // Set form data for edit mode after dropdowns are loaded
   useEffect(() => {
@@ -754,10 +754,9 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       onClick={(e) => {
-        // Close dialog if clicking on backdrop
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        // Do not close on backdrop click - only close via X button (like product page)
+        if (e.target !== e.currentTarget) return;
+        e.stopPropagation();
       }}
     >
       <div
@@ -777,7 +776,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             type="button"
             className="text-gray-400 hover:text-gray-600 transition-colors"
           >
@@ -1016,7 +1015,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
         {/* Fixed Footer */}
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
           <Button 
