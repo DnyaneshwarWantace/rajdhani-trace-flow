@@ -49,8 +49,9 @@ export default function ProductList() {
   // Stats state for inventory tab
   const [inventoryStats, setInventoryStats] = useState({
     totalProducts: 0,
-    lowStockAlerts: 0,
-    availablePieces: 0,
+    inStock: 0,
+    lowStock: 0,
+    outOfStock: 0,
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -102,10 +103,14 @@ export default function ProductList() {
     try {
       setStatsLoading(true);
       const statsData = await ProductService.getProductStats();
+      const total = statsData.total_products || 0;
+      const low = statsData.low_stock_products || 0;
+      const out = statsData.out_of_stock_products || 0;
       setInventoryStats({
-        totalProducts: statsData.total_products || 0,
-        lowStockAlerts: (statsData.low_stock_products || 0) + (statsData.out_of_stock_products || 0),
-        availablePieces: statsData.available_individual_products || 0,
+        totalProducts: total,
+        inStock: Math.max(0, total - low - out),
+        lowStock: low,
+        outOfStock: out,
       });
     } catch (err) {
       console.error('Failed to load inventory stats:', err);
@@ -383,8 +388,9 @@ export default function ProductList() {
         {/* Stats Boxes - Always Visible */}
         <InventoryStatsBoxes
           totalProducts={inventoryStats.totalProducts}
-          lowStockAlerts={inventoryStats.lowStockAlerts}
-          availablePieces={inventoryStats.availablePieces}
+          inStock={inventoryStats.inStock}
+          lowStock={inventoryStats.lowStock}
+          outOfStock={inventoryStats.outOfStock}
           loading={statsLoading}
         />
 

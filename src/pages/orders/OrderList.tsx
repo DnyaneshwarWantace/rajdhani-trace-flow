@@ -35,6 +35,7 @@ export default function OrderList() {
     accepted: 0,
     dispatched: 0,
     delivered: 0,
+    cancelled: 0,
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
@@ -97,6 +98,7 @@ export default function OrderList() {
         accepted: data.accepted,
         dispatched: data.dispatched,
         delivered: data.delivered,
+        cancelled: data.cancelled ?? 0,
       });
     } catch (error) {
       console.error('Error loading stats:', error);

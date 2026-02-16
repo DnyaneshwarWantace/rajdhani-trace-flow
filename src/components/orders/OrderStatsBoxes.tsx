@@ -1,4 +1,4 @@
-import { ShoppingCart, Clock, CheckSquare, Truck, CheckCircle, Loader2 } from 'lucide-react';
+import { ShoppingCart, Clock, CheckSquare, Truck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 interface OrderStatsBoxesProps {
   stats: {
@@ -7,6 +7,7 @@ interface OrderStatsBoxesProps {
     accepted: number;
     dispatched: number;
     delivered: number;
+    cancelled: number;
   };
   loading?: boolean;
 }
@@ -14,8 +15,8 @@ interface OrderStatsBoxesProps {
 export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-center h-20">
               <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
@@ -62,10 +63,17 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
       color: 'bg-green-100 text-green-700',
       iconColor: 'text-green-600',
     },
+    {
+      label: 'Cancelled',
+      value: stats.cancelled,
+      icon: XCircle,
+      color: 'bg-gray-100 text-gray-700',
+      iconColor: 'text-gray-600',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
       {statItems.map((item) => {
         const Icon = item.icon;
         return (

@@ -64,6 +64,8 @@ export interface OrderStats {
   totalOrders: number;
   totalValue: number;
   pendingOrders: number;
+  approvedOrders: number;
+  shippedOrders: number;
   deliveredOrders: number;
 }
 
@@ -314,17 +316,17 @@ export class ManageStockService {
 
       const totalOrders = orders.length;
       const totalValue = orders.reduce((sum, order) => sum + order.totalCost, 0);
-      const pendingOrders = orders.filter(order => 
-        order.status === 'pending' || 
-        order.status === 'approved' || 
-        order.status === 'shipped'
-      ).length;
+      const pendingOrders = orders.filter(order => order.status === 'pending').length;
+      const approvedOrders = orders.filter(order => order.status === 'approved').length;
+      const shippedOrders = orders.filter(order => order.status === 'shipped').length;
       const deliveredOrders = orders.filter(order => order.status === 'delivered').length;
 
       return {
         totalOrders,
         totalValue,
         pendingOrders,
+        approvedOrders,
+        shippedOrders,
         deliveredOrders,
       };
     } catch (error) {
@@ -333,6 +335,8 @@ export class ManageStockService {
         totalOrders: 0,
         totalValue: 0,
         pendingOrders: 0,
+        approvedOrders: 0,
+        shippedOrders: 0,
         deliveredOrders: 0,
       };
     }

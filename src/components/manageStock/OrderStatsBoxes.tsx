@@ -1,4 +1,4 @@
-import { Package, DollarSign, Clock, CheckCircle } from 'lucide-react';
+import { Package, DollarSign, Clock, CheckSquare, Truck, CheckCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrency } from '@/utils/formatHelpers';
 import type { OrderStats } from '@/types/manageStock';
@@ -10,7 +10,7 @@ interface OrderStatsBoxesProps {
 
 export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
       {/* Total Orders */}
       <Card>
         <CardContent className="p-4">
@@ -49,7 +49,7 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
         </CardContent>
       </Card>
 
-      {/* Pending Orders */}
+      {/* Pending */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -68,7 +68,45 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
         </CardContent>
       </Card>
 
-      {/* Delivered Orders */}
+      {/* Approved */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600">Approved</p>
+              <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                {loading ? (
+                  <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>
+                ) : (
+                  stats.approvedOrders.toLocaleString()
+                )}
+              </p>
+            </div>
+            <CheckSquare className="w-8 h-8 text-blue-600 opacity-50" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Shipped */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600">Shipped</p>
+              <p className="text-xl sm:text-2xl font-bold text-indigo-600">
+                {loading ? (
+                  <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>
+                ) : (
+                  stats.shippedOrders.toLocaleString()
+                )}
+              </p>
+            </div>
+            <Truck className="w-8 h-8 text-indigo-600 opacity-50" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delivered */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">

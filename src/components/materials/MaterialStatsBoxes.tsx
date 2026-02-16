@@ -1,21 +1,25 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Box, AlertTriangle, XCircle } from 'lucide-react';
+import { Box, CheckCircle, AlertTriangle, XCircle, PackagePlus } from 'lucide-react';
 
 interface MaterialStatsBoxesProps {
   totalMaterials: number;
+  inStock: number;
   lowStockAlerts: number;
   outOfStock: number;
+  overstock: number;
   loading: boolean;
 }
 
 export default function MaterialStatsBoxes({
   totalMaterials,
+  inStock,
   lowStockAlerts,
   outOfStock,
+  overstock,
   loading,
 }: MaterialStatsBoxesProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       {/* Total Materials */}
       <Card>
         <CardContent className="p-4">
@@ -31,6 +35,25 @@ export default function MaterialStatsBoxes({
               </p>
             </div>
             <Box className="w-8 h-8 text-blue-600 opacity-50" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* In Stock */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600">In Stock</p>
+              <p className="text-xl sm:text-2xl font-bold text-green-600">
+                {loading ? (
+                  <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>
+                ) : (
+                  inStock.toLocaleString()
+                )}
+              </p>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-600 opacity-50" />
           </div>
         </CardContent>
       </Card>
@@ -69,6 +92,25 @@ export default function MaterialStatsBoxes({
               </p>
             </div>
             <XCircle className="w-8 h-8 text-red-600 opacity-50" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Overstock */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs sm:text-sm text-gray-600">Overstock</p>
+              <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                {loading ? (
+                  <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>
+                ) : (
+                  overstock.toLocaleString()
+                )}
+              </p>
+            </div>
+            <PackagePlus className="w-8 h-8 text-blue-600 opacity-50" />
           </div>
         </CardContent>
       </Card>

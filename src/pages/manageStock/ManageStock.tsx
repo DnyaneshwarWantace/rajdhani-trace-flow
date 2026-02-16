@@ -36,6 +36,8 @@ export default function ManageStock() {
     totalOrders: 0,
     totalValue: 0,
     pendingOrders: 0,
+    approvedOrders: 0,
+    shippedOrders: 0,
     deliveredOrders: 0,
   });
   const [filters, setFilters] = useState<OrderFiltersType>({

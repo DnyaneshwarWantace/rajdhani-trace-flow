@@ -33,6 +33,8 @@ export interface OrderStats {
   totalOrders: number;
   totalValue: number;
   pendingOrders: number;
+  approvedOrders: number;
+  shippedOrders: number;
   deliveredOrders: number;
 }
 

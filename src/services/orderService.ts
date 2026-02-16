@@ -77,7 +77,7 @@ export class OrderService {
 
   /** Lightweight stats (counts by status) – use instead of getOrders for stats. */
   static async getOrderStats(): Promise<{
-    data: { total: number; pending: number; accepted: number; dispatched: number; delivered: number } | null;
+    data: { total: number; pending: number; accepted: number; dispatched: number; delivered: number; cancelled: number } | null;
     error: string | null;
   }> {
     try {
@@ -94,6 +94,7 @@ export class OrderService {
           accepted: d.accepted_orders ?? 0,
           dispatched: d.dispatched_orders ?? 0,
           delivered: d.delivered_orders ?? 0,
+          cancelled: d.cancelled_orders ?? 0,
         },
         error: null,
       };

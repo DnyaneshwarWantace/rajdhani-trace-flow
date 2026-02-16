@@ -68,8 +68,10 @@ export default function MaterialList() {
   // Stats state
   const [materialStats, setMaterialStats] = useState({
     totalMaterials: 0,
+    inStock: 0,
     lowStockAlerts: 0,
     outOfStock: 0,
+    overstock: 0,
   });
   const [fullStats, setFullStats] = useState<any>(null); // Full stats for analytics tab
   const [statsLoading, setStatsLoading] = useState(false);
@@ -288,15 +290,19 @@ export default function MaterialList() {
       // Save summary for stat boxes
       setMaterialStats({
         totalMaterials: stats.totalMaterials || 0,
+        inStock: stats.inStock ?? 0,
         lowStockAlerts: stats.lowStock || 0,
         outOfStock: stats.outOfStock || 0,
+        overstock: stats.overstock ?? 0,
       });
     } catch (err) {
       console.error('Failed to load stats:', err);
       setMaterialStats({
         totalMaterials: totalMaterials || 0,
+        inStock: 0,
         lowStockAlerts: 0,
         outOfStock: 0,
+        overstock: 0,
       });
     } finally {
       setStatsLoading(false);
@@ -854,21 +860,23 @@ export default function MaterialList() {
   return (
     <Layout>
             <div>
-        {/* Page Header */}
+        {/* Page Header - only show Export, Add to Inventory, Grid/Table on Inventory tab */}
         <MaterialHeader
-          onImportCSV={handleImportCSV}
-          onExport={handleExport}
-          onAddToInventory={handleAddToInventory}
+          onImportCSV={activeTab === 'inventory' ? handleImportCSV : undefined}
+          onExport={activeTab === 'inventory' ? handleExport : undefined}
+          onAddToInventory={activeTab === 'inventory' ? handleAddToInventory : undefined}
           onAddMaterial={handleCreate}
           viewMode={viewMode}
-          onViewModeChange={setViewMode}
+          onViewModeChange={activeTab === 'inventory' ? setViewMode : undefined}
         />
 
         {/* Stats Boxes */}
         <MaterialStatsBoxes
           totalMaterials={materialStats.totalMaterials}
+          inStock={materialStats.inStock}
           lowStockAlerts={materialStats.lowStockAlerts}
           outOfStock={materialStats.outOfStock}
+          overstock={materialStats.overstock}
           loading={statsLoading}
         />
 
