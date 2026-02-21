@@ -57,7 +57,7 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       show: batch.length && batch.width && batch.length !== 'N/A' && batch.width !== 'N/A',
     },
     {
-      label: 'Weight',
+      label: 'Expected GSM',
       value: batch.weight && batch.weight !== 'N/A'
         ? `${batch.weight} ${batch.weight_unit || ''}`
         : 'N/A',

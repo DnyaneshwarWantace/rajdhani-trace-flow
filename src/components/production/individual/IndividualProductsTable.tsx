@@ -231,7 +231,7 @@ export default function IndividualProductsTable({
         
         if (col === 'final_weight' && product?.weight) {
           expectedNumeric = parseFloat(product.weight.toString().replace(/[^\d.]/g, ''));
-          fieldName = 'Weight';
+          fieldName = 'GSM';
         } else if (col === 'final_length' && product?.length) {
           expectedNumeric = parseFloat(product.length.toString().replace(/[^\d.]/g, ''));
           fieldName = 'Length';
@@ -883,7 +883,7 @@ export default function IndividualProductsTable({
       
       if (col === 'final_weight' && product?.weight) {
         expectedNumeric = parseFloat(product.weight.toString().replace(/[^\d.]/g, ''));
-        fieldName = 'Weight';
+        fieldName = 'GSM';
       } else if (col === 'final_length' && product?.length) {
         expectedNumeric = parseFloat(product.length.toString().replace(/[^\d.]/g, ''));
         fieldName = 'Length';
@@ -964,7 +964,7 @@ export default function IndividualProductsTable({
               )}
               {product.weight && (
                 <div>
-                  <p className="text-gray-600 font-medium mb-1">Expected Quality</p>
+                  <p className="text-gray-600 font-medium mb-1">Expected GSM</p>
                   <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
                 </div>
               )}
@@ -1001,7 +1001,7 @@ export default function IndividualProductsTable({
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final GSM</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
@@ -1144,7 +1144,7 @@ export default function IndividualProductsTable({
                             }}
                             className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                             disabled={index === localProducts.length - 1}
-                            title="Fill down weight"
+                            title="Fill down GSM"
                           >
                             <ArrowDown className="w-3 h-3" />
                           </Button>

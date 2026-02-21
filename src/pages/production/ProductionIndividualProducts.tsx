@@ -256,7 +256,7 @@ export default function ProductionIndividualProducts() {
     if (completeProducts.length === 0) {
       toast({
         title: 'Cannot Complete Production',
-        description: 'You must fill in all required fields (Final Weight, Final Width, Final Length) for at least 1 product before completing.',
+        description: 'You must fill in all required fields (Final GSM, Final Width, Final Length) for at least 1 product before completing.',
         variant: 'destructive',
       });
       return;

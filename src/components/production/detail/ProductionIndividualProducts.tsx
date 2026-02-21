@@ -92,7 +92,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Dimensions</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Weight</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">GSM</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Inspector</th>

@@ -442,7 +442,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">QR Code</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Serial Number</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Size (L × W)</th>
-                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Weight</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">GSM</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Color</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Pattern</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Status</th>
@@ -797,7 +797,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">QR Code</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Serial Number</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Size (L × W)</th>
-                                          <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Weight</th>
+                                          <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">GSM</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Color</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Pattern</th>
                                         </tr>

@@ -79,7 +79,7 @@ export default function ProductionOverviewStats({
               </div>
               <div>
                 <p className="text-2xl font-bold text-orange-600">{expectedWeight}</p>
-                <p className="text-sm text-gray-600">Expected Weight</p>
+                <p className="text-sm text-gray-600">Expected GSM</p>
               </div>
             </div>
           </Card>

@@ -76,7 +76,7 @@ export default function PlanningProductCard({ product, onClear }: PlanningProduc
             <div className="flex items-start gap-2">
               <Weight className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
-                <span className="text-xs text-gray-500">Weight</span>
+                <span className="text-xs text-gray-500">Expected GSM</span>
                 <p className="text-sm font-medium text-gray-900">
                   {product.weight} {product.weight_unit || ''}
                 </p>

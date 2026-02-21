@@ -13,6 +13,7 @@ import type { CreateProductionBatchData } from '@/services/productionService';
 import type { Product } from '@/types/product';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
+import { formatIndianDate } from '@/utils/formatHelpers';
 
 interface BatchDetailsFormProps {
   formData: CreateProductionBatchData;
@@ -93,7 +94,7 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
             {selectedProduct.weight && selectedProduct.weight !== 'N/A' && (
               <div className="flex items-start gap-1.5">
                 <Weight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span className="text-gray-600 flex-shrink-0">Weight:</span>
+                <span className="text-gray-600 flex-shrink-0">Expected GSM:</span>
                 <span className="font-medium text-gray-900 min-w-0 flex-1">
                   <TruncatedText
                     text={`${selectedProduct.weight} ${selectedProduct.weight_unit || ''}`}
@@ -173,7 +174,7 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
         />
         {orderDeliveryDate && (
           <p className="text-xs text-red-600 font-medium mt-1">
-            Order delivery: {new Date(orderDeliveryDate).toLocaleDateString()}. Suggested: complete before this date.
+            Order delivery: {formatIndianDate(orderDeliveryDate)}. Suggested: complete before this date.
           </p>
         )}
         {!orderDeliveryDate && (

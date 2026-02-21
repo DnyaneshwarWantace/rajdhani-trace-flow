@@ -194,7 +194,7 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
           )}
           {batch.weight && batch.weight !== 'N/A' && (
             <div className="flex justify-between gap-2">
-              <span className="text-gray-600 flex-shrink-0">Weight:</span>
+              <span className="text-gray-600 flex-shrink-0">Expected GSM:</span>
               <span className="font-medium text-gray-900 truncate">
                 {batch.weight} {batch.weight_unit || ''}
               </span>

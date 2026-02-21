@@ -57,7 +57,7 @@ export default function ExpectedProductDetails({ product, onEdit }: ExpectedProd
 
           {product.weight && (
             <div>
-              <p className="text-sm text-gray-600 mb-1">Weight:</p>
+              <p className="text-sm text-gray-600 mb-1">Expected GSM:</p>
               <p className="font-medium text-gray-900">
                 {product.weight} {product.weight_unit || ''}
               </p>

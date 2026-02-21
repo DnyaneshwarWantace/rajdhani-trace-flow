@@ -221,7 +221,7 @@ export default function MaterialRequirementsTable({
                                 <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">QR Code</th>
                                 <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Serial Number</th>
                                 <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Size (L × W)</th>
-                                <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Weight</th>
+                                <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">GSM</th>
                                 <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Color</th>
                                 <th className="border border-green-300 px-2 py-2 text-left font-semibold text-green-900">Pattern</th>
                               </tr>

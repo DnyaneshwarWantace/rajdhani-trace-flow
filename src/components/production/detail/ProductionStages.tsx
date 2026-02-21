@@ -439,7 +439,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                       )}
                       {product.weight && (
                         <div>
-                          <span className="text-gray-500">Weight:</span>
+                          <span className="text-gray-500">Expected GSM:</span>
                           <span className="ml-1 text-gray-900">{product.weight}</span>
                         </div>
                       )}

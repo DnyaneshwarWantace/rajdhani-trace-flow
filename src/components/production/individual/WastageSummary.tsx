@@ -379,7 +379,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                                 <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">QR Code</th>
                                 <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">Serial Number</th>
                                 <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">Dimensions</th>
-                                <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">Weight</th>
+                                <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">GSM</th>
                                 <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">Color</th>
                                 <th className="border border-purple-300 px-2 py-1 text-left font-semibold text-purple-900">Pattern</th>
                               </tr>

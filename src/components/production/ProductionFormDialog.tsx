@@ -23,6 +23,7 @@ import type { ProductionBatch, CreateProductionBatchData } from '@/services/prod
 import { ProductService } from '@/services/productService';
 import { OrderService } from '@/services/orderService';
 import type { Product } from '@/types/product';
+import { formatIndianDate } from '@/utils/formatHelpers';
 
 interface ProductionFormDialogProps {
   isOpen: boolean;
@@ -250,7 +251,7 @@ export default function ProductionFormDialog({
               />
               {selectedBatch && orderEarliestDelivery ? (
                 <p className="text-xs text-red-600 font-medium mt-1">
-                  Order delivery: {new Date(orderEarliestDelivery).toLocaleDateString()}. Suggested: complete before this date.
+                  Order delivery: {formatIndianDate(orderEarliestDelivery)}. Suggested: complete before this date.
                 </p>
               ) : (
                 <p className="text-xs text-gray-500 mt-1">
