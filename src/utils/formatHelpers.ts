@@ -80,11 +80,16 @@ export const formatIndianNumberWithDecimals = (value: number, maxDecimals: numbe
 };
 
 // Indian Currency Formatting
-export const formatCurrency = (value: number): string => {
+// Set full: true to always show full amount (e.g. ₹1,14,000) instead of abbreviated (e.g. ₹1.14 Lac)
+export const formatCurrency = (value: number, options?: { full?: boolean }): string => {
   if (value === null || value === undefined || isNaN(value)) return '₹0';
 
   const absValue = Math.abs(value);
   const sign = value < 0 ? '-' : '';
+
+  if (options?.full) {
+    return `${sign}₹${formatIndianNumberWithDecimals(absValue, 2)}`;
+  }
 
   if (absValue >= 10000000) {
     // Crores

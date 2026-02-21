@@ -30,32 +30,32 @@ export function PaymentSummaryCard({
       <CardContent className="space-y-3">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Subtotal</span>
-          <span className="font-semibold">{formatCurrency(parseFloat(subtotal || '0'))}</span>
+          <span className="font-semibold">{formatCurrency(parseFloat(subtotal || '0'), { full: true })}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">GST Amount</span>
-          <span className="font-semibold text-blue-600">{formatCurrency(parseFloat(gstAmount || '0'))}</span>
+          <span className="font-semibold text-blue-600">{formatCurrency(parseFloat(gstAmount || '0'), { full: true })}</span>
         </div>
         {discountAmount && parseFloat(discountAmount) > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Discount</span>
             <span className="font-semibold text-red-600">
-              -{formatCurrency(parseFloat(discountAmount))}
+              -{formatCurrency(parseFloat(discountAmount), { full: true })}
             </span>
           </div>
         )}
         <div className="flex justify-between pt-3 border-t">
           <span className="font-semibold text-lg">Total Amount</span>
-          <span className="font-bold text-xl">{formatCurrency(totalAmount)}</span>
+          <span className="font-bold text-xl">{formatCurrency(totalAmount, { full: true })}</span>
         </div>
         <div className="flex justify-between text-sm pt-2 border-t">
           <span className="text-gray-600">Paid Amount</span>
-          <span className="font-semibold text-green-600">{formatCurrency(paidAmount)}</span>
+          <span className="font-semibold text-green-600">{formatCurrency(paidAmount, { full: true })}</span>
         </div>
         <div className="flex justify-between pt-2 border-t">
           <span className="font-semibold text-base">Outstanding</span>
           <span className="font-bold text-lg text-red-600">
-            {formatCurrency(outstandingAmount)}
+            {formatCurrency(outstandingAmount, { full: true })}
           </span>
         </div>
       </CardContent>

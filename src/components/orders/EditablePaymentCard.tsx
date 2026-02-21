@@ -59,7 +59,7 @@ export function EditablePaymentCard({
     if (editedPaidAmount > totalAmount) {
       toast({
         title: 'Validation Error',
-        description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount)}`,
+        description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount, { full: true })}`,
         variant: 'destructive',
       });
       return;
@@ -114,26 +114,26 @@ export function EditablePaymentCard({
       <CardContent className="space-y-3">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Subtotal</span>
-          <span className="font-semibold">{formatCurrency(parseFloat(subtotal.toString()))}</span>
+          <span className="font-semibold">{formatCurrency(parseFloat(subtotal.toString()), { full: true })}</span>
         </div>
 
         {gstAmount && parseFloat(gstAmount.toString()) > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">GST</span>
-            <span className="font-semibold">{formatCurrency(parseFloat(gstAmount.toString()))}</span>
+            <span className="font-semibold">{formatCurrency(parseFloat(gstAmount.toString()), { full: true })}</span>
           </div>
         )}
 
         {discountAmount && parseFloat(discountAmount.toString()) > 0 && (
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Discount</span>
-            <span className="font-semibold text-red-600">-{formatCurrency(parseFloat(discountAmount.toString()))}</span>
+            <span className="font-semibold text-red-600">-{formatCurrency(parseFloat(discountAmount.toString()), { full: true })}</span>
           </div>
         )}
 
         <div className="flex justify-between pt-3 border-t">
           <span className="font-semibold">Total Amount</span>
-          <span className="font-bold text-lg">{formatCurrency(totalAmount)}</span>
+          <span className="font-bold text-lg">{formatCurrency(totalAmount, { full: true })}</span>
         </div>
 
         {isEditing && !readOnly ? (
@@ -161,7 +161,7 @@ export function EditablePaymentCard({
                   if (newPaidAmount > totalAmount) {
                     toast({
                       title: 'Validation Error',
-                      description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount)}`,
+                      description: `Paid amount cannot exceed total amount of ${formatCurrency(totalAmount, { full: true })}`,
                       variant: 'destructive',
                     });
                     // Cap the value at totalAmount
@@ -182,7 +182,7 @@ export function EditablePaymentCard({
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Outstanding</span>
               <span className={`font-semibold ${calculatedOutstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(calculatedOutstanding)}
+                {formatCurrency(calculatedOutstanding, { full: true })}
               </span>
             </div>
             <div className="flex gap-2">
@@ -209,12 +209,12 @@ export function EditablePaymentCard({
           <>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Paid</span>
-              <span className="font-semibold text-green-600">{formatCurrency(paidAmount)}</span>
+              <span className="font-semibold text-green-600">{formatCurrency(paidAmount, { full: true })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Outstanding</span>
               <span className={`font-semibold ${outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(outstandingAmount)}
+                {formatCurrency(outstandingAmount, { full: true })}
               </span>
             </div>
           </>
@@ -230,11 +230,11 @@ export function EditablePaymentCard({
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-medium text-gray-900">{history.changed_by}</span>
                     <span className={`font-semibold ${history.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {history.amount >= 0 ? '+' : ''}{formatCurrency(history.amount)}
+                      {history.amount >= 0 ? '+' : ''}{formatCurrency(history.amount, { full: true })}
                     </span>
                   </div>
                   <div className="text-gray-600">
-                    {formatCurrency(history.previous_paid_amount)} → {formatCurrency(history.new_paid_amount)}
+                    {formatCurrency(history.previous_paid_amount, { full: true })} → {formatCurrency(history.new_paid_amount, { full: true })}
                   </div>
                   <div className="text-gray-500 mt-1">
                     {new Date(history.changed_at).toLocaleString()}

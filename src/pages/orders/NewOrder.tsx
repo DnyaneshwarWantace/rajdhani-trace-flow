@@ -415,7 +415,7 @@ export default function NewOrder() {
       if (paidAmount > totalAmount) {
         toast({
           title: 'Validation Error',
-          description: `Paid amount (${formatCurrency(paidAmount)}) cannot exceed total amount (${formatCurrency(totalAmount)})`,
+          description: `Paid amount (${formatCurrency(paidAmount, { full: true })}) cannot exceed total amount (${formatCurrency(totalAmount, { full: true })})`,
           variant: 'destructive',
         });
         return;
@@ -472,7 +472,7 @@ export default function NewOrder() {
 
       toast({
         title: 'Success',
-        description: `Order created successfully! Total: ${formatCurrency(totalAmount)}`,
+        description: `Order created successfully! Total: ${formatCurrency(totalAmount, { full: true })}`,
       });
 
       // Keep button disabled during navigation

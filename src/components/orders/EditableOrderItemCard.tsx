@@ -171,8 +171,8 @@ export function EditableOrderItemCard({
           )}
         </div>
         <div className="text-right ml-4">
-          <p className="text-xl font-bold">{formatCurrency(parseFloat(item.total_price))}</p>
-          <p className="text-xs text-gray-500">@ {formatCurrency(parseFloat(item.unit_price))} / {getPriceUnitLabel(item.pricing_unit, item.unit)}</p>
+          <p className="text-xl font-bold">{formatCurrency(parseFloat(item.total_price), { full: true })}</p>
+          <p className="text-xs text-gray-500">@ {formatCurrency(parseFloat(item.unit_price), { full: true })} / {getPriceUnitLabel(item.pricing_unit, item.unit)}</p>
         </div>
       </div>
 

@@ -70,16 +70,16 @@ function CollapsedItemSummary({
             </span>
             {item.unit_price > 0 && (
               <span className="text-gray-600">
-                @ <span className="font-medium text-gray-900">{formatCurrency(item.unit_price ?? 0)}</span> / {item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : unitLabel}
+                @ <span className="font-medium text-gray-900">{formatCurrency(item.unit_price ?? 0, { full: true })}</span> / {item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : unitLabel}
               </span>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-600 pt-0.5 border-t border-gray-100 mt-1.5">
-            <span><span className="text-gray-500">Subtotal:</span> <span className="font-medium text-gray-800">{formatCurrency(item.subtotal ?? 0)}</span></span>
+            <span><span className="text-gray-500">Subtotal:</span> <span className="font-medium text-gray-800">{formatCurrency(item.subtotal ?? 0, { full: true })}</span></span>
             {(item.gst_amount ?? 0) > 0 && (
-              <span><span className="text-gray-500">GST:</span> <span className="font-medium text-gray-800">{formatCurrency(item.gst_amount ?? 0)}</span></span>
+              <span><span className="text-gray-500">GST:</span> <span className="font-medium text-gray-800">{formatCurrency(item.gst_amount ?? 0, { full: true })}</span></span>
             )}
-            <span><span className="text-gray-500">Total:</span> <span className="font-semibold text-primary-600">{formatCurrency(item.total_price ?? 0)}</span></span>
+            <span><span className="text-gray-500">Total:</span> <span className="font-semibold text-primary-600">{formatCurrency(item.total_price ?? 0, { full: true })}</span></span>
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>

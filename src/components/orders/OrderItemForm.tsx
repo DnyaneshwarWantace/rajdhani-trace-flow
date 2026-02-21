@@ -482,9 +482,9 @@ export default function OrderItemForm({
 
       {/* This item summary only – at bottom of card */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 py-2 px-3 rounded-md bg-gray-100 border border-gray-200 text-sm">
-        <span><span className="text-gray-600">Subtotal:</span> <span className="font-medium">{formatCurrency(item.subtotal ?? 0)}</span></span>
-        <span><span className="text-gray-600">GST:</span> <span className="font-medium">{formatCurrency(item.gst_amount ?? 0)}</span></span>
-        <span><span className="text-gray-600">This item total:</span> <span className="font-semibold text-primary">{formatCurrency(item.total_price ?? 0)}</span></span>
+        <span><span className="text-gray-600">Subtotal:</span> <span className="font-medium">{formatCurrency(item.subtotal ?? 0, { full: true })}</span></span>
+        <span><span className="text-gray-600">GST:</span> <span className="font-medium">{formatCurrency(item.gst_amount ?? 0, { full: true })}</span></span>
+        <span><span className="text-gray-600">This item total:</span> <span className="font-semibold text-primary">{formatCurrency(item.total_price ?? 0, { full: true })}</span></span>
       </div>
     </div>
   );

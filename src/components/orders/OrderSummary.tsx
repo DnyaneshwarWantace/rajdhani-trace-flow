@@ -151,9 +151,9 @@ export default function OrderSummary({
                         <td className="py-2 px-3 text-right">
                           {item.quantity} {item.unit || ''}
                         </td>
-                        <td className="py-2 px-3 text-right">{formatCurrency(item.unit_price ?? 0)}</td>
-                        <td className="py-2 px-3 text-right">{formatCurrency(item.gst_amount ?? 0)}</td>
-                        <td className="py-2 px-3 text-right font-medium">{formatCurrency(item.total_price ?? 0)}</td>
+                        <td className="py-2 px-3 text-right">{formatCurrency(item.unit_price ?? 0, { full: true })}</td>
+                        <td className="py-2 px-3 text-right">{formatCurrency(item.gst_amount ?? 0, { full: true })}</td>
+                        <td className="py-2 px-3 text-right font-medium">{formatCurrency(item.total_price ?? 0, { full: true })}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -167,23 +167,23 @@ export default function OrderSummary({
         <div className="space-y-3">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>{formatCurrency(subtotal)}</span>
+            <span>{formatCurrency(subtotal, { full: true })}</span>
           </div>
           <div className="flex justify-between">
             <span>GST:</span>
-            <span>{formatCurrency(gstAmount)}</span>
+            <span>{formatCurrency(gstAmount, { full: true })}</span>
           </div>
           <div className="flex justify-between font-medium text-lg border-t pt-2">
             <span>Total Amount:</span>
-            <span className="text-primary">{formatCurrency(totalAmount)}</span>
+            <span className="text-primary">{formatCurrency(totalAmount, { full: true })}</span>
           </div>
           <div className="flex justify-between">
             <span>Paid Amount:</span>
-            <span className="text-green-600">{formatCurrency(paidAmount)}</span>
+            <span className="text-green-600">{formatCurrency(paidAmount, { full: true })}</span>
           </div>
           <div className="flex justify-between font-medium text-lg border-t pt-2">
             <span>Outstanding Amount:</span>
-            <span className="text-orange-600">{formatCurrency(outstandingAmount)}</span>
+            <span className="text-orange-600">{formatCurrency(outstandingAmount, { full: true })}</span>
           </div>
         </div>
 
