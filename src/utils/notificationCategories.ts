@@ -106,6 +106,15 @@ export const categorizeNotifications = (notifications: Notification[]): Notifica
   ];
 
   // Filter out empty sections
-  return sections.filter(section => section.notifications.length > 0);
+  const nonEmpty = sections.filter(section => section.notifications.length > 0);
+
+  // Sort sections by newest notification first (descending order: new first, old last)
+  nonEmpty.sort((a, b) => {
+    const aNewest = new Date(a.notifications[0].created_at).getTime();
+    const bNewest = new Date(b.notifications[0].created_at).getTime();
+    return bNewest - aNewest;
+  });
+
+  return nonEmpty;
 };
 

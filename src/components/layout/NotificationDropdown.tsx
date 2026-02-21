@@ -58,8 +58,8 @@ export default function NotificationDropdown({ isOpen, onClose }: NotificationDr
         offset: 0,
       });
       
-      // Sort by created_at descending (newest first)
-      const sorted = data.sort((a, b) => 
+      // Sort by created_at descending (newest first, old last)
+      const sorted = [...data].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
       
