@@ -660,6 +660,13 @@ export default function IndividualProductsTable({
 
     setLocalProducts(updated);
 
+    // Check if target row (temp) now has all required fields for auto-create
+    const tempProduct = updated[targetIndex];
+    const hasRequiredFields = tempProduct.final_weight &&
+      tempProduct.final_width &&
+      tempProduct.final_length &&
+      productId;
+
     // Auto-save if it's a real product
     if (targetRow.id && !targetRow.id.startsWith('temp-') && Object.keys(updateData).length > 0) {
       try {
@@ -674,6 +681,38 @@ export default function IndividualProductsTable({
         toast({
           title: 'Error',
           description: 'Failed to save values',
+          variant: 'destructive',
+        });
+      }
+    } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
+      // For temp row: full-row fill down filled all required fields → create product so QR code is generated
+      try {
+        const newProduct = await IndividualProductService.createIndividualProduct({
+          product_id: productId!,
+          qr_code: tempProduct.qr_code || '',
+          serial_number: tempProduct.serial_number || '',
+          status: tempProduct.status || 'available',
+          final_length: tempProduct.final_length || '',
+          final_width: tempProduct.final_width || '',
+          final_weight: tempProduct.final_weight || '',
+          inspector: user?.full_name || user?.email || 'System',
+          location: tempProduct.location || 'Warehouse A - General Storage',
+          notes: tempProduct.notes || '',
+          production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
+          batch_number: batchId || '',
+        });
+        updated[targetIndex] = newProduct;
+        setLocalProducts(updated);
+        toast({
+          title: 'Filled Down & Created',
+          description: 'Row copied to next row and product created successfully. QR code generated.',
+        });
+        onUpdate?.();
+      } catch (error) {
+        console.error('Error creating individual product:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to create individual product',
           variant: 'destructive',
         });
       }

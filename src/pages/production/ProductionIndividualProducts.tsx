@@ -235,6 +235,23 @@ export default function ProductionIndividualProducts() {
     }
   };
 
+  // Silent refresh: only refetch individual products. No full-page loading.
+  // Used when table saves/deletes/creates so the page doesn't reload or show loading spinner.
+  const handleTableUpdate = async () => {
+    if (!batch?.product_id) return;
+    try {
+      const { products } = await IndividualProductService.getIndividualProducts({
+        product_id: batch.product_id,
+      });
+      const batchProducts = products.filter((p: IndividualProduct) =>
+        p.batch_number === id || p.batch_number === batch.batch_number
+      );
+      setIndividualProducts(batchProducts);
+    } catch (error) {
+      console.error('Error refetching individual products:', error);
+    }
+  };
+
   const handleCompleteClick = async () => {
     // Refetch from backend so we validate against latest saved data (avoids stale state after copy/paste or fill down)
     const freshProducts = await refetchIndividualProducts();
@@ -392,7 +409,7 @@ export default function ProductionIndividualProducts() {
         {/* Individual Products Table */}
         <IndividualProductsTable
           individualProducts={individualProducts}
-          onUpdate={handleRefresh}
+          onUpdate={handleTableUpdate}
           product={product ? {
             weight_unit: product.weight_unit,
             width_unit: product.width_unit,
