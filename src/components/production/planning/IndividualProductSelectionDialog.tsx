@@ -104,19 +104,20 @@ export default function IndividualProductSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Select Individual Products
-          </DialogTitle>
-          <p className="text-sm text-gray-600 mt-1">
-            Product: <span className="font-medium">{materialName}</span>
-          </p>
-        </DialogHeader>
+      <DialogContent customLayout className="max-w-4xl h-[90vh] max-h-[90vh] flex flex-col p-0 gap-0">
+        <div className="flex-shrink-0 px-6 pt-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Select Individual Products
+            </DialogTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Product: <span className="font-medium">{materialName}</span>
+            </p>
+          </DialogHeader>
 
-        {/* Selection Summary */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          {/* Selection Summary */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div>
@@ -148,35 +149,36 @@ export default function IndividualProductSelectionDialog({
               </Badge>
             )}
           </div>
-        </div>
+          </div>
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search by ID, QR code, serial number, or batch..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Select All */}
-        <div className="flex items-center justify-between py-2 border-b">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <Checkbox
-              checked={filteredProducts.length > 0 && selectedProducts.size === filteredProducts.length}
-              onCheckedChange={handleSelectAll}
+          {/* Search */}
+          <div className="relative mt-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search by ID, QR code, serial number, or batch..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
             />
-            <span className="text-sm font-medium">
-              Select All ({filteredProducts.length} products)
-            </span>
-          </label>
+          </div>
+
+          {/* Select All */}
+          <div className="flex items-center justify-between py-2 border-b mt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Checkbox
+                checked={filteredProducts.length > 0 && selectedProducts.size === filteredProducts.length}
+                onCheckedChange={handleSelectAll}
+              />
+              <span className="text-sm font-medium">
+                Select All ({filteredProducts.length} products)
+              </span>
+            </label>
+          </div>
         </div>
 
-        {/* Product List */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Product List - scrollable only this section so Confirm stays visible */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -269,8 +271,8 @@ export default function IndividualProductSelectionDialog({
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between pt-4 border-t">
+        {/* Actions - sticky at bottom so no scrolling to confirm when quantity is large */}
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t bg-white">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

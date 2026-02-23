@@ -89,10 +89,15 @@ export default function RecipeManagementCard({
     setIsMaterialSelectorOpen(false);
   };
 
+  const to4Decimals = (v: number | string | undefined): number | '' =>
+    v === '' || v == null ? '' : Number(Number(v).toFixed(4));
+
   const handleEditMaterial = (material: any, recipe: Recipe) => {
+    const q = material.quantity_per_sqm ?? material.quantity;
     setEditingMaterial({
       ...material,
       recipe_id: recipe.id,
+      quantity_per_sqm: q != null ? to4Decimals(q) as number : undefined,
     });
     setIsMaterialSelectorOpen(false); // Close material selector when editing
   };
@@ -235,7 +240,7 @@ export default function RecipeManagementCard({
           material_id: m.material_id,
           material_name: m.material_name,
           material_type: m.material_type,
-          quantity_per_sqm: m.quantity_per_sqm,
+          quantity_per_sqm: typeof m.quantity_per_sqm === 'number' ? Number(m.quantity_per_sqm.toFixed(4)) : m.quantity_per_sqm,
           unit: m.unit,
         })),
       });
@@ -412,13 +417,17 @@ export default function RecipeManagementCard({
                           <Input
                             id={`quantity-${index}`}
                             type="number"
-                            value={material.quantity_per_sqm ?? ''}
+                            value={
+                              material.quantity_per_sqm != null
+                                ? Number(material.quantity_per_sqm).toFixed(4)
+                                : ''
+                            }
                             onChange={(e) => {
                               const value = e.target.value;
                               const updated = [...editingMaterial.materials];
                               updated[index] = {
                                 ...updated[index],
-                                quantity_per_sqm: value === '' ? '' : parseFloat(value),
+                                quantity_per_sqm: value === '' ? '' : (to4Decimals(parseFloat(value)) as number),
                               };
                               setEditingMaterial({ ...editingMaterial, materials: updated });
                             }}
@@ -455,12 +464,16 @@ export default function RecipeManagementCard({
                     <Input
                       id="quantity"
                       type="number"
-                      value={editingMaterial.quantity_per_sqm ?? editingMaterial.quantity ?? ''}
+                      value={
+                        editingMaterial.quantity_per_sqm != null || editingMaterial.quantity != null
+                          ? Number(editingMaterial.quantity_per_sqm ?? editingMaterial.quantity).toFixed(4)
+                          : ''
+                      }
                       onChange={(e) => {
                         const value = e.target.value;
                         setEditingMaterial({
                           ...editingMaterial,
-                          quantity_per_sqm: value === '' ? '' : parseFloat(value),
+                          quantity_per_sqm: value === '' ? '' : (to4Decimals(parseFloat(value)) as number),
                         });
                       }}
                       min="0"

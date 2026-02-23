@@ -3,7 +3,7 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { CustomerService, type Customer, type CreateCustomerData } from '@/services/customerService';
+import { CustomerService, type Customer, type CreateCustomerData, type UpdateCustomerData } from '@/services/customerService';
 import { OrderService, type Order } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -179,7 +179,21 @@ export default function CustomerDetail() {
 
     try {
       setSubmitting(true);
-      const { data, error } = await CustomerService.updateCustomer(id, formData);
+      // Serialize address objects for API (same as CustomerList) so address gets updated
+      const submitData: Record<string, unknown> = {
+        ...formData,
+        permanent_address: formData.permanentAddress ? JSON.stringify(formData.permanentAddress) : undefined,
+        delivery_address: formData.deliveryAddress ? JSON.stringify(formData.deliveryAddress) : undefined,
+        address: formData.permanentAddress?.address ?? formData.address,
+        city: formData.permanentAddress?.city ?? formData.city,
+        state: formData.permanentAddress?.state ?? formData.state,
+        pincode: formData.permanentAddress?.pincode ?? formData.pincode,
+      };
+      delete submitData.permanentAddress;
+      delete submitData.deliveryAddress;
+      delete submitData.sameAsPermanent;
+
+      const { data, error } = await CustomerService.updateCustomer(id, submitData as UpdateCustomerData);
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
         return;

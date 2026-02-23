@@ -547,7 +547,7 @@ export default function ProductMaterialSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent customLayout className="max-w-7xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
@@ -582,7 +582,7 @@ export default function ProductMaterialSelectionDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex flex-col px-6 pt-4 gap-4" style={{ height: 'calc(90vh - 200px)' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col px-6 pt-4 gap-4">
           {/* Search */}
           <div className="flex gap-2 flex-shrink-0">
             <div className="flex-1">

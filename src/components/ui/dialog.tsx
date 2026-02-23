@@ -64,10 +64,15 @@ const DialogOverlay = React.forwardRef<
 })
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** When true, children are rendered directly without the default scroll wrapper (use for custom layout with sticky header/footer). */
+  customLayout?: boolean;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, customLayout, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -78,25 +83,35 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
-      <div
-        className="overflow-y-auto max-h-[85vh]"
-        onWheel={(e) => {
-          // Prevent scroll propagation when scrolling inside dialog
-          e.stopPropagation();
-        }}
-        onTouchMove={(e) => {
-          // Prevent scroll propagation on mobile
-          e.stopPropagation();
-        }}
-      >
-        <div className="grid gap-4 px-6 py-6">
+      {customLayout ? (
+        <>
           {children}
-        </div>
-      </div>
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </>
+      ) : (
+        <>
+          <div
+            className="overflow-y-auto max-h-[85vh]"
+            onWheel={(e) => {
+              e.stopPropagation();
+            }}
+            onTouchMove={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="grid gap-4 px-6 py-6">
+              {children}
+            </div>
+          </div>
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground z-10">
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        </>
+      )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
