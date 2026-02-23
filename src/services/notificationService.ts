@@ -63,8 +63,13 @@ export class NotificationService {
       }
 
       const result = await response.json();
+      const list = result.data || [];
+      // Always return newest first (by created_at or createdAt)
+      const getTime = (n: Notification & { createdAt?: string }) =>
+        new Date(n.created_at || n.createdAt || 0).getTime();
+      const sorted = [...list].sort((a, b) => getTime(b) - getTime(a));
       return {
-        data: result.data || [],
+        data: sorted,
         total: result.total || 0,
       };
     } catch (error) {

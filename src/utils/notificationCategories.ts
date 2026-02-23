@@ -66,41 +66,47 @@ export const categorizeNotifications = (notifications: Notification[]): Notifica
     categories[category].push(notification);
   });
 
-  // Create sections with metadata
+  // Sort by date descending (newest first); support created_at or createdAt
+  const getTime = (n: Notification & { createdAt?: string }) =>
+    new Date(n.created_at || (n as any).createdAt || 0).getTime();
+  const sortByNewest = (list: Notification[]) =>
+    [...list].sort((a, b) => getTime(b) - getTime(a));
+
+  // Create sections with metadata; notifications in each section are newest first
   const sections: NotificationSection[] = [
     {
       category: 'orders',
       title: 'Order Related',
-      icon: null, // Will be set in component
-      notifications: categories.orders,
+      icon: null,
+      notifications: sortByNewest(categories.orders),
       unreadCount: categories.orders.filter(n => n.status === 'unread').length,
     },
     {
       category: 'production',
       title: 'Production Related',
       icon: null,
-      notifications: categories.production,
+      notifications: sortByNewest(categories.production),
       unreadCount: categories.production.filter(n => n.status === 'unread').length,
     },
     {
       category: 'stock',
       title: 'Stock Notifications',
       icon: null,
-      notifications: categories.stock,
+      notifications: sortByNewest(categories.stock),
       unreadCount: categories.stock.filter(n => n.status === 'unread').length,
     },
     {
       category: 'activity_logs',
       title: 'Activity Logs',
       icon: null,
-      notifications: categories.activity_logs,
+      notifications: sortByNewest(categories.activity_logs),
       unreadCount: categories.activity_logs.filter(n => n.status === 'unread').length,
     },
     {
       category: 'other',
       title: 'Other Notifications',
       icon: null,
-      notifications: categories.other,
+      notifications: sortByNewest(categories.other),
       unreadCount: categories.other.filter(n => n.status === 'unread').length,
     },
   ];
@@ -108,10 +114,10 @@ export const categorizeNotifications = (notifications: Notification[]): Notifica
   // Filter out empty sections
   const nonEmpty = sections.filter(section => section.notifications.length > 0);
 
-  // Sort sections by newest notification first (descending order: new first, old last)
+  // Sort sections by newest notification first (new first, old last)
   nonEmpty.sort((a, b) => {
-    const aNewest = new Date(a.notifications[0].created_at).getTime();
-    const bNewest = new Date(b.notifications[0].created_at).getTime();
+    const aNewest = getTime(a.notifications[0]);
+    const bNewest = getTime(b.notifications[0]);
     return bNewest - aNewest;
   });
 
