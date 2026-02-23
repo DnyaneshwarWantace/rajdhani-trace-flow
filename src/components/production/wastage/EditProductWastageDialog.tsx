@@ -156,12 +156,14 @@ export default function EditProductWastageDialog({
       let lengthUnit = '';
       let widthUnit = '';
       let weightUnit = '';
-      try {
-        const baseProduct = await ProductService.getProductById(materialId);
-        lengthUnit = baseProduct.length_unit || '';
-        widthUnit = baseProduct.width_unit || '';
-        weightUnit = baseProduct.weight_unit || '';
-      } catch (_) {}
+      if (materialId) {
+        try {
+          const baseProduct = await ProductService.getProductById(materialId);
+          lengthUnit = baseProduct.length_unit || '';
+          widthUnit = baseProduct.width_unit || '';
+          weightUnit = baseProduct.weight_unit || '';
+        } catch (_) {}
+      }
 
       const selectedProductsDetails = individualProducts
         .filter((p) => selectedProductIds.has(p.id || ''))

@@ -23,7 +23,7 @@ interface WastageManagementProps {
 export default function WastageManagement({
   batchId,
   consumedMaterials,
-  onRefresh,
+  onRefresh: _onRefresh,
   onWasteUpdated,
   productId,
   productName,
