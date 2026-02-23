@@ -8,11 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import AddWasteDialog from './AddWasteDialog';
 import ProductWastageAutoDialog from './ProductWastageAutoDialog';
+import EditWasteDialog from './EditWasteDialog';
+import EditProductWastageDialog from './EditProductWastageDialog';
 
 interface WastageManagementProps {
   batchId: string;
   consumedMaterials: any[];
   onRefresh?: () => void;
+  onWasteUpdated?: () => void;
   productId?: string;
   productName?: string;
 }
@@ -21,6 +24,7 @@ export default function WastageManagement({
   batchId,
   consumedMaterials,
   onRefresh,
+  onWasteUpdated,
   productId,
   productName,
 }: WastageManagementProps) {
@@ -30,6 +34,8 @@ export default function WastageManagement({
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showProductWastageDialog, setShowProductWastageDialog] = useState(false);
   const [selectedMaterialForWastage, setSelectedMaterialForWastage] = useState<any>(null);
+  const [editingWaste, setEditingWaste] = useState<WasteItem | null>(null);
+  const [editingProductWaste, setEditingProductWaste] = useState<WasteItem | null>(null);
 
   useEffect(() => {
     if (batchId) {
@@ -184,8 +190,8 @@ export default function WastageManagement({
 
   return (
     <>
-      <Card>
-        <CardHeader>
+      <Card className="overflow-visible">
+        <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Trash2 className="w-5 h-5" />
@@ -205,7 +211,7 @@ export default function WastageManagement({
         <CardContent>
           {/* Auto-Generate Wastage for Products */}
           {consumedMaterials.length > 0 && (
-            <div className="mb-6 space-y-3">
+            <div className="mb-6 mt-4 space-y-3">
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Auto-Generate Product Wastage</h3>
               {(() => {
                 // Filter products - also check by material_id format (PRO-* indicates product)
@@ -440,10 +446,16 @@ export default function WastageManagement({
             </div>
           )}
 
-        {/* Separate wastage by type */}
+        {/* Separate wastage by type - product only (exclude raw_material); raw only */}
         {(() => {
+          const isProductWaste = (w: WasteItem) =>
+            w.material_type !== 'raw_material' &&
+            (w.material_type === 'product' ||
+              !!w.product_id ||
+              (w.material_id && (String(w.material_id).startsWith('PRO-') || String(w.material_id).startsWith('PRD-'))) ||
+              (w.individual_products && w.individual_products.length > 0));
+          const productWaste = wasteItems.filter(isProductWaste);
           const rawMaterialWaste = wasteItems.filter(w => w.material_type === 'raw_material');
-          const productWaste = wasteItems.filter(w => w.material_type === 'product');
 
           if (wasteItems.length === 0 && !consumedMaterials.some((m) => {
             const potential = getProductWastagePotential(m);
@@ -527,7 +539,12 @@ export default function WastageManagement({
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingWaste(waste)}
+                      title="Edit waste"
+                    >
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
@@ -631,17 +648,10 @@ export default function WastageManagement({
                       <div>
                         <p className="text-gray-500 text-xs">Can Be Reused</p>
                         <p className="font-medium text-gray-900">
-                          {waste.can_be_reused ? (
-                            <span className="text-green-600 flex items-center gap-1">
-                              <CheckCircle className="w-4 h-4" />
-                              Yes
-                            </span>
-                          ) : (
-                            <span className="text-red-600 flex items-center gap-1">
-                              <XCircle className="w-4 h-4" />
-                              No
-                            </span>
-                          )}
+                          <span className="text-red-600 flex items-center gap-1">
+                            <XCircle className="w-4 h-4" />
+                            No
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -652,7 +662,12 @@ export default function WastageManagement({
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingProductWaste(waste)}
+                      title="Edit which individual products are in this wastage"
+                    >
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
@@ -731,11 +746,7 @@ export default function WastageManagement({
       onSuccess={() => {
         loadWasteItems();
         setShowAddDialog(false);
-        // Call onRefresh to update parent component's wasteItems state
-        // This is needed for the "Individual Products" button to enable
-        if (onRefresh) {
-          onRefresh();
-        }
+        onWasteUpdated?.();
       }}
       batchId={batchId}
       consumedMaterials={consumedMaterials}
@@ -754,16 +765,36 @@ export default function WastageManagement({
           loadWasteItems();
           setShowProductWastageDialog(false);
           setSelectedMaterialForWastage(null);
-          // Call onRefresh to update parent component's wasteItems state
-          // This is needed for the "Individual Products" button to enable
-          if (onRefresh) {
-            onRefresh();
-          }
+          onWasteUpdated?.();
         }}
         batchId={batchId}
         material={selectedMaterialForWastage}
       />
     )}
+
+    <EditWasteDialog
+      isOpen={!!editingWaste}
+      onClose={() => setEditingWaste(null)}
+      onSuccess={() => {
+        loadWasteItems();
+        setEditingWaste(null);
+        onWasteUpdated?.();
+      }}
+      waste={editingWaste}
+    />
+
+    <EditProductWastageDialog
+      isOpen={!!editingProductWaste}
+      onClose={() => setEditingProductWaste(null)}
+      onSuccess={() => {
+        loadWasteItems();
+        setEditingProductWaste(null);
+        onWasteUpdated?.();
+      }}
+      batchId={batchId}
+      waste={editingProductWaste}
+      consumedMaterials={consumedMaterials}
+    />
     </>
   );
 }

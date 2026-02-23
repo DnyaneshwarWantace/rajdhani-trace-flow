@@ -56,9 +56,10 @@ export default function ProductWastageAutoDialog({
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
   const [wasteTypes, setWasteTypes] = useState<string[]>([]);
   const [wasteType, setWasteType] = useState('');
-  const [wasteCategory, setWasteCategory] = useState('disposable');
-  const [canBeReused, setCanBeReused] = useState(false);
   const [notes, setNotes] = useState('');
+  // Product wastage is not reused - fixed to disposable / No
+  const wasteCategory = 'disposable';
+  const canBeReused = false;
 
   // Calculate wastage quantity
   const wastageQuantity = material.whole_product_count - material.actual_consumed_quantity;
@@ -274,12 +275,13 @@ export default function ProductWastageAutoDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden pt-6 p-0 gap-0">
+        <DialogHeader className="pt-6 px-6 pb-2 flex-shrink-0">
           <DialogTitle>Auto-Generate Product Wastage</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4 space-y-4">
           {/* Wastage Calculation Info */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
@@ -301,42 +303,24 @@ export default function ProductWastageAutoDialog({
             </div>
           </div>
 
-          {/* Waste Type Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="waste_type">Waste Type *</Label>
-              <Select value={wasteType} onValueChange={setWasteType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select waste type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {wasteTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="waste_category">Waste Category</Label>
-              <Select
-                value={wasteCategory}
-                onValueChange={(value) => {
-                  setWasteCategory(value);
-                  setCanBeReused(value === 'reusable');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="reusable">Reusable</SelectItem>
-                  <SelectItem value="disposable">Disposable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          {/* Waste Type Selection - Product wastage is not reused, so only waste type is configurable */}
+          <div className="space-y-2">
+            <Label htmlFor="waste_type">Waste Type *</Label>
+            <Select value={wasteType} onValueChange={setWasteType}>
+              <SelectTrigger id="waste_type">
+                <SelectValue placeholder="Select waste type" />
+              </SelectTrigger>
+              <SelectContent>
+                {wasteTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500 flex items-center gap-1">
+              <span className="text-red-600">Can be reused: No</span> (product wastage is not reused)
+            </p>
           </div>
 
           {/* Individual Products Selection */}
@@ -405,8 +389,9 @@ export default function ProductWastageAutoDialog({
               placeholder="Additional notes about the waste..."
             />
           </div>
+          </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t bg-gray-50 px-6 py-4 mt-0">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>

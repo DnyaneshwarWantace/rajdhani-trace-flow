@@ -21,6 +21,7 @@ export interface WasteItem {
   individual_product_ids?: string[]; // Individual product IDs that are marked as waste (for product type materials)
   individual_products?: any[]; // Full individual product details with dimensions, weight, color, pattern, etc.
   status: 'generated' | 'disposed' | 'reused' | 'added_to_inventory' | 'available_for_reuse'; // 'available_for_reuse' is frontend display only
+  notes?: string;
   generation_date?: string;
   created_at?: string;
   added_at?: string;
@@ -66,6 +67,26 @@ export class WasteService {
       console.error('Error fetching waste items:', error);
       return [];
     }
+  }
+
+  // Update waste item (raw material: waste_type, category, notes; product: also individual_product_ids, quantity, individual_products)
+  static async updateWaste(
+    id: string,
+    data: Partial<Pick<WasteItem, 'waste_type' | 'waste_category' | 'can_be_reused' | 'notes' | 'status' | 'individual_product_ids' | 'individual_products'>> & { quantity?: number }
+  ): Promise<WasteItem> {
+    const response = await fetch(`${API_URL}/production/waste/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const result = await response.json();
+      throw new Error(result.error || 'Failed to update waste item');
+    }
+
+    const result = await response.json();
+    return result.data;
   }
 
   // Return waste to inventory

@@ -1,8 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Package, RefreshCw, Calendar, ChevronDown, ChevronUp, Hash, Factory, TrendingDown } from 'lucide-react';
-import { useState } from 'react';
+import { Package, Calendar, Hash, Factory, TrendingDown } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { WasteItem } from '@/services/wasteService';
 import { WasteService } from '@/services/wasteService';
@@ -16,13 +14,9 @@ interface ExtendedWasteItem extends WasteItem {
 
 interface ProductWasteCardProps {
   waste: ExtendedWasteItem;
-  onReturn: (waste: WasteItem) => void;
-  isReturning: boolean;
 }
 
-export default function ProductWasteCard({ waste, onReturn, isReturning }: ProductWasteCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
+export default function ProductWasteCard({ waste }: ProductWasteCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available_for_reuse':
@@ -45,19 +39,24 @@ export default function ProductWasteCard({ waste, onReturn, isReturning }: Produ
     }
   };
 
-  // Calculate usage stats from material consumption
+  // Calculate usage stats from material consumption (summary API uses actual_consumed_quantity, whole_product_count, not quantity_used)
   const productConsumption = waste.materialConsumption?.filter(
-    (cons: any) => cons.material_type === 'product' && cons.material_id === waste.product_id
+    (cons: any) =>
+      cons.material_type === 'product' &&
+      (cons.material_id === waste.product_id || cons.material_id === waste.material_id)
   ) || [];
-  
-  const totalUsed = productConsumption.reduce((sum: number, cons: any) => sum + (cons.quantity_used || 0), 0);
+  const totalUsed = productConsumption.reduce(
+    (sum: number, cons: any) =>
+      sum + (cons.quantity_used ?? cons.actual_consumed_quantity ?? cons.whole_product_count ?? cons.required_quantity ?? 0),
+    0
+  );
   const totalWasted = waste.quantity || 0;
   
   return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between mb-3">
+    <Card className="hover:shadow-md transition-shadow h-[420px] flex flex-col overflow-hidden">
+      <CardContent className="p-4 flex flex-col flex-1 min-h-0 overflow-hidden">
+        {/* Header - fixed height section */}
+        <div className="flex-shrink-0 flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 break-words mb-1">
               <TruncatedText text={waste.product_name || waste.material_name} maxLength={30} />
@@ -74,8 +73,8 @@ export default function ProductWasteCard({ waste, onReturn, isReturning }: Produ
           </Badge>
         </div>
 
-        {/* Details Grid */}
-        <div className="space-y-2 mb-3">
+        {/* Details Grid - fixed height section */}
+        <div className="flex-shrink-0 space-y-2 mb-3">
           {/* Usage Stats */}
           <div className="bg-gray-50 rounded-md p-2 space-y-1.5 mb-2">
             <div className="flex items-center justify-between text-xs">
@@ -129,24 +128,18 @@ export default function ProductWasteCard({ waste, onReturn, isReturning }: Produ
             </div>
           )}
 
-          {/* Individual Products Count */}
+          {/* Individual Products label when present */}
           {waste.individualProducts && waste.individualProducts.length > 0 && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="w-full flex items-center justify-between text-xs text-gray-600 hover:text-gray-900 py-1"
-            >
-              <span className="flex items-center gap-1">
-                <Package className="w-3 h-3" />
-                {waste.individualProducts.length} Individual Product{waste.individualProducts.length !== 1 ? 's' : ''}
-              </span>
-              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            </button>
+            <div className="flex items-center gap-1 text-xs text-gray-600 py-1">
+              <Package className="w-3 h-3" />
+              {waste.individualProducts.length} Individual Product{waste.individualProducts.length !== 1 ? 's' : ''}
+            </div>
           )}
         </div>
 
-        {/* Expanded Individual Products */}
-        {isExpanded && waste.individualProducts && waste.individualProducts.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-200 space-y-2 max-h-64 overflow-y-auto">
+        {/* Individual Products - always shown when present, scrolls inside same box size */}
+        {waste.individualProducts && waste.individualProducts.length > 0 ? (
+          <div className="flex-1 min-h-0 mt-3 pt-3 border-t border-gray-200 space-y-2 overflow-y-auto">
             {waste.individualProducts.map((indProduct) => (
               <Card key={indProduct.id} className="bg-gray-50">
                 <CardContent className="p-3">
@@ -188,35 +181,9 @@ export default function ProductWasteCard({ waste, onReturn, isReturning }: Produ
               </Card>
             ))}
           </div>
-        )}
+        ) : null}
 
-        {/* Action Button */}
-        {waste.status === 'available_for_reuse' && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onReturn(waste)}
-            disabled={isReturning}
-            className="w-full text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50 text-xs"
-          >
-            {isReturning ? (
-              <>
-                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                Returning...
-              </>
-            ) : (
-              <>
-                <Package className="w-3 h-3 mr-1" />
-                Return to Inventory
-              </>
-            )}
-          </Button>
-        )}
-        {waste.status === 'added_to_inventory' && (
-          <div className="text-center text-sm text-green-600 font-medium py-2">
-            ✓ Added to Inventory
-          </div>
-        )}
+        {/* Product wastage is never reused - no Return to Inventory */}
       </CardContent>
     </Card>
   );

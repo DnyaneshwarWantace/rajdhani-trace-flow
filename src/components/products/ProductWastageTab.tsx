@@ -21,7 +21,6 @@ export default function ProductWastageTab() {
   const { toast } = useToast();
   const [wasteData, setWasteData] = useState<ExtendedWasteItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [returningIds, setReturningIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   useEffect(() => {
@@ -33,8 +32,18 @@ export default function ProductWastageTab() {
       setLoading(true);
       const wasteItems = await WasteService.getAllWaste();
       
-      // Filter only product waste items
-      const productWaste = wasteItems.filter((item: any) => item.material_type === 'product');
+      // Only product wastage: exclude raw_material, then require product indicators (same logic as WastageManagement)
+      const isProductWaste = (item: any) => {
+        if (item.material_type === 'raw_material') return false;
+        return (
+          item.material_type === 'product' ||
+          !!item.product_id ||
+          (item.material_id && (String(item.material_id).startsWith('PRO-') || String(item.material_id).startsWith('PRD-'))) ||
+          (item.individual_products && item.individual_products.length > 0) ||
+          (item.individual_product_ids && item.individual_product_ids.length > 0)
+        );
+      };
+      const productWaste = wasteItems.filter(isProductWaste);
       
       // Map waste data to display format and fetch additional details
       const mappedWastePromises = productWaste.map(async (item: any) => {
@@ -116,14 +125,19 @@ export default function ProductWastageTab() {
       
       const mappedWaste = await Promise.all(mappedWastePromises);
       
-      // Filter out fake data: items with 0.00 used in production (no material consumption)
+      // Filter out invalid: no batch or no quantity. Use summary fields (actual_consumed_quantity, whole_product_count) not quantity_used.
       const validWaste = mappedWaste.filter((item) => {
-        const productConsumption = item.materialConsumption?.filter(
-          (cons: any) => cons.material_type === 'product' && cons.material_id === item.product_id
-        ) || [];
-        const totalUsed = productConsumption.reduce((sum: number, cons: any) => sum + (cons.quantity_used || 0), 0);
-        // Only show items that have actual consumption records (totalUsed > 0)
-        return totalUsed > 0;
+        const consumption = item.materialConsumption;
+        if (!Array.isArray(consumption)) return item.quantity > 0;
+        const productConsumption = consumption.filter(
+          (cons: any) => cons.material_type === 'product' && (cons.material_id === item.product_id || cons.material_id === item.material_id)
+        );
+        const totalUsed = productConsumption.reduce(
+          (sum: number, cons: any) =>
+            sum + (cons.quantity_used ?? cons.actual_consumed_quantity ?? cons.whole_product_count ?? cons.required_quantity ?? 0),
+          0
+        );
+        return totalUsed > 0 || (item.quantity > 0 && (item.product_id || item.material_id));
       });
       
       setWasteData(validWaste);
@@ -136,48 +150,6 @@ export default function ProductWastageTab() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleReturnToInventory = async (waste: WasteItem) => {
-    if (returningIds.has(waste.id)) return;
-
-    try {
-      setReturningIds((prev) => new Set(prev).add(waste.id));
-      
-      const result = await WasteService.returnWasteToInventory(waste.id);
-      
-      if (result.success) {
-        toast({
-          title: '✅ Product Returned to Inventory',
-          description: `${waste.quantity} ${waste.unit} of ${waste.product_name || waste.material_name} has been returned to inventory.`,
-        });
-        
-        // Reload waste data
-        await loadWasteData();
-        
-        // Call onRefresh if provided
-        // onRefresh?.();
-      } else {
-        toast({
-          title: 'Error',
-          description: result.error || 'Failed to return product to inventory',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error returning product to inventory:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to return product to inventory',
-        variant: 'destructive',
-      });
-    } finally {
-      setReturningIds((prev) => {
-        const next = new Set(prev);
-        next.delete(waste.id);
-        return next;
-      });
     }
   };
 
@@ -311,14 +283,9 @@ export default function ProductWastageTab() {
           </CardContent>
         </Card>
       ) : viewMode === 'card' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
           {wasteData.map((waste) => (
-            <ProductWasteCard
-              key={waste.id}
-              waste={waste}
-              onReturn={handleReturnToInventory}
-              isReturning={returningIds.has(waste.id)}
-            />
+            <ProductWasteCard key={waste.id} waste={waste} />
           ))}
         </div>
       ) : (
@@ -340,9 +307,15 @@ export default function ProductWastageTab() {
             <tbody>
               {wasteData.map((waste) => {
                 const productConsumption = waste.materialConsumption?.filter(
-                  (cons: any) => cons.material_type === 'product' && cons.material_id === waste.product_id
+                  (cons: any) =>
+                    cons.material_type === 'product' &&
+                    (cons.material_id === waste.product_id || cons.material_id === waste.material_id)
                 ) || [];
-                const totalUsed = productConsumption.reduce((sum: number, cons: any) => sum + (cons.quantity_used || 0), 0);
+                const totalUsed = productConsumption.reduce(
+                  (sum: number, cons: any) =>
+                    sum + (cons.quantity_used ?? cons.actual_consumed_quantity ?? cons.whole_product_count ?? cons.required_quantity ?? 0),
+                  0
+                );
                 const totalWasted = waste.quantity || 0;
 
                 const getStatusColor = (status: string) => {
@@ -422,27 +395,7 @@ export default function ProductWastageTab() {
                       )}
                     </td>
                     <td className="p-4">
-                      {waste.status === 'available_for_reuse' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleReturnToInventory(waste)}
-                          disabled={returningIds.has(waste.id)}
-                          className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
-                        >
-                          {returningIds.has(waste.id) ? (
-                            <>
-                              <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                              Returning...
-                            </>
-                          ) : (
-                            <>
-                              <Package className="w-4 h-4 mr-1" />
-                              Return
-                            </>
-                          )}
-                        </Button>
-                      )}
+                      {/* Product wastage is never reused - no Return to Inventory */}
                       {waste.status === 'added_to_inventory' && (
                         <span className="text-sm text-green-600 font-medium">✓ Added</span>
                       )}

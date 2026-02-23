@@ -168,14 +168,16 @@ export default function ProductionWastage() {
 
   const handleRefresh = async () => {
     setRefreshKey(prev => prev + 1);
-    // Reload waste items to check wastage status
+  };
+
+  // Lightweight update: only refetch waste items (no full page reload). Use after save wastage.
+  const handleWasteUpdated = async () => {
     try {
       const allWaste = await WasteService.getAllWaste();
       const batchWaste = allWaste.filter(
         (item) => item.production_batch_id === id || item.batch_id === id
       );
       setWasteItems(batchWaste);
-      console.log('✅ Waste items reloaded:', batchWaste.length);
     } catch (error) {
       console.error('Error reloading waste items:', error);
     }
@@ -703,7 +705,7 @@ export default function ProductionWastage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="space-y-6 min-h-0 pb-8">
         <WastageStageHeader
           batch={batch}
           onBack={() => {
@@ -762,6 +764,7 @@ export default function ProductionWastage() {
           batchId={id!}
           consumedMaterials={consumedMaterials}
           onRefresh={handleRefresh}
+          onWasteUpdated={handleWasteUpdated}
           productId={batch?.product_id}
           productName={batch?.product_name || product?.name}
         />

@@ -72,17 +72,16 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           {/* Logo */}
           <Link to="/" className="flex items-center">
             <img 
-              src={`${import.meta.env.BASE_URL}logo.svg`}
-              alt="Rajdhani Logo" 
-              className="h-12 sm:h-14 md:h-16 w-auto object-contain"
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt="Rajdhani Carpets Logo" 
+              className="h-10 sm:h-12 md:h-14 w-auto object-contain"
               onError={(e) => {
-                // Try fallback paths
                 const img = e.target as HTMLImageElement;
                 const currentSrc = img.src;
-                if (currentSrc.includes('/v2/logo.svg')) {
-                  img.src = '/logo.svg';
-                } else if (currentSrc.includes('/logo.svg')) {
-                  img.src = '/v2/logo.svg';
+                if (currentSrc.includes('/v2/logo.png')) {
+                  img.src = '/logo.png';
+                } else if (currentSrc.includes('/logo.png')) {
+                  img.src = '/v2/logo.png';
                 } else {
                   console.error('Logo not found at any path');
                 }
