@@ -158,10 +158,10 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           </div>
           <div>
             <div className="text-gray-600 text-xs">Total Amount (incl. GST):</div>
-            <div className="font-bold text-gray-900">{formatCurrency(order.totalAmount)}</div>
+            <div className="font-bold text-gray-900">{formatCurrency(order.totalAmount, { full: true })}</div>
             {order.gstAmount && parseFloat(order.gstAmount) > 0 && (
               <div className="text-xs text-gray-500 mt-0.5">
-                GST: {formatCurrency(parseFloat(order.gstAmount))}
+                GST: {formatCurrency(parseFloat(order.gstAmount), { full: true })}
               </div>
             )}
           </div>
@@ -246,7 +246,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                         </div>
                       </div>
                       <div className="text-sm font-medium ml-3">
-                        {formatCurrency(item.totalPrice)}
+                        {formatCurrency(item.totalPrice, { full: true })}
                       </div>
                     </div>
                   </div>
@@ -283,12 +283,12 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
         <div className="grid grid-cols-2 gap-3 text-sm mt-3">
           <div>
             <div className="text-gray-600 text-xs">Paid:</div>
-            <div className="font-semibold text-green-600">{formatCurrency(order.paidAmount)}</div>
+            <div className="font-semibold text-green-600">{formatCurrency(order.paidAmount, { full: true })}</div>
           </div>
           <div>
             <div className="text-gray-600 text-xs">Outstanding:</div>
             <div className={`font-semibold ${order.outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {formatCurrency(order.outstandingAmount)}
+              {formatCurrency(order.outstandingAmount, { full: true })}
             </div>
           </div>
         </div>
@@ -373,12 +373,12 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
             <div className="grid grid-cols-2 gap-2 text-sm mb-2">
               <div className="flex justify-between">
                 <span>Paid:</span>
-                <span className="font-medium text-green-600">{formatCurrency(order.paidAmount)}</span>
+                <span className="font-medium text-green-600">{formatCurrency(order.paidAmount, { full: true })}</span>
               </div>
               <div className="flex justify-between">
                 <span>Outstanding:</span>
                 <span className={`font-medium ${order.outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {formatCurrency(order.outstandingAmount)}
+                  {formatCurrency(order.outstandingAmount, { full: true })}
                 </span>
               </div>
             </div>

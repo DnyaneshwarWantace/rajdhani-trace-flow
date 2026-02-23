@@ -77,11 +77,11 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                           <TruncatedText text={order.customerName} maxLength={18} as="span" />
                         </div>
                         <div className="text-sm font-medium text-gray-900 mt-1">
-                          {formatCurrency(order.totalAmount)}
+                          {formatCurrency(order.totalAmount, { full: true })}
                         </div>
                         {order.outstandingAmount > 0 && (
                           <div className="text-xs text-red-600">
-                            Due: {formatCurrency(order.outstandingAmount)}
+                            Due: {formatCurrency(order.outstandingAmount, { full: true })}
                           </div>
                         )}
                       </div>
