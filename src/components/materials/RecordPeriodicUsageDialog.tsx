@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MaterialService } from '@/services/materialService';
-import type { PeriodicDueMaterial } from '@/types/material';
+import { type PeriodicDueMaterial, toPeriodicDueMaterial } from '@/types/material';
 import { useToast } from '@/hooks/use-toast';
 
 interface RecordPeriodicUsageDialogProps {
@@ -50,7 +50,7 @@ export default function RecordPeriodicUsageDialog({
   useEffect(() => {
     if (isOpen && materials.length === 0) {
       MaterialService.getMaterials({ usage_type: 'periodic', limit: 500 })
-        .then(({ materials: list }) => setAllPeriodic(list || []))
+        .then(({ materials: list }) => setAllPeriodic((list || []).map(toPeriodicDueMaterial)))
         .catch(() => setAllPeriodic([]));
     } else {
       setAllPeriodic([]);

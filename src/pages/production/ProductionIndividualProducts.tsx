@@ -32,7 +32,7 @@ export default function ProductionIndividualProducts() {
   const [loading, setLoading] = useState(true);
   const [canProceedFromTable, setCanProceedFromTable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [createdProductsCount, setCreatedProductsCount] = useState(0);
+  const [, setCreatedProductsCount] = useState(0);
 
   useEffect(() => {
     if (id) {
