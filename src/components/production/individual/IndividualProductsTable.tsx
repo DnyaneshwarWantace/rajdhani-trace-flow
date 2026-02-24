@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus, CheckCircle, Copy, ArrowDown } from 'lucide-react';
+import { Trash2, Plus, CheckCircle, Copy, ArrowDown, Layers } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +33,8 @@ interface IndividualProductsTableProps {
   canComplete?: boolean;
   onCanCompleteChange?: (canComplete: boolean) => void;
   onCreatedProductsCountChange?: (count: number) => void;
+  /** Button label when onComplete is provided. Default: "Complete Production" */
+  actionLabel?: string;
 }
 
 export default function IndividualProductsTable({
@@ -46,6 +48,7 @@ export default function IndividualProductsTable({
   canComplete = false,
   onCanCompleteChange,
   onCreatedProductsCountChange,
+  actionLabel = 'Complete Production',
 }: IndividualProductsTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -72,62 +75,56 @@ export default function IndividualProductsTable({
     'Temporary Storage',
   ];
 
-  // Auto-populate rows based on planned quantity - always maintain at least plannedQuantity rows
+  // Sync from backend without reordering: preserve local row order, update by id, append only new rows
   useEffect(() => {
     if (!productId || plannedQuantity <= 0) return;
 
-    // Merge backend products with local temporary products
-    const tempProducts = localProducts.filter(p => p.id.startsWith('temp-'));
     const backendProducts = individualProducts.filter(p => !p.id.startsWith('temp-'));
-    
-    // Start with temporary products (preserve them)
-    const mergedProducts: IndividualProduct[] = [...tempProducts];
-    
-    // Add/update backend products
-    backendProducts.forEach(backendProduct => {
-      const existingIndex = mergedProducts.findIndex(p => p.id === backendProduct.id);
-      if (existingIndex >= 0) {
-        // Update existing product with backend data
-        mergedProducts[existingIndex] = backendProduct;
-      } else {
-        // Add new backend product
-        mergedProducts.push(backendProduct);
-      }
-    });
-    
-    // Always ensure we have exactly plannedQuantity rows total
-    // If user has saved products, show those + empty rows to fill up to plannedQuantity
-    const currentCount = mergedProducts.length;
-    
-    if (currentCount < plannedQuantity) {
-      const rowsToAdd = plannedQuantity - currentCount;
-      const newProducts: IndividualProduct[] = Array.from({ length: rowsToAdd }).map((_, index) => ({
-        _id: `temp-${Date.now()}-${index}`,
-        id: `temp-${Date.now()}-${index}`,
-        product_id: productId,
-        qr_code: '',
-        serial_number: '',
-        status: 'available',
-        production_date: new Date().toISOString().split('T')[0],
-        batch_number: batchId || '',
-        final_weight: '',
-        final_width: '',
-        final_length: '',
-        inspector: '',
-        location: '',
-        notes: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }));
-      mergedProducts.push(...newProducts);
+    const backendById = new Map(backendProducts.map(p => [p.id, p]));
+
+    let merged: IndividualProduct[];
+
+    if (localProducts.length === 0) {
+      // Initial load: use backend order, then fill to plannedQuantity with temp rows
+      merged = [...backendProducts];
+    } else {
+      // Preserve local order: for each local row, use backend data if same id, else keep local
+      merged = localProducts.map(localP => backendById.get(localP.id) ?? localP);
+      // Append any backend products that aren't in local (e.g. created in another tab)
+      backendProducts.forEach(b => {
+        if (!localProducts.some(l => l.id === b.id)) merged.push(b);
+      });
     }
-    
-    // Only update if there are actual changes
-    const localIds = localProducts.map(p => p.id).sort().join(',');
-    const mergedIds = mergedProducts.map(p => p.id).sort().join(',');
-    
-    if (localIds !== mergedIds || mergedProducts.length !== localProducts.length) {
-      setLocalProducts(mergedProducts);
+
+    // Only append temp rows at the end if we're under plannedQuantity (never insert in middle)
+    if (merged.length < plannedQuantity) {
+      const toAdd = plannedQuantity - merged.length;
+      for (let i = 0; i < toAdd; i++) {
+        merged.push({
+          _id: `temp-${Date.now()}-${i}`,
+          id: `temp-${Date.now()}-${i}`,
+          product_id: productId,
+          qr_code: '',
+          serial_number: '',
+          status: 'available',
+          production_date: new Date().toISOString().split('T')[0],
+          batch_number: batchId || '',
+          final_weight: '',
+          final_width: '',
+          final_length: '',
+          inspector: '',
+          location: '',
+          notes: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as IndividualProduct);
+      }
+    }
+
+    const localIds = localProducts.map(p => p.id).join(',');
+    const mergedIds = merged.map(p => p.id).join(',');
+    if (localIds !== mergedIds || merged.length !== localProducts.length) {
+      setLocalProducts(merged);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [individualProducts, plannedQuantity, productId, batchId]);
@@ -453,16 +450,6 @@ export default function IndividualProductsTable({
   };
 
   const handleAddRow = () => {
-    // Prevent adding more rows than planned quantity
-    if (plannedQuantity > 0 && localProducts.length >= plannedQuantity) {
-      toast({
-        title: 'Limit Reached',
-        description: `Cannot add more than ${plannedQuantity} product(s). Planned quantity is ${plannedQuantity}.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     const newProduct: IndividualProduct = {
       _id: `temp-${Date.now()}`,
       id: `temp-${Date.now()}`,
@@ -827,6 +814,43 @@ export default function IndividualProductsTable({
     }
   };
 
+  // Apply one row's details (final_weight, final_width, final_length) to all other rows
+  const handleApplySameToAll = () => {
+    const required = ['final_weight', 'final_width', 'final_length'] as const;
+    const sourceIndex = localProducts.findIndex(p =>
+      required.every(f => p[f] && String(p[f]).trim() !== '')
+    );
+    if (sourceIndex < 0) {
+      toast({
+        title: 'No complete row',
+        description: 'Fill at least one row with Final GSM, Width and Length first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const source = localProducts[sourceIndex];
+    const template = {
+      final_weight: source.final_weight ? String(source.final_weight).trim() : '',
+      final_width: source.final_width ? String(source.final_width).trim() : '',
+      final_length: source.final_length ? String(source.final_length).trim() : '',
+    };
+    const updated = localProducts.map((row, i) =>
+      i === sourceIndex ? row : { ...row, ...template }
+    );
+    setLocalProducts(updated);
+    toast({
+      title: 'Applied to all rows',
+      description: `Same GSM, Width and Length applied to all ${localProducts.length} row(s). Save or edit as needed.`,
+    });
+  };
+
+  const hasOneRowFilled = localProducts.some(p =>
+    p.final_weight && p.final_width && p.final_length &&
+    String(p.final_weight).trim() !== '' &&
+    String(p.final_width).trim() !== '' &&
+    String(p.final_length).trim() !== ''
+  );
+
   const handleRemoveRow = (index: number) => {
     // Prevent deleting if there's only one row left
     if (localProducts.length <= 1) {
@@ -957,11 +981,21 @@ export default function IndividualProductsTable({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {hasOneRowFilled && (
+              <Button
+                onClick={handleApplySameToAll}
+                size="sm"
+                variant="outline"
+                className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
+              >
+                <Layers className="w-4 h-4" />
+                Apply same details to all
+              </Button>
+            )}
             <Button
               onClick={handleAddRow}
               size="sm"
-              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:text-white"
-              disabled={plannedQuantity > 0 && localProducts.length >= plannedQuantity}
+              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               Add Row
@@ -971,10 +1005,10 @@ export default function IndividualProductsTable({
                 onClick={onComplete}
                 size="sm"
                 disabled={!canComplete}
-                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:text-white"
+                className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:text-white"
               >
                 <CheckCircle className="w-4 h-4" />
-                Complete Production
+                {actionLabel}
               </Button>
             )}
           </div>

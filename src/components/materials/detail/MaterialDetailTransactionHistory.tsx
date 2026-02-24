@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Package, Factory, ShoppingCart, CheckCircle, Clock } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
+import { MaterialService } from '@/services/materialService';
 import { getApiUrl } from '@/utils/apiConfig';
 import type { RawMaterial } from '@/types/material';
 import {
@@ -31,6 +32,7 @@ interface ConsumptionRecord {
   reserved_at?: string;
   sold_at?: string;
   notes?: string;
+  recorded_by?: string;
   product_id?: string;
   product_name?: string;
   product_category?: string;
@@ -126,8 +128,38 @@ export default function MaterialDetailTransactionHistory({
         console.error('Error loading orders:', error);
       }
 
-      // Combine consumption records and order records
-      const allRecords = [...(consumptionData || []), ...orderRecords];
+      // Load stock movement history (includes periodic usage - when & who)
+      let stockMovementRecords: ConsumptionRecord[] = [];
+      try {
+        const materialId = material.id || material._id;
+        if (materialId) {
+          const { data: movements } = await MaterialService.getStockHistory(materialId, { limit: 100 });
+          stockMovementRecords = (movements || [])
+            .filter((m: any) => m.reason === 'periodic_usage')
+            .map((m: any) => ({
+              id: m.id || `SM-${m.reference_id}`,
+              quantity_used: m.quantity,
+              unit: m.unit,
+              consumption_status: 'used' as const,
+              consumed_at: m.createdAt || m.created_at || new Date().toISOString(),
+              notes: [m.notes, m.operator ? `Recorded by: ${m.operator}` : ''].filter(Boolean).join(' • '),
+              recorded_by: m.operator,
+            }));
+        }
+      } catch (error) {
+        console.error('Error loading stock history:', error);
+      }
+
+      // Combine consumption records, order records, and periodic usage (stock movements)
+      const allRecords = [...(consumptionData || []), ...orderRecords, ...stockMovementRecords];
+
+      // Include periodic usage in summary cards (Total Used, Used)
+      const periodicUsedTotal = stockMovementRecords.reduce((sum, r) => sum + (r.quantity_used || 0), 0);
+      const mergedSummary = {
+        ...(summaryData || {}),
+        total_used: (summaryData?.total_used ?? 0) + periodicUsedTotal,
+        used: (summaryData?.used ?? 0) + periodicUsedTotal,
+      };
       
       // Filter by status if needed
       let filteredRecords = allRecords;
@@ -143,7 +175,7 @@ export default function MaterialDetailTransactionHistory({
       });
 
       setRecords(filteredRecords);
-      setSummary(summaryData || {});
+      setSummary(mergedSummary);
     } catch (error) {
       console.error('Error loading transaction history:', error);
       setRecords([]);
@@ -231,7 +263,9 @@ export default function MaterialDetailTransactionHistory({
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="reserved">Reserved</SelectItem>
-              <SelectItem value="in_production">In Production</SelectItem>
+              {((material.category || '').toString().toLowerCase().trim() !== 'ink') && (
+                <SelectItem value="in_production">In Production</SelectItem>
+              )}
               <SelectItem value="used">Used</SelectItem>
               <SelectItem value="sold">Sold</SelectItem>
             </SelectContent>
@@ -240,17 +274,24 @@ export default function MaterialDetailTransactionHistory({
       </CardHeader>
       <CardContent>
         {summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className={`grid grid-cols-2 gap-4 mb-6 ${(material.category || '').toString().toLowerCase().trim() === 'ink' ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}>
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-600 font-medium">Total Used</p>
               <p className="text-2xl font-bold text-blue-900">
                 {summary.total_used?.toFixed(2) || 0} {material.unit}
               </p>
             </div>
+            {((material.category || '').toString().toLowerCase().trim() !== 'ink') && (
+              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                <p className="text-sm text-orange-600 font-medium">In Production</p>
+                <p className="text-2xl font-bold text-orange-900">
+                  {(Number(summary.in_production ?? material.in_production ?? 0)).toFixed(2)} {material.unit}
+                </p>
+              </div>
+            )}
             <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
               <p className="text-sm text-yellow-600 font-medium">Reserved</p>
               <p className="text-2xl font-bold text-yellow-900">
-                {/* Reserved from orders (material.reserved) + reserved from MaterialConsumption (summary.reserved) */}
                 {(Number(material.reserved || 0) + Number(summary.reserved || 0)).toFixed(2)} {material.unit}
               </p>
               {(Number(material.reserved || 0) > 0) && (
@@ -268,7 +309,6 @@ export default function MaterialDetailTransactionHistory({
             <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
               <p className="text-sm text-purple-600 font-medium">Sold</p>
               <p className="text-2xl font-bold text-purple-900">
-                {/* Sold from orders (material.sold) + sold from MaterialConsumption (summary.sold) */}
                 {(Number(material.sold || 0) + Number(summary.sold || 0)).toFixed(2)} {material.unit}
               </p>
               {(Number(material.sold || 0) > 0) && (
@@ -325,6 +365,9 @@ export default function MaterialDetailTransactionHistory({
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200">
                     Sold Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-200">
+                    Recorded by
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Notes
@@ -386,6 +429,9 @@ export default function MaterialDetailTransactionHistory({
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 border-r border-gray-200 whitespace-nowrap">
                       {record.sold_at ? formatDate(record.sold_at) : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-700 border-r border-gray-200">
+                      {record.recorded_by || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-xs">
                       <div className="truncate" title={record.notes || ''}>

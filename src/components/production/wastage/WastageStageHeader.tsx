@@ -1,19 +1,23 @@
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Package, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CheckCircle, RefreshCw } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface WastageStageHeaderProps {
   batch: ProductionBatch;
   onBack: () => void;
-  onIndividualProducts: () => void;
+  onCompleteProduction: () => void;
   onRefresh: () => void;
+  completeDisabled?: boolean;
+  isCompleting?: boolean;
 }
 
 export default function WastageStageHeader({
   batch,
   onBack,
-  onIndividualProducts,
+  onCompleteProduction,
   onRefresh,
+  completeDisabled = false,
+  isCompleting = false,
 }: WastageStageHeaderProps) {
   return (
     <div className="flex items-center justify-between">
@@ -34,17 +38,28 @@ export default function WastageStageHeader({
           size="sm"
           onClick={onRefresh}
           className="flex items-center gap-2"
+          disabled={isCompleting}
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
         </Button>
         <Button
-          onClick={onIndividualProducts}
+          onClick={onCompleteProduction}
           size="lg"
-          className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2"
+          disabled={completeDisabled || isCompleting}
+          className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 disabled:opacity-50"
         >
-          <Package className="w-4 h-4" />
-          Individual Products
+          {isCompleting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Completing...
+            </>
+          ) : (
+            <>
+              <CheckCircle className="w-4 h-4" />
+              Complete Production
+            </>
+          )}
         </Button>
       </div>
     </div>

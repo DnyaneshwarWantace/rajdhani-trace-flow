@@ -157,7 +157,8 @@ export default function MaterialSelectorDialog({
         sortBy: materialSortBy,
         sortOrder: materialSortOrder,
       };
-      let { materials, total } = await MaterialService.getMaterials(filters);
+      const filtersWithRecipe = { ...filters, usage_type: 'per_batch' as const };
+      let { materials, total } = await MaterialService.getMaterials(filtersWithRecipe);
 
       // Apply client-side search if search term exists
       if (materialSearchTerm) {
@@ -246,9 +247,10 @@ export default function MaterialSelectorDialog({
           setProductsTotal(productsResult.total || 0);
           
           // Load materials count + full list for filter options (like main material page)
-          const materialsResult = await MaterialService.getMaterials({ limit: 1000 });
-          setMaterialsTotal(materialsResult.total || 0);
-          setAllRawMaterials(materialsResult.materials || []);
+          const materialsResult = await MaterialService.getMaterials({ limit: 1000, usage_type: 'per_batch' });
+          const mats = materialsResult.materials || [];
+          setMaterialsTotal(materialsResult.total ?? mats.length);
+          setAllRawMaterials(mats);
         } catch (err) {
           console.error('Failed to load initial counts:', err);
         }

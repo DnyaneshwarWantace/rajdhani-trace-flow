@@ -66,28 +66,21 @@ export default function ProductionTable({
       return 'planning';
     }
 
-    // For in_progress/in_production batches, check stage fields from most advanced to least
+    // For in_progress/in_production batches. Order: planning → machine → individual products → wastage (last).
     if (batch.status === 'in_progress' || batch.status === 'in_production') {
-      // Check final stage first (most advanced)
-      if (batch.final_stage?.status === 'in_progress' || batch.final_stage?.status === 'completed') {
-        return 'individual_products';
+      // Batch fully completed
+      if (batch.final_stage?.status === 'completed' || batch.wastage_stage?.status === 'completed') {
+        return 'completed';
       }
 
-      // Check wastage stage
-      if (batch.wastage_stage?.status === 'completed') {
-        return 'individual_products';
-      }
-      if (batch.wastage_stage?.status === 'in_progress' || batch.wastage_stage?.status === 'not_started') {
-        // If wastage stage exists (even if not_started) and machine is completed, show wastage
-        if (batch.machine_stage?.status === 'completed') {
-          return 'wastage';
-        }
-      }
-
-      // Check machine stage
-      if (batch.machine_stage?.status === 'completed') {
-        // Machine completed but no wastage stage info - show wastage
+      // Wastage in progress → current step is wastage
+      if (batch.wastage_stage?.status === 'in_progress') {
         return 'wastage';
+      }
+
+      // Machine completed → next is individual products (then wastage)
+      if (batch.machine_stage?.status === 'completed') {
+        return 'individual_products';
       }
       if (batch.machine_stage?.status === 'in_progress' || batch.machine_stage?.status === 'not_started') {
         // If machine stage exists and planning is completed, show machine

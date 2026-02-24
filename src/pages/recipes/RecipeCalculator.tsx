@@ -75,16 +75,27 @@ export default function RecipeCalculator() {
     loadRecipes();
   }, []);
 
-  // Clear calculation results only when rows are added or removed (not on every edit),
-  // so "Ready to Calculate" and results don't disappear when typing/selecting
+  // When a row is ADDED: clear results (user must recalculate).
+  // When a row is REMOVED: recalculate with remaining products so the table shows only the remaining items.
   useEffect(() => {
     const currentLength = calculationItems.length;
-    if (currentLength !== prevCalculationItemsLengthRef.current) {
-      prevCalculationItemsLengthRef.current = currentLength;
+    const prevLength = prevCalculationItemsLengthRef.current;
+    if (currentLength === prevLength) return;
+
+    if (currentLength > prevLength) {
       setFinalBreakdown([]);
       setProductionSteps([]);
       setExpandedSteps(new Set());
+    } else {
+      if (currentLength === 0) {
+        setFinalBreakdown([]);
+        setProductionSteps([]);
+        setExpandedSteps(new Set());
+      } else {
+        calculateRecipes();
+      }
     }
+    prevCalculationItemsLengthRef.current = currentLength;
   }, [calculationItems.length]);
 
   const loadProducts = async () => {
@@ -167,9 +178,6 @@ export default function RecipeCalculator() {
 
   const removeCalculationItem = (index: number) => {
     setCalculationItems((prev) => prev.filter((_, i) => i !== index));
-    setFinalBreakdown([]);
-    setProductionSteps([]);
-    setExpandedSteps(new Set());
   };
 
   const calculateRecipes = async () => {
@@ -304,6 +312,8 @@ export default function RecipeCalculator() {
         const rawMaterial = rawMaterials.find((rm) => rm.id === recipeMaterial.material_id);
 
         if (rawMaterial) {
+          const isInk = (rawMaterial.category || '').toString().toLowerCase().trim() === 'ink' || rawMaterial.usage_type === 'periodic';
+          if (isInk) continue;
           // It's a raw material - use available_stock instead of current_stock
           const materialAvailableStock = rawMaterial.available_stock ?? rawMaterial.current_stock;
 

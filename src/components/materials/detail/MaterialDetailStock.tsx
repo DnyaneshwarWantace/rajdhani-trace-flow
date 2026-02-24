@@ -110,7 +110,7 @@ export default function MaterialDetailStock({ material }: MaterialDetailStockPro
                 <span className="text-gray-600">Available:</span>
                 <span className="font-medium text-green-600">{formatIndianNumberWithDecimals(availableStock, 2)} {material.unit}</span>
               </div>
-              {(material.in_production ?? 0) > 0 && (
+              {(material.in_production ?? 0) > 0 && (material.category || '').toString().toLowerCase().trim() !== 'ink' && (
                 <div className="flex justify-between">
                   <span className="text-gray-600">In Production:</span>
                   <span className="font-medium text-orange-600">{formatIndianNumberWithDecimals(material.in_production!, 2)} {material.unit}</span>

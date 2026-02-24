@@ -24,9 +24,9 @@ export default function ProductionDetailStats({ batch }: ProductionDetailStatsPr
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-gray-600 mb-1">Planned Quantity</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Expected</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {batch.planned_quantity}
+                {batch.planned_quantity} product(s)
               </p>
             </div>
             <div className="flex-shrink-0 ml-4">
@@ -40,14 +40,14 @@ export default function ProductionDetailStats({ batch }: ProductionDetailStatsPr
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-gray-600 mb-1">Actual Quantity</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Created</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {batch.actual_quantity || 0}
+                {batch.actual_quantity ?? batch.planned_quantity ?? 0} product(s)
               </p>
-              {batch.actual_quantity && batch.actual_quantity !== batch.planned_quantity && (
+              {batch.actual_quantity != null && batch.actual_quantity !== batch.planned_quantity && (
                 <p className="text-xs text-gray-500 mt-1">
                   {batch.actual_quantity > batch.planned_quantity ? '+' : ''}
-                  {batch.actual_quantity - batch.planned_quantity} difference
+                  {batch.actual_quantity - batch.planned_quantity} vs expected
                 </p>
               )}
             </div>

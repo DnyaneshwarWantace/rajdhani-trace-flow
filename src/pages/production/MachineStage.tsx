@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -344,7 +344,7 @@ export default function MachineStage() {
     const validation = await validateMachineStageCompletion();
     if (!validation.valid) {
       toast({
-        title: 'Cannot Proceed to Wastage Stage',
+        title: 'Cannot Proceed to Individual Products Stage',
         description: validation.error || 'Machine stage is not complete.',
         variant: 'destructive',
       });
@@ -360,7 +360,7 @@ export default function MachineStage() {
           completed_by: 'User',
           ...(remark ? { remark } : {}),
         },
-        wastage_stage: {
+        individual_stage: {
           status: 'in_progress',
           started_at: new Date().toISOString(),
           started_by: 'User',
@@ -371,16 +371,16 @@ export default function MachineStage() {
         console.error('❌ Error updating machine stage:', updateError);
         toast({
           title: 'Warning',
-          description: 'Machine stage completion may not have been saved. Proceeding to wastage stage.',
+          description: 'Machine stage completion may not have been saved. Proceeding to individual products stage.',
           variant: 'destructive',
         });
       }
-      navigate(`/production/${id}/wastage`);
+      navigate(`/production/${id}/individual-products`);
     } catch (error) {
       console.error('❌ Error updating machine stage:', error);
       toast({
         title: 'Error',
-        description: 'Failed to proceed to wastage stage. Please try again.',
+          description: 'Failed to proceed to individual products stage. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -480,23 +480,23 @@ export default function MachineStage() {
           </CardContent>
         </Card>
 
-        {/* Wastage Button at Bottom */}
+        {/* Individual Products Stage Button at Bottom */}
         <div className="flex justify-end mt-6">
           <Button
             onClick={handleNavigateToWastage}
             disabled={!isMachineCompleted || navigatingToWastage}
-            className="bg-orange-600 hover:bg-orange-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
           >
             {navigatingToWastage ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Proceeding to Wastage...
+                Proceeding to Individual Products...
               </>
             ) : (
               <>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Wastage Stage
+                <FileText className="w-4 h-4 mr-2" />
+                Individual Products Stage
               </>
             )}
           </Button>

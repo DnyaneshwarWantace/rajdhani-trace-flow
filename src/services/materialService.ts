@@ -1,6 +1,22 @@
-import type { RawMaterial, RawMaterialFormData, MaterialStats, MaterialFilters } from '@/types/material';
+import type { RawMaterial, RawMaterialFormData, MaterialStats, MaterialFilters, PeriodicDueMaterial } from '@/types/material';
 
 import { getApiUrl } from '@/utils/apiConfig';
+
+export interface StockMovement {
+  id: string;
+  material_id: string;
+  material_name: string;
+  movement_type: string;
+  quantity: number;
+  unit: string;
+  reason: string;
+  reference_type?: string;
+  reference_id?: string;
+  operator?: string;
+  notes?: string;
+  createdAt?: string;
+  created_at?: string;
+}
 
 const API_URL = getApiUrl();
 
@@ -42,6 +58,10 @@ export class MaterialService {
     if (filters?.supplier) {
       const suppliers = Array.isArray(filters.supplier) ? filters.supplier : [filters.supplier];
       suppliers.forEach(supplier => supplier && queryParams.append('supplier', supplier));
+    }
+
+    if (filters?.usage_type) {
+      queryParams.append('usage_type', filters.usage_type);
     }
 
     // Backend uses offset and limit, not page
@@ -161,6 +181,51 @@ export class MaterialService {
       throw new Error(error.error || 'Failed to adjust stock');
     }
 
+    const data = await response.json();
+    return data.data;
+  }
+
+  static async getPeriodicDueMaterials(): Promise<{
+    materials: PeriodicDueMaterial[];
+    isFixedReminderDay?: boolean;
+  }> {
+    const response = await fetch(`${API_URL}/raw-materials/periodic-due`, {
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch periodic-due materials');
+    const json = await response.json();
+    const materials = json.data || [];
+    const isFixedReminderDay = !!json.is_fixed_reminder_day;
+    return { materials, isFixedReminderDay };
+  }
+
+  static async getStockHistory(materialId: string, params?: { limit?: number; offset?: number }): Promise<{ data: StockMovement[]; count: number }> {
+    const query = new URLSearchParams();
+    if (params?.limit != null) query.append('limit', String(params.limit));
+    if (params?.offset != null) query.append('offset', String(params.offset));
+    const response = await fetch(`${API_URL}/raw-materials/${encodeURIComponent(materialId)}/history?${query}`, {
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch stock history');
+    const json = await response.json();
+    return { data: json.data || [], count: json.count ?? 0 };
+  }
+
+  static async recordPeriodicConsumption(payload: {
+    material_id: string;
+    quantity_used: number;
+    period_end_date?: string;
+    notes?: string;
+  }): Promise<{ record: any; material: RawMaterial }> {
+    const response = await fetch(`${API_URL}/raw-materials/periodic-consumption`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Failed to record periodic usage');
+    }
     const data = await response.json();
     return data.data;
   }

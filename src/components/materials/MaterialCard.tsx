@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { ShoppingCart, Edit, Trash2 } from 'lucide-react';
+import { ShoppingCart, Edit, Trash2, Droplets } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
@@ -18,6 +18,7 @@ interface MaterialCardProps {
   onEdit?: (material: RawMaterial) => void;
   onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
+  onRecordUsage?: (material: RawMaterial) => void;
   showActions?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
@@ -29,6 +30,7 @@ export default function MaterialCard({
   onEdit,
   onDelete,
   onOrder,
+  onRecordUsage,
   showActions = true,
   isSelected = false,
   onClick,
@@ -272,6 +274,19 @@ export default function MaterialCard({
               >
                 <ShoppingCart className="w-3 h-3 mr-1" />
                 Order
+              </Button>
+            )}
+            {onRecordUsage && material.category?.toLowerCase().trim() === 'ink' && (
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRecordUsage(material);
+                }}
+                className="flex-1 text-[10px] py-1.5 h-auto bg-violet-600 text-white hover:bg-violet-700 hover:text-white"
+              >
+                <Droplets className="w-3 h-3 mr-1" />
+                Record usage
               </Button>
             )}
           </div>

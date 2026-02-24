@@ -21,6 +21,7 @@ interface MaterialInventoryTabProps {
   onEdit?: (material: RawMaterial) => void;
   onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
+  onRecordUsage?: (material: RawMaterial) => void;
   canDelete?: boolean;
 }
 
@@ -41,6 +42,7 @@ export default function MaterialInventoryTab({
   onEdit,
   onDelete,
   onOrder,
+  onRecordUsage,
   canDelete = false,
 }: MaterialInventoryTabProps) {
   return (
@@ -74,6 +76,7 @@ export default function MaterialInventoryTab({
                 onEdit={onEdit}
                 onDelete={canDelete ? onDelete : undefined}
                 onOrder={onOrder}
+                onRecordUsage={onRecordUsage}
               />
             ) : (
               <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
@@ -85,6 +88,7 @@ export default function MaterialInventoryTab({
                       onEdit={onEdit}
                       onDelete={canDelete ? onDelete : undefined}
                       onOrder={onOrder}
+                      onRecordUsage={onRecordUsage}
                     />
                   </div>
                 ))}
@@ -103,6 +107,7 @@ export default function MaterialInventoryTab({
                     onEdit={onEdit}
                     onDelete={canDelete ? onDelete : undefined}
                     onOrder={onOrder}
+                    onRecordUsage={onRecordUsage}
                   />
                 </div>
               ))}

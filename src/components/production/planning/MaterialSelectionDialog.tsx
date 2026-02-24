@@ -191,11 +191,12 @@ export default function MaterialSelectionDialog({
   const loadRawMaterialsOnly = async (): Promise<void> => {
     try {
       const response = await MaterialService.getMaterials({
-        category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
         page: 1,
         limit: 1000,
+        usage_type: 'per_batch',
       });
-      let materialsData = response.materials || [];
+      const all = response.materials || [];
+      let materialsData = [...all];
       if (searchQuery) {
         const searchLower = searchQuery.toLowerCase();
         materialsData = materialsData.filter((m: any) =>
@@ -237,7 +238,6 @@ export default function MaterialSelectionDialog({
       }));
       setRawMaterials(list);
       setTotalPages(Math.ceil(list.length / itemsPerPage));
-      const all = response.materials || [];
       setRawMaterialCategories(Array.from(new Set(all.map((m: any) => m.category).filter(Boolean))).sort());
       setMaterialTypes(Array.from(new Set(all.map((m: any) => m.type || m.material_type).filter(Boolean))).sort());
       setMaterialColors(Array.from(new Set(all.map((m: any) => m.color).filter((c: any) => c && c !== 'N/A'))).sort());
@@ -251,17 +251,11 @@ export default function MaterialSelectionDialog({
     try {
       const response = await ProductService.getProducts({
         search: searchQuery || undefined,
-        category: categoryFilter.length === 1 ? categoryFilter[0] : undefined,
-        color: colorFilter.length > 0 ? colorFilter : undefined,
-        pattern: patternFilter.length > 0 ? patternFilter : undefined,
-        subcategory: subcategoryFilter.length > 0 ? subcategoryFilter : undefined,
-        length: lengthFilter.length > 0 ? lengthFilter : undefined,
-        width: widthFilter.length > 0 ? widthFilter : undefined,
-        weight: weightFilter.length > 0 ? weightFilter : undefined,
         page: 1,
         limit: 1000,
       });
-      let productsData = response.products || [];
+      const all = response.products || [];
+      let productsData = [...all];
       if (categoryFilter.length > 0) {
         productsData = productsData.filter((p: any) => categoryFilter.includes(p.category));
       }
@@ -292,7 +286,6 @@ export default function MaterialSelectionDialog({
           return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
         });
       }
-      // Use current_stock from API only (no per-product API calls) so load is as fast as product page
       const productsWithStock = productsData.map((p: any) => ({
         id: p.id,
         name: p.name,
@@ -312,7 +305,6 @@ export default function MaterialSelectionDialog({
       }));
       setProducts(productsWithStock);
       setTotalPages(Math.ceil(productsWithStock.length / itemsPerPage));
-      const all = response.products || [];
       setProductCategories(Array.from(new Set(all.map((p: any) => p.category).filter(Boolean))).sort());
       setProductSubcategories(Array.from(new Set(all.map((p: any) => p.subcategory).filter(Boolean))).sort());
       setProductColors(Array.from(new Set(all.map((p: any) => p.color).filter((c: any) => c && c !== 'N/A'))).sort());

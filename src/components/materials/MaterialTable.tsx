@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { Eye, ShoppingCart, Edit, Trash2 } from 'lucide-react';
+import { Eye, ShoppingCart, Edit, Trash2, Droplets } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
@@ -18,6 +18,7 @@ interface MaterialTableProps {
   onEdit?: (material: RawMaterial) => void;
   onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
+  onRecordUsage?: (material: RawMaterial) => void;
 }
 
 export default function MaterialTable({
@@ -26,6 +27,7 @@ export default function MaterialTable({
   onEdit,
   onDelete,
   onOrder,
+  onRecordUsage,
 }: MaterialTableProps) {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -183,6 +185,15 @@ export default function MaterialTable({
                         title="Order/Restock"
                       >
                         <ShoppingCart className="w-4 h-4" />
+                      </button>
+                    )}
+                    {onRecordUsage && material.category?.toLowerCase().trim() === 'ink' && (
+                      <button
+                        onClick={() => onRecordUsage(material)}
+                        className="p-1.5 text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                        title="Record usage (deduct & use in production)"
+                      >
+                        <Droplets className="w-4 h-4" />
                       </button>
                     )}
                   </div>

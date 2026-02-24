@@ -265,7 +265,7 @@ export default function ProductionDetail() {
           </Card>
         )}
 
-        {/* Production Stages - Planning, Machine, Wastage, Final Products */}
+        {/* Production Stages - Planning → Machine → Individual Product Details → Wastage → Completion */}
         <ProductionStagesDetailed batch={batch} />
 
         {/* Individual Products Created in This Batch */}

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { CustomerService, type Customer } from '@/services/customerService';
@@ -41,18 +40,17 @@ export default function OrderFilters({
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-      {/* Search - Flexible, takes remaining space */}
+      {/* Search - min 3 characters to search (like Materials page) */}
       <div className="flex-1 w-full sm:w-auto min-w-0">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            type="text"
-            placeholder="Search orders..."
-            value={filters.search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-10 h-9 text-sm"
-          />
-        </div>
+        <DebouncedSearchInput
+          value={filters.search}
+          onChange={onSearchChange}
+          placeholder="Search orders (min 3 characters)..."
+          minCharacters={3}
+          debounceMs={500}
+          className="h-9 text-sm"
+          showCounter={true}
+        />
       </div>
 
       {/* Status Filter - Multi-select */}

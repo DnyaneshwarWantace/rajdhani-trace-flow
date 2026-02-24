@@ -52,8 +52,9 @@ export default function OrderList() {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      const searchQuery = filters.search?.trim();
       const { data, error, count } = await OrderService.getOrders({
-        search: filters.search || undefined,
+        search: searchQuery && searchQuery.length >= 3 ? searchQuery : undefined,
         status: filters.status.length > 0 ? filters.status : undefined,
         customer_id: filters.customer_id.length > 0 ? filters.customer_id : undefined,
         limit: filters.limit,

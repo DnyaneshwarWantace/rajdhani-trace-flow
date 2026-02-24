@@ -12,6 +12,7 @@ interface ProductionStageProgressProps {
 }
 
 export default function ProductionStageProgress({ currentStage }: ProductionStageProgressProps) {
+  // Order: Material Selection → Machine → Individual Details → Waste Generation (wastage last)
   const stages: Stage[] = [
     {
       id: 'planning',
@@ -26,16 +27,16 @@ export default function ProductionStageProgress({ currentStage }: ProductionStag
       status: currentStage === 'machine' ? 'active' : currentStage === 'planning' ? 'pending' : currentStage === 'wastage' || currentStage === 'individual' ? 'completed' : 'pending',
     },
     {
-      id: 'wastage',
-      name: 'Waste Generation',
-      icon: Trash2,
-      status: currentStage === 'wastage' ? 'active' : currentStage === 'planning' || currentStage === 'machine' ? 'pending' : currentStage === 'individual' ? 'completed' : 'pending',
-    },
-    {
       id: 'individual',
       name: 'Individual Details',
       icon: FileText,
-      status: currentStage === 'individual' ? 'active' : 'pending',
+      status: currentStage === 'individual' ? 'active' : currentStage === 'planning' || currentStage === 'machine' ? 'pending' : currentStage === 'wastage' ? 'completed' : 'pending',
+    },
+    {
+      id: 'wastage',
+      name: 'Waste Generation',
+      icon: Trash2,
+      status: currentStage === 'wastage' ? 'active' : currentStage === 'planning' || currentStage === 'machine' || currentStage === 'individual' ? 'pending' : 'pending',
     },
   ];
 

@@ -404,7 +404,7 @@ export default function PlanningStage() {
       const sqmPerUnit = calculateSQM(productLength, productWidth, lengthUnit, widthUnit);
       const totalSQM = quantity * sqmPerUnit;
 
-      const materialRequirements = await Promise.all(
+      const materialRequirements = (await Promise.all(
         recipeData.materials.map(async (recipeMaterial) => {
           let requiredQuantity = recipeMaterial.quantity_per_sqm * totalSQM;
           let availableQuantity = 0;
@@ -414,6 +414,8 @@ export default function PlanningStage() {
           try {
             if (recipeMaterial.material_type === 'raw_material') {
               const material = await MaterialService.getMaterialById(recipeMaterial.material_id);
+              const isInk = (material.category || '').toString().toLowerCase().trim() === 'ink' || material.usage_type === 'periodic';
+              if (isInk) return null;
               availableQuantity = material.available_stock ?? (material.current_stock || 0);
               materialName = material.name;
               unit = material.unit || recipeMaterial.unit;
@@ -481,7 +483,7 @@ export default function PlanningStage() {
 
           return materialData;
         })
-      );
+      )).filter(Boolean);
 
       setMaterials(materialRequirements);
     } catch (error) {

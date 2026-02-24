@@ -1,21 +1,21 @@
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, CheckCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface IndividualProductsStageHeaderProps {
   batch: ProductionBatch;
   onBack: () => void;
-  onComplete: () => void;
+  onProceedToWastage: () => void;
   onRefresh: () => void;
-  canComplete?: boolean;
+  canProceed?: boolean;
 }
 
 export default function IndividualProductsStageHeader({
   batch,
   onBack,
-  onComplete,
+  onProceedToWastage,
   onRefresh,
-  canComplete = false,
+  canProceed = false,
 }: IndividualProductsStageHeaderProps) {
   return (
     <div className="flex items-center justify-between">
@@ -41,13 +41,13 @@ export default function IndividualProductsStageHeader({
           Refresh
         </Button>
         <Button
-          onClick={onComplete}
+          onClick={onProceedToWastage}
           size="lg"
-          disabled={!canComplete}
-          className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 disabled:opacity-50"
+          disabled={!canProceed}
+          className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 disabled:opacity-50"
         >
-          <CheckCircle className="w-4 h-4" />
-          Complete Production
+          <Trash2 className="w-4 h-4" />
+          Proceed to Wastage
         </Button>
       </div>
     </div>

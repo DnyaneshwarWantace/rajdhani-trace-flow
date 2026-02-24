@@ -94,7 +94,7 @@ export default function RecipeMaterialSelectionDialog({
         const { products } = await ProductService.getProducts({ limit: 1000 });
         setMaterials(products || []);
       } else {
-        const { materials: rawMats } = await MaterialService.getMaterials({ limit: 1000 });
+        const { materials: rawMats } = await MaterialService.getMaterials({ limit: 1000, usage_type: 'per_batch' });
         setMaterials(rawMats || []);
       }
     } catch (error) {

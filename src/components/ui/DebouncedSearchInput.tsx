@@ -41,7 +41,8 @@ export function DebouncedSearchInput({
     };
   }, []);
 
-  // Handle search input with debouncing
+  // Handle search input with debouncing. Always notify parent after debounce so that
+  // clearing the input or dropping below minCharacters still resets the filter.
   const handleSearchChange = (inputValue: string) => {
     // Update local state immediately for UI responsiveness
     setSearchValue(inputValue);
@@ -51,13 +52,11 @@ export function DebouncedSearchInput({
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Only trigger search if value length >= minCharacters or empty (to clear search)
-    if (inputValue.length >= minCharacters || inputValue.length === 0) {
-      // Set new timer to trigger actual search after debounceMs of no typing
-      debounceTimerRef.current = setTimeout(() => {
-        onChange(inputValue);
-      }, debounceMs);
-    }
+    // Always debounce and notify parent (including "" and short values) so filter state stays in sync.
+    // Parents can enforce min length for the actual API request (e.g. search only when length >= 3).
+    debounceTimerRef.current = setTimeout(() => {
+      onChange(inputValue);
+    }, debounceMs);
   };
 
   const remainingChars = minCharacters - searchValue.length;

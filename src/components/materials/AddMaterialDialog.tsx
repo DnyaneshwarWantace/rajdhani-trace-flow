@@ -10,7 +10,6 @@ import { uploadImageToR2 } from '@/services/imageService';
 import type { RawMaterial, RawMaterialFormData } from '@/types/material';
 import type { DropdownOption } from '@/types/dropdown';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 import MaterialBasicInfo from './form/MaterialBasicInfo';
 import MaterialSupplierSection from './form/MaterialSupplierSection';
 import MaterialCategorySection from './form/MaterialCategorySection';
@@ -36,8 +35,6 @@ interface Supplier {
 
 export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material, mode = 'create' }: AddMaterialDialogProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -78,6 +75,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
     costPerUnit: '',
     expectedDelivery: '',
     color: 'NA',
+    usageType: 'per_batch' as 'per_batch' | 'periodic',
+    reminderIntervalDays: '',
   };
 
   const [formData, setFormData] = useState(emptyFormData);
@@ -159,6 +158,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           costPerUnit: formatNumberDisplay(material.cost_per_unit ?? 0, 2),
           expectedDelivery: '',
           color: matchingColor || 'NA',
+          usageType: (material.usage_type as 'per_batch' | 'periodic') || 'per_batch',
+          reminderIntervalDays: material.reminder_interval_days != null ? String(material.reminder_interval_days) : '10',
         });
         
         if (material.image_url) {
@@ -603,15 +604,12 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
       if (mode === 'edit' && material) {
         // Update existing material - form shows available stock, so send total (available + in_production) to backend; round decimals
-        const availableEntered = parseFloat(formData.currentStock) || 0;
-        const inProduction = material.in_production ?? 0;
-        const totalStockToSave = Math.round((availableEntered + inProduction) * 100) / 100;
         const materialData: Partial<RawMaterialFormData> = {
           name: formData.name,
           type: formData.type,
           category: formData.category,
           unit: normalizedUnit,
-          current_stock: isAdmin ? totalStockToSave : undefined, // Only update stock if admin; backend expects total
+          current_stock: undefined,
           min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
           max_capacity: Math.round(parseFloat(formData.maxCapacity) || 1000),
           reorder_point: Math.round(parseFloat(formData.reorderPoint) || 50),
@@ -619,6 +617,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
           color: formData.type === 'color' ? formData.color : 'NA',
           image_url: imageUrl || material.image_url,
+          usage_type: formData.category?.toLowerCase().trim() === 'ink' ? 'periodic' : 'per_batch',
+          reminder_interval_days: formData.category?.toLowerCase().trim() === 'ink' ? 10 : null,
         };
 
         await MaterialService.updateMaterial(material._id || material.id, materialData);
@@ -639,7 +639,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         name: formData.name,
         type: formData.type,
         category: formData.category,
-        current_stock: 0, // Orders start with 0 stock
+        current_stock: 0,
         unit: normalizedUnit,
         min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
         max_capacity: Math.round(parseFloat(formData.maxCapacity) || 1000),
@@ -648,6 +648,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
         color: formData.type === 'color' ? formData.color : 'NA',
         image_url: imageUrl,
+        usage_type: formData.category?.toLowerCase().trim() === 'ink' ? 'periodic' : 'per_batch',
+        reminder_interval_days: formData.category?.toLowerCase().trim() === 'ink' ? 10 : null,
       };
 
       // Create the material first
@@ -730,7 +732,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         category: '',
         unit: '',
         quantity: '',
-        currentStock: '', // Not used in create mode
+        currentStock: '',
         minThreshold: '10',
         maxCapacity: '1000',
         reorderPoint: '50',
@@ -738,6 +740,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         costPerUnit: '',
         expectedDelivery: '',
         color: 'NA',
+        usageType: 'per_batch',
+        reminderIntervalDays: '',
       });
       setImageFile(null);
       setImagePreview('');
@@ -973,12 +977,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             minThreshold={formData.minThreshold}
             maxCapacity={formData.maxCapacity}
             showCurrentStock={mode === 'edit'}
-            isCurrentStockEditable={isAdmin}
-            onCurrentStockChange={(value: string) => {
-              if (isAdmin) {
-                setFormData({ ...formData, currentStock: value });
-              }
-            }}
+            isCurrentStockEditable={false}
+            onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
             onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
             onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
           />
@@ -1018,6 +1018,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               hasError={invalidFields.has('costPerUnit')}
             />
           </div>
+
         </form>
 
         {/* Fixed Footer */}

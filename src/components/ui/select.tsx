@@ -106,11 +106,12 @@ const SelectContent = React.forwardRef<
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           className={cn(
-            "p-1 bg-white",
+            "p-1 bg-white overflow-y-auto max-h-[var(--radix-select-content-available-height)]",
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]"
           )}
           style={{ backgroundColor: '#ffffff', opacity: 1 }}
+          onWheel={(e) => e.stopPropagation()}
         >
           {children}
         </SelectPrimitive.Viewport>

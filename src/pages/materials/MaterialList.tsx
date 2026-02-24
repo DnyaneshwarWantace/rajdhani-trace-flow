@@ -11,6 +11,7 @@ import MaterialAnalyticsTab from '@/components/materials/MaterialAnalyticsTab';
 import MaterialNotificationsTab from '@/components/materials/MaterialNotificationsTab';
 import AddMaterialDialog from '@/components/materials/AddMaterialDialog';
 import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
+import RecordPeriodicUsageDialog from '@/components/materials/RecordPeriodicUsageDialog';
 import ImportCSVDialog from '@/components/materials/ImportCSVDialog';
 import ExportMaterialsDialog from '@/components/materials/ExportMaterialsDialog';
 import {
@@ -31,8 +32,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, Plus, Loader2, X } from 'lucide-react';
-import type { RawMaterial, MaterialFilters as MaterialFiltersType } from '@/types/material';
+import { Package, Plus, Loader2, X, Bell } from 'lucide-react';
+import type { RawMaterial, MaterialFilters as MaterialFiltersType, PeriodicDueMaterial } from '@/types/material';
+import { toPeriodicDueMaterial } from '@/types/material';
 import { MaterialService } from '@/services/materialService';
 import { ManageStockService } from '@/services/manageStockService';
 import { SupplierService, type Supplier } from '@/services/supplierService';
@@ -98,6 +100,14 @@ export default function MaterialList() {
   const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [canDeleteMaterials, setCanDeleteMaterials] = useState(false);
+
+  // Periodic usage (e.g. Ink) - 10-day reminder: load due materials and show reminder + toast
+  const [periodicDueMaterials, setPeriodicDueMaterials] = useState<PeriodicDueMaterial[]>([]);
+  const [isFixedReminderDay, setIsFixedReminderDay] = useState(false);
+  const [periodicDueLoading, setPeriodicDueLoading] = useState(false);
+  const [isRecordPeriodicOpen, setIsRecordPeriodicOpen] = useState(false);
+  const [selectedPeriodicMaterial, setSelectedPeriodicMaterial] = useState<PeriodicDueMaterial | null>(null);
+  const periodicReminderShownRef = useRef(false);
 
   // Restock dialog states
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false);
@@ -169,6 +179,32 @@ export default function MaterialList() {
       }
     }
   }, [filters, activeTab]);
+
+  // Load periodic-due (10-day reminder) when on inventory tab
+  const loadPeriodicDueMaterials = async () => {
+    try {
+      setPeriodicDueLoading(true);
+      const { materials, isFixedReminderDay: fixedDay } = await MaterialService.getPeriodicDueMaterials();
+      setPeriodicDueMaterials(materials || []);
+      setIsFixedReminderDay(!!fixedDay);
+      if (fixedDay && !periodicReminderShownRef.current) {
+        periodicReminderShownRef.current = true;
+        toast({
+          title: 'Every 10 days reminder',
+          description: 'Day 10, 20, 30. Record usage from the table row if needed.',
+        });
+      }
+    } catch {
+      setPeriodicDueMaterials([]);
+      setIsFixedReminderDay(false);
+    } finally {
+      setPeriodicDueLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'inventory') loadPeriodicDueMaterials();
+  }, [activeTab]);
 
   // Reload materials when page becomes visible ONLY if coming back from another window
   // (not when switching tabs within the app)
@@ -516,6 +552,11 @@ export default function MaterialList() {
       costPerUnit: 0,
       unit: '',
     };
+  };
+
+  const handleRecordUsage = (material: RawMaterial) => {
+    setSelectedPeriodicMaterial(toPeriodicDueMaterial(material));
+    setIsRecordPeriodicOpen(true);
   };
 
   const handleOrder = async (material: RawMaterial) => {
@@ -888,6 +929,16 @@ export default function MaterialList() {
           wasteCount={wasteCount}
         />
 
+        {/* 10-day reminder – info only, on fixed days (10, 20, 30). Record from table row. */}
+        {activeTab === 'inventory' && (periodicDueLoading ? (
+          <div className="mb-4 py-2 text-sm text-gray-500">Checking…</div>
+        ) : isFixedReminderDay ? (
+          <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
+            <Bell className="h-5 w-5 text-amber-600 shrink-0" aria-hidden="true" />
+            <span className="text-sm font-medium text-amber-800">Every 10 days reminder (day 10, 20, 30).</span>
+          </div>
+        ) : null)}
+
         {/* Filters - Only show on inventory tab */}
         {activeTab === 'inventory' && (
           <MaterialFilters
@@ -921,6 +972,7 @@ export default function MaterialList() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onOrder={handleOrder}
+            onRecordUsage={handleRecordUsage}
             canDelete={canDeleteMaterials}
           />
         )}
@@ -951,6 +1003,28 @@ export default function MaterialList() {
         onSuccess={handleMaterialSuccess}
         material={selectedMaterial}
         mode={editMode}
+      />
+      <RecordPeriodicUsageDialog
+        isOpen={isRecordPeriodicOpen}
+        onClose={() => {
+          setIsRecordPeriodicOpen(false);
+          setSelectedPeriodicMaterial(null);
+        }}
+        onSuccess={() => {
+          loadMaterialsFast();
+          loadPeriodicDueMaterials();
+        }}
+        materials={
+          selectedPeriodicMaterial
+            ? [
+                selectedPeriodicMaterial,
+                ...periodicDueMaterials.filter(
+                  (m) => (m.id || m._id) !== (selectedPeriodicMaterial.id || selectedPeriodicMaterial._id),
+                ),
+              ]
+            : periodicDueMaterials
+        }
+        preselectedMaterial={selectedPeriodicMaterial}
       />
       <AddToInventoryDialog
         isOpen={isAddToInventoryOpen}

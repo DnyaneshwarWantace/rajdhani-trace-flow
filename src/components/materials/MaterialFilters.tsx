@@ -3,6 +3,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MaterialService } from '@/services/materialService';
+import { DropdownService } from '@/services/dropdownService';
 import type { MaterialFilters } from '@/types/material';
 
 interface MaterialFiltersProps {
@@ -19,12 +20,14 @@ interface MaterialFiltersProps {
 export default function MaterialFilters({
   filters,
   onSearchChange,
+  onCategoryChange,
   onStatusChange,
   onTypeChange,
   onColorChange,
   onSupplierChange,
   onSortChange,
 }: MaterialFiltersProps) {
+  const [categories, setCategories] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [suppliers, setSuppliers] = useState<string[]>([]);
@@ -35,8 +38,19 @@ export default function MaterialFilters({
 
   const loadFilterOptions = async () => {
     try {
-      // Load filter options from materials
+      // Load category options from dropdown (material_category) so all configured options show
+      const categoryOptions = await DropdownService.getOptionsByCategory('material_category');
+      const fromDropdown = categoryOptions
+        .filter((opt: any) => opt.value && opt.value.trim() !== '')
+        .map((opt: any) => opt.value.trim());
+
+      // Also get categories from materials (in case some exist in DB but not in dropdown)
       const { materials } = await MaterialService.getMaterials({ limit: 1000 });
+      const fromMaterials = Array.from(
+        new Set(materials.map((m: any) => m.category).filter((c) => c && String(c).trim() !== '' && c !== 'N/A'))
+      );
+      const uniqueCategories = Array.from(new Set([...fromDropdown, ...fromMaterials])).sort();
+      setCategories(uniqueCategories);
 
       // Extract unique types
       const uniqueTypes = Array.from(
@@ -92,9 +106,18 @@ export default function MaterialFilters({
         </div>
       </div>
 
-      {/* Second Row: Type, Color, Supplier - large screens only */}
-      {(onTypeChange || onColorChange || onSupplierChange) && (
-        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+      {/* Second Row: Category, Type, Color, Supplier - large screens only */}
+      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-4 gap-3 mb-3">
+        {/* Category Filter - Multi-select */}
+        {onCategoryChange && (
+            <MultiSelect
+              options={categories.map(cat => ({ label: cat, value: cat }))}
+              selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
+              onChange={onCategoryChange}
+              placeholder="All Categories"
+            />
+          )}
+
           {/* Type Filter - Multi-select */}
           {onTypeChange && (
             <MultiSelect
@@ -124,8 +147,7 @@ export default function MaterialFilters({
               placeholder="All Suppliers"
             />
           )}
-        </div>
-      )}
+      </div>
 
       {/* Sorting Controls */}
       {onSortChange && (

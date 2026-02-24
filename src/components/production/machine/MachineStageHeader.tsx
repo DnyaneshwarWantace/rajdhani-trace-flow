@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Trash2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, FileText, RefreshCw } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface MachineStageHeaderProps {
@@ -58,10 +58,10 @@ export default function MachineStageHeader({
           onClick={onWastage}
           disabled={wastageDisabled}
           size="lg"
-          className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-purple-600 hover:bg-purple-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Trash2 className="w-4 h-4" />
-          Wastage Stage
+          <FileText className="w-4 h-4" />
+          Individual Products
         </Button>
       </div>
     </div>

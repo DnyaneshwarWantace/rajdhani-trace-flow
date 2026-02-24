@@ -8,7 +8,6 @@ import { IndividualProductService } from '@/services/individualProductService';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import IndividualProductsStageHeader from '@/components/production/individual/IndividualProductsStageHeader';
 import IndividualProductsTable from '@/components/production/individual/IndividualProductsTable';
 import ConsumedMaterialsDisplay from '@/components/production/machine/ConsumedMaterialsDisplay';
@@ -31,9 +30,7 @@ export default function ProductionIndividualProducts() {
   const [consumedMaterials, setConsumedMaterials] = useState<any[]>([]);
   const [wasteItems, setWasteItems] = useState<WasteItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [canCompleteFromTable, setCanCompleteFromTable] = useState(false);
+  const [canProceedFromTable, setCanProceedFromTable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [createdProductsCount, setCreatedProductsCount] = useState(0);
 
@@ -252,87 +249,46 @@ export default function ProductionIndividualProducts() {
     }
   };
 
-  const handleCompleteClick = async () => {
-    // Refetch from backend so we validate against latest saved data (avoids stale state after copy/paste or fill down)
+  const handleProceedToWastage = async () => {
+    if (!id) return;
+    // Refetch from backend so we validate against latest saved data
     const freshProducts = await refetchIndividualProducts();
-
-    // Check if products are actually created (not temp IDs)
-    const createdProducts = freshProducts.filter(p =>
-      p.id && !p.id.startsWith('temp-')
-    );
-
-    // Validate that at least one product has all required fields
+    const createdProducts = freshProducts.filter(p => p.id && !p.id.startsWith('temp-'));
     const requiredFields = ['final_weight', 'final_width', 'final_length'];
     const completeProducts = createdProducts.filter(p =>
       requiredFields.every(field => p[field as keyof IndividualProduct] &&
         (typeof p[field as keyof IndividualProduct] === 'string' &&
          (p[field as keyof IndividualProduct] as string).trim() !== ''))
     );
-
-    // Allow completion with at least 1 complete product (user can complete even with fewer than planned)
     if (completeProducts.length === 0) {
       toast({
-        title: 'Cannot Complete Production',
-        description: 'You must fill in all required fields (Final GSM, Final Width, Final Length) for at least 1 product before completing.',
+        title: 'Cannot Proceed to Wastage',
+        description: 'You must fill in all required fields (Final GSM, Final Width, Final Length) for at least 1 product before proceeding.',
         variant: 'destructive',
       });
       return;
     }
-
-    // Show confirmation dialog
-    setShowCompleteDialog(true);
-  };
-
-  const handleConfirmComplete = async () => {
-    // Check if products are actually created (not temp IDs)
-    const createdProducts = individualProducts.filter(p => 
-      p.id && !p.id.startsWith('temp-')
-    );
-
-    setIsCompleting(true);
-
-    // Update batch status to completed with actual completion date
-    const completionDate = new Date().toISOString();
     try {
-      await ProductionService.updateBatch(id!, {
-        status: 'completed',
-        final_stage: {
+      await ProductionService.updateBatch(id, {
+        individual_stage: {
           status: 'completed',
-          completed_at: completionDate,
-          completed_by: user?.full_name || user?.email || 'System',
+          completed_at: new Date().toISOString(),
+          completed_by: user?.full_name || user?.email || 'User',
+        },
+        wastage_stage: {
+          status: 'in_progress',
+          started_at: new Date().toISOString(),
+          started_by: user?.full_name || user?.email || 'User',
         },
       });
-
-      toast({
-        title: 'Success',
-        description: `Production batch completed successfully! ${createdProducts.length} individual product(s) created and added to stock.`,
-      });
-
-      setShowCompleteDialog(false);
-      navigate('/production');
-    } catch (error) {
-      console.error('Error completing production:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to complete production batch',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsCompleting(false);
+    } catch (e) {
+      console.error('Error setting individual/wastage stage:', e);
     }
+    navigate(`/production/${id}/wastage`);
   };
 
-  // Use real-time count from table component, fallback to calculated from props
-  const createdProductsCountFromState = individualProducts.filter(p => 
-    p.id && !p.id.startsWith('temp-')
-  ).length;
-  const createdProductsCountFinal = createdProductsCount > 0 ? createdProductsCount : createdProductsCountFromState;
-
-  const plannedQty = batch?.planned_quantity || 0;
-
-  // Can complete only if all existing rows have required fields filled (no empty rows)
-  // This is calculated in IndividualProductsTable and passed via callback
-  const canComplete = canCompleteFromTable;
+  // Can proceed only if all existing rows have required fields filled (from table callback)
+  const canProceed = canProceedFromTable;
 
   if (loading) {
     return (
@@ -360,20 +316,16 @@ export default function ProductionIndividualProducts() {
         <IndividualProductsStageHeader
           batch={batch}
           onBack={() => {
-            // Check where we came from based on location state
             const from = location.state?.from;
-            
             if (from === 'production-detail' && id) {
-              // If we came from production detail page, go back to production detail
               navigate(`/production/${id}`);
             } else {
-              // Default: go to production list
               navigate('/production');
             }
           }}
-          onComplete={handleCompleteClick}
+          onProceedToWastage={handleProceedToWastage}
           onRefresh={handleRefresh}
-          canComplete={canComplete}
+          canProceed={canProceed}
         />
 
         {/* Production Progress Tracker */}
@@ -421,23 +373,11 @@ export default function ProductionIndividualProducts() {
           plannedQuantity={batch?.planned_quantity || 0}
           batchId={id}
           productId={product?.id}
-          onComplete={handleCompleteClick}
-          canComplete={canComplete}
-          onCanCompleteChange={setCanCompleteFromTable}
+          onComplete={handleProceedToWastage}
+          canComplete={canProceed}
+          onCanCompleteChange={setCanProceedFromTable}
           onCreatedProductsCountChange={setCreatedProductsCount}
-        />
-
-        {/* Completion Confirmation Dialog */}
-        <ConfirmDialog
-          isOpen={showCompleteDialog}
-          onClose={() => setShowCompleteDialog(false)}
-          onConfirm={handleConfirmComplete}
-          title="Complete Production?"
-          description={`Planned Quantity: ${plannedQty} product(s)\nCreated Quantity: ${createdProductsCountFinal} product(s)\n\n${createdProductsCountFinal < plannedQty ? `⚠️ Warning: You have created ${createdProductsCountFinal} product(s), which is less than the planned quantity of ${plannedQty} product(s).` : createdProductsCountFinal > plannedQty ? `ℹ️ Note: You have created ${createdProductsCountFinal} product(s), which is more than the planned quantity of ${plannedQty} product(s).` : 'All planned products have been created.'}\n\nAre you sure you want to complete this production batch?`}
-          confirmText="Complete Production"
-          cancelText="Cancel"
-          variant={createdProductsCountFinal < plannedQty ? 'warning' : 'info'}
-          isLoading={isCompleting}
+          actionLabel="Proceed to Wastage"
         />
       </div>
     </Layout>

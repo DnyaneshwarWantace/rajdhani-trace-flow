@@ -54,6 +54,13 @@ export interface ProductionBatch {
     completed_by?: string;
     remark?: string;
   };
+  individual_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
+  };
   wastage_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';
     started_at?: string;
@@ -103,6 +110,13 @@ export interface UpdateProductionBatchData extends Partial<CreateProductionBatch
     completed_at?: string;
     completed_by?: string;
     remark?: string;
+  };
+  individual_stage?: {
+    status?: 'not_started' | 'in_progress' | 'completed';
+    started_at?: string;
+    started_by?: string;
+    completed_at?: string;
+    completed_by?: string;
   };
   wastage_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';

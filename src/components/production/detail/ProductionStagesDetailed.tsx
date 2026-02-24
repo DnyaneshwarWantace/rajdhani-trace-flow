@@ -5,6 +5,7 @@ import { TruncatedText } from '@/components/ui/TruncatedText';
 import {
   ClipboardList,
   Cog,
+  FileText,
   Trash2,
   Package,
   CheckCircle2,
@@ -30,11 +31,13 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   const [expandedSections, setExpandedSections] = useState<{
     planning: boolean;
     machine: boolean;
+    individual: boolean;
     wastage: boolean;
     products: boolean;
   }>({
     planning: true,
     machine: true,
+    individual: true,
     wastage: true,
     products: true,
   });
@@ -125,15 +128,14 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
         setWastageRecords([]);
       }
 
-      // Load individual products count for this batch
+      // Load individual products count for this batch (match batch.id or batch.batch_number)
       try {
         const { IndividualProductService } = await import('@/services/individualProductService');
         const { products: individualProducts } = await IndividualProductService.getIndividualProducts({
           product_id: batch.product_id
         });
-        // Filter by batch_number
         const batchProducts = individualProducts.filter(
-          (p: any) => p.batch_number === batch.batch_number
+          (p: any) => p.batch_number === batch.id || p.batch_number === batch.batch_number
         );
         setIndividualProductsCount(batchProducts.length);
         console.log('📦 Individual products count loaded:', batchProducts.length);
@@ -243,12 +245,27 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
     completed_by: machineIsCompleted ? (wastageStep?.inspector_name || wastageStep?.inspector || batch.operator || batch.supervisor || 'System') : null
   };
 
-  // Wastage Stage:
+  // Individual Product Details Stage (3rd: after machine, before wastage)
+  // - Start when machine is completed; complete when user proceeds to wastage (wastage_stage in_progress or completed)
+  const individualStageFromBatch = (batch as any).individual_stage;
+  const individualStartDate = individualStageFromBatch?.started_at || (machineIsCompleted ? machineCompletionDate : null);
+  const individualCompletionDate = individualStageFromBatch?.completed_at || (batch.wastage_stage?.status === 'in_progress' || batch.wastage_stage?.status === 'completed' ? batch.wastage_stage?.started_at : null) || null;
+  const individualIsCompleted = individualStageFromBatch?.status === 'completed' || batch.wastage_stage?.status === 'in_progress' || batch.wastage_stage?.status === 'completed';
+  const individualIsInProgress = machineIsCompleted && !individualIsCompleted;
+
+  const individualStage = {
+    status: (individualIsCompleted ? 'completed' : (individualIsInProgress ? 'in_progress' : 'not_started')) as 'completed' | 'in_progress' | 'not_started',
+    started_at: individualStartDate,
+    started_by: individualStageFromBatch?.started_by || batch.operator || batch.supervisor || 'System',
+    completed_at: individualCompletionDate,
+    completed_by: individualStageFromBatch?.completed_by || (individualIsCompleted ? (batch.operator || batch.supervisor || 'System') : null),
+  };
+
+  // Wastage Stage (4th):
   // - Use explicit stage status from batch if available, otherwise infer from flow steps
-  // - Only mark as completed when explicitly set, not just when wastage records exist
   const wastageStartDate = batch.wastage_stage?.started_at || wastageStep?.created_at || wastageStep?.createdAt || wastageStep?.start_time || wastageStep?.started_at || null;
-  const wastageCompletionDate = batch.wastage_stage?.completed_at || null; // Only use explicit completion date
-  const wastageIsCompleted = batch.wastage_stage?.status === 'completed'; // Only completed if explicitly marked
+  const wastageCompletionDate = batch.wastage_stage?.completed_at || null;
+  const wastageIsCompleted = batch.wastage_stage?.status === 'completed';
   const wastageIsInProgress = batch.wastage_stage?.status === 'in_progress' || (wastageRecords.length > 0 && !wastageIsCompleted && (!batch.wastage_stage?.status || batch.wastage_stage?.status === 'not_started'));
   const hasWastage = wastageRecords.length > 0 || batch.wastage_stage?.has_wastage || false;
 
@@ -261,16 +278,13 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
     has_wastage: hasWastage
   };
 
-  // Final Stage (Individual Details):
-  // - Start when wastage is completed
-  // - Mark as in_progress when wastage is completed but batch is not completed
-  // - Only mark as completed when production batch status is 'completed'
+  // Completion / Final Stage (5th): Batch complete
   const finalStartDate = batch.final_stage?.started_at || (wastageIsCompleted ? wastageCompletionDate : null) || finalStep?.created_at || finalStep?.createdAt || finalStep?.start_time || finalStep?.started_at || null;
-  const finalCompletionDate = batch.status === 'completed' 
+  const finalCompletionDate = batch.status === 'completed'
     ? (batch.final_stage?.completed_at || batch.completion_date || null)
     : null;
-  const finalIsCompleted = batch.status === 'completed'; // Only completed when batch status is 'completed'
-  const finalIsInProgress = wastageIsCompleted && !finalIsCompleted; // In progress when wastage is completed but batch is not
+  const finalIsCompleted = batch.status === 'completed';
+  const finalIsInProgress = wastageIsCompleted && !finalIsCompleted;
 
   const finalStage = {
     status: (finalIsCompleted ? 'completed' : (finalIsInProgress ? 'in_progress' : 'not_started')) as 'completed' | 'in_progress' | 'not_started',
@@ -281,17 +295,14 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
     products_count: batch.actual_quantity || batch.planned_quantity || 0
   };
 
-  // Determine which stages to show based on progress
-  // Always show planning stage
-  // Show machine stage only if planning is completed
-  // Show wastage stage if machine is completed OR if wastage records exist OR if wastage_stage is in_progress OR completed
-  // Show final stage (individual products) only if wastage is completed
+  // Stage visibility: correct order = Planning → Machine → Individual Product Details → Wastage → Completion
   const showMachineStage = planningStage.status === 'completed';
-  const showWastageStage = machineStage.status === 'completed' || 
-                          wastageRecords.length > 0 || 
+  const showIndividualStage = machineStage.status === 'completed';
+  const showWastageStage = machineStage.status === 'completed' ||
+                          wastageRecords.length > 0 ||
                           batch.wastage_stage?.status === 'in_progress' ||
-                          batch.wastage_stage?.status === 'completed'; // Show wastage even when completed
-  const showFinalStage = wastageStage.status === 'completed' || wastageStage.status === 'in_progress'; // Show individual products stage when wastage is completed or in progress
+                          batch.wastage_stage?.status === 'completed';
+  const showFinalStage = wastageStage.status === 'completed' || wastageStage.status === 'in_progress';
 
   return (
     <div className="space-y-6">
@@ -660,7 +671,84 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       </Card>
       )}
 
-      {/* Wastage Stage - Show if machine is completed or wastage records exist */}
+      {/* Individual Product Details Stage (3rd) - After machine, before wastage */}
+      {showIndividualStage && (
+      <Card>
+        <CardHeader
+          className="cursor-pointer hover:bg-gray-50"
+          onClick={() => toggleSection('individual')}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <FileText className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <CardTitle>Individual Product Details</CardTitle>
+                <p className="text-sm text-gray-500 mt-1">
+                  Enter final GSM, width, length for each product
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant={
+                individualStage.status === 'completed' ? 'default' :
+                individualStage.status === 'in_progress' ? 'default' : 'secondary'
+              } className={(individualStage.status === 'completed' || individualStage.status === 'in_progress') ? 'text-white' : ''}>
+                {individualStage.status || 'not started'}
+              </Badge>
+              {expandedSections.individual ? (
+                <ChevronUp className="w-5 h-5 text-gray-400" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-gray-400" />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        {expandedSections.individual && (
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+              <div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <PlayCircle className="w-4 h-4" />
+                  Started
+                </div>
+                <div className="font-medium">{formatDate(individualStage.started_at)}</div>
+                {individualStage.started_by && (
+                  <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                    <User className="w-3 h-3" />
+                    {individualStage.started_by}
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <StopCircle className="w-4 h-4" />
+                  Completed
+                </div>
+                <div className="font-medium">{formatDate(individualStage.completed_at, individualStage.status === 'in_progress')}</div>
+                {individualStage.completed_by && (
+                  <div className="text-sm text-gray-600 flex items-center gap-1 mt-1">
+                    <User className="w-3 h-3" />
+                    {individualStage.completed_by}
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+                  <Package className="w-4 h-4" />
+                  Products
+                </div>
+                <div className="font-medium text-lg">{individualProductsCount}</div>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+      )}
+
+      {/* Wastage Stage (4th) */}
       {showWastageStage && (
       <Card>
         <CardHeader
@@ -669,13 +757,13 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <Trash2 className="w-5 h-5 text-red-600" />
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Trash2 className="w-5 h-5 text-orange-600" />
               </div>
               <div>
                 <CardTitle>Wastage Stage</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  Wastage and defect records
+                  Wastage and defect records (after individual product details)
                 </p>
               </div>
             </div>
@@ -848,7 +936,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       </Card>
       )}
 
-      {/* Final Products - Only show if wastage is completed */}
+      {/* Completion - Final stage (5th): batch complete */}
       {showFinalStage && (
       <Card>
         <CardHeader
@@ -858,12 +946,12 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-100 rounded-lg">
-                <Package className="w-5 h-5 text-green-600" />
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <CardTitle>Individual Details</CardTitle>
+                <CardTitle>Completion</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  Individual products produced in this batch
+                  Batch completed • Individual products produced
                 </p>
               </div>
             </div>
@@ -933,11 +1021,11 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                     <h4 className="font-semibold text-blue-900 mb-2">Production Summary</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-blue-700 font-medium">Planned Quantity:</span>
+                        <span className="text-blue-700 font-medium">Expected:</span>
                         <span className="ml-2 text-blue-900">{batch.planned_quantity || 0} product(s)</span>
                       </div>
                       <div>
-                        <span className="text-blue-700 font-medium">Created Quantity:</span>
+                        <span className="text-blue-700 font-medium">Created:</span>
                         <span className={`ml-2 font-semibold ${
                           individualProductsCount < (batch.planned_quantity || 0) 
                             ? 'text-orange-600' 
@@ -952,8 +1040,8 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                     {individualProductsCount !== (batch.planned_quantity || 0) && (
                       <div className="mt-2 text-xs text-blue-600">
                         {individualProductsCount < (batch.planned_quantity || 0) 
-                          ? `⚠️ ${(batch.planned_quantity || 0) - individualProductsCount} product(s) less than planned`
-                          : `ℹ️ ${individualProductsCount - (batch.planned_quantity || 0)} product(s) more than planned`
+                          ? `⚠️ ${(batch.planned_quantity || 0) - individualProductsCount} product(s) less than expected`
+                          : `ℹ️ Expected ${batch.planned_quantity || 0}, created ${individualProductsCount} (${individualProductsCount - (batch.planned_quantity || 0)} more)`
                         }
                       </div>
                     )}

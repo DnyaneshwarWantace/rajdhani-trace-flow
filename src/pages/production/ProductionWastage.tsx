@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, Package, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { WasteService } from '@/services/wasteService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { getApiUrl } from '@/utils/apiConfig';
 import WastageStageHeader from '@/components/production/wastage/WastageStageHeader';
 import ConsumedMaterialsDisplay from '@/components/production/machine/ConsumedMaterialsDisplay';
@@ -23,8 +24,8 @@ import type { IndividualProduct } from '@/types/product';
 export default function ProductionWastage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [batch, setBatch] = useState<ProductionBatch | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -296,7 +297,7 @@ export default function ProductionWastage() {
     });
   };
 
-  const handleNavigateToIndividualProducts = async () => {
+  const handleCompleteProduction = async () => {
     if (!batch || !batch.product_id) {
       toast({
         title: 'Error',
@@ -621,61 +622,56 @@ export default function ProductionWastage() {
         console.log('✅ Final validation passed: All products are now "used"');
       }
 
-      // Mark wastage stage as completed and start final stage (individual products) before navigating
-      console.log('✅ Marking wastage stage as completed and starting final stage...');
+      // Mark wastage stage and final stage as completed, then complete the batch and go to production list
+      const completionDate = new Date().toISOString();
+      const completedBy = user?.full_name || user?.email || 'User';
+      console.log('✅ Marking wastage stage and final stage as completed...');
       try {
         const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(id!, {
+          status: 'completed',
           wastage_stage: {
             status: 'completed',
-            completed_at: new Date().toISOString(),
-            completed_by: 'User', // You can get this from auth context
+            completed_at: completionDate,
+            completed_by: completedBy,
           },
           final_stage: {
-            status: 'in_progress',
-            started_at: new Date().toISOString(),
-            started_by: 'User', // You can get this from auth context
+            status: 'completed',
+            completed_at: completionDate,
+            completed_by: completedBy,
           },
         });
-        
+
         if (updateError || !updatedBatch) {
-          console.error('❌ Error marking wastage stage as completed:', updateError);
+          console.error('❌ Error completing production:', updateError);
           toast({
-            title: 'Warning',
-            description: 'Wastage stage completion status may not have been saved. Please verify before proceeding.',
+            title: 'Error',
+            description: 'Failed to complete production batch. Please try again.',
             variant: 'destructive',
           });
-          // Still allow navigation if status update was successful
-          } else {
-          console.log('✅ Wastage stage marked as completed successfully');
-          // Verify the update
-          if (updatedBatch.wastage_stage?.status !== 'completed') {
-            console.error('❌ Wastage stage status was not updated correctly');
-            toast({
-              title: 'Warning',
-              description: 'Wastage stage status may not have been updated correctly.',
-              variant: 'destructive',
-            });
-          }
+          setUpdatingStatus(false);
+          return;
         }
-      } catch (error) {
-        console.error('❌ Error marking wastage stage as completed:', error);
+        console.log('✅ Production batch completed successfully');
         toast({
-          title: 'Warning',
-          description: 'Failed to update wastage stage status. Please verify before proceeding.',
+          title: 'Success',
+          description: 'Production batch completed successfully.',
+        });
+        setUpdatingStatus(false);
+        navigate('/production');
+      } catch (error) {
+        console.error('❌ Error completing production:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to complete production batch. Please try again.',
           variant: 'destructive',
         });
-        // Still allow navigation if product status update was successful
+        setUpdatingStatus(false);
       }
-
-      // Only navigate if we got here (all validations passed)
-      console.log('✅ All validations passed - Navigating to individual products stage...');
-      setUpdatingStatus(false);
-      navigate(`/production/${id}/individual-products`);
     } catch (error) {
-      console.error('❌ Error updating product statuses:', error);
+      console.error('❌ Error completing production:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update product statuses. Please try again.',
+        description: 'Failed to complete production. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -709,19 +705,13 @@ export default function ProductionWastage() {
         <WastageStageHeader
           batch={batch}
           onBack={() => {
-            // Check where we came from based on location state
-            const from = location.state?.from;
-            
-            if (from === 'production-detail' && id) {
-              // If we came from production detail page, go back to production detail
-              navigate(`/production/${id}`);
-            } else {
-              // Default: go to production list
-              navigate('/production');
-            }
+            if (id) navigate(`/production/${id}/individual-products`);
+            else navigate('/production');
           }}
-          onIndividualProducts={handleNavigateToIndividualProducts}
+          onCompleteProduction={handleCompleteProduction}
           onRefresh={handleRefresh}
+          completeDisabled={!canNavigate}
+          isCompleting={updatingStatus}
         />
 
         {/* Machine stage remark - why completion was late / any note from machine stage */}
@@ -836,7 +826,7 @@ export default function ProductionWastage() {
                 {!canNavigateToIndividualProducts() && (
                   <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                      ⚠️ Please select wastage or mark "No Wastage" for all product materials before proceeding.
+                      ⚠️ Please select wastage or mark "No Wastage" for all product materials before completing production.
                     </p>
                   </div>
                 )}
@@ -845,23 +835,23 @@ export default function ProductionWastage() {
           );
         })()}
 
-        {/* Individual Products Button at Bottom */}
+        {/* Complete Production button at bottom */}
         <div className="flex justify-end mt-6">
           <Button
-            onClick={handleNavigateToIndividualProducts}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
-            size="lg"
+            onClick={handleCompleteProduction}
             disabled={updatingStatus || !canNavigate}
+            className="bg-green-600 hover:bg-green-700 text-white"
+            size="lg"
           >
             {updatingStatus ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Updating Status...
+                Completing...
               </>
             ) : (
               <>
-                <Package className="w-4 h-4 mr-2" />
-                Individual Products Stage
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Complete Production
               </>
             )}
           </Button>
