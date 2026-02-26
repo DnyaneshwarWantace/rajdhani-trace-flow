@@ -684,7 +684,7 @@ export default function Notifications() {
         ) : (
           // All Notifications Tab - Show regular notifications in sections
           <div className="space-y-6">
-            {categorizeNotifications(sortedNotifications).map((section) => (
+            {categorizeNotifications(sortedNotifications, sortBy, sortOrder).map((section) => (
               <Card key={section.category} className="overflow-hidden">
                 <CardContent className="p-0">
                   <NotificationSectionComponent

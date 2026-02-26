@@ -51,7 +51,11 @@ export const getNotificationCategory = (notification: Notification): Notificatio
   return 'other';
 };
 
-export const categorizeNotifications = (notifications: Notification[]): NotificationSection[] => {
+export const categorizeNotifications = (
+  notifications: Notification[],
+  sortBy: 'date' | 'type' | 'status' = 'date',
+  sortOrder: 'asc' | 'desc' = 'desc'
+): NotificationSection[] => {
   const categories: Record<NotificationCategory, Notification[]> = {
     orders: [],
     production: [],
@@ -66,47 +70,64 @@ export const categorizeNotifications = (notifications: Notification[]): Notifica
     categories[category].push(notification);
   });
 
-  // Sort by date descending (newest first); support created_at or createdAt
+  // Sorting function that respects user preferences
   const getTime = (n: Notification & { createdAt?: string }) =>
     new Date(n.created_at || (n as any).createdAt || 0).getTime();
-  const sortByNewest = (list: Notification[]) =>
-    [...list].sort((a, b) => getTime(b) - getTime(a));
 
-  // Create sections with metadata; notifications in each section are newest first
+  const sortNotifications = (list: Notification[]) => {
+    const sorted = [...list];
+    const mult = sortOrder === 'asc' ? 1 : -1;
+
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === 'date') {
+        cmp = getTime(a) - getTime(b);
+      } else if (sortBy === 'type') {
+        cmp = (a.type || '').localeCompare(b.type || '');
+      } else if (sortBy === 'status') {
+        cmp = (a.status || '').localeCompare(b.status || '');
+      }
+      return mult * cmp;
+    });
+
+    return sorted;
+  };
+
+  // Create sections with metadata; notifications in each section are sorted by user preference
   const sections: NotificationSection[] = [
     {
       category: 'orders',
       title: 'Order Related',
       icon: null,
-      notifications: sortByNewest(categories.orders),
+      notifications: sortNotifications(categories.orders),
       unreadCount: categories.orders.filter(n => n.status === 'unread').length,
     },
     {
       category: 'production',
       title: 'Production Related',
       icon: null,
-      notifications: sortByNewest(categories.production),
+      notifications: sortNotifications(categories.production),
       unreadCount: categories.production.filter(n => n.status === 'unread').length,
     },
     {
       category: 'stock',
       title: 'Stock Notifications',
       icon: null,
-      notifications: sortByNewest(categories.stock),
+      notifications: sortNotifications(categories.stock),
       unreadCount: categories.stock.filter(n => n.status === 'unread').length,
     },
     {
       category: 'activity_logs',
       title: 'Activity Logs',
       icon: null,
-      notifications: sortByNewest(categories.activity_logs),
+      notifications: sortNotifications(categories.activity_logs),
       unreadCount: categories.activity_logs.filter(n => n.status === 'unread').length,
     },
     {
       category: 'other',
       title: 'Other Notifications',
       icon: null,
-      notifications: sortByNewest(categories.other),
+      notifications: sortNotifications(categories.other),
       unreadCount: categories.other.filter(n => n.status === 'unread').length,
     },
   ];
@@ -114,11 +135,20 @@ export const categorizeNotifications = (notifications: Notification[]): Notifica
   // Filter out empty sections
   const nonEmpty = sections.filter(section => section.notifications.length > 0);
 
-  // Sort sections by newest notification first (new first, old last)
+  // Sort sections by first notification based on sort order
   nonEmpty.sort((a, b) => {
-    const aNewest = getTime(a.notifications[0]);
-    const bNewest = getTime(b.notifications[0]);
-    return bNewest - aNewest;
+    if (a.notifications.length === 0 || b.notifications.length === 0) return 0;
+
+    let cmp = 0;
+    if (sortBy === 'date') {
+      cmp = getTime(a.notifications[0]) - getTime(b.notifications[0]);
+    } else if (sortBy === 'type') {
+      cmp = (a.notifications[0].type || '').localeCompare(b.notifications[0].type || '');
+    } else if (sortBy === 'status') {
+      cmp = (a.notifications[0].status || '').localeCompare(b.notifications[0].status || '');
+    }
+
+    return (sortOrder === 'asc' ? 1 : -1) * cmp;
   });
 
   return nonEmpty;

@@ -41,7 +41,7 @@ export default function ProductSearchCombobox({
   }, [selectedProduct]);
 
   const searchProducts = async (term: string) => {
-    if (!term.trim() || term.length < 2) {
+    if (!term.trim() || term.length < 3) {
       setResults([]);
       return;
     }
@@ -74,7 +74,7 @@ export default function ProductSearchCombobox({
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (value.trim().length >= 2) {
+    if (value.trim().length >= 3) {
       setShowResults(true);
       searchTimeoutRef.current = setTimeout(() => {
         searchProducts(value);
@@ -110,7 +110,7 @@ export default function ProductSearchCombobox({
           value={searchTerm}
           onChange={(e) => handleSearchChange(e.target.value)}
           onFocus={() => {
-            if (searchTerm.length >= 2 && results.length > 0) {
+            if (searchTerm.length >= 3 && results.length > 0) {
               setShowResults(true);
             }
           }}
@@ -158,7 +158,7 @@ export default function ProductSearchCombobox({
                 </button>
               ))}
             </div>
-          ) : searchTerm.length >= 2 ? (
+          ) : searchTerm.length >= 3 ? (
             <div className="px-4 py-8 text-center text-gray-500">
               <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No products found</p>
