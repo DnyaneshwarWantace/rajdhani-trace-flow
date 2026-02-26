@@ -4,7 +4,7 @@ export type DropdownCategory =
   | 'width' | 'width_units' | 'width_unit'
   | 'category' | 'subcategory' | 'color' | 'pattern' | 'unit'
   | 'material_category' | 'material_unit' | 'material_type' | 'material_color'
-  | 'priority' | 'quality_rating' | 'waste_type';
+  | 'priority' | 'quality_rating' | 'waste_type' | 'storage_location';
 
 export interface DropdownOption {
   _id: string;

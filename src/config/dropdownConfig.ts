@@ -8,6 +8,7 @@ import {
   Factory,
   Hash,
   Settings,
+  Warehouse,
 } from 'lucide-react';
 
 export type TabType = 'product' | 'material' | 'production';
@@ -199,6 +200,15 @@ export const productionCategories: ProductionCategoryConfig[] = [
     placeholder: 'e.g., cutting waste, production waste',
     buttonText: 'Add Waste Type',
     color: 'red',
+  },
+  {
+    title: 'Storage Locations',
+    icon: Warehouse,
+    category: 'storage_location',
+    description: 'Storage Locations for Individual Products',
+    placeholder: 'e.g., First Floor - Zone A - Section 1',
+    buttonText: 'Add Location',
+    color: 'orange',
   },
 ];
 

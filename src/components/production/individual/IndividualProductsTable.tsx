@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -11,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2, Plus, CheckCircle, Copy, ArrowDown, Layers } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
+import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { IndividualProduct } from '@/types/product';
@@ -58,22 +67,69 @@ export default function IndividualProductsTable({
   const [localProducts, setLocalProducts] = useState<IndividualProduct[]>(individualProducts);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string} | null>(null);
+  const [locationOptions, setLocationOptions] = useState<string[]>([]);
+  const [isAddingLocation, setIsAddingLocation] = useState(false);
+  const [newLocationValue, setNewLocationValue] = useState('');
 
-  // Common warehouse locations
-  const locationOptions = [
-    'Warehouse A - General Storage',
-    'Warehouse A - Section 1',
-    'Warehouse A - Section 2',
-    'Warehouse A - Section 3',
-    'Warehouse B - General Storage',
-    'Warehouse B - Section 1',
-    'Warehouse B - Section 2',
-    'Warehouse C - General Storage',
-    'Production Floor',
-    'Quality Check Area',
-    'Shipping Area',
-    'Temporary Storage',
-  ];
+  // Load storage locations from dropdown service
+  useEffect(() => {
+    loadStorageLocations();
+  }, []);
+
+  const loadStorageLocations = async () => {
+    try {
+      const locations = await DropdownService.getDropdownsByCategory('storage_location');
+      setLocationOptions(locations.map(loc => loc.value));
+    } catch (error) {
+      console.error('Error loading storage locations:', error);
+      // Fallback to default locations if API fails
+      setLocationOptions([
+        'First Floor - Zone A - Section 1',
+        'First Floor - Zone B - Section 1',
+        'First Floor - Zone C - Section 1',
+        'Second Floor - Zone A',
+        'Second Floor - Zone B',
+        'Ground Floor - Zone A',
+        'Ground Floor - Zone B',
+      ]);
+    }
+  };
+
+  const handleAddLocation = async () => {
+    if (!newLocationValue.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a location name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await DropdownService.createDropdown({
+        category: 'storage_location',
+        value: newLocationValue.trim(),
+        display_order: locationOptions.length + 1,
+        is_active: true,
+      });
+
+      toast({
+        title: 'Success',
+        description: 'Location added successfully',
+      });
+
+      setNewLocationValue('');
+      setIsAddingLocation(false);
+      await loadStorageLocations();
+    } catch (error: any) {
+      console.error('Error adding location:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to add location',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Sync from backend without reordering: preserve local row order, update by id, append only new rows
   useEffect(() => {
@@ -971,6 +1027,7 @@ export default function IndividualProductsTable({
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -1227,11 +1284,17 @@ export default function IndividualProductsTable({
                   </td>
                   <td className="border border-gray-200 p-2">
                     <Select
-                      value={productItem.location || 'Warehouse A - General Storage'}
-                      onValueChange={(value) => handleSelectChange(index, 'location', value)}
+                      value={productItem.location || (locationOptions[0] || '')}
+                      onValueChange={(value) => {
+                        if (value === '__add_new__') {
+                          setIsAddingLocation(true);
+                        } else {
+                          handleSelectChange(index, 'location', value);
+                        }
+                      }}
                       disabled={saving === productItem.id}
                     >
-                      <SelectTrigger className="w-40 max-w-[160px] truncate" title={productItem.location || 'Warehouse A - General Storage'}>
+                      <SelectTrigger className="w-40 max-w-[160px] truncate" title={productItem.location || (locationOptions[0] || '')}>
                         <SelectValue placeholder="Select location" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1240,6 +1303,10 @@ export default function IndividualProductsTable({
                             {location}
                           </SelectItem>
                         ))}
+                        <SelectItem value="__add_new__" className="text-blue-600 font-medium">
+                          <Plus className="w-3 h-3 inline mr-1" />
+                          Add New Location
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </td>
@@ -1353,6 +1420,50 @@ export default function IndividualProductsTable({
         </div>
       </CardContent>
     </Card>
+
+    {/* Add New Location Dialog */}
+    <Dialog open={isAddingLocation} onOpenChange={setIsAddingLocation}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add New Storage Location</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="newLocation">Location Name</Label>
+            <Input
+              id="newLocation"
+              placeholder="e.g., First Floor - Zone A - Section 1"
+              value={newLocationValue}
+              onChange={(e) => setNewLocationValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAddLocation();
+                }
+              }}
+            />
+            <p className="text-xs text-gray-500">
+              Examples: First Floor - Zone A, Second Floor - Zone B - Section 1, Ground Floor - Zone C
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setIsAddingLocation(false);
+              setNewLocationValue('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button onClick={handleAddLocation}>
+            <Plus className="w-4 h-4 mr-1" />
+            Add Location
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
 
