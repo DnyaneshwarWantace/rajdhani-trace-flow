@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Recycle, Package, Loader2, RefreshCw, AlertCircle, LayoutGrid, Table2 } from 'lucide-react';
+import { Recycle, Package, Loader2, AlertCircle, LayoutGrid, Table2 } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { ProductionService } from '@/services/productionService';
