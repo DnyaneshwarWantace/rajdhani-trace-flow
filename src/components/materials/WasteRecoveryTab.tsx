@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { Recycle, Package, Loader2, RefreshCw } from 'lucide-react';
+import { Recycle, Package, Loader2, RefreshCw, LayoutGrid, Table2 } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { useToast } from '@/hooks/use-toast';
 import WasteCard from './waste/WasteCard';
@@ -17,6 +17,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
   const [wasteData, setWasteData] = useState<WasteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [returningIds, setReturningIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   useEffect(() => {
     loadWasteData();
@@ -140,13 +141,37 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Recycle className="w-5 h-5" />
-            Waste Recovery Management
-          </CardTitle>
-          <CardDescription>
-            Recover reusable materials from production waste and return them to inventory
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Recycle className="w-5 h-5" />
+                Waste Recovery Management
+              </CardTitle>
+              <CardDescription>
+                Recover reusable materials from production waste and return them to inventory
+              </CardDescription>
+            </div>
+            {wasteData.length > 0 && (
+              <div className="flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
+                <Button
+                  variant={viewMode === 'card' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('card')}
+                  className="h-8 px-3"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="h-8 px-3"
+                >
+                  <Table2 className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {wasteData.length === 0 ? (
@@ -157,139 +182,129 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                 Waste materials from production will appear here for recovery.
               </p>
             </div>
+          ) : viewMode === 'card' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {wasteData.map((waste) => (
+                <WasteCard
+                  key={waste.id}
+                  waste={waste}
+                  onReturn={handleReturnToInventory}
+                  isReturning={returningIds.has(waste.id)}
+                />
+              ))}
+            </div>
           ) : (
-            <>
-              {/* Card View - Mobile (1 col) & Tablet (2 cols) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:hidden gap-4">
-                {wasteData.map((waste) => (
-                  <WasteCard
-                    key={waste.id}
-                    waste={waste}
-                    onReturn={handleReturnToInventory}
-                    isReturning={returningIds.has(waste.id)}
-                  />
-                ))}
-              </div>
-
-              {/* Table View - Desktop (from xl breakpoint: 1280px+) */}
-              <div className="hidden xl:block overflow-x-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
                 <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 font-medium text-gray-700">Status</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Material</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Quantity</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Waste Type</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Product Info</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Generated</th>
-                    <th className="text-left p-4 font-medium text-gray-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {wasteData.map((waste) => (
-                    <tr key={waste.id} className="border-b hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <Badge
-                          variant={
-                            waste.status === 'available_for_reuse'
-                              ? 'default'
-                              : waste.status === 'added_to_inventory'
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                          className={
-                            waste.status === 'available_for_reuse'
-                              ? 'bg-green-100 text-green-700 border-green-200'
-                              : waste.status === 'added_to_inventory'
-                              ? 'bg-blue-100 text-blue-700 border-blue-200'
-                              : 'bg-gray-100 text-gray-700 border-gray-200'
-                          }
-                        >
-                          {waste.status === 'available_for_reuse'
-                            ? 'Reusable'
-                            : waste.status === 'added_to_inventory'
-                            ? 'Added'
-                            : 'Disposed'}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                    <div className="font-medium text-gray-900 min-w-0">
-                      <TruncatedText text={waste.material_name} maxLength={50} className="block" />
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {Number(waste.quantity).toFixed(4)} {waste.unit}
-                    </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="font-medium text-gray-900">{Number(waste.quantity).toFixed(4)}</div>
-                        <div className="text-sm text-gray-500">{waste.unit}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm text-gray-700">
-                          {WasteService.mapWasteTypeToDisplay(waste.waste_type)}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                    <div className="text-sm font-medium text-gray-900 min-w-0">
-                      <TruncatedText text={waste.material_name} maxLength={60} className="block" />
-                    </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {waste.material_type === 'product' ? '📦 Product' : '🔧 Raw Material'}
-                        </div>
-                        {waste.production_batch_id && (
-                      <div className="text-xs text-gray-500 min-w-0">
-                        <TruncatedText text={`Batch: ${waste.production_batch_id}`} maxLength={50} className="block" />
-                      </div>
-                        )}
-                        <div className="text-xs text-primary-600 mt-1">
-                          Type: {WasteService.mapWasteTypeToDisplay(waste.waste_type)}
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm text-gray-600">
-                        {waste.generation_date && (
-                          <>
-                            <div>{new Date(waste.generation_date).toLocaleDateString()}</div>
-                            <div className="text-xs">{new Date(waste.generation_date).toLocaleTimeString()}</div>
-                          </>
-                        )}
-                        {waste.added_at && (
-                          <div className="text-xs text-green-600 mt-1">
-                            Added: {new Date(waste.added_at).toLocaleDateString()}
-                          </div>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        {waste.status === 'available_for_reuse' && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReturnToInventory(waste)}
-                            disabled={returningIds.has(waste.id)}
-                            className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
-                          >
-                            {returningIds.has(waste.id) ? (
-                              <>
-                                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                                Returning...
-                              </>
-                            ) : (
-                              <>
-                                <Package className="w-4 h-4 mr-1" />
-                                Return to Inventory
-                              </>
-                            )}
-                          </Button>
-                        )}
-                        {waste.status === 'added_to_inventory' && (
-                          <div className="text-sm text-green-600 font-medium">✓ Added</div>
-                        )}
-                      </td>
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material / Details</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waste Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch ID</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {wasteData.map((waste) => (
+                      <tr key={waste.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="min-w-0 max-w-[250px]">
+                            <TruncatedText
+                              text={waste.material_name}
+                              maxLength={35}
+                              className="font-medium text-gray-900 block"
+                              as="p"
+                            />
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {waste.material_type === 'product' ? 'Product' : 'Raw Material'}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge
+                            variant="outline"
+                            className={
+                              waste.status === 'available_for_reuse'
+                                ? 'bg-green-100 text-green-700 border-green-200'
+                                : waste.status === 'added_to_inventory'
+                                ? 'bg-blue-100 text-blue-700 border-blue-200'
+                                : 'bg-gray-100 text-gray-700 border-gray-200'
+                            }
+                          >
+                            {waste.status === 'available_for_reuse'
+                              ? 'Reusable'
+                              : waste.status === 'added_to_inventory'
+                              ? 'Added'
+                              : 'Disposed'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="font-medium text-gray-900">{Number(waste.quantity).toFixed(4)}</div>
+                          <p className="text-xs text-gray-500 mt-0.5">{waste.unit}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm text-gray-700">
+                            {WasteService.mapWasteTypeToDisplay(waste.waste_type)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          {waste.production_batch_id ? (
+                            <div className="text-sm font-mono text-gray-700">
+                              <TruncatedText text={waste.production_batch_id} maxLength={20} className="block" />
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          {waste.generation_date && (
+                            <>
+                              <div className="text-sm text-gray-600">{new Date(waste.generation_date).toLocaleDateString()}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">{new Date(waste.generation_date).toLocaleTimeString()}</div>
+                            </>
+                          )}
+                          {waste.added_at && (
+                            <div className="text-xs text-green-600 mt-1">
+                              Added: {new Date(waste.added_at).toLocaleDateString()}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          {waste.status === 'available_for_reuse' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleReturnToInventory(waste)}
+                              disabled={returningIds.has(waste.id)}
+                              className="text-green-600 hover:text-green-700 border-green-200 hover:border-green-300 hover:bg-green-50"
+                            >
+                              {returningIds.has(waste.id) ? (
+                                <>
+                                  <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                                  Returning...
+                                </>
+                              ) : (
+                                <>
+                                  <Package className="w-4 h-4 mr-1" />
+                                  Return to Inventory
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {waste.status === 'added_to_inventory' && (
+                            <div className="text-sm text-green-600 font-medium">✓ Added</div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
