@@ -17,7 +17,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
   const [wasteData, setWasteData] = useState<WasteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [returningIds, setReturningIds] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
 
   useEffect(() => {
     loadWasteData();
@@ -28,11 +28,18 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
       setLoading(true);
       const wasteItems = await WasteService.getAllWaste();
       
+      // Filter to only raw materials (exclude products that were wasted as final products)
+      const rawMaterialWaste = wasteItems.filter((item: any) => {
+        // ONLY exclude if the waste itself is a product (material_type === 'product')
+        // Do NOT exclude based on product_id (that's just which product was being made)
+        return item.material_type !== 'product';
+      });
+
       // Map waste data to display format
-      const mappedWaste: WasteItem[] = wasteItems.map((item: any) => {
+      const mappedWaste: WasteItem[] = rawMaterialWaste.map((item: any) => {
         // Use backend status directly, but map 'generated' to display status based on can_be_reused
         let status: 'available_for_reuse' | 'added_to_inventory' | 'disposed' | 'reused';
-        
+
         // If backend status is already set, use it
         if (item.status === 'added_to_inventory' || item.added_at) {
           status = 'added_to_inventory';
@@ -45,12 +52,12 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
           const canBeReused = item.can_be_reused === true || item.can_be_reused === 'true' || item.waste_category === 'reusable';
           status = canBeReused ? 'available_for_reuse' : 'disposed';
         }
-        
+
         return {
           id: item.id,
           waste_number: item.waste_number,
           material_id: item.material_id,
-          material_name: item.material_name || item.product_name || '',
+          material_name: item.material_name || '',
           material_type: item.material_type || 'raw_material',
           quantity: item.quantity || 0,
           unit: item.unit || '',
@@ -68,9 +75,9 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
           updated_at: item.updated_at,
         };
       });
-      
+
       setWasteData(mappedWaste);
-      console.log(`✅ Loaded ${mappedWaste.length} waste items`);
+      console.log(`✅ Loaded ${mappedWaste.length} raw material waste items`);
     } catch (error) {
       console.error('Error loading waste data:', error);
       toast({
@@ -152,7 +159,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
               </CardDescription>
             </div>
             {wasteData.length > 0 && (
-              <div className="flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
+              <div className="hidden lg:flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
                 <Button
                   variant={viewMode === 'card' ? 'default' : 'ghost'}
                   size="sm"
@@ -182,22 +189,37 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                 Waste materials from production will appear here for recovery.
               </p>
             </div>
-          ) : viewMode === 'card' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {wasteData.map((waste) => (
-                <WasteCard
-                  key={waste.id}
-                  waste={waste}
-                  onReturn={handleReturnToInventory}
-                  isReturning={returningIds.has(waste.id)}
-                />
-              ))}
-            </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+            <>
+              {/* Card view for small/medium screens */}
+              <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+                {wasteData.map((waste) => (
+                  <WasteCard
+                    key={waste.id}
+                    waste={waste}
+                    onReturn={handleReturnToInventory}
+                    isReturning={returningIds.has(waste.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Card or Table view for large screens based on viewMode */}
+              {viewMode === 'card' ? (
+                <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {wasteData.map((waste) => (
+                    <WasteCard
+                      key={waste.id}
+                      waste={waste}
+                      onReturn={handleReturnToInventory}
+                      isReturning={returningIds.has(waste.id)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material / Details</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -301,10 +323,12 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

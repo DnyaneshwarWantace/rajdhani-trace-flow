@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { NotificationService, type Notification } from '@/services/notificationService';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { 
-  Bell, 
-  CheckCircle, 
+import {
+  Bell,
+  CheckCircle,
   Info,
   Trash2,
 } from 'lucide-react';
@@ -37,6 +37,15 @@ import ActivityLogTabs from '@/components/notifications/ActivityLogTabs';
 import ActivityNotificationCard from '@/components/notifications/ActivityNotificationCard';
 import NotificationCategoryTabs from '@/components/notifications/NotificationCategoryTabs';
 import MaterialLogFilters from '@/components/notifications/filters/MaterialLogFilters';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination-primitives';
 
 type TabValue = 'all' | 'activity_logs';
 
@@ -44,6 +53,12 @@ export default function Notifications() {
   const [activeTab, setActiveTab] = useState<TabValue>('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  // Total regular notifications from backend (currently only logged)
+  const [totalNotifications, setTotalNotifications] = useState(0);
+  const [totalActivityLogs, setTotalActivityLogs] = useState(0);
+  const [backendCategoryCounts, setBackendCategoryCounts] = useState<Record<string, number>>({});
   const [filterTypes, setFilterTypes] = useState<string[]>([]);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'date' | 'type' | 'status'>('date');
@@ -51,7 +66,12 @@ export default function Notifications() {
   const [activeLogCategory, setActiveLogCategory] = useState<string>('all');
   const [activeNotificationCategory, setActiveNotificationCategory] = useState<string>('all');
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
-  
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [globalUnread, setGlobalUnread] = useState(0);
+  const [globalRead, setGlobalRead] = useState(0);
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+
   // Category-specific filters for activity logs
   const [materialFilterAction, setMaterialFilterAction] = useState<string>('all');
   const [materialFilterStatus, setMaterialFilterStatus] = useState<string>('all');
@@ -64,25 +84,127 @@ export default function Notifications() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  // Reset to first page whenever tab changes
   useEffect(() => {
-    loadNotifications();
+    setPage(1);
+  }, [activeTab]);
+
+  // Reset to first page whenever high-level filters change so we don't
+  // end up requesting an out-of-range page that looks "empty".
+  useEffect(() => {
+    setPage(1);
+  }, [monthFilter, sortBy, sortOrder, filterTypes, filterStatuses, activeLogCategory]);
+
+  // On initial mount, prefetch global activity log totals so the Activity Logs
+  // tab badge shows the correct count even before the tab is opened.
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await NotificationService.getNotifications({
+          limit: 1,
+          offset: 0,
+          // Do not disable logs here – we just want the totals and category counts.
+        });
+        setTotalActivityLogs(resp.totalActivityLogs || 0);
+        setBackendCategoryCounts(resp.activityLogCategoryCounts || {});
+      } catch (e) {
+        console.error('Error prefetching activity log totals:', e);
+      }
+    })();
   }, []);
 
+  useEffect(() => {
+    // Load notifications whenever page, pageSize, tab, log category, or global filters change
+    loadNotifications();
+  }, [page, pageSize, activeTab, activeLogCategory, monthFilter, sortBy, sortOrder, filterTypes, filterStatuses]);
+
+  // Load ONE page of notifications/logs from the backend (server-side pagination)
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      // Fetch ALL notifications - no filters, no deletion
-      const { data } = await NotificationService.getNotifications({
-        limit: 1000, // Get a large number to show all
-        offset: 0,
+
+      const limit = pageSize;
+      const offset = (page - 1) * pageSize;
+
+      // For the main All Notifications tab, we only want REAL notifications, not logs.
+      // For the Activity Logs tab, we want both (notifications will be filtered out in UI).
+      const include_logs = activeTab === 'all' ? 'false' : undefined;
+
+      // When on Activity Logs tab and a specific category is selected (Material, Product, etc.),
+      // use the backend "module" filter so each category tab can page through its own logs.
+      let moduleParam: string | undefined;
+      if (activeTab === 'activity_logs') {
+        if (activeLogCategory === 'material') {
+          moduleParam = 'materials';
+        } else if (activeLogCategory === 'product') {
+          moduleParam = 'products';
+        } else if (activeLogCategory === 'order') {
+          moduleParam = 'orders';
+        } else if (activeLogCategory === 'production') {
+          moduleParam = 'production';
+        }
+        // For "all", "customer", "supplier" we leave module undefined to include all logs.
+      }
+
+      // Map top-level filters into backend query params.
+      const statusParam =
+        activeTab === 'all' && filterStatuses.length > 0
+          ? filterStatuses.join(',')
+          : undefined;
+      const typeParam =
+        activeTab === 'all' && filterTypes.length === 1
+          ? filterTypes[0]
+          : undefined;
+      const monthParam = monthFilter !== 'all' ? monthFilter : undefined;
+
+      const response = await NotificationService.getNotifications({
+        limit,
+        offset,
+        include_logs,
+        module: moduleParam,
+        status: statusParam,
+        type: typeParam,
+        sortBy,
+        sortOrder,
+        month: monthParam,
       });
-      
-      // Sort by created_at descending (newest first)
-      const sorted = data.sort((a, b) => 
+
+      const {
+        data,
+        totalNotifications: notifCount,
+        totalActivityLogs: logsCount,
+        activityLogCategoryCounts,
+        unreadNotifications,
+        readNotifications,
+        months,
+      } = response;
+
+      // Sort this page by created_at descending (newest first)
+      const sorted = (data || []).sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
-      
+
       setNotifications(sorted);
+      setHasMore(false);
+
+      // Update month options from backend whenever provided
+      if (months && months.length > 0) {
+        setAvailableMonths(months);
+      }
+
+      // For real notifications tab (include_logs === 'false') keep global notification stats in sync.
+      if (include_logs === 'false') {
+        setTotalNotifications(notifCount || 0);
+        setGlobalUnread(unreadNotifications || 0);
+        setGlobalRead(readNotifications || 0);
+      } else {
+        // For any response that actually includes logs, update global logs stats and category counts.
+        setTotalActivityLogs(logsCount || 0);
+        setBackendCategoryCounts(activityLogCategoryCounts || {});
+      }
+
+      console.log('✅ Loaded notifications page:', page, 'size:', pageSize, 'items:', sorted.length);
+      console.log('   Regular notifications total:', notifCount, 'Activity logs total:', logsCount);
     } catch (error) {
       console.error('Error loading notifications:', error);
       toast({
@@ -96,6 +218,28 @@ export default function Notifications() {
     }
   };
 
+  // Removed automatic infinite scroll - now using manual "Load More" button
+
+  // Load all notifications at once
+  const handleLoadAll = async () => {
+    try {
+      setLoadingMore(true);
+      await loadNotifications();
+      toast({
+        title: 'Success',
+        description: 'Loaded all notifications',
+      });
+    } catch (error) {
+      console.error('Error loading all notifications:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load all notifications',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -148,26 +292,20 @@ export default function Notifications() {
 
   // Get category counts for activity logs - memoized
   const categoryCounts = useMemo(() => {
-    const categorized = categorizeActivityLogs(activityLogNotifications);
+    // Use backend counts instead of calculating from loaded items
     const counts: Record<string, number> = {
-      all: activityLogNotifications.length,
-      material: 0,
-      product: 0,
-      order: 0,
-      customer: 0,
-      supplier: 0,
-      production: 0,
+      all: totalActivityLogs,
+      material: (backendCategoryCounts['MATERIAL'] || 0) + (backendCategoryCounts['PURCHASE_ORDER'] || 0),
+      product: backendCategoryCounts['PRODUCT'] || 0,
+      order: backendCategoryCounts['ORDER'] || 0,
+      customer: backendCategoryCounts['CUSTOMER'] || 0,
+      supplier: backendCategoryCounts['SUPPLIER'] || 0,
+      production: (backendCategoryCounts['PRODUCTION'] || 0) + (backendCategoryCounts['RECIPE'] || 0),
     };
 
-    categorized.forEach(section => {
-      if (section.category in counts) {
-        counts[section.category] = section.notifications.length;
-      }
-    });
-
     return counts;
-  }, [activityLogNotifications]);
-  
+  }, [totalActivityLogs, backendCategoryCounts]);
+
   // Filter activity logs by selected category - memoized
   const getFilteredActivityLogs = useMemo(() => {
     let logs = activityLogNotifications;
@@ -283,20 +421,19 @@ export default function Notifications() {
     [activeTab, getFilteredActivityLogs, getFilteredNotifications]
   );
 
-  // Month options from notifications (unique year-months, newest first)
-  const monthOptions = useMemo(() => {
-    const dates = notifications.map(n => {
-      const raw = n.created_at || (n as any).createdAt || n.related_data?.created_at || '';
-      return raw ? new Date(raw) : null;
-    }).filter((d): d is Date => d !== null && !Number.isNaN(d.getTime()));
-    const set = new Set<string>();
-    dates.forEach(d => set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`));
-    return Array.from(set).sort().reverse().map(ym => {
-      const [y, m] = ym.split('-').map(Number);
-      const label = new Date(y, m - 1, 1).toLocaleString('en-IN', { month: 'long', year: 'numeric' });
-      return { value: ym, label };
-    });
-  }, [notifications]);
+  // Month options for filter, using backend-provided list of all months
+  const monthOptions = useMemo(
+    () =>
+      availableMonths.map((ym) => {
+        const [y, m] = ym.split('-').map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleString('en-IN', {
+          month: 'long',
+          year: 'numeric',
+        });
+        return { value: ym, label };
+      }),
+    [availableMonths]
+  );
 
   // Filter notifications (multi-select: empty = all, + month) - memoized
   const filteredNotifications = useMemo(() =>
@@ -339,20 +476,76 @@ export default function Notifications() {
     return list;
   }, [filteredNotifications, sortBy, sortOrder]);
 
-  const unreadCount = useMemo(() =>
-    notifications.filter(n => n.status === 'unread').length,
+  // Server-side pagination over sorted notifications (we only have one page in memory)
+  const isActivityTab = activeTab === 'activity_logs';
+  const totalItemsForTab = useMemo(() => {
+    if (!isActivityTab) {
+      // All Notifications tab: use global notification total from backend
+      return totalNotifications;
+    }
+
+    // Activity Logs tab:
+    // When "All Logs" is selected, use global logs total.
+    // When a specific category (Material, Product, etc.) is selected,
+    // use the backend category totals so pagination reflects that section.
+    if (activeLogCategory === 'all') {
+      return totalActivityLogs;
+    }
+
+    return categoryCounts[activeLogCategory] || 0;
+  }, [isActivityTab, totalNotifications, activeLogCategory, totalActivityLogs, categoryCounts]);
+
+  const totalPages = Math.max(1, Math.ceil((totalItemsForTab || 0) / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedNotifications = sortedNotifications;
+
+  // Build page list with ellipsis, same pattern as ProductPagination
+  const pages: (number | 'ellipsis')[] = useMemo(() => {
+    const result: (number | 'ellipsis')[] = [];
+
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) {
+        result.push(i);
+      }
+    } else {
+      result.push(1);
+
+      if (currentPage > 3) {
+        result.push('ellipsis');
+      }
+
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        if (i !== 1 && i !== totalPages) {
+          result.push(i);
+        }
+      }
+
+      if (currentPage < totalPages - 2) {
+        result.push('ellipsis');
+      }
+
+      if (totalPages > 1) {
+        result.push(totalPages);
+      }
+    }
+
+    return result;
+  }, [currentPage, totalPages]);
+
+  const unreadCount = useMemo(
+    () => notifications.filter(n => n.status === 'unread').length,
     [notifications]
   );
 
-  const allUnreadCount = useMemo(() =>
-    allNotifications.filter(n => n.status === 'unread').length,
-    [allNotifications]
-  );
+  // Unread badge for the main Notifications tab uses globalUnread from backend.
+  const allUnreadCount = globalUnread;
 
-  const activityUnreadCount = useMemo(() =>
-    activityLogNotifications.filter(n => n.status === 'unread').length,
-    [activityLogNotifications]
-  );
+  // Activity logs are system history and are treated as already-read,
+  // so we don't show an "unread" bubble for them.
+  const activityUnreadCount = 0;
 
   // Memoize callback functions
   const handleMarkAsRead = useCallback(async (id: string) => {
@@ -380,8 +573,8 @@ export default function Notifications() {
   }, []);
 
   const selectAllOnPage = useCallback(() => {
-    setSelectedIds(new Set(sortedNotifications.map(n => n.id)));
-  }, [sortedNotifications]);
+    setSelectedIds(new Set(pagedNotifications.map(n => n.id)));
+  }, [pagedNotifications]);
 
   const deselectAll = useCallback(() => {
     setSelectedIds(new Set());
@@ -427,7 +620,9 @@ export default function Notifications() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Notifications</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                  {activeTab === 'activity_logs' ? 'Activity Logs' : 'Notifications'}
+                </h1>
                 {unreadCount > 0 && (
                   <Badge className="bg-red-500 text-white">
                     {unreadCount} Unread
@@ -435,19 +630,30 @@ export default function Notifications() {
                 )}
               </div>
               <p className="text-gray-600 mt-1">
-                {activeTab === 'activity_logs' 
-                  ? 'View all activity logs and system actions.'
-                  : 'View all your notifications. Notifications are never deleted and remain in the system.'}
+                {activeTab === 'activity_logs'
+                  ? `View all activity logs and system actions. Total: ${totalActivityLogs} logs`
+                  : `View all your notifications. Total: ${totalNotifications} notifications`}
               </p>
             </div>
-            {unreadCount > 0 && (
+            <div className="flex flex-wrap gap-2">
               <Button
                 onClick={handleMarkAllAsRead}
-                className="bg-primary-600 hover:bg-primary-700"
+                disabled={unreadCount === 0}
+                className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
               >
-                Mark All as Read
+                Mark All as Read {unreadCount > 0 && `(${unreadCount})`}
               </Button>
-            )}
+              {hasMore && (
+                <Button
+                  onClick={handleLoadAll}
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="border-primary-600 text-primary-600 hover:bg-primary-50"
+                >
+                  {loadingMore ? 'Loading...' : 'Load All'}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -455,8 +661,9 @@ export default function Notifications() {
         <NotificationTabs
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          allNotificationsCount={allNotifications.length}
-          activityLogsCount={activityLogNotifications.length}
+          // Use backend totals for tab badges
+          allNotificationsCount={totalNotifications}
+          activityLogsCount={totalActivityLogs}
           allUnreadCount={allUnreadCount}
           activityUnreadCount={activityUnreadCount}
         />
@@ -484,7 +691,7 @@ export default function Notifications() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Unread</p>
-                    <p className="text-2xl font-bold text-blue-600">{allUnreadCount}</p>
+                    <p className="text-2xl font-bold text-blue-600">{globalUnread}</p>
                   </div>
                   <Bell className="w-8 h-8 text-blue-600 opacity-50" />
                 </div>
@@ -495,7 +702,7 @@ export default function Notifications() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Read</p>
-                    <p className="text-2xl font-bold text-gray-600">{allNotifications.filter(n => n.status === 'read').length}</p>
+                    <p className="text-2xl font-bold text-gray-600">{globalRead}</p>
                   </div>
                   <CheckCircle className="w-8 h-8 text-gray-600 opacity-50" />
                 </div>
@@ -506,7 +713,7 @@ export default function Notifications() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600">Total</p>
-                    <p className="text-2xl font-bold text-gray-700">{allNotifications.length}</p>
+                    <p className="text-2xl font-bold text-gray-700">{totalNotifications}</p>
                   </div>
                   <Info className="w-8 h-8 text-gray-600 opacity-50" />
                 </div>
@@ -519,23 +726,27 @@ export default function Notifications() {
         {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
           <Card className="mb-6">
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Month</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Month</label>
                   <Select value={monthFilter} onValueChange={setMonthFilter}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue placeholder="All time" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All time</SelectItem>
+                      <SelectItem value="all" className="font-semibold">
+                        All time
+                      </SelectItem>
                       {monthOptions.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Type</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Type</label>
                   <MultiSelect
                     options={[
                       { label: 'Low Stock', value: 'low_stock' },
@@ -552,11 +763,11 @@ export default function Notifications() {
                     selected={filterTypes}
                     onChange={setFilterTypes}
                     placeholder="All Types"
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Status</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Status</label>
                   <MultiSelect
                     options={[
                       { label: 'Unread', value: 'unread' },
@@ -566,13 +777,13 @@ export default function Notifications() {
                     selected={filterStatuses}
                     onChange={setFilterStatuses}
                     placeholder="All Status"
-                    className="h-8 text-xs"
+                    className="h-9 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Sort by</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Sort by</label>
                   <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status') => setSortBy(v)}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -583,9 +794,9 @@ export default function Notifications() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700 mb-0.5 block">Order</label>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Order</label>
                   <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -652,11 +863,11 @@ export default function Notifications() {
           </Card>
         ) : activeTab === 'activity_logs' ? (
           // Activity Logs Tab - Show activity log notifications
-          <div>
+          <div className="space-y-6">
             {/* Activity Logs List */}
-            {sortedNotifications.length > 0 ? (
-          <div className="space-y-3">
-            {sortedNotifications.map((notification) => (
+            {pagedNotifications.length > 0 ? (
+              <div className="space-y-3">
+                {pagedNotifications.map((notification) => (
                   <div key={notification.id} id={`notification-${notification.id}`}>
                     <ActivityNotificationCard
                       notification={notification}
@@ -676,10 +887,102 @@ export default function Notifications() {
                 <CardContent className="p-8 text-center">
                   <Bell className="w-16 h-16 mx-auto text-gray-400 mb-4" />
                   <p className="text-gray-600 text-lg">No activity logs found</p>
-                  <p className="text-gray-500 text-sm mt-2">Try adjusting your filters or select a different category</p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    Try adjusting your filters or select a different category
+                  </p>
                 </CardContent>
               </Card>
             )}
+
+            {/* Pagination Controls (shared with All Notifications tab) */}
+            <div className="mt-4 sm:mt-6 w-full">
+              <Pagination className="w-full">
+                <PaginationContent className="w-full justify-center flex-wrap gap-1">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (currentPage > 1) setPage(currentPage - 1);
+                      }}
+                      className={`${
+                        currentPage === 1
+                          ? 'pointer-events-none opacity-50'
+                          : 'cursor-pointer'
+                      } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+
+                  {/* Page Numbers - same responsive behaviour as ProductPagination */}
+                  {pages.map((p, index) => (
+                    <PaginationItem
+                      key={index}
+                      className={p === 'ellipsis' ? 'hidden sm:block' : ''}
+                    >
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          isActive={p === currentPage}
+                          onClick={() => setPage(p as number)}
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
+                            Math.abs((p as number) - currentPage) > 1 &&
+                            (p as number) !== 1 &&
+                            (p as number) !== totalPages
+                              ? 'hidden sm:flex'
+                              : ''
+                          }`}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (currentPage < totalPages) setPage(currentPage + 1);
+                      }}
+                      className={`${
+                        currentPage >= totalPages
+                          ? 'pointer-events-none opacity-50'
+                          : 'cursor-pointer'
+                      } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                  Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                  {Math.min(currentPage * pageSize, totalItemsForTab)} of {totalItemsForTab}{' '}
+                  {isActivityTab ? 'logs' : 'notifications'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                    Per page:
+                  </span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      const newSize = parseInt(value);
+                      setPageSize(newSize);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-16 sm:w-20 h-8 sm:h-10 text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           // All Notifications Tab - Show regular notifications in sections
@@ -701,6 +1004,88 @@ export default function Notifications() {
                 </CardContent>
               </Card>
             ))}
+
+            {/* Pagination Controls */}
+            <div className="mt-4 sm:mt-6 w-full">
+              <Pagination className="w-full">
+                <PaginationContent className="w-full justify-center flex-wrap gap-1">
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => {
+                        if (currentPage > 1) setPage(currentPage - 1);
+                      }}
+                      className={`${currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+
+                  {/* Page Numbers - same responsive behaviour as ProductPagination */}
+                  {pages.map((p, index) => (
+                    <PaginationItem
+                      key={index}
+                      className={p === 'ellipsis' ? 'hidden sm:block' : ''}
+                    >
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          isActive={p === currentPage}
+                          onClick={() => setPage(p as number)}
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
+                            Math.abs((p as number) - currentPage) > 1 &&
+                            (p as number) !== 1 &&
+                            (p as number) !== totalPages
+                              ? 'hidden sm:flex'
+                              : ''
+                          }`}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => {
+                        if (currentPage < totalPages) setPage(currentPage + 1);
+                      }}
+                      className={`${currentPage >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              {/* Pagination Info and Page Size Selector */}
+              <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                  Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                  {Math.min(currentPage * pageSize, totalItemsForTab)} of {totalItemsForTab}{' '}
+                  {isActivityTab ? 'logs' : 'notifications'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">Per page:</span>
+                  <Select
+                    value={pageSize.toString()}
+                    onValueChange={(value) => {
+                      const newSize = parseInt(value);
+                      setPageSize(newSize);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-16 sm:w-20 h-8 sm:h-10 text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
       </div>

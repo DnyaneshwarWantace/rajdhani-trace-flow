@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/button';
 import { Upload, Plus, Download, List, Grid3x3 } from 'lucide-react';
 
 interface MaterialHeaderProps {
+  title?: string;
+  subtitle?: string;
   onImportCSV?: () => void;
   onExport?: () => void;
   onAddToInventory?: () => void;
@@ -11,6 +13,8 @@ interface MaterialHeaderProps {
 }
 
 export default function MaterialHeader({
+  title = 'Raw Materials',
+  subtitle = 'Manage your material inventory',
   onImportCSV,
   onExport,
   onAddToInventory,
@@ -22,8 +26,8 @@ export default function MaterialHeader({
     <div className="mb-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Raw Materials</h1>
-          <p className="text-gray-600 mt-1">Manage your material inventory</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{title}</h1>
+          <p className="text-gray-600 mt-1">{subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {onExport && (

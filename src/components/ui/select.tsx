@@ -88,7 +88,7 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Content
         ref={ref}
         className={cn(
-          "z-[99999] max-h-96 overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          "z-[99999] max-h-96 overflow-hidden rounded-md border border-gray-200 bg-white text-gray-900 shadow-xl overscroll-contain data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
           className
@@ -106,12 +106,19 @@ const SelectContent = React.forwardRef<
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
           className={cn(
-            "p-1 bg-white overflow-y-auto max-h-[var(--radix-select-content-available-height)]",
+            "p-1 bg-white overflow-y-auto max-h-[var(--radix-select-content-available-height)] overscroll-contain",
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] max-w-[var(--radix-select-trigger-width)]"
           )}
-          style={{ backgroundColor: '#ffffff', opacity: 1 }}
-          onWheel={(e) => e.stopPropagation()}
+          style={{ backgroundColor: '#ffffff', opacity: 1, overscrollBehavior: 'contain' }}
+          onWheel={(e) => {
+            e.stopPropagation();
+            const target = e.currentTarget;
+            const { scrollTop, scrollHeight, clientHeight } = target;
+            const atTop = scrollTop <= 0 && e.deltaY < 0;
+            const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+            if (atTop || atBottom) e.preventDefault();
+          }}
         >
           {children}
         </SelectPrimitive.Viewport>

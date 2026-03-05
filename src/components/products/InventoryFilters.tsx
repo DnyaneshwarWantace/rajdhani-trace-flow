@@ -36,6 +36,7 @@ export default function InventoryFilters({
   const [lengths, setLengths] = useState<string[]>([]);
   const [widths, setWidths] = useState<string[]>([]);
   const [weights, setWeights] = useState<string[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState<boolean>(false);
 
   useEffect(() => {
     loadFilterOptions();
@@ -43,65 +44,75 @@ export default function InventoryFilters({
 
   const loadFilterOptions = async () => {
     try {
-      // Fetch all products to extract unique filter values
-      const response = await ProductService.getProducts({ limit: 1000 });
-      const products = response.products || [];
+      setLoadingOptions(true);
+      // Use optimized dropdown-data API; fallback to products for any missing group
+      const data = await ProductService.getDropdownData();
 
-      // Extract unique categories
-      const uniqueCategories = Array.from(
-        new Set(products.map((p: any) => p.category).filter(Boolean))
-      ).sort();
-      setCategories(uniqueCategories);
+      const mapOptions = (arr?: { value: string }[]) =>
+        (arr || [])
+          .map((o) => o.value)
+          .filter((v) => v && v !== 'N/A')
+          .sort();
 
-      // Extract unique colors
-      const uniqueColors = Array.from(
-        new Set(products.map((p: any) => p.color).filter((c) => c && c !== 'N/A'))
-      ).sort();
-      setColors(uniqueColors);
+      // Categories / color / pattern from dropdown API
+      setCategories(mapOptions(data.categories));
+      setColors(mapOptions(data.colors));
+      setPatterns(mapOptions(data.patterns));
 
-      // Extract unique patterns
-      const uniquePatterns = Array.from(
-        new Set(products.map((p: any) => p.pattern).filter((p) => p && p !== 'N/A'))
-      ).sort();
-      setPatterns(uniquePatterns);
+      // Length / width / weight: prefer dropdown API, but if missing, fallback to scanning products
+      let lengthValues = mapOptions(data.lengths);
+      let widthValues = mapOptions(data.widths);
+      let weightValues = mapOptions(data.weights);
 
-      // Extract unique lengths with units
-      const lengthsWithUnits = products
-        .map((p: any) => {
-          if (!p.length) return null;
-          const unit = p.length_unit || '';
-          return `${p.length} ${unit}`.trim();
-        })
-        .filter((v): v is string => Boolean(v));
-      const uniqueLengths = Array.from(new Set(lengthsWithUnits))
-        .sort((a, b) => parseFloat(a) - parseFloat(b));
-      setLengths(uniqueLengths);
+      if (lengthValues.length === 0 || widthValues.length === 0 || weightValues.length === 0) {
+        try {
+          const { products } = await ProductService.getProducts({ limit: 1000 });
+          const all = products || [];
 
-      // Extract unique widths with units
-      const widthsWithUnits = products
-        .map((p: any) => {
-          if (!p.width) return null;
-          const unit = p.width_unit || '';
-          return `${p.width} ${unit}`.trim();
-        })
-        .filter((v): v is string => Boolean(v));
-      const uniqueWidths = Array.from(new Set(widthsWithUnits))
-        .sort((a, b) => parseFloat(a) - parseFloat(b));
-      setWidths(uniqueWidths);
+          if (lengthValues.length === 0) {
+            const lengthsWithUnits = all
+              .map((p: any) => {
+                if (!p.length) return null;
+                const unit = p.length_unit || '';
+                return `${p.length} ${unit}`.trim();
+              })
+              .filter((v): v is string => Boolean(v));
+            lengthValues = Array.from(new Set(lengthsWithUnits)).sort((a, b) => parseFloat(a) - parseFloat(b));
+          }
 
-      // Extract unique weights with units
-      const weightsWithUnits = products
-        .map((p: any) => {
-          if (!p.weight) return null;
-          const unit = p.weight_unit || '';
-          return `${p.weight} ${unit}`.trim();
-        })
-        .filter((v): v is string => Boolean(v));
-      const uniqueWeights = Array.from(new Set(weightsWithUnits))
-        .sort((a, b) => parseFloat(a) - parseFloat(b));
-      setWeights(uniqueWeights);
+          if (widthValues.length === 0) {
+            const widthsWithUnits = all
+              .map((p: any) => {
+                if (!p.width) return null;
+                const unit = p.width_unit || '';
+                return `${p.width} ${unit}`.trim();
+              })
+              .filter((v): v is string => Boolean(v));
+            widthValues = Array.from(new Set(widthsWithUnits)).sort((a, b) => parseFloat(a) - parseFloat(b));
+          }
+
+          if (weightValues.length === 0) {
+            const weightsWithUnits = all
+              .map((p: any) => {
+                if (!p.weight) return null;
+                const unit = p.weight_unit || '';
+                return `${p.weight} ${unit}`.trim();
+              })
+              .filter((v): v is string => Boolean(v));
+            weightValues = Array.from(new Set(weightsWithUnits)).sort((a, b) => parseFloat(a) - parseFloat(b));
+          }
+        } catch (fallbackError) {
+          console.error('Error in fallback filter option loader:', fallbackError);
+        }
+      }
+
+      setLengths(lengthValues);
+      setWidths(widthValues);
+      setWeights(weightValues);
     } catch (error) {
       console.error('Error loading filter options:', error);
+    } finally {
+      setLoadingOptions(false);
     }
   };
 
@@ -127,6 +138,7 @@ export default function InventoryFilters({
             selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
             onChange={onCategoryChange}
             placeholder="All Categories"
+            loading={loadingOptions}
           />
         </div>
 
@@ -155,6 +167,7 @@ export default function InventoryFilters({
               selected={Array.isArray(filters.color) ? filters.color : (filters.color ? [filters.color] : [])}
               onChange={onColorChange}
               placeholder="All Colors"
+              loading={loadingOptions}
             />
           )}
 
@@ -165,6 +178,7 @@ export default function InventoryFilters({
               selected={Array.isArray(filters.pattern) ? filters.pattern : (filters.pattern ? [filters.pattern] : [])}
               onChange={onPatternChange}
               placeholder="All Patterns"
+              loading={loadingOptions}
             />
           )}
 
@@ -175,6 +189,7 @@ export default function InventoryFilters({
               selected={Array.isArray(filters.length) ? filters.length : (filters.length ? [filters.length] : [])}
               onChange={onLengthChange}
               placeholder="All Lengths"
+              loading={loadingOptions}
             />
           )}
 
@@ -185,6 +200,7 @@ export default function InventoryFilters({
               selected={Array.isArray(filters.width) ? filters.width : (filters.width ? [filters.width] : [])}
               onChange={onWidthChange}
               placeholder="All Widths"
+              loading={loadingOptions}
             />
           )}
 
@@ -195,6 +211,7 @@ export default function InventoryFilters({
               selected={Array.isArray(filters.weight) ? filters.weight : (filters.weight ? [filters.weight] : [])}
               onChange={onWeightChange}
               placeholder="All Weights"
+              loading={loadingOptions}
             />
           )}
         </div>

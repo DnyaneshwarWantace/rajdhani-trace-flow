@@ -9,12 +9,14 @@ import type { MaterialFilters } from '@/types/material';
 interface MaterialFiltersProps {
   filters: MaterialFilters;
   onSearchChange: (value: string) => void;
-  onCategoryChange: (values: string[]) => void;
+  onCategoryChange?: (values: string[]) => void;
   onStatusChange: (values: string[]) => void;
   onTypeChange?: (values: string[]) => void;
   onColorChange?: (values: string[]) => void;
   onSupplierChange?: (values: string[]) => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
+  /** Categories to hide from the filter (e.g. ["Ink"] so Ink is only in Ink Management) */
+  excludeCategories?: string[];
 }
 
 export default function MaterialFilters({
@@ -26,6 +28,7 @@ export default function MaterialFilters({
   onColorChange,
   onSupplierChange,
   onSortChange,
+  excludeCategories = [],
 }: MaterialFiltersProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
@@ -34,7 +37,7 @@ export default function MaterialFilters({
 
   useEffect(() => {
     loadFilterOptions();
-  }, []);
+  }, [excludeCategories?.join(',')]);
 
   const loadFilterOptions = async () => {
     try {
@@ -49,7 +52,10 @@ export default function MaterialFilters({
       const fromMaterials = Array.from(
         new Set(materials.map((m: any) => m.category).filter((c) => c && String(c).trim() !== '' && c !== 'N/A'))
       );
-      const uniqueCategories = Array.from(new Set([...fromDropdown, ...fromMaterials])).sort();
+      let uniqueCategories = Array.from(new Set([...fromDropdown, ...fromMaterials])).sort();
+      if (excludeCategories?.length) {
+        uniqueCategories = uniqueCategories.filter((c) => !excludeCategories!.includes(c));
+      }
       setCategories(uniqueCategories);
 
       // Extract unique types
@@ -75,10 +81,9 @@ export default function MaterialFilters({
   };
   return (
     <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      {/* First Row: Search + Status on large only */}
-      <div className="flex flex-wrap items-center gap-3 mb-3 lg:grid lg:grid-cols-12">
-        {/* Search - grows on tablet, 6 cols on lg */}
-        <div className="flex-1 min-w-0 lg:col-span-6">
+      {/* Row 1: Search, All Status, All Type (+ All Categories when on Materials) */}
+      <div className={`grid grid-cols-1 gap-3 mb-3 sm:grid-cols-2 lg:grid-cols-3 ${onCategoryChange ? 'lg:grid-cols-4' : ''}`}>
+        <div className="min-w-0">
           <DebouncedSearchInput
             value={filters.search || ''}
             onChange={onSearchChange}
@@ -89,9 +94,7 @@ export default function MaterialFilters({
             showCounter={true}
           />
         </div>
-
-        {/* Status - large screens only */}
-        <div className="hidden lg:block lg:col-span-6">
+        <div className="min-w-0">
           <MultiSelect
             options={[
               { label: 'In Stock', value: 'in-stock' },
@@ -104,85 +107,84 @@ export default function MaterialFilters({
             placeholder="All Status"
           />
         </div>
-      </div>
-
-      {/* Second Row: Category, Type, Color, Supplier - large screens only */}
-      <div className="hidden lg:grid grid-cols-1 lg:grid-cols-4 gap-3 mb-3">
-        {/* Category Filter - Multi-select */}
-        {onCategoryChange && (
-            <MultiSelect
-              options={categories.map(cat => ({ label: cat, value: cat }))}
-              selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
-              onChange={onCategoryChange}
-              placeholder="All Categories"
-            />
-          )}
-
-          {/* Type Filter - Multi-select */}
-          {onTypeChange && (
+        {onTypeChange && (
+          <div className="min-w-0">
             <MultiSelect
               options={types.map(type => ({ label: type, value: type }))}
               selected={Array.isArray(filters.type) ? filters.type : (filters.type ? [filters.type] : [])}
               onChange={onTypeChange}
               placeholder="All Types"
             />
-          )}
+          </div>
+        )}
+        {onCategoryChange && (
+          <div className="min-w-0">
+            <MultiSelect
+              options={categories.map(cat => ({ label: cat, value: cat }))}
+              selected={Array.isArray(filters.category) ? filters.category : (filters.category ? [filters.category] : [])}
+              onChange={onCategoryChange}
+              placeholder="All Categories"
+            />
+          </div>
+        )}
+      </div>
 
-          {/* Color Filter - Multi-select */}
-          {onColorChange && (
+      {/* Row 2: All Colors, All Suppliers, Sorting */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {onColorChange && (
+          <div className="min-w-0">
             <MultiSelect
               options={colors.map(color => ({ label: color, value: color }))}
               selected={Array.isArray(filters.color) ? filters.color : (filters.color ? [filters.color] : [])}
               onChange={onColorChange}
               placeholder="All Colors"
             />
-          )}
-
-          {/* Supplier Filter - Multi-select */}
-          {onSupplierChange && (
+          </div>
+        )}
+        {onSupplierChange && (
+          <div className="min-w-0">
             <MultiSelect
               options={suppliers.map(supplier => ({ label: supplier, value: supplier }))}
               selected={Array.isArray(filters.supplier) ? filters.supplier : (filters.supplier ? [filters.supplier] : [])}
               onChange={onSupplierChange}
               placeholder="All Suppliers"
             />
-          )}
+          </div>
+        )}
+        {onSortChange && (
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by</span>
+            <Select
+              value={filters.sortBy || 'name'}
+              onValueChange={(value) => onSortChange(value, filters.sortOrder || 'asc')}
+            >
+              <SelectTrigger className="h-9 text-sm flex-1 min-w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="stock">Stock</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="type">Material Type</SelectItem>
+                <SelectItem value="supplier">Supplier</SelectItem>
+                <SelectItem value="recent">Recently Added</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.sortOrder || 'asc'}
+              onValueChange={(value: 'asc' | 'desc') => onSortChange(filters.sortBy || 'name', value)}
+            >
+              <SelectTrigger className="h-9 text-sm w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
-
-      {/* Sorting Controls */}
-      {onSortChange && (
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
-          <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
-          <Select
-            value={filters.sortBy || 'name'}
-            onValueChange={(value) => onSortChange(value, filters.sortOrder || 'asc')}
-          >
-            <SelectTrigger className="w-[200px] h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="stock">Stock</SelectItem>
-              <SelectItem value="category">Category</SelectItem>
-              <SelectItem value="type">Material Type</SelectItem>
-              <SelectItem value="supplier">Supplier</SelectItem>
-              <SelectItem value="recent">Recently Added</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.sortOrder || 'asc'}
-            onValueChange={(value: 'asc' | 'desc') => onSortChange(filters.sortBy || 'name', value)}
-          >
-            <SelectTrigger className="w-[130px] h-9 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Ascending</SelectItem>
-              <SelectItem value="desc">Descending</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
     </div>
   );
 }

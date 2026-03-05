@@ -61,6 +61,15 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    name: 'Ink Management',
+    path: '/ink',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12" />
+      </svg>
+    ),
+  },
+  {
     name: 'Recipes / Calculator',
     path: '/recipes',
     icon: (

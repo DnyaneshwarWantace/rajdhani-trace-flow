@@ -156,8 +156,11 @@ export class MaterialService {
     }
   }
 
-  static async getMaterialStats(): Promise<MaterialStats> {
-    const response = await fetch(`${API_URL}/raw-materials/stats`, {
+  static async getMaterialStats(category?: string): Promise<MaterialStats> {
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    const url = `${API_URL}/raw-materials/stats${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url, {
       headers: this.getHeaders(),
     });
 

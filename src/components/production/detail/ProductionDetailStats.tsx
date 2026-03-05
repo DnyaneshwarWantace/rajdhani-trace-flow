@@ -7,9 +7,21 @@ interface ProductionDetailStatsProps {
 }
 
 export default function ProductionDetailStats({ batch }: ProductionDetailStatsProps) {
-  const efficiency = batch.planned_quantity > 0 && batch.actual_quantity
-    ? ((batch.actual_quantity / batch.planned_quantity) * 100).toFixed(1)
-    : '0';
+  // Treat actual_quantity as meaningful only once the batch is completed AND we have a positive value.
+  const hasFinalActual =
+    batch.status === 'completed' &&
+    typeof batch.actual_quantity === 'number' &&
+    !Number.isNaN(batch.actual_quantity) &&
+    batch.actual_quantity > 0;
+
+  const createdQuantity = hasFinalActual
+    ? batch.actual_quantity!
+    : batch.planned_quantity;
+
+  const efficiency =
+    batch.planned_quantity > 0
+      ? ((createdQuantity / batch.planned_quantity) * 100).toFixed(1)
+      : '0';
 
   const getProgressPercentage = () => {
     if (batch.status === 'completed') return 100;
@@ -42,12 +54,12 @@ export default function ProductionDetailStats({ batch }: ProductionDetailStatsPr
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm text-gray-600 mb-1">Created</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
-                {batch.actual_quantity ?? batch.planned_quantity ?? 0} product(s)
+                {createdQuantity} product(s)
               </p>
-              {batch.actual_quantity != null && batch.actual_quantity !== batch.planned_quantity && (
+              {hasFinalActual && createdQuantity !== batch.planned_quantity && (
                 <p className="text-xs text-gray-500 mt-1">
-                  {batch.actual_quantity > batch.planned_quantity ? '+' : ''}
-                  {batch.actual_quantity - batch.planned_quantity} vs expected
+                  {createdQuantity > batch.planned_quantity ? '+' : ''}
+                  {createdQuantity - batch.planned_quantity} vs expected
                 </p>
               )}
             </div>

@@ -5,12 +5,13 @@ import DashboardStatsCards from '@/components/dashboard/DashboardStatsCards';
 import RecentOrders from '@/components/dashboard/RecentOrders';
 import ProductionOverview from '@/components/dashboard/ProductionOverview';
 import InventoryAlerts from '@/components/dashboard/InventoryAlerts';
-import TopCustomers from '@/components/dashboard/TopCustomers';
-import TopSuppliers from '@/components/dashboard/TopSuppliers';
+import ManageStockOverview from '@/components/dashboard/ManageStockOverview';
 import { ProductService } from '@/services/productService';
 import { OrderService, type Order } from '@/services/orderService';
 import { ProductionService } from '@/services/productionService';
 import { SupplierService } from '@/services/supplierService';
+import { MaterialService } from '@/services/materialService';
+import { ManageStockService } from '@/services/manageStockService';
 import type { Product } from '@/types/product';
 
 interface DashboardData {
@@ -27,6 +28,22 @@ interface DashboardData {
     totalRecipes: number;
     totalWastage: number;
     totalMaterials: number;
+    inStockMaterials: number;
+    lowStockMaterials: number;
+    outOfStockMaterials: number;
+    manageStockPending: number;
+    manageStockApproved: number;
+    manageStockShipped: number;
+    manageStockDelivered: number;
+    manageStockTotalValue: number;
+    ordersPending: number;
+    ordersAccepted: number;
+    ordersDispatched: number;
+    ordersDelivered: number;
+    productionPlanned: number;
+    productionInProgress: number;
+    productionCompleted: number;
+    productionCancelled: number;
   };
   recentOrders: Order[];
   productionBatches: any[];
@@ -52,6 +69,22 @@ export default function Dashboard() {
       totalRecipes: 0,
       totalWastage: 0,
       totalMaterials: 0,
+      inStockMaterials: 0,
+      lowStockMaterials: 0,
+      outOfStockMaterials: 0,
+      manageStockPending: 0,
+      manageStockApproved: 0,
+      manageStockShipped: 0,
+      manageStockDelivered: 0,
+      manageStockTotalValue: 0,
+      ordersPending: 0,
+      ordersAccepted: 0,
+      ordersDispatched: 0,
+      ordersDelivered: 0,
+      productionPlanned: 0,
+      productionInProgress: 0,
+      productionCompleted: 0,
+      productionCancelled: 0,
     },
     recentOrders: [],
     productionBatches: [],
@@ -61,26 +94,51 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    loadDashboardData();
+    // Try to hydrate from cache first for instant load
+    let hydratedFromCache = false;
+    try {
+      const cachedRaw = localStorage.getItem('dashboardCacheV1');
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw) as { data: DashboardData; timestamp: number };
+        const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+        if (cached?.data && typeof cached.timestamp === 'number' && Date.now() - cached.timestamp < maxAgeMs) {
+          setDashboardData(cached.data);
+          setLoading(false);
+          hydratedFromCache = true;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read dashboard cache', e);
+    }
+
+    loadDashboardData(hydratedFromCache);
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (skipLoading = false) => {
     try {
-      setLoading(true);
+      if (!skipLoading) {
+        setLoading(true);
+      }
 
-      // Fetch data in parallel
+      // Fetch data in parallel (include material stats, manage stock stats, and order stats)
       const [
         productsResponse,
         ordersResponse,
         productStatsResponse,
         productionResponse,
         suppliersResponse,
+        materialStatsResponse,
+        manageStockStatsResponse,
+        orderStatsResponse,
       ] = await Promise.all([
         ProductService.getProducts({ limit: 1000 }),
         OrderService.getOrders({ limit: 1000 }),
         ProductService.getProductStats(),
         ProductionService.getBatches(),
         SupplierService.getSuppliers(),
+        MaterialService.getMaterialStats().catch(() => ({ totalMaterials: 0, inStock: 0, lowStock: 0, outOfStock: 0, overstock: 0, totalValue: 0, averageValue: 0 })),
+        ManageStockService.getOrderStats().catch(() => ({ totalOrders: 0, totalValue: 0, pendingOrders: 0, approvedOrders: 0, shippedOrders: 0, deliveredOrders: 0 })),
+        OrderService.getOrderStats().catch(() => ({ data: null, error: null })),
       ]);
 
       // Process products data
@@ -119,34 +177,21 @@ export default function Dashboard() {
       });
       const customers = Array.from(customerMap.values());
 
-      // Get production batches
+      // Get production batches and count by status
       const productionBatches = productionResponse.data || [];
-      const activeBatches = productionBatches.filter((batch: any) =>
-        batch.status === 'in_progress' || batch.status === 'planned'
+      const productionPlanned = productionBatches.filter((b: any) => b.status === 'planned').length;
+      const productionInProgress = productionBatches.filter((b: any) => b.status === 'in_progress' || b.status === 'in_production').length;
+      const productionCompleted = productionBatches.filter((b: any) => b.status === 'completed').length;
+      const productionCancelled = productionBatches.filter((b: any) => b.status === 'cancelled').length;
+      const activeBatches = productionBatches.filter(
+        (batch: any) => batch.status === 'in_progress' || batch.status === 'planned'
       );
 
-      // Enrich batches with product names if missing
-      const enrichedBatches = await Promise.all(
-        activeBatches.map(async (batch: any) => {
-          // If product_name is missing, fetch it from product_id
-          if (!batch.product_name && batch.product_id) {
-            try {
-              const product = await ProductService.getProductById(batch.product_id);
-              return {
-                ...batch,
-                product_name: product.name || batch.product_name || 'Product',
-              };
-            } catch (error) {
-              console.error(`Error fetching product ${batch.product_id}:`, error);
-              return {
-                ...batch,
-                product_name: batch.product_name || 'Product',
-              };
-            }
-          }
-          return batch;
-        })
-      );
+      // Enrich batches with a safe fallback product_name without extra API calls
+      const enrichedBatches = activeBatches.map((batch: any) => ({
+        ...batch,
+        product_name: batch.product_name || 'Product',
+      }));
 
       // Get suppliers
       const suppliers = suppliersResponse.data || [];
@@ -170,10 +215,25 @@ export default function Dashboard() {
       // Get wastage count from productStatsResponse
       const totalWastage = (productStatsResponse as any).total_wastage || 0;
 
-      // Get materials count (you can fetch from materials service if available)
-      const totalMaterials = (productStatsResponse as any).total_materials || 0;
+      // Material stats from MaterialService
+      const totalMaterials = materialStatsResponse?.totalMaterials ?? 0;
+      const inStockMaterials = materialStatsResponse?.inStock ?? 0;
+      const lowStockMaterials = materialStatsResponse?.lowStock ?? 0;
+      const outOfStockMaterials = materialStatsResponse?.outOfStock ?? 0;
 
-      setDashboardData({
+      const manageStockPending = manageStockStatsResponse?.pendingOrders ?? 0;
+      const manageStockApproved = manageStockStatsResponse?.approvedOrders ?? 0;
+      const manageStockShipped = manageStockStatsResponse?.shippedOrders ?? 0;
+      const manageStockDelivered = manageStockStatsResponse?.deliveredOrders ?? 0;
+      const manageStockTotalValue = manageStockStatsResponse?.totalValue ?? 0;
+
+      const orderStatsData = orderStatsResponse?.data;
+      const ordersPending = orderStatsData?.pending ?? orders.filter((o: any) => o.status === 'pending').length;
+      const ordersAccepted = orderStatsData?.accepted ?? orders.filter((o: any) => o.status === 'accepted').length;
+      const ordersDispatched = orderStatsData?.dispatched ?? orders.filter((o: any) => o.status === 'dispatched').length;
+      const ordersDelivered = orderStatsData?.delivered ?? orders.filter((o: any) => o.status === 'delivered').length;
+
+      const nextData: DashboardData = {
         stats: {
           totalProducts: productStatsResponse.total_products || products.length,
           totalOrders: orders.length,
@@ -187,15 +247,46 @@ export default function Dashboard() {
           totalRecipes: productsWithRecipes,
           totalWastage,
           totalMaterials,
+          inStockMaterials,
+          lowStockMaterials,
+          outOfStockMaterials,
+          manageStockPending,
+          manageStockApproved,
+          manageStockShipped,
+          manageStockDelivered,
+          manageStockTotalValue,
+          ordersPending,
+          ordersAccepted,
+          ordersDispatched,
+          ordersDelivered,
+          productionPlanned,
+          productionInProgress,
+          productionCompleted,
+          productionCancelled,
         },
-        recentOrders: orders.slice(0, 10).sort((a: any, b: any) => {
-          return new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime();
-        }),
+        recentOrders: orders
+          .slice(0, 10)
+          .sort((a: any, b: any) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime()),
         productionBatches: enrichedBatches.slice(0, 10),
         lowStockProducts: lowStockProducts.slice(0, 10),
         topCustomers: customers,
         topSuppliers: Array.from(supplierStatsMap.values()),
-      });
+      };
+
+      setDashboardData(nextData);
+
+      // Cache dashboard data for faster subsequent loads
+      try {
+        localStorage.setItem(
+          'dashboardCacheV1',
+          JSON.stringify({
+            data: nextData,
+            timestamp: Date.now(),
+          })
+        );
+      } catch (e) {
+        console.warn('Failed to write dashboard cache', e);
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -228,17 +319,15 @@ export default function Dashboard() {
           <ProductionOverview batches={dashboardData.productionBatches} loading={loading} />
         </div>
 
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Inventory Alerts */}
-          <InventoryAlerts products={dashboardData.lowStockProducts} loading={loading} />
-
-          {/* Top Customers */}
-          <TopCustomers customers={dashboardData.topCustomers} loading={loading} />
+        {/* Inventory & Manage Stock - half half */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+          <div className="min-h-0 flex flex-col">
+            <InventoryAlerts products={dashboardData.lowStockProducts} loading={loading} />
+          </div>
+          <div className="min-h-0 flex flex-col">
+            <ManageStockOverview />
+          </div>
         </div>
-
-        {/* Top Suppliers - Full Width */}
-        <TopSuppliers suppliers={dashboardData.topSuppliers} loading={loading} />
       </div>
     </Layout>
   );

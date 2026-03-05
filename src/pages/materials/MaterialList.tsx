@@ -45,7 +45,16 @@ import { canDelete } from '@/utils/permissions';
 
 type TabValue = 'inventory' | 'waste-recovery' | 'analytics' | 'notifications';
 
-export default function MaterialList() {
+export interface MaterialListProps {
+  /** When set, only materials with this category are shown (e.g. "Ink" for Ink Management). */
+  categoryFilter?: string;
+  /** Page title (e.g. "Ink Management"). */
+  pageTitle?: string;
+  /** Page subtitle. */
+  pageSubtitle?: string;
+}
+
+export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }: MaterialListProps = {}) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabValue>('inventory');
@@ -55,7 +64,7 @@ export default function MaterialList() {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
   const [filters, setFilters] = useState<MaterialFiltersType>({
     search: '',
-    category: [],
+    category: categoryFilter ? [categoryFilter] : [],
     status: [],
     type: [],
     color: [],
@@ -80,7 +89,7 @@ export default function MaterialList() {
 
   // Notifications state - load count from cache immediately
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(true); // Start with true to prevent empty state flash
   const [notificationCount, setNotificationCount] = useState(() => {
     const cached = localStorage.getItem('material_notification_count');
     return cached ? parseInt(cached, 10) : 0;
@@ -180,6 +189,15 @@ export default function MaterialList() {
     }
   }, [filters, activeTab]);
 
+  // Load notifications with loading state when switching to notifications tab
+  const hasLoadedNotificationsRef = useRef(false);
+  useEffect(() => {
+    if (activeTab === 'notifications' && !hasLoadedNotificationsRef.current) {
+      hasLoadedNotificationsRef.current = true;
+      loadNotifications(false); // Show loading spinner on first visit
+    }
+  }, [activeTab]);
+
   // Load periodic-due (10-day reminder) when on inventory tab
   const loadPeriodicDueMaterials = async () => {
     try {
@@ -238,9 +256,9 @@ export default function MaterialList() {
       setLoading(true);
       setError(null);
 
-      // Build API filters - include all filters except search (handled client-side)
+      // Build API filters - when categoryFilter is set (e.g. Ink Management), always filter by it
       const apiFilters: any = {
-        category: filters.category && filters.category.length > 0 ? filters.category : undefined,
+        category: categoryFilter ? [categoryFilter] : (filters.category && filters.category.length > 0 ? filters.category : undefined),
         status: filters.status && filters.status.length > 0 ? filters.status : undefined,
         type: filters.type && filters.type.length > 0 ? filters.type : undefined,
         color: filters.color && filters.color.length > 0 ? filters.color : undefined,
@@ -318,7 +336,7 @@ export default function MaterialList() {
     try {
       statsLoadingRef.current = true;
       setStatsLoading(true);
-      const stats = await MaterialService.getMaterialStats();
+      const stats = await MaterialService.getMaterialStats(categoryFilter);
 
       // Save full stats for analytics tab
       setFullStats(stats);
@@ -841,9 +859,10 @@ export default function MaterialList() {
       if (!silent) setNotificationsLoading(true);
       const { NotificationService } = await import('@/services/notificationService');
 
+      // Load ALL material notifications at once
       const materialNotifications = await NotificationService.getNotifications({
         module: 'materials',
-        limit: 1000
+        limit: 5000 // Load all
       });
 
       const allNotifs = materialNotifications.data || [];
@@ -866,11 +885,15 @@ export default function MaterialList() {
       // Update count and cache for fast display
       setNotificationCount(unreadCount);
       localStorage.setItem('material_notification_count', unreadCount.toString());
+
+      console.log('✅ Loaded ALL material notifications:', realNotifications.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
+      setNotifications([]);
     } finally {
       notificationsLoadingRef.current = false;
-      if (!silent) setNotificationsLoading(false);
+      // ALWAYS set loading to false, even if silent (fixes infinite loading bug)
+      setNotificationsLoading(false);
     }
   };
 
@@ -903,6 +926,8 @@ export default function MaterialList() {
             <div>
         {/* Page Header - only show Export, Add to Inventory, Grid/Table on Inventory tab */}
         <MaterialHeader
+          title={pageTitle}
+          subtitle={pageSubtitle}
           onImportCSV={activeTab === 'inventory' ? handleImportCSV : undefined}
           onExport={activeTab === 'inventory' ? handleExport : undefined}
           onAddToInventory={activeTab === 'inventory' ? handleAddToInventory : undefined}
@@ -911,7 +936,7 @@ export default function MaterialList() {
           onViewModeChange={activeTab === 'inventory' ? setViewMode : undefined}
         />
 
-        {/* Stats Boxes */}
+        {/* Stats Boxes – when categoryFilter (e.g. Ink), stats are for that category only */}
         <MaterialStatsBoxes
           totalMaterials={materialStats.totalMaterials}
           inStock={materialStats.inStock}
@@ -919,18 +944,21 @@ export default function MaterialList() {
           outOfStock={materialStats.outOfStock}
           overstock={materialStats.overstock}
           loading={statsLoading}
+          totalLabel={categoryFilter ? 'Total Ink Materials' : undefined}
         />
 
-        {/* Tabs */}
-        <MaterialTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          unreadCount={notificationCount}
-          wasteCount={wasteCount}
-        />
+        {/* Tabs – hidden on Ink Management (categoryFilter); only inventory is shown there */}
+        {!categoryFilter && (
+          <MaterialTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            unreadCount={notificationCount}
+            wasteCount={wasteCount}
+          />
+        )}
 
         {/* 10-day reminder – info only, on fixed days (10, 20, 30). Record from table row. */}
-        {activeTab === 'inventory' && (periodicDueLoading ? (
+        {(activeTab === 'inventory' || categoryFilter) && (periodicDueLoading ? (
           <div className="mb-4 py-2 text-sm text-gray-500">Checking…</div>
         ) : isFixedReminderDay ? (
           <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
@@ -939,22 +967,23 @@ export default function MaterialList() {
           </div>
         ) : null)}
 
-        {/* Filters - Only show on inventory tab */}
-        {activeTab === 'inventory' && (
+        {/* Filters - Only show on inventory tab (or always when Ink Management) */}
+        {(activeTab === 'inventory' || categoryFilter) && (
           <MaterialFilters
             filters={filters}
             onSearchChange={handleSearch}
-            onCategoryChange={handleCategoryFilter}
+            onCategoryChange={categoryFilter ? undefined : handleCategoryFilter}
             onStatusChange={handleStatusFilter}
             onTypeChange={handleTypeFilter}
             onColorChange={handleColorFilter}
             onSupplierChange={handleSupplierFilter}
             onSortChange={handleSortChange}
+            excludeCategories={categoryFilter ? undefined : ['Ink']}
           />
         )}
 
         {/* Inventory Tab Content */}
-        {activeTab === 'inventory' && (
+        {(activeTab === 'inventory' || categoryFilter) && (
           <MaterialInventoryTab
             materials={materials}
             loading={loading}
@@ -977,18 +1006,14 @@ export default function MaterialList() {
           />
         )}
 
-        {/* Waste Recovery Tab Content */}
-        {activeTab === 'waste-recovery' && (
+        {/* Waste Recovery / Analytics / Notifications – only on Materials page, not Ink Management */}
+        {!categoryFilter && activeTab === 'waste-recovery' && (
           <WasteRecoveryTab onRefresh={handleWasteRefresh} />
         )}
-
-        {/* Analytics Tab Content */}
-        {activeTab === 'analytics' && (
+        {!categoryFilter && activeTab === 'analytics' && (
           <MaterialAnalyticsTab initialStats={fullStats} />
         )}
-
-        {/* Notifications Tab Content */}
-        {activeTab === 'notifications' && (
+        {!categoryFilter && activeTab === 'notifications' && (
           <MaterialNotificationsTab
             notifications={notifications}
             loading={notificationsLoading}
@@ -1003,6 +1028,8 @@ export default function MaterialList() {
         onSuccess={handleMaterialSuccess}
         material={selectedMaterial}
         mode={editMode}
+        fixedCategory={categoryFilter}
+        excludeCategories={categoryFilter ? undefined : ['Ink']}
       />
       <RecordPeriodicUsageDialog
         isOpen={isRecordPeriodicOpen}
@@ -1030,6 +1057,8 @@ export default function MaterialList() {
         isOpen={isAddToInventoryOpen}
         onClose={() => setIsAddToInventoryOpen(false)}
         onSuccess={handleMaterialSuccess}
+        fixedCategory={categoryFilter}
+        excludeCategories={categoryFilter ? undefined : ['Ink']}
       />
 
       {/* CSV Import Dialog */}

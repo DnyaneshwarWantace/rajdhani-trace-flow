@@ -678,7 +678,14 @@ export default function ActivityNotificationCard({
                   </div>
                 )}
 
-                {/* Regular Activity Details */}
+                {/* Regular Activity Details - Only show if there's content */}
+                {(metadata?.batch_number || metadata?.added_materials || metadata?.removed_materials ||
+                  metadata?.changed_materials || metadata?.individual_products || metadata?.raw_materials ||
+                  metadata?.machine_name || metadata?.waste_type || metadata?.field_updated ||
+                  metadata?.product_name || metadata?.material_name || action?.includes('RECIPE') ||
+                  actionCategory === 'RECIPE' || metadata?.quantity_generated || metadata?.category ||
+                  (activityData?.changes && Object.keys(activityData.changes).length > 0) ||
+                  action || userName) && (
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
               {/* Production Batch Info */}
               {(action.includes('PRODUCTION') || actionCategory === 'PRODUCTION') && metadata?.batch_number && (
@@ -1073,6 +1080,7 @@ export default function ActivityNotificationCard({
                 </p>
               </div>
                 </div>
+                )}
               </div>
             )}
 

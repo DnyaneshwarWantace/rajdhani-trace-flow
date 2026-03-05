@@ -12,52 +12,76 @@ const DialogPortal = DialogPrimitive.Portal
 
 const DialogClose = DialogPrimitive.Close
 
+// Global counter to track how many dialogs are open (for nested dialogs)
+const incrementDialogCount = () => {
+  const currentCount = parseInt(document.documentElement.getAttribute('data-dialog-count') || '0', 10);
+  document.documentElement.setAttribute('data-dialog-count', String(currentCount + 1));
+  return currentCount + 1;
+};
+
+const decrementDialogCount = () => {
+  const currentCount = parseInt(document.documentElement.getAttribute('data-dialog-count') || '0', 10);
+  const newCount = Math.max(0, currentCount - 1);
+  document.documentElement.setAttribute('data-dialog-count', String(newCount));
+  return newCount;
+};
+
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
-  React.useEffect(() => {
-    const supportsStableScrollbarGutter =
-      typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
-        ? CSS.supports('scrollbar-gutter: stable')
-        : false;
+  const [savedScrollY] = React.useState(() => window.scrollY || document.documentElement.scrollTop);
 
-    // Calculate scrollbar width BEFORE hiding scrollbar
-    // This must be done before adding modal-open class
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    
-    // Set CSS variable for scrollbar width (will be used by CSS)
-    // Use a more persistent storage method
-    const storedWidth = scrollbarWidth > 0 ? `${scrollbarWidth}px` : '0px';
-    document.documentElement.style.setProperty('--scrollbar-width', storedWidth);
-    document.documentElement.setAttribute('data-scrollbar-width', storedWidth);
-    
-    // Add modal-open class to body and html to trigger CSS scroll lock
-    document.body.classList.add('modal-open');
-    document.documentElement.classList.add('modal-open');
-    
-    // Only apply padding compensation if stable gutter is not supported.
-    // Otherwise we'd double-compensate and cause layout shift.
-    if (!supportsStableScrollbarGutter && scrollbarWidth > 0) {
-      document.body.style.paddingRight = storedWidth;
+  React.useEffect(() => {
+    // Increment dialog counter
+    const count = incrementDialogCount();
+    console.log('Dialog opened, count:', count);
+
+    // Only set up scroll lock on FIRST dialog
+    if (count === 1) {
+      // FORCE hide scrollbar and prevent ALL scrolling
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${savedScrollY}px`;
+      document.body.style.width = '100%';
     }
 
     return () => {
-      document.body.classList.remove('modal-open');
-      document.documentElement.classList.remove('modal-open');
-      document.body.style.paddingRight = '';
-      // Don't remove scrollbar-width immediately - dropdowns might still need it
-      // It will be cleaned up when all modals close
+      // Decrement dialog counter
+      const newCount = decrementDialogCount();
+      console.log('Dialog closed, count:', newCount);
+
+      // Only remove scroll lock when ALL dialogs are closed
+      if (newCount === 0) {
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+
+        // Restore scroll position
+        window.scrollTo(0, savedScrollY);
+      }
     };
-  }, []);
+  }, [savedScrollY]);
 
   return (
     <DialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        "fixed inset-0 z-[9998] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-[9998] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overscroll-contain",
         className
       )}
+      style={{ overscrollBehavior: 'contain' }}
+      onWheel={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+      onTouchMove={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
       {...props}
     />
   );
@@ -78,9 +102,10 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-[9998] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border border-gray-200 bg-white shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-hidden",
+        "fixed left-[50%] top-[50%] z-[9998] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] border border-gray-200 bg-white shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-hidden overscroll-contain",
         className
       )}
+      style={{ overscrollBehavior: 'contain' }}
       {...props}
     >
       {customLayout ? (
@@ -94,9 +119,15 @@ const DialogContent = React.forwardRef<
       ) : (
         <>
           <div
-            className="overflow-y-auto max-h-[85vh]"
+            className="overflow-y-auto max-h-[85vh] overscroll-contain"
+            style={{ overscrollBehavior: 'contain' }}
             onWheel={(e) => {
               e.stopPropagation();
+              const target = e.currentTarget;
+              const { scrollTop, scrollHeight, clientHeight } = target;
+              const atTop = scrollTop <= 0 && e.deltaY < 0;
+              const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+              if (atTop || atBottom) e.preventDefault();
             }}
             onTouchMove={(e) => {
               e.stopPropagation();

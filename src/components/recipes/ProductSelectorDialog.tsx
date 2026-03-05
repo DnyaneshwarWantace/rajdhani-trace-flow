@@ -111,8 +111,14 @@ export default function ProductSelectorDialog({
   const loadProducts = async () => {
     try {
       setLoading(true);
-      // Always load full list (no filters) so filter dropdowns show ALL options
-      const result = await ProductService.getProducts({ limit: 10000 });
+      // Load products that have recipes from backend (server-side filter)
+      // so we don't fetch unnecessary items.
+      const result = await ProductService.getProducts({
+        limit: 10000,
+        has_recipe: true,
+        sortBy: 'name',
+        sortOrder: 'asc',
+      });
       const loadedProducts = result.products || [];
       const productsWithRecipes = loadedProducts.filter((p) => p.has_recipe);
 
@@ -687,12 +693,16 @@ export default function ProductSelectorDialog({
           )}
         </div>
 
-        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t mt-auto">
-          <Button type="button" variant="outline" onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          }}>
+        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t mt-auto flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+          >
             Cancel
           </Button>
         </DialogFooter>

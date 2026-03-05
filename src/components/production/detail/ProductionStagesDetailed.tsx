@@ -286,13 +286,23 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   const finalIsCompleted = batch.status === 'completed';
   const finalIsInProgress = wastageIsCompleted && !finalIsCompleted;
 
+  const hasFinalActual =
+    batch.status === 'completed' &&
+    typeof batch.actual_quantity === 'number' &&
+    !Number.isNaN(batch.actual_quantity) &&
+    batch.actual_quantity > 0;
+
+  const finalProductsCount = hasFinalActual
+    ? batch.actual_quantity!
+    : batch.planned_quantity || individualProductsCount || 0;
+
   const finalStage = {
     status: (finalIsCompleted ? 'completed' : (finalIsInProgress ? 'in_progress' : 'not_started')) as 'completed' | 'in_progress' | 'not_started',
     started_at: finalStartDate,
     started_by: batch.final_stage?.started_by || finalStep?.inspector_name || finalStep?.inspector || batch.operator || batch.supervisor || 'System',
     completed_at: finalCompletionDate,
     completed_by: batch.final_stage?.completed_by || (finalIsCompleted ? (batch.operator || batch.supervisor || 'System') : null),
-    products_count: batch.actual_quantity || batch.planned_quantity || 0
+    products_count: finalProductsCount
   };
 
   // Stage visibility: correct order = Planning → Machine → Individual Product Details → Wastage → Completion

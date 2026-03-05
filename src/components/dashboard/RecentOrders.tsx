@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, User, ArrowRight } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatHelpers';
+import { ShoppingCart, User, ArrowRight, Calendar } from 'lucide-react';
+import { formatCurrency, formatDate } from '@/utils/formatHelpers';
 import type { Order } from '@/services/orderService';
 
 interface RecentOrdersProps {
@@ -73,6 +73,12 @@ export default function RecentOrders({ orders, loading }: RecentOrdersProps) {
                       <User className="w-3 h-3 flex-shrink-0" />
                       <span className="truncate">{order.customerName}</span>
                     </div>
+                    {order.orderDate && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5">
+                        <Calendar className="w-3 h-3 flex-shrink-0" />
+                        <span>{formatDate(order.orderDate)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

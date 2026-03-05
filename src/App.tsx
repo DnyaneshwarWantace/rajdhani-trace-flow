@@ -12,6 +12,7 @@ import IndividualProductDetail from '@/pages/products/IndividualProductDetail';
 import DropdownMaster from '@/pages/dropdowns/DropdownMaster';
 import MaterialList from '@/pages/materials/MaterialList';
 import MaterialDetail from '@/pages/materials/MaterialDetail';
+import InkManagement from '@/pages/materials/InkManagement';
 import RecipeCalculator from '@/pages/recipes/RecipeCalculator';
 import ManageStock from '@/pages/manageStock/ManageStock';
 import Settings from '@/pages/settings/Settings';
@@ -118,6 +119,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <MaterialDetail />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/ink"
+        element={
+          <PrivateRoute>
+            <InkManagement />
           </PrivateRoute>
         }
       />

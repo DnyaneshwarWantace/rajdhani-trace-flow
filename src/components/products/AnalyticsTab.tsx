@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ProductService } from '@/services/productService';
 import { AnalyticsService } from '@/services/analyticsService';
 import type { Product, ProductStats } from '@/types/product';
@@ -17,6 +17,76 @@ interface AnalyticsTabProps {
   products: Product[];
 }
 
+// Cache for analytics data (shared between component and prefetch)
+const analyticsCache = {
+  stats: null as ProductStats | null,
+  allProducts: null as Product[] | null,
+  monthlyDemand: null as MonthlyDemand[] | null,
+  mostProduced: null as ProducedProduct[] | null,
+  monthlySales: null as MonthlySales[] | null,
+  monthlyProduction: null as MonthlyProduction[] | null,
+  timestamp: 0,
+  TTL: 60000, // 1 minute cache (analytics changes less frequently)
+};
+
+async function fetchAnalyticsData() {
+  // Fetch all analytics data in parallel - reduced limits for speed
+  const [
+    statsData,
+    productsData,
+    demandData,
+    producedData,
+    salesData,
+    productionData,
+  ] = await Promise.all([
+    ProductService.getProductStats(),
+    ProductService.getProducts({ limit: 500 }), // Further reduced to 500 for faster analytics
+    AnalyticsService.getProductDemandByMonth(6),
+    AnalyticsService.getMostProducedProducts(10),
+    AnalyticsService.getMonthlySalesAnalytics(6),
+    AnalyticsService.getMonthlyProductionAnalytics(6),
+  ]);
+
+  return {
+    statsData,
+    products: productsData.products || [],
+    demandData,
+    producedData,
+    salesData,
+    productionData,
+  };
+}
+
+// Lightweight prefetch helper so analytics can be warmed in background
+export async function prefetchProductAnalytics() {
+  const now = Date.now();
+  if (analyticsCache.stats && now - analyticsCache.timestamp < analyticsCache.TTL) {
+    return;
+  }
+  try {
+    const {
+      statsData,
+      products,
+      demandData,
+      producedData,
+      salesData,
+      productionData,
+    } = await fetchAnalyticsData();
+
+    analyticsCache.stats = statsData;
+    analyticsCache.allProducts = products;
+    analyticsCache.monthlyDemand = demandData;
+    analyticsCache.mostProduced = producedData;
+    analyticsCache.monthlySales = salesData;
+    analyticsCache.monthlyProduction = productionData;
+    analyticsCache.timestamp = Date.now();
+
+    console.log('✅ Prefetched product analytics data');
+  } catch (err) {
+    console.error('Error prefetching product analytics:', err);
+  }
+}
+
 export default function AnalyticsTab({ products: _products }: AnalyticsTabProps) {
   const [stats, setStats] = useState<ProductStats | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -26,9 +96,28 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
   const [monthlyProduction, setMonthlyProduction] = useState<MonthlyProduction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    loadAnalyticsData();
+    // Check cache first
+    const now = Date.now();
+    if (analyticsCache.stats && (now - analyticsCache.timestamp) < analyticsCache.TTL && !hasLoadedRef.current) {
+      console.log('📦 Using cached analytics data');
+      setStats(analyticsCache.stats);
+      setAllProducts(analyticsCache.allProducts || []);
+      setMonthlyDemand(analyticsCache.monthlyDemand || []);
+      setMostProduced(analyticsCache.mostProduced || []);
+      setMonthlySales(analyticsCache.monthlySales || []);
+      setMonthlyProduction(analyticsCache.monthlyProduction || []);
+      setLoading(false);
+      hasLoadedRef.current = true;
+      return;
+    }
+
+    if (!hasLoadedRef.current) {
+      loadAnalyticsData();
+      hasLoadedRef.current = true;
+    }
   }, []);
 
   const loadAnalyticsData = async () => {
@@ -36,29 +125,33 @@ export default function AnalyticsTab({ products: _products }: AnalyticsTabProps)
       setLoading(true);
       setError(null);
 
-      // Fetch all analytics data in parallel
-      const [
+      // Reuse shared fetch helper so component and prefetch stay in sync
+      const {
         statsData,
-        productsData,
+        products,
         demandData,
         producedData,
         salesData,
-        productionData
-      ] = await Promise.all([
-        ProductService.getProductStats(),
-        ProductService.getProducts({ limit: 10000 }),
-        AnalyticsService.getProductDemandByMonth(6),
-        AnalyticsService.getMostProducedProducts(10),
-        AnalyticsService.getMonthlySalesAnalytics(12),
-        AnalyticsService.getMonthlyProductionAnalytics(12)
-      ]);
+        productionData,
+      } = await fetchAnalyticsData();
 
       setStats(statsData);
-      setAllProducts(productsData.products || []);
+      setAllProducts(products);
       setMonthlyDemand(demandData);
       setMostProduced(producedData);
       setMonthlySales(salesData);
       setMonthlyProduction(productionData);
+
+      // Update cache
+      analyticsCache.stats = statsData;
+      analyticsCache.allProducts = products;
+      analyticsCache.monthlyDemand = demandData;
+      analyticsCache.mostProduced = producedData;
+      analyticsCache.monthlySales = salesData;
+      analyticsCache.monthlyProduction = productionData;
+      analyticsCache.timestamp = Date.now();
+
+      console.log('✅ Loaded analytics data');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
       console.error('Error loading analytics:', err);

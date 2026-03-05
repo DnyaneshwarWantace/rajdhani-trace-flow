@@ -23,6 +23,10 @@ interface AddToInventoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** When set (e.g. "Ink" on Ink Management), category is fixed and user can only add materials of this category */
+  fixedCategory?: string;
+  /** Categories to hide from dropdown (e.g. ["Ink"] on Materials page so Ink is only in Ink Management) */
+  excludeCategories?: string[];
 }
 
 interface Supplier {
@@ -30,7 +34,7 @@ interface Supplier {
   name: string;
 }
 
-export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: AddToInventoryDialogProps) {
+export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixedCategory, excludeCategories = [] }: AddToInventoryDialogProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -67,7 +71,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
   const [formData, setFormData] = useState(emptyFormData);
 
   const resetForm = () => {
-    setFormData(emptyFormData);
+    setFormData({ ...emptyFormData, category: fixedCategory || '' });
     setImagePreview('');
     setImageFile(null);
     setTouchedFields(new Set());
@@ -78,7 +82,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       loadDropdowns();
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, fixedCategory]);
 
   const handleClose = () => {
     resetForm();
@@ -113,11 +117,14 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       const result = await response.json();
       const allDropdowns = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result.data) ? result.data : []);
 
-      // Filter by category
+      // Filter by category (exclude e.g. Ink on Materials page so it only appears in Ink Management)
       const categoryOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_category' && opt.is_active !== false);
-      const categoryValues = categoryOptions
+      let categoryValues = categoryOptions
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
+      if (excludeCategories?.length) {
+        categoryValues = categoryValues.filter((c: string) => !excludeCategories!.includes(c));
+      }
       setCategories(categoryValues);
 
       // Filter units
@@ -309,7 +316,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       if (!formData.supplier || formData.supplier.trim() === '') {
         missingFields.push('Supplier');
       }
-      if (!formData.category || formData.category.trim() === '') {
+      if (!fixedCategory && (!formData.category || formData.category.trim() === '')) {
         missingFields.push('Category');
       }
       if (!formData.unit || formData.unit.trim() === '') {
@@ -387,12 +394,13 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
 
       // Normalize unit to match backend enum
       const normalizedUnit = normalizeUnit(formData.unit);
+      const effectiveCategory = (fixedCategory || formData.category || '').trim();
 
       // Create material data (with stock for direct inventory addition); round decimals
       const materialData: RawMaterialFormData = {
         name: formData.name,
         type: formData.type,
-        category: formData.category,
+        category: effectiveCategory,
         current_stock: Math.round(parseFloat(formData.currentStock) * 100) / 100 || 0,
         unit: normalizedUnit,
         min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
@@ -415,7 +423,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
       setFormData({
         name: '',
         type: '',
-        category: '',
+        category: fixedCategory || '',
         unit: '',
         currentStock: '0',
         minThreshold: '', // Optional - will default to 10 if empty
@@ -577,14 +585,23 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess }: Add
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
-            <MaterialCategorySection
-              category={formData.category}
-              categories={categories}
-              onCategoryChange={(value) => setFormData({ ...formData, category: value })}
-              onCategoriesReload={loadDropdowns}
-              touchedFields={touchedFields}
-              markFieldTouched={markFieldTouched}
-            />
+            {fixedCategory ? (
+              <div>
+                <Label htmlFor="category-fixed">Category</Label>
+                <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
+                  {fixedCategory}
+                </p>
+              </div>
+            ) : (
+              <MaterialCategorySection
+                category={formData.category}
+                categories={categories}
+                onCategoryChange={(value) => setFormData({ ...formData, category: value })}
+                onCategoriesReload={loadDropdowns}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
+              />
+            )}
           </div>
 
           {/* Material Type and Unit on same line */}

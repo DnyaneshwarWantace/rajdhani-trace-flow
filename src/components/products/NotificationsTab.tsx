@@ -1,22 +1,61 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
-import { Bell, CheckCircle, X, ArrowRight, RefreshCw, Clock, Factory, AlertCircle, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import {
+  Bell,
+  CheckCircle,
+  X,
+  ArrowRight,
+  RefreshCw,
+  Clock,
+  Factory,
+  AlertCircle,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+} from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination-primitives';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface NotificationsTabProps {
   products: any[]; // Product list to check individual stock tracking
 }
+
+// Cache for notifications - persist across tab switches
+const notificationCache = {
+  data: null as Notification[] | null,
+  timestamp: 0,
+  TTL: 30000, // 30 seconds cache
+};
 
 export default function NotificationsTab({ products }: NotificationsTabProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [isAddingToProduction, setIsAddingToProduction] = useState<string | null>(null);
   const [expandedNotifications, setExpandedNotifications] = useState<Set<string>>(new Set());
 
@@ -34,24 +73,28 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [page, pageSize]);
 
   const loadNotifications = async () => {
     try {
       setLoading(true);
 
-      // Filter at backend level - only fetch product and production notifications
-      const { data } = await NotificationService.getNotifications({
+      const LIMIT = pageSize;
+      const currentOffset = (page - 1) * pageSize;
+
+      // Fetch ONLY real product notifications (exclude activity-log copies) with pagination
+      const { data, totalNotifications } = await NotificationService.getNotifications({
         module: 'products',
-        limit: 1000
+        include_logs: 'false',
+        limit: LIMIT,
+        offset: currentOffset,
       });
 
-      // Filter out activity logs
-      const filteredNotifications = data
-        .filter(n => !n.related_data?.activity_log_id)
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // Data already excludes activity logs at query level
+      setNotifications(data || []);
+      setTotalCount(totalNotifications || 0); // Set total count of REAL notifications only
 
-      setNotifications(filteredNotifications);
+      console.log('✅ Loaded', (data || []).length, 'product notifications, Total:', totalNotifications);
     } catch (error) {
       console.error('Error loading notifications:', error);
       toast({
@@ -64,13 +107,21 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
     }
   };
 
+  // Removed automatic infinite scroll - now using manual "Load More" button
+
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await NotificationService.updateNotificationStatus(notificationId, 'read');
       // Update the notification status to 'read' instead of removing it
-      setNotifications(prev =>
-        prev.map(n => n.id === notificationId ? { ...n, status: 'read' as const } : n)
+      const updatedNotifications = notifications.map(n =>
+        n.id === notificationId ? { ...n, status: 'read' as const } : n
       );
+      setNotifications(updatedNotifications);
+
+      // Update cache
+      notificationCache.data = updatedNotifications;
+      notificationCache.timestamp = Date.now();
+
       toast({
         title: 'Success',
         description: 'Notification marked as read',
@@ -88,7 +139,13 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
   const handleResolveNotification = async (notificationId: string) => {
     try {
       await NotificationService.updateNotificationStatus(notificationId, 'dismissed');
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      const updatedNotifications = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updatedNotifications);
+
+      // Update cache
+      notificationCache.data = updatedNotifications;
+      notificationCache.timestamp = Date.now();
+
       toast({
         title: 'Success',
         description: 'Notification dismissed',
@@ -145,7 +202,7 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
       // Mark notification as read
       await NotificationService.updateNotificationStatus(notification.id, 'read');
 
-      // Reload notifications
+      // Reload notifications for current page
       await loadNotifications();
 
       toast({
@@ -221,7 +278,7 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Product Notifications</h2>
                 <p className="text-xs sm:text-sm text-gray-500">
-                  {notifications.length} notification{notifications.length !== 1 ? 's' : ''} 
+                  Showing {notifications.length} of {totalCount} total
                   ({notifications.filter(n => n.status === 'unread').length} unread)
                 </p>
               </div>
@@ -641,6 +698,114 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                 </Card>
               );
             })}
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="mt-4 sm:mt-6 w-full">
+            <Pagination className="w-full">
+              <PaginationContent className="w-full justify-center flex-wrap gap-1">
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => {
+                      if (page > 1) setPage(page - 1);
+                    }}
+                    className={`${page === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                  />
+                </PaginationItem>
+
+                {(() => {
+                  const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+                  const pages: (number | 'ellipsis')[] = [];
+
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    pages.push(1);
+                    if (page > 3) pages.push('ellipsis');
+                    const start = Math.max(2, page - 1);
+                    const end = Math.min(totalPages - 1, page + 1);
+                    for (let i = start; i <= end; i++) {
+                      if (i !== 1 && i !== totalPages) pages.push(i);
+                    }
+                    if (page < totalPages - 2) pages.push('ellipsis');
+                    if (totalPages > 1) pages.push(totalPages);
+                  }
+
+                  return pages.map((p, index) => (
+                    <PaginationItem
+                      key={index}
+                      className={p === 'ellipsis' ? 'hidden sm:block' : ''}
+                    >
+                      {p === 'ellipsis' ? (
+                        <PaginationEllipsis />
+                      ) : (
+                        <PaginationLink
+                          isActive={p === page}
+                          onClick={() => setPage(p as number)}
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
+                            Math.abs((p as number) - page) > 1 &&
+                            (p as number) !== 1 &&
+                            (p as number) !== Math.max(1, Math.ceil((totalCount || 0) / pageSize))
+                              ? 'hidden sm:flex'
+                              : ''
+                          }`}
+                        >
+                          {p}
+                        </PaginationLink>
+                      )}
+                    </PaginationItem>
+                  ));
+                })()}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => {
+                      const totalPages = Math.max(1, Math.ceil((totalCount || 0) / pageSize));
+                      if (page < totalPages) setPage(page + 1);
+                    }}
+                    className={`${page >= Math.max(1, Math.ceil((totalCount || 0) / pageSize)) ? 'pointer-events-none opacity-50' : 'cursor-pointer'} h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+
+            {/* Pagination Info and Page Size Selector */}
+            <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                {totalCount === 0 ? (
+                  'Showing 0 of 0 notifications'
+                ) : (
+                  <>
+                    Showing {(page - 1) * pageSize + 1} to{' '}
+                    {Math.min((page - 1) * pageSize + notifications.length, totalCount)} of{' '}
+                    {totalCount} notifications
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                  Per page:
+                </span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    const newSize = parseInt(value, 10);
+                    setPageSize(newSize);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-16 sm:w-20 h-8 sm:h-10 text-xs sm:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </>
       ) : (

@@ -26,6 +26,10 @@ interface AddMaterialDialogProps {
   onSuccess: () => void;
   material?: RawMaterial | null; // For edit mode
   mode?: 'create' | 'edit';
+  /** When set (e.g. "Ink" on Ink Management), category is fixed and user can only add materials of this category */
+  fixedCategory?: string;
+  /** Categories to hide from dropdown (e.g. ["Ink"] on Materials page so Ink is only in Ink Management) */
+  excludeCategories?: string[];
 }
 
 interface Supplier {
@@ -33,7 +37,7 @@ interface Supplier {
   name: string;
 }
 
-export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material, mode = 'create' }: AddMaterialDialogProps) {
+export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material, mode = 'create', fixedCategory, excludeCategories = [] }: AddMaterialDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -82,7 +86,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const [formData, setFormData] = useState(emptyFormData);
 
   const resetCreateForm = () => {
-    setFormData(emptyFormData);
+    setFormData({ ...emptyFormData, category: fixedCategory || '' });
     setImagePreview('');
     setImageFile(null);
     setInvalidFields(new Set());
@@ -97,7 +101,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         resetCreateForm();
       }
     }
-  }, [isOpen, mode]);
+  }, [isOpen, mode, fixedCategory]);
 
   const handleClose = () => {
     if (mode === 'create') {
@@ -216,11 +220,14 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       const result = await response.json();
       const allDropdowns = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result.data) ? result.data : []);
 
-      // Filter by category
+      // Filter by category (exclude e.g. Ink on Materials page so it only appears in Ink Management)
       const categoryOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_category' && opt.is_active !== false);
-      const categoryValues = categoryOptions
+      let categoryValues = categoryOptions
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
+      if (excludeCategories?.length) {
+        categoryValues = categoryValues.filter((c: string) => !excludeCategories!.includes(c));
+      }
       setCategories(categoryValues);
 
       // Filter units
@@ -448,7 +455,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       if (!formData.supplier || formData.supplier.trim() === '') {
         missingFields.push('supplier');
       }
-      if (!formData.category || formData.category.trim() === '') {
+      if (!fixedCategory && (!formData.category || formData.category.trim() === '')) {
         missingFields.push('category');
       }
       if (!formData.unit || formData.unit.trim() === '') {
@@ -503,6 +510,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         setLoading(false);
         return;
       }
+
+      const effectiveCategory = (fixedCategory || formData.category || '').trim();
 
       // Validate expected delivery date is in the future (only for create mode)
       // Only validate if the date is actually filled (already checked above, but double-check)
@@ -607,7 +616,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         const materialData: Partial<RawMaterialFormData> = {
           name: formData.name,
           type: formData.type,
-          category: formData.category,
+          category: effectiveCategory,
           unit: normalizedUnit,
           current_stock: undefined,
           min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
@@ -617,8 +626,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
           color: formData.type === 'color' ? formData.color : 'NA',
           image_url: imageUrl || material.image_url,
-          usage_type: formData.category?.toLowerCase().trim() === 'ink' ? 'periodic' : 'per_batch',
-          reminder_interval_days: formData.category?.toLowerCase().trim() === 'ink' ? 10 : null,
+          usage_type: effectiveCategory?.toLowerCase() === 'ink' ? 'periodic' : 'per_batch',
+          reminder_interval_days: effectiveCategory?.toLowerCase() === 'ink' ? 10 : null,
         };
 
         await MaterialService.updateMaterial(material._id || material.id, materialData);
@@ -638,7 +647,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       const materialData: RawMaterialFormData = {
         name: formData.name,
         type: formData.type,
-        category: formData.category,
+        category: effectiveCategory,
         current_stock: 0,
         unit: normalizedUnit,
         min_threshold: Math.round(parseFloat(formData.minThreshold) || 10),
@@ -648,8 +657,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         cost_per_unit: Math.round(parseFloat(formData.costPerUnit) * 100) / 100 || 0,
         color: formData.type === 'color' ? formData.color : 'NA',
         image_url: imageUrl,
-        usage_type: formData.category?.toLowerCase().trim() === 'ink' ? 'periodic' : 'per_batch',
-        reminder_interval_days: formData.category?.toLowerCase().trim() === 'ink' ? 10 : null,
+        usage_type: effectiveCategory?.toLowerCase() === 'ink' ? 'periodic' : 'per_batch',
+        reminder_interval_days: effectiveCategory?.toLowerCase() === 'ink' ? 10 : null,
       };
 
       // Create the material first
@@ -687,7 +696,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         status: 'pending' as const,
         material_details: {
           materialName: formData.name,
-          materialCategory: formData.category,
+          materialCategory: effectiveCategory,
           materialBatchNumber: `BATCH-${timestamp}`,
           quantity: orderQuantity,
           unit: normalizedUnit,
@@ -836,23 +845,32 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
-            <MaterialCategorySection
-              ref={categoryRef}
-              category={formData.category}
-              categories={categories}
-              onCategoryChange={(value: string) => {
-                setFormData({ ...formData, category: value });
-                setInvalidFields(prev => {
-                  const next = new Set(prev);
-                  next.delete('category');
-                  return next;
-                });
-              }}
-              onCategoriesReload={loadDropdowns}
-              hasError={invalidFields.has('category')}
-              touchedFields={touchedFields}
-              markFieldTouched={markFieldTouched}
-            />
+            {fixedCategory ? (
+              <div>
+                <Label htmlFor="category-fixed">Category</Label>
+                <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
+                  {fixedCategory}
+                </p>
+              </div>
+            ) : (
+              <MaterialCategorySection
+                ref={categoryRef}
+                category={formData.category}
+                categories={categories}
+                onCategoryChange={(value: string) => {
+                  setFormData({ ...formData, category: value });
+                  setInvalidFields(prev => {
+                    const next = new Set(prev);
+                    next.delete('category');
+                    return next;
+                  });
+                }}
+                onCategoriesReload={loadDropdowns}
+                hasError={invalidFields.has('category')}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
+              />
+            )}
           </div>
 
           {/* Material Type and Unit on same line */}

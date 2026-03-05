@@ -5,7 +5,7 @@ import ProductFormModal from '@/components/products/ProductFormModal';
 import InventoryStatsBoxes from '@/components/products/InventoryStatsBoxes';
 import ProductTabs from '@/components/products/ProductTabs';
 import InventoryTab from '@/components/products/InventoryTab';
-import AnalyticsTab from '@/components/products/AnalyticsTab';
+import AnalyticsTab, { prefetchProductAnalytics } from '@/components/products/AnalyticsTab';
 import NotificationsTab from '@/components/products/NotificationsTab';
 import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
@@ -75,9 +75,11 @@ export default function ProductList() {
   const [selectedQRProduct, setSelectedQRProduct] = useState<Product | null>(null);
 
 
-  // Load notifications count on mount
+  // Load notifications count on mount and prefetch analytics in background
   useEffect(() => {
     loadNotifications();
+    // Warm analytics cache so Analytics tab opens faster
+    prefetchProductAnalytics();
   }, []);
 
   // Load stats only when activeTab changes (not when filters change)
@@ -139,8 +141,8 @@ export default function ProductList() {
   };
 
   const loadAnalytics = async () => {
-    // TODO: Implement analytics loading when AnalyticsTab component is created
-    console.log('Loading analytics...');
+    // AnalyticsTab handles its own loading; keep this for future hooks/logging if needed.
+    console.log('Analytics tab activated');
   };
 
   const loadNotifications = async () => {

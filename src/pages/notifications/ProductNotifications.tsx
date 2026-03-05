@@ -34,15 +34,29 @@ export default function ProductNotifications() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Filter at backend level - only fetch product notifications
-      const { data } = await NotificationService.getNotifications({
-        module: 'products',
-        limit: 1000
-      });
+      // Fetch REAL product notifications (no logs) and product activity logs separately
+      const [notificationsResp, logsResp] = await Promise.all([
+        NotificationService.getNotifications({
+          module: 'products',
+          include_logs: 'false', // exclude activity logs at query level
+          limit: 1000,
+        }),
+        NotificationService.getNotifications({
+          module: 'products',
+          // include_logs undefined => include activity logs
+          limit: 1000,
+        }),
+      ]);
 
-      // Separate notifications and activity logs
-      const regularNotifications = data.filter(n => !n.related_data?.activity_log_id);
-      const logs = data.filter(n => n.related_data?.activity_log_id);
+      // Regular notifications: from notifications-only response
+      const regularNotifications = (notificationsResp.data || []).filter(
+        (n) => !n.related_data?.activity_log_id
+      );
+
+      // Activity logs: from logs-enabled response
+      const logs = (logsResp.data || []).filter(
+        (n) => n.related_data?.activity_log_id
+      );
 
       setNotifications(regularNotifications);
       setActivityLogs(logs);

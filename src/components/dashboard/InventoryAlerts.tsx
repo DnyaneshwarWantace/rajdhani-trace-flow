@@ -19,9 +19,9 @@ export default function InventoryAlerts({ products, loading }: InventoryAlertsPr
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full min-h-[280px] flex flex-col">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Inventory Alerts</h2>
-        <div className="flex items-center justify-center py-8">
+        <div className="flex items-center justify-center flex-1 py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -29,8 +29,8 @@ export default function InventoryAlerts({ products, loading }: InventoryAlertsPr
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full flex flex-col min-h-[280px]">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-lg font-semibold text-gray-900">Inventory Alerts</h2>
         <button
           onClick={() => navigate('/products')}
@@ -42,12 +42,12 @@ export default function InventoryAlerts({ products, loading }: InventoryAlertsPr
       </div>
 
       {lowStockProducts.length === 0 ? (
-        <div className="text-center py-8">
+        <div className="text-center py-8 flex-1 flex flex-col items-center justify-center">
           <Package className="w-12 h-12 text-green-400 mx-auto mb-3" />
           <p className="text-gray-500">All products are well stocked!</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1 min-h-0">
           {lowStockProducts.slice(0, 5).map((product) => {
             const isOutOfStock = (product.current_stock || 0) === 0;
             const stockStatus = isOutOfStock ? 'Out of Stock' : 'Low Stock';

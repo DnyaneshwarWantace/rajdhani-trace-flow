@@ -8,6 +8,8 @@ interface MaterialStatsBoxesProps {
   outOfStock: number;
   overstock: number;
   loading: boolean;
+  /** e.g. "Total Ink Materials" when showing ink-only stats */
+  totalLabel?: string;
 }
 
 export default function MaterialStatsBoxes({
@@ -17,15 +19,16 @@ export default function MaterialStatsBoxes({
   outOfStock,
   overstock,
   loading,
+  totalLabel = 'Total Materials',
 }: MaterialStatsBoxesProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-      {/* Total Materials */}
+      {/* Total (Materials or e.g. Ink Materials) */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-600">Total Materials</p>
+              <p className="text-xs sm:text-sm text-gray-600">{totalLabel}</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {loading ? (
                   <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>

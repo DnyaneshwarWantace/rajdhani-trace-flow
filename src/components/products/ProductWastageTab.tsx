@@ -21,7 +21,7 @@ export default function ProductWastageTab() {
   const { toast } = useToast();
   const [wasteData, setWasteData] = useState<ExtendedWasteItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
 
   useEffect(() => {
     loadWasteData();
@@ -244,7 +244,7 @@ export default function ProductWastageTab() {
               </p>
             </div>
             {wasteData.length > 0 && (
-              <div className="flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
+              <div className="hidden lg:flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
                 <Button
                   variant={viewMode === 'card' ? 'default' : 'ghost'}
                   size="sm"
@@ -274,17 +274,27 @@ export default function ProductWastageTab() {
                 Product waste items will appear here when they are generated during production.
               </p>
             </div>
-          ) : viewMode === 'card' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-              {wasteData.map((waste) => (
-                <ProductWasteCard key={waste.id} waste={waste} />
-              ))}
-            </div>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+            <>
+              {/* Card view for small/medium screens */}
+              <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                {wasteData.map((waste) => (
+                  <ProductWasteCard key={waste.id} waste={waste} />
+                ))}
+              </div>
+
+              {/* Card or Table view for large screens based on viewMode */}
+              {viewMode === 'card' ? (
+                <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                  {wasteData.map((waste) => (
+                    <ProductWasteCard key={waste.id} waste={waste} />
+                  ))}
+                </div>
+              ) : (
+                <div className="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product / Details</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -401,10 +411,12 @@ export default function ProductWastageTab() {
                         </tr>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

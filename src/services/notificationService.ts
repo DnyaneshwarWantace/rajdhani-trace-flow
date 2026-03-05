@@ -45,7 +45,20 @@ export class NotificationService {
     type?: string;
     limit?: number;
     offset?: number;
-  }): Promise<{ data: Notification[]; total: number }> {
+    include_logs?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    month?: string;
+  }): Promise<{
+    data: Notification[];
+    total: number;
+    totalNotifications: number;
+    totalActivityLogs: number;
+    activityLogCategoryCounts?: Record<string, number>;
+    unreadNotifications?: number;
+    readNotifications?: number;
+    months?: string[];
+  }> {
     try {
       const queryParams = new URLSearchParams();
       if (filters?.module) queryParams.append('module', filters.module);
@@ -53,6 +66,10 @@ export class NotificationService {
       if (filters?.type) queryParams.append('type', filters.type);
       if (filters?.limit) queryParams.append('limit', filters.limit.toString());
       if (filters?.offset) queryParams.append('offset', filters.offset.toString());
+      if (filters?.include_logs) queryParams.append('include_logs', filters.include_logs);
+      if (filters?.sortBy) queryParams.append('sortBy', filters.sortBy);
+      if (filters?.sortOrder) queryParams.append('sortOrder', filters.sortOrder);
+      if (filters?.month) queryParams.append('month', filters.month);
 
       const response = await fetch(`${API_URL}/notifications?${queryParams}`, {
         headers: this.getHeaders(),
@@ -71,10 +88,16 @@ export class NotificationService {
       return {
         data: sorted,
         total: result.total || 0,
+        totalNotifications: result.totalNotifications || 0,
+        totalActivityLogs: result.totalActivityLogs || 0,
+        activityLogCategoryCounts: result.activityLogCategoryCounts || {},
+        unreadNotifications: result.unreadNotifications || 0,
+        readNotifications: result.readNotifications || 0,
+        months: result.months || [],
       };
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      return { data: [], total: 0 };
+      return { data: [], total: 0, totalNotifications: 0, totalActivityLogs: 0, activityLogCategoryCounts: {} };
     }
   }
 

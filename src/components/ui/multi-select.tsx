@@ -20,6 +20,7 @@ interface MultiSelectProps {
   onChange: (values: string[]) => void
   placeholder?: string
   className?: string
+  loading?: boolean
 }
 
 export function MultiSelect({
@@ -28,6 +29,7 @@ export function MultiSelect({
   onChange,
   placeholder = "Select items...",
   className,
+  loading = false,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -70,7 +72,14 @@ export function MultiSelect({
       >
         <div
           className="max-h-64 overflow-auto overflow-y-auto overscroll-contain"
-          onWheel={(e) => e.stopPropagation()}
+          onWheel={(e) => {
+            e.stopPropagation();
+            const target = e.currentTarget;
+            const { scrollTop, scrollHeight, clientHeight } = target;
+            const atTop = scrollTop <= 0 && e.deltaY < 0;
+            const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+            if (atTop || atBottom) e.preventDefault();
+          }}
         >
           {/* Clear All Button */}
           {selected.length > 0 && (
@@ -92,7 +101,11 @@ export function MultiSelect({
 
           {/* Options List */}
           <div className="p-1">
-            {options.length === 0 ? (
+            {loading ? (
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                Loading options...
+              </div>
+            ) : options.length === 0 ? (
               <div className="px-2 py-4 text-center text-sm text-muted-foreground">
                 No options available
               </div>

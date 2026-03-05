@@ -112,7 +112,8 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
     }
   };
 
-  if (loading) {
+  // Show loading if still loading OR if we have no notifications yet (prevents flash of empty state)
+  if (loading || (propLoading && notifications.length === 0)) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
