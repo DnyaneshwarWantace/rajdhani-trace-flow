@@ -6,6 +6,14 @@ import RecentOrders from '@/components/dashboard/RecentOrders';
 import ProductionOverview from '@/components/dashboard/ProductionOverview';
 import InventoryAlerts from '@/components/dashboard/InventoryAlerts';
 import ManageStockOverview from '@/components/dashboard/ManageStockOverview';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Calendar } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { OrderService, type Order } from '@/services/orderService';
 import { ProductionService } from '@/services/productionService';
@@ -13,6 +21,31 @@ import { SupplierService } from '@/services/supplierService';
 import { MaterialService } from '@/services/materialService';
 import { ManageStockService } from '@/services/manageStockService';
 import type { Product } from '@/types/product';
+
+/** Returns true if date (ISO string or Date) falls in the given month (YYYY-MM). */
+function isDateInMonth(dateInput: string | Date | undefined, monthKey: string): boolean {
+  if (!monthKey) return true;
+  if (!dateInput) return false;
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return false;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}` === monthKey;
+}
+
+/** Build month options: All time + last 12 months (newest first). */
+function getMonthFilterOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [{ value: '', label: 'All time' }];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    options.push({ value: `${y}-${m}`, label: `${monthNames[d.getMonth()]} ${y}` });
+  }
+  return options;
+}
 
 interface DashboardData {
   stats: {
@@ -52,9 +85,12 @@ interface DashboardData {
   topSuppliers: any[];
 }
 
+const MONTH_OPTIONS = getMonthFilterOptions();
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     stats: {
       totalProducts: 0,
@@ -94,27 +130,29 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    // Try to hydrate from cache first for instant load
+    // Only use cache when showing "All time" (no month filter)
     let hydratedFromCache = false;
-    try {
-      const cachedRaw = localStorage.getItem('dashboardCacheV1');
-      if (cachedRaw) {
-        const cached = JSON.parse(cachedRaw) as { data: DashboardData; timestamp: number };
-        const maxAgeMs = 5 * 60 * 1000; // 5 minutes
-        if (cached?.data && typeof cached.timestamp === 'number' && Date.now() - cached.timestamp < maxAgeMs) {
-          setDashboardData(cached.data);
-          setLoading(false);
-          hydratedFromCache = true;
+    if (!selectedMonth) {
+      try {
+        const cachedRaw = localStorage.getItem('dashboardCacheV1');
+        if (cachedRaw) {
+          const cached = JSON.parse(cachedRaw) as { data: DashboardData; timestamp: number };
+          const maxAgeMs = 5 * 60 * 1000; // 5 minutes
+          if (cached?.data && typeof cached.timestamp === 'number' && Date.now() - cached.timestamp < maxAgeMs) {
+            setDashboardData(cached.data);
+            setLoading(false);
+            hydratedFromCache = true;
+          }
         }
+      } catch (e) {
+        console.warn('Failed to read dashboard cache', e);
       }
-    } catch (e) {
-      console.warn('Failed to read dashboard cache', e);
     }
 
-    loadDashboardData(hydratedFromCache);
-  }, []);
+    loadDashboardData(hydratedFromCache, selectedMonth);
+  }, [selectedMonth]);
 
-  const loadDashboardData = async (skipLoading = false) => {
+  const loadDashboardData = async (skipLoading = false, monthKey = '') => {
     try {
       if (!skipLoading) {
         setLoading(true);
@@ -152,8 +190,11 @@ export default function Dashboard() {
       // Count products with recipes
       const productsWithRecipes = products.filter((p: any) => p.has_recipe).length;
 
-      // Process orders data
-      const orders = ordersResponse.data || [];
+      // Process orders data and apply month filter
+      let orders = ordersResponse.data || [];
+      if (monthKey) {
+        orders = orders.filter((o: any) => isDateInMonth(o.orderDate, monthKey));
+      }
       const pendingOrders = orders.filter((o: any) => o.status === 'pending');
       const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0);
       const outstandingAmount = orders.reduce((sum: number, order: any) => sum + (order.outstandingAmount || 0), 0);
@@ -177,8 +218,14 @@ export default function Dashboard() {
       });
       const customers = Array.from(customerMap.values());
 
-      // Get production batches and count by status
-      const productionBatches = productionResponse.data || [];
+      // Get production batches, apply month filter, then count by status
+      let productionBatches = productionResponse.data || [];
+      if (monthKey) {
+        productionBatches = productionBatches.filter((b: any) => {
+          const batchDate = b.created_at ?? b.createdAt ?? b.planned_start_date ?? b.actual_start_date;
+          return isDateInMonth(batchDate, monthKey);
+        });
+      }
       const productionPlanned = productionBatches.filter((b: any) => b.status === 'planned').length;
       const productionInProgress = productionBatches.filter((b: any) => b.status === 'in_progress' || b.status === 'in_production').length;
       const productionCompleted = productionBatches.filter((b: any) => b.status === 'completed').length;
@@ -275,17 +322,19 @@ export default function Dashboard() {
 
       setDashboardData(nextData);
 
-      // Cache dashboard data for faster subsequent loads
-      try {
-        localStorage.setItem(
-          'dashboardCacheV1',
-          JSON.stringify({
-            data: nextData,
-            timestamp: Date.now(),
-          })
-        );
-      } catch (e) {
-        console.warn('Failed to write dashboard cache', e);
+      // Cache dashboard data only for "All time" so next visit loads fast
+      if (!monthKey) {
+        try {
+          localStorage.setItem(
+            'dashboardCacheV1',
+            JSON.stringify({
+              data: nextData,
+              timestamp: Date.now(),
+            })
+          );
+        } catch (e) {
+          console.warn('Failed to write dashboard cache', e);
+        }
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -297,14 +346,34 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Welcome Section */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Welcome back, {user?.full_name || user?.email || 'User'}!
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Here's what's happening with your business today.
-          </p>
+        {/* Welcome Section + Month filter */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              Welcome back, {user?.full_name || user?.email || 'User'}!
+            </h1>
+            <p className="text-gray-600 mt-1">
+              Here's what's happening with your business today.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
+            <Select
+              value={selectedMonth || '__all__'}
+              onValueChange={(value) => setSelectedMonth(value === '__all__' ? '' : value)}
+            >
+              <SelectTrigger className="w-[180px] bg-white">
+                <SelectValue placeholder="All time" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value || 'all'} value={opt.value || '__all__'}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Stats Cards */}

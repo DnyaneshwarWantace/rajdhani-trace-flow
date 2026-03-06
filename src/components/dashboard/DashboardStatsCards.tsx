@@ -48,7 +48,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
   const cards = [
     {
       title: 'Total Orders',
-      value: loading ? '...' : formatCurrency(stats.totalRevenue),
+      value: loading ? '...' : (stats.totalOrders ?? 0).toLocaleString(),
       icon: ShoppingCart,
       bgColor: 'bg-purple-50',
       iconColor: 'text-purple-600',
@@ -60,7 +60,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
     },
     {
       title: 'Total Revenue',
-      value: loading ? '...' : formatCurrency(stats.totalRevenue),
+      value: loading ? '...' : formatCurrency(stats.totalRevenue ?? 0),
       icon: DollarSign,
       bgColor: 'bg-green-50',
       iconColor: 'text-green-600',
@@ -118,25 +118,20 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
             onClick={card.onClick}
             className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow min-h-[120px] flex flex-col text-left w-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${card.onClick ? 'cursor-pointer' : ''}`}
           >
-            <div className="flex items-start justify-between gap-4">
-              {/* Left side: Icon, Title, Value - stacked vertically */}
-              <div className="flex flex-col gap-2">
-                <div className={`w-10 h-10 ${card.bgColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                  <Icon className={`w-5 h-5 ${card.iconColor}`} />
-                </div>
+            {/* Top row: title + value on left, icon on right */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                 <p className="text-xs text-gray-600">{card.title}</p>
-                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                <p className="text-2xl font-bold text-gray-900 truncate">{card.value}</p>
               </div>
-
-              {/* Right side: Status - stacked vertically */}
-              <div className="text-right space-y-1">
-                {card.subtext.split(/[·•]/).map((item, i) => (
-                  <p key={i} className={`text-xs ${card.subtextColor} font-medium whitespace-nowrap`}>
-                    {item.trim()}
-                  </p>
-                ))}
+              <div className={`w-10 h-10 ${card.bgColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                <Icon className={`w-5 h-5 ${card.iconColor}`} />
               </div>
             </div>
+            {/* Status breakdown below */}
+            <p className={`text-xs ${card.subtextColor} mt-3 pt-3 border-t border-gray-100`}>
+              {card.subtext}
+            </p>
           </Wrapper>
         );
       })}
