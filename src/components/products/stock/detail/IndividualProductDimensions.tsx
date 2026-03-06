@@ -2,6 +2,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Ruler, Weight } from 'lucide-react';
 import type { IndividualProduct, Product } from '@/types/product';
 
+function weightKgFromItem(item: IndividualProduct): number | null {
+  const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
+  const lengthStr = (item.final_length || '').toString();
+  const widthStr = (item.final_width || '').toString();
+  let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
+  let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
+  if (lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
+  if (widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
+  if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
+    return (gsm * lengthM * widthM) / 1000;
+  }
+  return null;
+}
+
 interface IndividualProductDimensionsProps {
   individualProduct: IndividualProduct;
   product: Product;
@@ -48,9 +62,13 @@ export default function IndividualProductDimensions({
             <div>
               <p className="text-gray-600">Final Weight</p>
               <p className="font-medium text-gray-900">
-                {individualProduct.final_weight.includes(' ')
-                  ? individualProduct.final_weight
-                  : `${individualProduct.final_weight} ${product.weight_unit || 'kg'}`}
+                {individualProduct.final_weight}
+                {(() => {
+                  const wKg = weightKgFromItem(individualProduct);
+                  return wKg !== null ? (
+                    <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                  ) : null;
+                })()}
               </p>
             </div>
           </div>

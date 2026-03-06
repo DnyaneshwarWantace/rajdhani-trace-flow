@@ -58,12 +58,21 @@ export default function EditIndividualProductDialog({
     }
   }, [individualProduct, open]);
 
+  const [locationError, setLocationError] = useState('');
+
   const handleSave = async () => {
     if (!individualProduct) return;
 
+    const locationTrimmed = (formData.location || '').trim();
+    if (!locationTrimmed) {
+      setLocationError('Location is required');
+      return;
+    }
+    setLocationError('');
+
     try {
       setSaving(true);
-      await onSave(individualProduct.id, formData);
+      await onSave(individualProduct.id, { ...formData, location: locationTrimmed });
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving individual product:', error);
@@ -120,7 +129,8 @@ export default function EditIndividualProductDialog({
             <Input
               id="inspector"
               value={formData.inspector}
-              onChange={(e) => setFormData({ ...formData, inspector: e.target.value })}
+              readOnly
+              disabled
               placeholder="Inspector name"
             />
           </div>
@@ -130,9 +140,14 @@ export default function EditIndividualProductDialog({
             <Input
               id="location"
               value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, location: e.target.value });
+                setLocationError('');
+              }}
               placeholder="e.g., Warehouse A, Shelf 3"
+              className={locationError ? 'border-red-500' : ''}
             />
+            {locationError && <p className="text-xs text-red-600">{locationError}</p>}
           </div>
 
           <div className="space-y-2">

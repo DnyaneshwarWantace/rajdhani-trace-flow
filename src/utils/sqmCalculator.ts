@@ -46,9 +46,10 @@ export function calculateSQM(
 
 /**
  * Convert SQM to Square Feet
+ * Using 1 sqm = 10.76 sqft (rounded)
  */
 export function sqmToSquareFeet(sqm: number): number {
-  return sqm * 10.7639; // 1 sqm = 10.7639 sqft
+  return sqm * 10.76;
 }
 
 /**

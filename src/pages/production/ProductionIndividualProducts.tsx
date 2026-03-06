@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import IndividualProductsStageHeader from '@/components/production/individual/IndividualProductsStageHeader';
 import IndividualProductsTable from '@/components/production/individual/IndividualProductsTable';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { DropdownService } from '@/services/dropdownService';
 import ConsumedMaterialsDisplay from '@/components/production/machine/ConsumedMaterialsDisplay';
 import ProductionStageProgress from '@/components/production/planning/ProductionStageProgress';
 import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
@@ -33,12 +35,20 @@ export default function ProductionIndividualProducts() {
   const [canProceedFromTable, setCanProceedFromTable] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [, setCreatedProductsCount] = useState(0);
+  const [locationFilter, setLocationFilter] = useState<string[]>([]);
+  const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
 
   useEffect(() => {
     if (id) {
       loadData();
     }
   }, [id, refreshKey]);
+
+  useEffect(() => {
+    DropdownService.getDropdownsByCategory('storage_location')
+      .then((list) => setLocationOptions(list.map((d) => ({ label: d.value, value: d.value }))))
+      .catch(() => setLocationOptions([]));
+  }, []);
 
   const loadData = async () => {
     try {
@@ -290,6 +300,14 @@ export default function ProductionIndividualProducts() {
   // Can proceed only if all existing rows have required fields filled (from table callback)
   const canProceed = canProceedFromTable;
 
+  // Filter individual products by selected location(s)
+  const filteredIndividualProducts = useMemo(() => {
+    if (!locationFilter.length) return individualProducts;
+    return individualProducts.filter(
+      (p) => p.location && locationFilter.includes(p.location)
+    );
+  }, [individualProducts, locationFilter]);
+
   if (loading) {
     return (
       <Layout>
@@ -358,9 +376,29 @@ export default function ProductionIndividualProducts() {
           <WastageSummary wasteItems={wasteItems} />
         )}
 
+        {/* Location filter */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-gray-500" />
+            Location
+          </span>
+          <MultiSelect
+            options={locationOptions}
+            selected={locationFilter}
+            onChange={setLocationFilter}
+            placeholder="All Locations"
+            className="w-full max-w-xs"
+          />
+          {locationFilter.length > 0 && (
+            <span className="text-xs text-gray-500">
+              Showing {filteredIndividualProducts.length} of {individualProducts.length} product(s)
+            </span>
+          )}
+        </div>
+
         {/* Individual Products Table */}
         <IndividualProductsTable
-          individualProducts={individualProducts}
+          individualProducts={filteredIndividualProducts}
           onUpdate={handleTableUpdate}
           product={product ? {
             weight_unit: product.weight_unit,

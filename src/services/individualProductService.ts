@@ -58,6 +58,7 @@ export class IndividualProductService {
       search?: string;
       start_date?: string;
       end_date?: string;
+      location?: string | string[];
       limit?: number;
       offset?: number;
       sortBy?: string;
@@ -65,6 +66,15 @@ export class IndividualProductService {
     }
   ): Promise<{ products: IndividualProduct[]; total: number }> {
     const queryParams = new URLSearchParams();
+    
+    // Handle location filter - array or comma-separated
+    if (filters?.location && (Array.isArray(filters.location) ? filters.location.length > 0 : filters.location)) {
+      const locArray = Array.isArray(filters.location) ? filters.location : [filters.location];
+      const cleaned = locArray.filter((s: string) => s && s !== 'all');
+      if (cleaned.length > 0) {
+        queryParams.append('location', cleaned.join(','));
+      }
+    }
     
     // Handle status as array (multi-select) - send as comma-separated string
     if (filters?.status && filters.status !== 'all') {

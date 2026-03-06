@@ -137,6 +137,7 @@ export default function ProductStock() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -174,7 +175,7 @@ export default function ProductStock() {
     if (productId) {
       loadIndividualProducts();
     }
-  }, [productId, searchTerm, statusFilter, startDate, endDate, currentPage, limit, sortBy, sortOrder]);
+  }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, currentPage, limit, sortBy, sortOrder]);
 
   const loadProduct = async () => {
     if (!productId) return;
@@ -215,6 +216,7 @@ export default function ProductStock() {
       const offset = (currentPage - 1) * limit;
       const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
         status: statusFilter,
+        location: locationFilter.length > 0 ? locationFilter : undefined,
         search: searchTerm || undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
@@ -297,6 +299,10 @@ export default function ProductStock() {
     handleFilterChange();
   };
 
+  const handleLocationChange = (values: string[]) => {
+    setLocationFilter(values);
+    handleFilterChange();
+  };
 
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
@@ -467,12 +473,14 @@ export default function ProductStock() {
           <ProductStockFilters
             searchTerm={searchTerm}
             statusFilter={statusFilter}
+            locationFilter={locationFilter}
             startDate={startDate}
             endDate={endDate}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSearchChange={handleSearchChange}
             onStatusChange={handleStatusChange}
+            onLocationChange={handleLocationChange}
             onStartDateChange={handleStartDateChange}
             onEndDateChange={handleEndDateChange}
             onSortChange={handleSortChange}

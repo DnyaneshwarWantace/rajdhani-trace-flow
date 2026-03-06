@@ -1,4 +1,5 @@
-import { Calendar } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -9,16 +10,19 @@ import {
 } from '@/components/ui/select';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { DropdownService } from '@/services/dropdownService';
 
 interface ProductStockFiltersProps {
   searchTerm: string;
   statusFilter: string[];
+  locationFilter: string[];
   startDate: string;
   endDate: string;
   sortBy: 'qr_code' | 'status' | 'created_at';
   sortOrder: 'asc' | 'desc';
   onSearchChange: (value: string) => void;
   onStatusChange: (values: string[]) => void;
+  onLocationChange: (values: string[]) => void;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onSortChange: (sortBy: 'qr_code' | 'status' | 'created_at', sortOrder: 'asc' | 'desc') => void;
@@ -27,16 +31,26 @@ interface ProductStockFiltersProps {
 export default function ProductStockFilters({
   searchTerm,
   statusFilter,
+  locationFilter,
   startDate,
   endDate,
   sortBy,
   sortOrder,
   onSearchChange,
   onStatusChange,
+  onLocationChange,
   onStartDateChange,
   onEndDateChange,
   onSortChange,
 }: ProductStockFiltersProps) {
+  const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
+
+  useEffect(() => {
+    DropdownService.getDropdownsByCategory('storage_location')
+      .then((list) => setLocationOptions(list.map((d) => ({ label: d.value, value: d.value }))))
+      .catch(() => setLocationOptions([]));
+  }, []);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
       <div className="space-y-4">
@@ -67,6 +81,18 @@ export default function ProductStockFilters({
               selected={statusFilter}
               onChange={onStatusChange}
               placeholder="All Status"
+            />
+          </div>
+
+          {/* Location Filter - Multi-select */}
+          <div className="w-full lg:w-64 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-gray-400 shrink-0" aria-hidden />
+            <MultiSelect
+              options={locationOptions}
+              selected={locationFilter}
+              onChange={onLocationChange}
+              placeholder="All Locations"
+              className="flex-1"
             />
           </div>
         </div>

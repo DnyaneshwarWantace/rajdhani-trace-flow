@@ -6,6 +6,20 @@ import { IndividualProductService } from '@/services/individualProductService';
 import type { IndividualProduct } from '@/types/product';
 import type { ProductionBatch } from '@/services/productionService';
 
+function weightKgFromRow(item: IndividualProduct): number | null {
+  const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
+  const lengthStr = (item.final_length || '').toString();
+  const widthStr = (item.final_width || '').toString();
+  let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
+  let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
+  if (lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
+  if (widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
+  if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
+    return (gsm * lengthM * widthM) / 1000;
+  }
+  return null;
+}
+
 interface ProductionIndividualProductsProps {
   batch: ProductionBatch;
 }
@@ -92,7 +106,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Dimensions</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">GSM</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Inspector</th>
@@ -111,7 +125,19 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                       ? `${product.final_length} × ${product.final_width}`
                       : '—'}
                   </td>
-                  <td className="border border-gray-200 p-2 text-sm text-gray-900">{product.final_weight || '—'}</td>
+                  <td className="border border-gray-200 p-2 text-sm text-gray-900">
+                    {(() => {
+                      const wKg = weightKgFromRow(product);
+                      return product.final_weight ? (
+                        <>
+                          {product.final_weight}
+                          {wKg !== null && (
+                            <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                          )}
+                        </>
+                      ) : '—';
+                    })()}
+                  </td>
                   <td className="border border-gray-200 p-2">
                     <Badge 
                       variant="outline" 

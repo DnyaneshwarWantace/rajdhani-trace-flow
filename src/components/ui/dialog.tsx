@@ -14,57 +14,50 @@ const DialogClose = DialogPrimitive.Close
 
 // Global counter to track how many dialogs are open (for nested dialogs)
 const incrementDialogCount = () => {
-  const currentCount = parseInt(document.documentElement.getAttribute('data-dialog-count') || '0', 10);
-  document.documentElement.setAttribute('data-dialog-count', String(currentCount + 1));
-  return currentCount + 1;
-};
+  const currentCount = parseInt(
+    document.documentElement.getAttribute("data-dialog-count") || "0",
+    10
+  )
+  document.documentElement.setAttribute("data-dialog-count", String(currentCount + 1))
+  return currentCount + 1
+}
 
 const decrementDialogCount = () => {
-  const currentCount = parseInt(document.documentElement.getAttribute('data-dialog-count') || '0', 10);
-  const newCount = Math.max(0, currentCount - 1);
-  document.documentElement.setAttribute('data-dialog-count', String(newCount));
-  return newCount;
-};
+  const currentCount = parseInt(
+    document.documentElement.getAttribute("data-dialog-count") || "0",
+    10
+  )
+  const newCount = Math.max(0, currentCount - 1)
+  document.documentElement.setAttribute("data-dialog-count", String(newCount))
+  return newCount
+}
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
-  const [savedScrollY] = React.useState(() => window.scrollY || document.documentElement.scrollTop);
-
   React.useEffect(() => {
     // Increment dialog counter
-    const count = incrementDialogCount();
-    console.log('Dialog opened, count:', count);
+    const count = incrementDialogCount()
 
     // Only set up scroll lock on FIRST dialog
     if (count === 1) {
-      // FORCE hide scrollbar and prevent ALL scrolling
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${savedScrollY}px`;
-      document.body.style.width = '100%';
+      // Hide scrollbars and prevent background scrolling without shifting content
+      document.body.style.overflow = "hidden"
+      document.documentElement.style.overflow = "hidden"
     }
 
     return () => {
       // Decrement dialog counter
-      const newCount = decrementDialogCount();
-      console.log('Dialog closed, count:', newCount);
+      const newCount = decrementDialogCount()
 
       // Only remove scroll lock when ALL dialogs are closed
       if (newCount === 0) {
-        document.body.style.overflow = '';
-        document.documentElement.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-
-        // Restore scroll position
-        window.scrollTo(0, savedScrollY);
+        document.body.style.overflow = ""
+        document.documentElement.style.overflow = ""
       }
-    };
-  }, [savedScrollY]);
+    }
+  }, [])
 
   return (
     <DialogPrimitive.Overlay
@@ -73,18 +66,18 @@ const DialogOverlay = React.forwardRef<
         "fixed inset-0 z-[9998] bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 overscroll-contain",
         className
       )}
-      style={{ overscrollBehavior: 'contain' }}
+      style={{ overscrollBehavior: "contain" }}
       onWheel={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
+        e.stopPropagation()
+        e.preventDefault()
       }}
       onTouchMove={(e) => {
-        e.stopPropagation();
-        e.preventDefault();
+        e.stopPropagation()
+        e.preventDefault()
       }}
       {...props}
     />
-  );
+  )
 })
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 

@@ -4,6 +4,20 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { IndividualProduct, Product } from '@/types/product';
 
+function weightKgFromItem(item: IndividualProduct): number | null {
+  const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
+  const lengthStr = (item.final_length || '').toString();
+  const widthStr = (item.final_width || '').toString();
+  let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
+  let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
+  if (lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
+  if (widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
+  if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
+    return (gsm * lengthM * widthM) / 1000;
+  }
+  return null;
+}
+
 interface ProductStockTableProps {
   products: IndividualProduct[];
   product: Product;
@@ -67,6 +81,8 @@ export default function ProductStockTable({
             </th>
             <th className="text-left p-3 font-medium text-gray-600">Final Length</th>
             <th className="text-left p-3 font-medium text-gray-600">Final Width</th>
+            <th className="text-left p-3 font-medium text-gray-600">Final Weight</th>
+            <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">Location</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden lg:table-cell">Inspector</th>
             <th className="text-left p-3 font-medium text-gray-600">Status</th>
             <th className="text-right p-3 font-medium text-gray-600">Actions</th>
@@ -133,6 +149,20 @@ export default function ProductStockTable({
                     : `${item.final_width} ${product.width_unit || 'feet'}`
                   : 'N/A'}
               </td>
+              <td className="p-3 text-sm">
+                {item.final_weight ? (
+                  <>
+                    {item.final_weight}
+                    {(() => {
+                      const wKg = weightKgFromItem(item);
+                      return wKg !== null ? (
+                        <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                      ) : null;
+                    })()}
+                  </>
+                ) : 'N/A'}
+              </td>
+              <td className="p-3 text-sm hidden lg:table-cell">{item.location || 'N/A'}</td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.inspector || 'N/A'}</td>
               <td className="p-3">
                 {item.status === 'available' ? (

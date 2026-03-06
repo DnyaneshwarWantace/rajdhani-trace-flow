@@ -760,8 +760,13 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                       </p>
                       <p>
                         <span className="font-medium">Area:</span> {(() => {
-                          const sqm = calculateSQM(formData.length, formData.width, formData.length_unit, formData.width_unit);
-                          const sqft = sqm * 10.7639;
+                          const sqm = calculateSQM(
+                            formData.length,
+                            formData.width,
+                            formData.length_unit,
+                            formData.width_unit
+                          );
+                          const sqft = sqm * 10.76;
                           return `${sqm.toFixed(4)} sqm (${sqft.toFixed(4)} sqft)`;
                         })()}
                       </p>

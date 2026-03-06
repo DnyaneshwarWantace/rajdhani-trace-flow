@@ -190,7 +190,7 @@ export default function IndividualProductsTable({
   useEffect(() => {
     if (!onCanCompleteChange) return;
 
-    const requiredFields = ['final_weight', 'final_width', 'final_length'];
+    const requiredFields = ['final_weight', 'final_width', 'final_length', 'location'];
     const allRowsComplete = localProducts.length > 0 && localProducts.every(product => 
       requiredFields.every(field => {
         const value = product[field as keyof IndividualProduct];
@@ -220,11 +220,22 @@ export default function IndividualProductsTable({
     setValidationError(null);
     
     switch (col) {
-      case 'final_weight':
-        // Extract number only (remove unit if present)
-        const weightValue = productItem.final_weight || '';
-        value = weightValue.replace(/[^\d.]/g, '');
+      case 'final_weight': {
+        // Show weight (kg) for editing when length+width exist; else show GSM number. Max 4 decimals.
+        const lw = getLengthWidthMeters(productItem);
+        if (lw) {
+          const wKg = gsmToWeightKg(productItem);
+          if (wKg !== null) {
+            const rounded = Math.round(wKg * 1e4) / 1e4;
+            value = String(rounded);
+          } else {
+            value = (productItem.final_weight || '').replace(/[^\d.]/g, '');
+          }
+        } else {
+          value = (productItem.final_weight || '').replace(/[^\d.]/g, '');
+        }
         break;
+      }
       case 'final_width':
         const widthValue = productItem.final_width || '';
         value = widthValue.replace(/[^\d.]/g, '');
@@ -278,6 +289,16 @@ export default function IndividualProductsTable({
           return;
         }
 
+        // For final_weight: user enters weight (kg); we convert to GSM when length+width present
+        let valueToValidate = enteredNumeric;
+        if (col === 'final_weight') {
+          const lw = getLengthWidthMeters(productItem);
+          if (lw) {
+            const gsm = weightKgToGsm(enteredNumeric, productItem);
+            if (gsm !== null) valueToValidate = gsm; // validate GSM range
+          }
+        }
+
         // Get expected value and validate range
         let expectedNumeric: number | null = null;
         let fieldName = '';
@@ -299,7 +320,7 @@ export default function IndividualProductsTable({
           const minValue = expectedNumeric - range;
           const maxValue = expectedNumeric + range;
           
-        if (enteredNumeric < minValue || enteredNumeric > maxValue) {
+        if (valueToValidate < minValue || valueToValidate > maxValue) {
           toast({
             title: 'Validation Error',
             description: `${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`,
@@ -312,15 +333,35 @@ export default function IndividualProductsTable({
       }
     }
 
+    // Location is mandatory
+    if (col === 'location') {
+      if (!valueToSave) {
+        toast({
+          title: 'Location required',
+          description: 'Please select a storage location.',
+          variant: 'destructive',
+        });
+        setSaving(null);
+        return;
+      }
+    }
+
     // Clear validation error on successful validation
     setValidationError(null);
       
-      // Auto-append units for weight, width, length if user only typed numbers
+      // For final_weight: user entered weight (kg) → convert to GSM and save (weight max 4 decimals)
       if (col === 'final_weight' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
-        const weightUnit = product?.weight_unit || 
-          (product?.weight?.includes('GSM') ? 'GSM' : 
-           product?.weight?.includes('kg') ? 'kg' : 'kg');
-        valueToSave = `${valueToSave} ${weightUnit}`;
+        let weightKg = parseFloat(valueToSave.replace(/[^\d.]/g, ''));
+        if (!isNaN(weightKg)) weightKg = Math.round(weightKg * 1e4) / 1e4;
+        const lw = getLengthWidthMeters(productItem);
+        if (lw && !isNaN(weightKg)) {
+          const gsm = weightKgToGsm(weightKg, productItem);
+          valueToSave = gsm !== null ? `${gsm.toFixed(2)} GSM` : valueToSave;
+        }
+        if (!valueToSave.includes('GSM')) {
+          const weightUnit = product?.weight_unit || (product?.weight?.includes('GSM') ? 'GSM' : 'GSM');
+          valueToSave = `${valueToSave} ${weightUnit}`;
+        }
       } else if (col === 'final_width' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
         const widthUnit = product?.width_unit || 
           (product?.width?.includes('feet') ? 'feet' : 
@@ -547,7 +588,6 @@ export default function IndividualProductsTable({
     });
   };
 
-
   const handleFillDownField = async (index: number, field: 'final_length' | 'final_width' | 'final_weight') => {
     const sourceRow = localProducts[index];
     const sourceValue = sourceRow[field];
@@ -652,6 +692,111 @@ export default function IndividualProductsTable({
       toast({
         title: 'Filled Down',
         description: `${field.replace('final_', '').charAt(0).toUpperCase() + field.replace('final_', '').slice(1)} (${cleanValue}) copied to next row.`,
+      });
+    }
+  };
+
+  // Copy location from this row to the next row
+  const handleFillDownLocation = async (index: number) => {
+    const sourceRow = localProducts[index];
+    const cleanLocation = (sourceRow.location || '').trim();
+
+    if (!cleanLocation) {
+      toast({
+        title: 'No Location',
+        description: 'This row has no location to copy.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (index + 1 >= localProducts.length) {
+      toast({
+        title: 'No Rows Below',
+        description: 'This is the last row. Nothing to fill down.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const targetIndex = index + 1;
+    const targetRow = localProducts[targetIndex];
+    const updated = [...localProducts];
+
+    updated[targetIndex] = {
+      ...targetRow,
+      location: cleanLocation,
+    };
+
+    setLocalProducts(updated);
+
+    const tempProduct = updated[targetIndex];
+    const hasRequiredFields =
+      tempProduct.final_weight &&
+      tempProduct.final_width &&
+      tempProduct.final_length &&
+      tempProduct.location &&
+      productId;
+
+    // Save for existing product row
+    if (targetRow.id && !targetRow.id.startsWith('temp-')) {
+      try {
+        await IndividualProductService.updateIndividualProduct(targetRow.id, {
+          location: cleanLocation,
+        });
+        onUpdate?.();
+        toast({
+          title: 'Location Filled Down',
+          description: `Location (${cleanLocation}) copied to next row and saved.`,
+        });
+      } catch (error) {
+        console.error('Error updating product location:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to save location',
+          variant: 'destructive',
+        });
+        // Revert on error
+        setLocalProducts(localProducts);
+      }
+    } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
+      // For temp products, if all required fields are now filled (including location), create the product
+      try {
+        const newProduct = await IndividualProductService.createIndividualProduct({
+          product_id: productId!,
+          qr_code: tempProduct.qr_code || '',
+          serial_number: tempProduct.serial_number || '',
+          status: tempProduct.status || 'available',
+          final_length: tempProduct.final_length || '',
+          final_width: tempProduct.final_width || '',
+          final_weight: tempProduct.final_weight || '',
+          inspector: user?.full_name || user?.email || 'System',
+          location: tempProduct.location || 'Warehouse A - General Storage',
+          notes: tempProduct.notes || '',
+          production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
+          batch_number: batchId || '',
+        });
+
+        updated[targetIndex] = newProduct;
+        setLocalProducts(updated);
+
+        toast({
+          title: 'Location Filled Down & Created',
+          description: `Location copied and product created successfully.`,
+        });
+        onUpdate?.();
+      } catch (error) {
+        console.error('Error creating individual product:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to create individual product',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      toast({
+        title: 'Location Filled Down',
+        description: `Location (${cleanLocation}) copied to next row.`,
       });
     }
   };
@@ -767,6 +912,64 @@ export default function IndividualProductsTable({
     }
   };
 
+  // Apply location from a given row to ALL rows in the table
+  const handleApplyLocationToAll = async (index: number) => {
+    const sourceRow = localProducts[index];
+    const cleanLocation = (sourceRow.location || '').trim();
+
+    if (!cleanLocation) {
+      toast({
+        title: 'No Location',
+        description: 'This row has no location to apply.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (localProducts.length <= 1) {
+      toast({
+        title: 'Only One Row',
+        description: 'There is only one row. Location is already applied.',
+      });
+      return;
+    }
+
+    const updated = localProducts.map((row) => ({
+      ...row,
+      location: cleanLocation,
+    }));
+
+    setLocalProducts(updated);
+
+    // Save location for all existing (non-temp) rows
+    try {
+      const savePromises = updated
+        .filter((row) => row.id && !row.id.startsWith('temp-'))
+        .map((row) =>
+          IndividualProductService.updateIndividualProduct(row.id!, {
+            location: cleanLocation,
+          })
+        );
+
+      if (savePromises.length > 0) {
+        await Promise.all(savePromises);
+        onUpdate?.();
+      }
+
+      toast({
+        title: 'Location Applied',
+        description: `Location (${cleanLocation}) applied to all ${updated.length} row(s).`,
+      });
+    } catch (error) {
+      console.error('Error applying location to all products:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save location for some rows',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handlePasteRow = async (index: number) => {
     if (!copiedRowData) {
       toast({
@@ -870,16 +1073,16 @@ export default function IndividualProductsTable({
     }
   };
 
-  // Apply one row's details (final_weight, final_width, final_length) to all other rows
+  // Apply one row's details (final_weight, final_width, final_length, location) to all other rows
   const handleApplySameToAll = () => {
-    const required = ['final_weight', 'final_width', 'final_length'] as const;
+    const required = ['final_weight', 'final_width', 'final_length', 'location'] as const;
     const sourceIndex = localProducts.findIndex(p =>
       required.every(f => p[f] && String(p[f]).trim() !== '')
     );
     if (sourceIndex < 0) {
       toast({
         title: 'No complete row',
-        description: 'Fill at least one row with Final GSM, Width and Length first.',
+        description: 'Fill at least one row with Final Weight, Width, Length and Location first.',
         variant: 'destructive',
       });
       return;
@@ -889,6 +1092,7 @@ export default function IndividualProductsTable({
       final_weight: source.final_weight ? String(source.final_weight).trim() : '',
       final_width: source.final_width ? String(source.final_width).trim() : '',
       final_length: source.final_length ? String(source.final_length).trim() : '',
+      location: source.location ? String(source.location).trim() : '',
     };
     const updated = localProducts.map((row, i) =>
       i === sourceIndex ? row : { ...row, ...template }
@@ -896,15 +1100,16 @@ export default function IndividualProductsTable({
     setLocalProducts(updated);
     toast({
       title: 'Applied to all rows',
-      description: `Same GSM, Width and Length applied to all ${localProducts.length} row(s). Save or edit as needed.`,
+      description: `Same Weight, Width, Length and Location applied to all ${localProducts.length} row(s). Save or edit as needed.`,
     });
   };
 
   const hasOneRowFilled = localProducts.some(p =>
-    p.final_weight && p.final_width && p.final_length &&
+    p.final_weight && p.final_width && p.final_length && p.location &&
     String(p.final_weight).trim() !== '' &&
     String(p.final_width).trim() !== '' &&
-    String(p.final_length).trim() !== ''
+    String(p.final_length).trim() !== '' &&
+    String(p.location).trim() !== ''
   );
 
   const handleRemoveRow = (index: number) => {
@@ -948,7 +1153,7 @@ export default function IndividualProductsTable({
     }
   };
 
-  // Calculate actual weight in KG from GSM, length, and width
+  // Calculate actual weight in KG from GSM, length, and width (product reference values)
   const calculateWeightInKg = (): number | null => {
     if (!product?.weight || !product?.length || !product?.width) return null;
     
@@ -976,11 +1181,42 @@ export default function IndividualProductsTable({
     return null;
   };
 
+  // Parse length and width in meters from a row (for weight ↔ GSM conversion)
+  const getLengthWidthMeters = (item: IndividualProduct): { lengthM: number; widthM: number } | null => {
+    const lengthStr = (item.final_length || '').toString();
+    const widthStr = (item.final_width || '').toString();
+    let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
+    let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
+    if (product?.length_unit?.toLowerCase().includes('feet') || lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
+    if (product?.width_unit?.toLowerCase().includes('feet') || widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
+    if (!isNaN(lengthM) && !isNaN(widthM) && lengthM > 0 && widthM > 0) return { lengthM, widthM };
+    return null;
+  };
+
+  // Weight (kg) → GSM: GSM = weight_kg * 1000 / (length_m * width_m)
+  const weightKgToGsm = (weightKg: number, item: IndividualProduct): number | null => {
+    const lw = getLengthWidthMeters(item);
+    if (!lw) return null;
+    return (weightKg * 1000) / (lw.lengthM * lw.widthM);
+  };
+
+  // GSM → Weight (kg) for display when editing
+  const gsmToWeightKg = (item: IndividualProduct): number | null => {
+    const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
+    const lw = getLengthWidthMeters(item);
+    if (!lw || isNaN(gsm) || gsm <= 0) return null;
+    return (gsm * lw.lengthM * lw.widthM) / 1000;
+  };
+
   const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>, col: string) => {
-    const value = e.target.value;
-    
+    let value = e.target.value;
     // Only allow numbers and decimal point
-    const numericValue = value.replace(/[^\d.]/g, '');
+    let numericValue = value.replace(/[^\d.]/g, '');
+    // For final_weight (weight kg), allow max 4 decimal places
+    if (col === 'final_weight' && numericValue.includes('.')) {
+      const [intPart, decPart] = numericValue.split('.');
+      if (decPart && decPart.length > 4) numericValue = `${intPart}.${decPart.slice(0, 4)}`;
+    }
     setEditValue(numericValue);
     
     // Clear validation error when user types
@@ -997,26 +1233,24 @@ export default function IndividualProductsTable({
         return;
       }
 
+      // Skip range validation for final_weight in real time (user enters weight kg; we validate GSM on save)
+      if (col === 'final_weight') {
+        setValidationError(null);
+        return;
+      }
       let expectedNumeric: number | null = null;
       let fieldName = '';
-      
-      if (col === 'final_weight' && product?.weight) {
-        expectedNumeric = parseFloat(product.weight.toString().replace(/[^\d.]/g, ''));
-        fieldName = 'GSM';
-      } else if (col === 'final_length' && product?.length) {
+      if (col === 'final_length' && product?.length) {
         expectedNumeric = parseFloat(product.length.toString().replace(/[^\d.]/g, ''));
         fieldName = 'Length';
       } else if (col === 'final_width' && product?.width) {
         expectedNumeric = parseFloat(product.width.toString().replace(/[^\d.]/g, ''));
         fieldName = 'Width';
       }
-
       if (expectedNumeric !== null && !isNaN(expectedNumeric)) {
-        // GSM (weight) uses ±10 range, length and width use ±2 range
-        const range = col === 'final_weight' ? 10 : 2;
+        const range = 2;
         const minValue = expectedNumeric - range;
         const maxValue = expectedNumeric + range;
-        
         if (enteredNumeric < minValue || enteredNumeric > maxValue) {
           setValidationError(`${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`);
         } else {
@@ -1118,7 +1352,7 @@ export default function IndividualProductsTable({
               )}
             </div>
             <p className="text-xs text-blue-700 mt-3 italic">
-              Fill in the table below according to these reference values. Units are added automatically when you type numbers.
+              Fill Length and Width first, then enter <strong>weight (kg)</strong> in the Final Weight column — it is converted to GSM and saved (max 4 decimals).
             </p>
           </div>
         )}
@@ -1131,7 +1365,7 @@ export default function IndividualProductsTable({
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final GSM</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
@@ -1248,7 +1482,7 @@ export default function IndividualProductsTable({
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder={`e.g., 15 (${product?.weight_unit || 'kg'} auto-added)`}
+                          placeholder={getLengthWidthMeters(productItem) ? 'Weight (kg, max 4 decimals)' : `e.g., 15 (${product?.weight_unit || 'GSM'})`}
                           disabled={saving === productItem.id}
                           className={validationError && editingCell?.col === 'final_weight' ? 'border-red-500 focus:border-red-500' : ''}
                         />
@@ -1262,7 +1496,21 @@ export default function IndividualProductsTable({
                           className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
                           onClick={() => handleCellClick(index, 'final_weight')}
                         >
-                          {productItem.final_weight || <span className="text-gray-400">Click to edit</span>}
+                          {(() => {
+                            const wKg = gsmToWeightKg(productItem);
+                            return productItem.final_weight ? (
+                              <>
+                                {productItem.final_weight}
+                                {wKg !== null && (
+                                  <span className="text-gray-500 ml-1">
+                                    ({wKg.toFixed(4)} kg)
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-gray-400">Click to edit</span>
+                            );
+                          })()}
                         </div>
                         {productItem.final_weight && (
                           <Button
@@ -1274,7 +1522,7 @@ export default function IndividualProductsTable({
                             }}
                             className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                             disabled={index === localProducts.length - 1}
-                            title="Fill down GSM"
+                            title="Fill down weight"
                           >
                             <ArrowDown className="w-3 h-3" />
                           </Button>
@@ -1282,7 +1530,8 @@ export default function IndividualProductsTable({
                       </div>
                     )}
                   </td>
-                  <td className="border border-gray-200 p-2">
+                <td className="border border-gray-200 p-2">
+                  <div className="flex items-center gap-1">
                     <Select
                       value={productItem.location || (locationOptions[0] || '')}
                       onValueChange={(value) => {
@@ -1294,7 +1543,10 @@ export default function IndividualProductsTable({
                       }}
                       disabled={saving === productItem.id}
                     >
-                      <SelectTrigger className="w-40 max-w-[160px] truncate" title={productItem.location || (locationOptions[0] || '')}>
+                      <SelectTrigger
+                        className="w-40 max-w-[160px] truncate"
+                        title={productItem.location || (locationOptions[0] || '')}
+                      >
                         <SelectValue placeholder="Select location" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1309,7 +1561,37 @@ export default function IndividualProductsTable({
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                  </td>
+                    {productItem.location && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleFillDownLocation(index);
+                          }}
+                          className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          disabled={index === localProducts.length - 1}
+                          title="Fill down location"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApplyLocationToAll(index);
+                          }}
+                          className="h-6 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          title="Apply this location to all rows"
+                        >
+                          All
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </td>
                   <td className="border border-gray-200 p-2">
                     <Select
                       value={productItem.status === 'used' || productItem.status === 'in_production' ? 'available' : (productItem.status || 'available')}

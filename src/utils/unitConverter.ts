@@ -84,7 +84,7 @@ export const PRICING_UNITS: PricingUnitInfo[] = [
 const CONVERSION_FACTORS: Record<string, number> = {
   // Area conversions (relative to square meters)
   sqm: 1,
-  sqft: 10.764, // 1 sqm = 10.764 sqft
+  sqft: 10.76, // 1 sqm = 10.76 sqft
   
   // Weight conversions (relative to kg)
   kg: 1,
