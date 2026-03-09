@@ -590,21 +590,55 @@ export default function Notifications() {
       setShowDeleteConfirm(false);
       return;
     }
+
+    // Separate real notifications from activity log notifications
+    const realNotificationIds = ids.filter(id => !id.startsWith('activity_'));
+    const activityLogIds = ids.filter(id => id.startsWith('activity_'));
+
     setDeleting(true);
     try {
-      await Promise.all(ids.map(id => NotificationService.deleteNotification(id)));
-      setNotifications(prev => prev.filter(n => !selectedIds.has(n.id)));
+      const deletePromises = [];
+
+      // Delete real notifications
+      if (realNotificationIds.length > 0) {
+        deletePromises.push(
+          ...realNotificationIds.map(id => NotificationService.deleteNotification(id))
+        );
+      }
+
+      // Delete activity logs (extract MongoDB ObjectId from activity_ prefix)
+      if (activityLogIds.length > 0) {
+        const activityLogObjectIds = activityLogIds.map(id => id.replace('activity_', ''));
+        deletePromises.push(
+          ...activityLogObjectIds.map(id =>
+            fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/activity-logs/${id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              },
+            })
+          )
+        );
+      }
+
+      await Promise.all(deletePromises);
+
+      // Remove deleted items from UI
+      setNotifications(prev => prev.filter(n => !ids.includes(n.id)));
       setSelectedIds(new Set());
       setShowDeleteConfirm(false);
+
+      const totalDeleted = realNotificationIds.length + activityLogIds.length;
       toast({
         title: 'Deleted',
-        description: `${ids.length} notification(s) deleted permanently.`,
+        description: `${totalDeleted} item(s) deleted permanently. ${realNotificationIds.length} notification(s), ${activityLogIds.length} activity log(s).`,
       });
     } catch (error) {
-      console.error('Error deleting notifications:', error);
+      console.error('Error deleting items:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete some notifications.',
+        description: 'Failed to delete some items.',
         variant: 'destructive',
       });
     } finally {

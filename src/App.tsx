@@ -1,7 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
+import { useToast } from '@/hooks/use-toast';
+import { canAccessPage } from '@/utils/permissions';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import ProductList from '@/pages/products/ProductList';
@@ -98,9 +101,43 @@ function HomeRedirect() {
   return <Navigate to="/orders" />;
 }
 
+function PageAccessRoute({ pageKey, children }: { pageKey: string; children: React.ReactNode }) {
+  const { toast } = useToast();
+  const didToast = useRef(false);
+
+  if (canAccessPage(pageKey)) {
+    return <>{children}</>;
+  }
+
+  useEffect(() => {
+    if (!didToast.current) {
+      didToast.current = true;
+      toast({
+        title: 'Access denied',
+        description: "You don't have access to that page.",
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
+  return <Navigate to="/orders" replace />;
+}
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [pathname]);
+  return null;
+}
+
 function AppRoutes() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route
         path="/qr-result"
@@ -114,7 +151,9 @@ function AppRoutes() {
         path="/dashboard"
         element={
           <AdminRoute>
-            <Dashboard />
+            <PageAccessRoute pageKey="dashboard">
+              <Dashboard />
+            </PageAccessRoute>
           </AdminRoute>
         }
       />
@@ -122,7 +161,9 @@ function AppRoutes() {
         path="/products"
         element={
           <PrivateRoute>
-            <ProductList />
+            <PageAccessRoute pageKey="products">
+              <ProductList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -130,7 +171,9 @@ function AppRoutes() {
         path="/products/:id"
         element={
           <PrivateRoute>
-            <ProductDetail />
+            <PageAccessRoute pageKey="products">
+              <ProductDetail />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -138,7 +181,9 @@ function AppRoutes() {
         path="/products/:productId/stock"
         element={
           <PrivateRoute>
-            <ProductStock />
+            <PageAccessRoute pageKey="products">
+              <ProductStock />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -146,7 +191,9 @@ function AppRoutes() {
         path="/products/:productId/stock/:individualProductId"
         element={
           <PrivateRoute>
-            <IndividualProductDetail />
+            <PageAccessRoute pageKey="products">
+              <IndividualProductDetail />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -154,7 +201,9 @@ function AppRoutes() {
         path="/materials"
         element={
           <PrivateRoute>
-            <MaterialList />
+            <PageAccessRoute pageKey="materials">
+              <MaterialList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -162,7 +211,9 @@ function AppRoutes() {
         path="/materials/:id"
         element={
           <PrivateRoute>
-            <MaterialDetail />
+            <PageAccessRoute pageKey="materials">
+              <MaterialDetail />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -170,7 +221,9 @@ function AppRoutes() {
         path="/ink"
         element={
           <PrivateRoute>
-            <InkManagement />
+            <PageAccessRoute pageKey="materials">
+              <InkManagement />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -178,7 +231,9 @@ function AppRoutes() {
         path="/recipes"
         element={
           <PrivateRoute>
-            <RecipeCalculator />
+            <PageAccessRoute pageKey="production">
+              <RecipeCalculator />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -186,7 +241,9 @@ function AppRoutes() {
         path="/manage-stock"
         element={
           <PrivateRoute>
-            <ManageStock />
+            <PageAccessRoute pageKey="materials">
+              <ManageStock />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -194,7 +251,9 @@ function AppRoutes() {
         path="/production"
         element={
           <PrivateRoute>
-            <ProductionList />
+            <PageAccessRoute pageKey="production">
+              <ProductionList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -202,7 +261,9 @@ function AppRoutes() {
         path="/production/new"
         element={
           <PrivateRoute>
-            <ProductionCreate />
+            <PageAccessRoute pageKey="production">
+              <ProductionCreate />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -210,7 +271,9 @@ function AppRoutes() {
         path="/production/create"
         element={
           <PrivateRoute>
-            <ProductionCreate />
+            <PageAccessRoute pageKey="production">
+              <ProductionCreate />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -218,7 +281,9 @@ function AppRoutes() {
         path="/production/planning"
         element={
           <PrivateRoute>
-            <PlanningStage />
+            <PageAccessRoute pageKey="production">
+              <PlanningStage />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -226,7 +291,9 @@ function AppRoutes() {
         path="/production/:id/planning"
         element={
           <PrivateRoute>
-            <PlanningStage />
+            <PageAccessRoute pageKey="production">
+              <PlanningStage />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -234,7 +301,9 @@ function AppRoutes() {
         path="/production/:id/machine"
         element={
           <PrivateRoute>
-            <MachineStage />
+            <PageAccessRoute pageKey="production">
+              <MachineStage />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -242,7 +311,9 @@ function AppRoutes() {
         path="/production/:id/wastage"
         element={
           <PrivateRoute>
-            <ProductionWastage />
+            <PageAccessRoute pageKey="production">
+              <ProductionWastage />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -250,7 +321,9 @@ function AppRoutes() {
         path="/production/:id/individual-products"
         element={
           <PrivateRoute>
-            <ProductionIndividualProducts />
+            <PageAccessRoute pageKey="production">
+              <ProductionIndividualProducts />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -258,7 +331,19 @@ function AppRoutes() {
         path="/production/:id"
         element={
           <PrivateRoute>
-            <ProductionDetail />
+            <PageAccessRoute pageKey="production">
+              <ProductionDetail />
+            </PageAccessRoute>
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/orders"
+        element={
+          <PrivateRoute>
+            <PageAccessRoute pageKey="orders">
+              <OrderList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -266,7 +351,9 @@ function AppRoutes() {
         path="/customers"
         element={
           <PrivateRoute>
-            <CustomerList />
+            <PageAccessRoute pageKey="customers">
+              <CustomerList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -274,7 +361,9 @@ function AppRoutes() {
         path="/customers/:id"
         element={
           <PrivateRoute>
-            <CustomerDetail />
+            <PageAccessRoute pageKey="customers">
+              <CustomerDetail />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -282,7 +371,9 @@ function AppRoutes() {
         path="/suppliers"
         element={
           <PrivateRoute>
-            <SupplierList />
+            <PageAccessRoute pageKey="suppliers">
+              <SupplierList />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -290,7 +381,9 @@ function AppRoutes() {
         path="/suppliers/:id"
         element={
           <PrivateRoute>
-            <SupplierDetail />
+            <PageAccessRoute pageKey="suppliers">
+              <SupplierDetail />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -298,7 +391,9 @@ function AppRoutes() {
         path="/dropdowns"
         element={
           <PrivateRoute>
-            <DropdownMaster />
+            <PageAccessRoute pageKey="settings">
+              <DropdownMaster />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -306,7 +401,9 @@ function AppRoutes() {
         path="/settings"
         element={
           <PrivateRoute>
-            <Settings />
+            <PageAccessRoute pageKey="settings">
+              <Settings />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -314,7 +411,9 @@ function AppRoutes() {
         path="/notifications"
         element={
           <PrivateRoute>
-            <Notifications />
+            <PageAccessRoute pageKey="reports">
+              <Notifications />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -367,18 +466,12 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/orders"
-        element={
-          <PrivateRoute>
-            <OrderList />
-          </PrivateRoute>
-        }
-      />
-      <Route
         path="/orders/new"
         element={
           <PrivateRoute>
-            <NewOrder />
+            <PageAccessRoute pageKey="orders">
+              <NewOrder />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
@@ -386,12 +479,15 @@ function AppRoutes() {
         path="/orders/:id"
         element={
           <PrivateRoute>
-            <OrderDetails />
+            <PageAccessRoute pageKey="orders">
+              <OrderDetails />
+            </PageAccessRoute>
           </PrivateRoute>
         }
       />
       <Route path="/" element={<HomeRedirect />} />
     </Routes>
+    </>
   );
 }
 

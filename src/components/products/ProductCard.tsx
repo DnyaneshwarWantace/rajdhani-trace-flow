@@ -14,6 +14,7 @@ interface ProductCardProps {
   onProduction?: (product: Product) => void;
   onQRCode?: (product: Product) => void;
   onDelete?: (product: Product) => void;
+  canEdit?: boolean;
   canDelete?: boolean;
   showActions?: boolean;
   variant?: 'default' | 'compact' | 'detailed';
@@ -29,6 +30,9 @@ export default function ProductCard({
   onStock,
   onProduction,
   onQRCode,
+  onDelete: _onDelete,
+  canEdit = true,
+  canDelete: _canDelete = false,
   showActions = true,
   variant: _variant = 'default',
   isSelected = false,
@@ -197,7 +201,7 @@ export default function ProductCard({
                   View
                 </button>
               )}
-              {onEdit && (
+              {onEdit && canEdit && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

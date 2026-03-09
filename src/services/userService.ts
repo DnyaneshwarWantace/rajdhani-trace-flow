@@ -1,6 +1,6 @@
 import type { User } from '@/types/auth';
-
 import { getApiUrl } from '@/utils/apiConfig';
+import { getApiError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -34,12 +34,10 @@ export class UserService {
     const response = await fetch(`${API_URL}/auth/admin/users`, {
       headers: this.getHeaders(),
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch users');
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
     return data.data || [];
   }
 
@@ -47,12 +45,10 @@ export class UserService {
     const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
       headers: this.getHeaders(),
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user');
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
     return data.data.user;
   }
 
@@ -62,13 +58,10 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create user');
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
     return {
       user: data.data.user,
       temporary_password: data.data.temporary_password,
@@ -82,13 +75,10 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update user');
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
     return data.data;
   }
 
@@ -97,9 +87,9 @@ export class UserService {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
-
+    const data = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error('Failed to delete user');
+      throw new Error(getApiError(response, data));
     }
   }
 
@@ -109,10 +99,9 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify({ newPassword }),
     });
-
+    const data = await response.json();
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to reset password');
+      throw new Error(getApiError(response, data));
     }
   }
 
@@ -122,13 +111,10 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify({ status }),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update user status');
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
     return data.data;
   }
 }

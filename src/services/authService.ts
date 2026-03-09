@@ -1,5 +1,6 @@
 import type { LoginCredentials, AuthResponse, User } from '@/types/auth';
 import { getApiUrl } from '@/utils/apiConfig';
+import { getApiError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -16,7 +17,7 @@ export class AuthService {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || 'Login failed');
+      throw new Error(getApiError(response, data));
     }
 
     // Store auth data
@@ -44,6 +45,9 @@ export class AuthService {
       }
 
       const data = await response.json();
+      if (data.data?.permissions) {
+        localStorage.setItem('permissions', JSON.stringify(data.data.permissions));
+      }
       return data.data.user;
     } catch (error) {
       this.logout();
