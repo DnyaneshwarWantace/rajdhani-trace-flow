@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -99,21 +99,22 @@ function HomeRedirect() {
 }
 
 function PageAccessRoute({ pageKey, children }: { pageKey: string; children: React.ReactNode }) {
-  const navigate = useNavigate();
-  const didRedirect = useRef(false);
-
-  if (canAccessPage(pageKey)) {
-    return <>{children}</>;
-  }
+  const hasAccess = canAccessPage(pageKey);
 
   useEffect(() => {
-    if (didRedirect.current) return;
-    didRedirect.current = true;
-    navigate('/orders', { replace: true });
-  }, [navigate]);
+    if (!hasAccess) {
+      // Hard redirect so the app loads at /orders and never shows a white screen
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
+      window.location.replace(base ? `${base}/orders` : '/orders');
+    }
+  }, [hasAccess]);
 
+  if (hasAccess) {
+    return <>{children}</>;
+  }
+  // Show spinner until redirect completes (avoids white screen)
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="flex flex-col items-center gap-3 text-gray-500">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-primary-600" />
         <p className="text-sm">Redirecting…</p>
