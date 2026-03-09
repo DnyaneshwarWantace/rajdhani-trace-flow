@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
-import { useToast } from '@/hooks/use-toast';
 import { canAccessPage } from '@/utils/permissions';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
@@ -100,25 +99,27 @@ function HomeRedirect() {
 }
 
 function PageAccessRoute({ pageKey, children }: { pageKey: string; children: React.ReactNode }) {
-  const { toast } = useToast();
-  const didToast = useRef(false);
+  const navigate = useNavigate();
+  const didRedirect = useRef(false);
 
   if (canAccessPage(pageKey)) {
     return <>{children}</>;
   }
 
   useEffect(() => {
-    if (!didToast.current) {
-      didToast.current = true;
-      toast({
-        title: 'Access denied',
-        description: "You don't have access to that page.",
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+    if (didRedirect.current) return;
+    didRedirect.current = true;
+    navigate('/orders', { replace: true });
+  }, [navigate]);
 
-  return <Navigate to="/orders" replace />;
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3 text-gray-500">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-primary-600" />
+        <p className="text-sm">Redirecting…</p>
+      </div>
+    </div>
+  );
 }
 
 function ScrollToTop() {
@@ -389,9 +390,7 @@ function AppRoutes() {
         path="/settings"
         element={
           <PrivateRoute>
-            <PageAccessRoute pageKey="settings">
-              <Settings />
-            </PageAccessRoute>
+            <Settings />
           </PrivateRoute>
         }
       />

@@ -233,7 +233,7 @@ export default function Permissions(_props: PermissionsProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <CardHeader className="space-y-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-blue-600" />
@@ -253,15 +253,17 @@ export default function Permissions(_props: PermissionsProps) {
           </CardDescription>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">User</span>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1">
+            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide sm:w-24">
+              User
+            </span>
             <Select
               value={selectedUserId}
               onValueChange={(val) => setSelectedUserId(val)}
               disabled={loadingMeta || users.length === 0}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:max-w-xs md:max-w-sm">
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
