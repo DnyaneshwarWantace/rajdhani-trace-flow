@@ -160,7 +160,10 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const visibleMenuItems = menuItems.filter((item) => user && canAccessPage(item.pageKey));
+  // Settings is visible to all logged-in users (profile + password); other items use permissions
+  const visibleMenuItems = menuItems.filter((item) =>
+    user && (item.path === '/settings' ? true : canAccessPage(item.pageKey))
+  );
 
   useEffect(() => {
     if (hoveredItem && linkRefs.current.has(hoveredItem)) {
