@@ -120,19 +120,9 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="ml-2 text-sm text-gray-600">Remember me</span>
-              </label>
-              <span className="text-sm text-gray-500">
-                Forgot password? Contact your administrator to reset it.
-              </span>
-            </div>
+            <p className="text-sm text-gray-500">
+              Forgot password? Contact your administrator to reset it.
+            </p>
 
             {/* Submit Button */}
             <button
