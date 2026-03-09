@@ -21,7 +21,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const loadUnreadCount = async () => {
     if (!isMounted.current) return;
-
+    // Don't call API when not logged in — avoids 401 and console errors
+    if (!localStorage.getItem('auth_token')) {
+      if (isMounted.current) setUnreadCount(0);
+      setIsLoading(false);
+      return;
+    }
     try {
       // Only fetch 1 notification, we just need the total count
       const { total } = await NotificationService.getNotifications({
