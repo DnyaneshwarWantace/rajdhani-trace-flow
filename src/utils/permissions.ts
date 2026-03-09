@@ -1,127 +1,104 @@
 /**
- * Permission utility functions
- * Handles permission checks for users based on role and specific permissions
+ * Permission checks using backend shape: page_permissions and action_permissions.
+ * Super-admin always has full access. Admin with no permissions doc treated as full access.
  */
 
-export interface UserPermissions {
-  products?: {
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-    view?: boolean;
-  };
-  materials?: {
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-    view?: boolean;
-  };
-  customers?: {
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-    view?: boolean;
-  };
-  suppliers?: {
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-    view?: boolean;
-  };
-  recipes?: {
-    create?: boolean;
-    edit?: boolean;
-    delete?: boolean;
-    view?: boolean;
-  };
-  [key: string]: any;
+export interface StoredPermissions {
+  page_permissions?: Record<string, boolean>;
+  action_permissions?: Record<string, boolean>;
 }
 
-/**
- * Check if user has permission to delete items
- * Admin always has permission, or user must have specific delete permission
- */
-export function canDelete(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
+function getStoredPermissions(): StoredPermissions | null {
   try {
-    // Get user from localStorage
+    const raw = localStorage.getItem('permissions');
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return {
+      page_permissions: p?.page_permissions ?? {},
+      action_permissions: p?.action_permissions ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isSuperAdmin(): boolean {
+  try {
     const userStr = localStorage.getItem('user');
     if (!userStr) return false;
-
-    const user = JSON.parse(userStr);
-
-    // Admin always has delete permission
-    if (user.role === 'admin') return true;
-
-    // Check specific permissions
-    const permissionsStr = localStorage.getItem('permissions');
-    if (!permissionsStr) return false;
-
-    const permissions: UserPermissions = JSON.parse(permissionsStr);
-
-    // Check if user has delete permission for this module
-    return permissions[module]?.delete === true;
-  } catch (error) {
-    console.error('Error checking delete permission:', error);
+    return JSON.parse(userStr).role === 'super-admin';
+  } catch {
     return false;
   }
 }
 
-/**
- * Check if user has permission to create items
- */
-export function canCreate(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
+function isAdmin(): boolean {
   try {
     const userStr = localStorage.getItem('user');
     if (!userStr) return false;
-
-    const user = JSON.parse(userStr);
-    if (user.role === 'admin') return true;
-
-    const permissionsStr = localStorage.getItem('permissions');
-    if (!permissionsStr) return false;
-
-    const permissions: UserPermissions = JSON.parse(permissionsStr);
-    return permissions[module]?.create === true;
-  } catch (error) {
-    console.error('Error checking create permission:', error);
+    const role = JSON.parse(userStr).role;
+    return role === 'admin' || role === 'super-admin';
+  } catch {
     return false;
   }
 }
 
-/**
- * Check if user has permission to edit items
- */
-export function canEdit(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes'): boolean {
-  try {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return false;
-
-    const user = JSON.parse(userStr);
-    if (user.role === 'admin') return true;
-
-    const permissionsStr = localStorage.getItem('permissions');
-    if (!permissionsStr) return false;
-
-    const permissions: UserPermissions = JSON.parse(permissionsStr);
-    return permissions[module]?.edit === true;
-  } catch (error) {
-    console.error('Error checking edit permission:', error);
-    return false;
-  }
+/** True if user can access this page (sidebar + route). */
+export function canAccessPage(pageKey: string): boolean {
+  if (isSuperAdmin()) return true;
+  const p = getStoredPermissions();
+  if (!p?.page_permissions) return isAdmin(); // admin with no permissions = full access
+  return p.page_permissions[pageKey] === true;
 }
 
-/**
- * Check if user is admin
- */
-export function isAdmin(): boolean {
-  try {
-    const userStr = localStorage.getItem('user');
-    if (!userStr) return false;
-
-    const user = JSON.parse(userStr);
-    return user.role === 'admin';
-  } catch (error) {
-    console.error('Error checking admin status:', error);
-    return false;
-  }
+/** True if user can perform this action (e.g. product_create, material_edit). */
+export function canDoAction(actionKey: string): boolean {
+  if (isSuperAdmin()) return true;
+  const p = getStoredPermissions();
+  if (!p?.action_permissions) return isAdmin();
+  const v = p.action_permissions[actionKey];
+  return v === true;
 }
+
+// Map module names (used by UI) to action keys
+const moduleToActions: Record<string, { create: string; edit: string; delete: string; view?: string }> = {
+  products: { create: 'product_create', edit: 'product_edit', delete: 'product_delete', view: 'product_view' },
+  materials: { create: 'material_create', edit: 'material_edit', delete: 'material_delete', view: 'material_view' },
+  customers: { create: 'customer_create', edit: 'customer_edit', delete: 'customer_delete', view: 'customer_view' },
+  suppliers: { create: 'supplier_create', edit: 'supplier_edit', delete: 'supplier_delete', view: 'supplier_view' },
+  orders: { create: 'order_create', edit: 'order_edit', delete: 'order_delete', view: 'order_view' },
+  production: { create: 'production_create', edit: 'production_edit', delete: 'production_delete', view: 'production_view' },
+};
+
+export function canCreate(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes' | 'orders' | 'production'): boolean {
+  if (isSuperAdmin()) return true;
+  const actions = moduleToActions[module as keyof typeof moduleToActions];
+  if (!actions) return isAdmin();
+  return canDoAction(actions.create);
+}
+
+export function canEdit(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes' | 'orders' | 'production'): boolean {
+  if (isSuperAdmin()) return true;
+  const actions = moduleToActions[module as keyof typeof moduleToActions];
+  if (!actions) return isAdmin();
+  return canDoAction(actions.edit);
+}
+
+export function canDelete(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes' | 'orders' | 'production'): boolean {
+  if (isSuperAdmin()) return true;
+  const actions = moduleToActions[module as keyof typeof moduleToActions];
+  if (!actions) return isAdmin();
+  return canDoAction(actions.delete);
+}
+
+export function canView(module: string): boolean {
+  if (isSuperAdmin()) return true;
+  const actions = moduleToActions[module as keyof typeof moduleToActions];
+  if (!actions?.view) return isAdmin();
+  return canDoAction(actions.view);
+}
+
+export { isAdmin };
+
+/** Message to show when API returns 403. */
+export const PERMISSION_DENIED_MESSAGE = "You don't have permission to perform this action.";

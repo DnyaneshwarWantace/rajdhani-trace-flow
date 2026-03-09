@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { User, Key, Users, Edit, Save, X, Eye, EyeOff, LogOut } from 'lucide-react';
+import { User, Key, Users, Shield, Edit, Save, X, Eye, EyeOff, LogOut } from 'lucide-react';
 import UserManagement from './UserManagement';
+import Permissions from './Permissions';
 import Layout from '@/components/layout/Layout';
 
 import { getApiUrl } from '@/utils/apiConfig';
@@ -17,7 +18,7 @@ const API_URL = getApiUrl();
 export default function Settings() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'users'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'users' | 'permissions'>('profile');
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -221,18 +222,31 @@ export default function Settings() {
                   <Key className="w-4 h-4" />
                   Security
                 </button>
-                {user?.role === 'admin' && (
-                  <button
-                    onClick={() => setActiveTab('users')}
-                    className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
-                      activeTab === 'users'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
-                  >
-                    <Users className="w-4 h-4" />
-                    Users
-                  </button>
+                {(user?.role === 'admin' || user?.role === 'super-admin') && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('users')}
+                      className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'users'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Users className="w-4 h-4" />
+                      Users
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('permissions')}
+                      className={`flex-1 px-4 py-2.5 text-sm font-medium whitespace-nowrap rounded-md transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'permissions'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4" />
+                      Permissions
+                    </button>
+                  </>
                 )}
               </nav>
             </div>
@@ -492,9 +506,14 @@ export default function Settings() {
             </Card>
           )}
 
-          {/* Users Tab (Admin Only) */}
-          {user?.role === 'admin' && activeTab === 'users' && (
+          {/* Users Tab (Admin & Super Admin) */}
+          {(user?.role === 'admin' || user?.role === 'super-admin') && activeTab === 'users' && (
             <UserManagement />
+          )}
+
+          {/* Permissions Tab (Admin & Super Admin) */}
+          {(user?.role === 'admin' || user?.role === 'super-admin') && activeTab === 'permissions' && (
+            <Permissions />
           )}
         </div>
       </div>
