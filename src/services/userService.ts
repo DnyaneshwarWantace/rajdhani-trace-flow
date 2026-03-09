@@ -8,6 +8,7 @@ export interface CreateUserData {
   email: string;
   full_name: string;
   role: string;
+  password?: string;
   phone?: string;
   department?: string;
 }
@@ -55,7 +56,7 @@ export class UserService {
     return data.data.user;
   }
 
-  static async createUser(userData: CreateUserData): Promise<User> {
+  static async createUser(userData: CreateUserData): Promise<{ user: User; temporary_password?: string; message?: string }> {
     const response = await fetch(`${API_URL}/auth/admin/users`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -68,7 +69,11 @@ export class UserService {
     }
 
     const data = await response.json();
-    return data.data.user;
+    return {
+      user: data.data.user,
+      temporary_password: data.data.temporary_password,
+      message: data.message,
+    };
   }
 
   static async updateUser(id: string, userData: UpdateUserData): Promise<User> {

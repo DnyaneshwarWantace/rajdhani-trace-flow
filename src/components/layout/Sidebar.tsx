@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MenuItem {
   name: string;
@@ -137,11 +138,17 @@ const menuItems: MenuItem[] = [
 
 export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const location = useLocation();
+  const { user } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
 
   const isActive = (path: string) => location.pathname === path;
+
+  const visibleMenuItems =
+    user && (user.role === 'admin' || user.role === 'super-admin')
+      ? menuItems
+      : menuItems.filter((item) => item.path !== '/dashboard');
 
   useEffect(() => {
     if (hoveredItem && linkRefs.current.has(hoveredItem)) {
@@ -208,7 +215,7 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
           {/* Navigation Menu */}
           <nav className={`flex-1 space-y-1 ${isOpen ? 'overflow-y-auto' : 'overflow-visible'}`}>
-            {menuItems.map((item) => (
+            {visibleMenuItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
