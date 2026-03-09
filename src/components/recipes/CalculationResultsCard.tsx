@@ -35,6 +35,8 @@ interface ProductionStep {
   quantity: number;
   unit: string;
   current_stock?: number;
+  mainProductId?: string;
+  mainProductName?: string;
   materials_needed: {
     material_id?: string;
     material_name: string;

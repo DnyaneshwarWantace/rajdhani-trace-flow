@@ -10,23 +10,16 @@ const SelectGroup = SelectPrimitive.Group
 
 const SelectValue = SelectPrimitive.Value
 
-// Store scroll position when trigger is pressed so we can restore after open (prevents page jumping)
-let selectScrollRestore: { x: number; y: number } | null = null;
-
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, onPointerDown, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
       "flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary-600 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 transition-colors data-[state=open]:border-primary-600",
       className
     )}
-    onPointerDown={(e) => {
-      selectScrollRestore = { x: window.scrollX, y: window.scrollY };
-      onPointerDown?.(e);
-    }}
     {...props}
   >
     {children}
@@ -88,21 +81,6 @@ const SelectContent = React.forwardRef<
         }
       }
     }
-  }, []);
-
-  // Restore scroll position when dropdown opens so page doesn't jump (e.g. Location select in table)
-  React.useEffect(() => {
-    if (!selectScrollRestore) return;
-    const { x, y } = selectScrollRestore;
-    const rafId = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.scrollTo(x, y);
-        selectScrollRestore = null;
-      });
-    });
-    return () => {
-      cancelAnimationFrame(rafId);
-    };
   }, []);
 
   return (

@@ -40,6 +40,8 @@ interface ProductionStep {
   quantity: number;
   unit: string;
   current_stock?: number;
+  mainProductId?: string;
+  mainProductName?: string;
   materials_needed: {
     material_id?: string;
     material_name: string;
@@ -207,9 +209,11 @@ export default function RecipeCalculator() {
       const steps: ProductionStep[] = [];
       let stepCounter = 1;
 
-      // Process each calculation item
+      // Process each calculation item - each main product should have its own recipe group
       for (const item of calculationItems) {
         if (!item.productId) continue;
+
+        const productStepsStart = steps.length;
 
         await processProductRecursively(
           item.productId,
@@ -218,10 +222,16 @@ export default function RecipeCalculator() {
           item.unit,
           materialBreakdown,
           steps,
-          stepCounter,
-          new Set() // Track processed products to avoid infinite loops
+          1, // Reset to 1 for each main product
+          new Set(), // Track processed products to avoid infinite loops
+          item.productId // Pass the main product ID to track hierarchy
         );
-        stepCounter++;
+
+        // Mark all steps for this product group with a product identifier
+        for (let i = productStepsStart; i < steps.length; i++) {
+          steps[i].mainProductId = item.productId;
+          steps[i].mainProductName = item.productName;
+        }
       }
 
       // Convert map to array and sort by material name
@@ -256,7 +266,8 @@ export default function RecipeCalculator() {
     materialBreakdown: Map<string, FinalMaterialBreakdown>,
     steps: ProductionStep[],
     stepNumber: number,
-    processedProducts: Set<string>
+    processedProducts: Set<string>,
+    mainProductId?: string
   ) => {
     // Avoid infinite loops
     if (processedProducts.has(productId)) {
@@ -393,7 +404,8 @@ export default function RecipeCalculator() {
             materialBreakdown,
             steps,
             steps.length + 1,
-            new Set(processedProducts) // Create new set for this branch
+            new Set(processedProducts), // Create new set for this branch
+            mainProductId
           );
         }
       }
