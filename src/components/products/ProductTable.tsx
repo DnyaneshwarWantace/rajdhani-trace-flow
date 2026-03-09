@@ -272,6 +272,7 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
           onClose={() => setSelectedImage(null)}
           imageUrl={selectedImage.url}
           alt={selectedImage.alt}
+          caption={selectedImage.alt}
         />
       )}
     </div>
