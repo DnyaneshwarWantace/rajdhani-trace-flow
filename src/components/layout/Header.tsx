@@ -78,12 +78,10 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
                 const currentSrc = img.src;
-                if (currentSrc.includes('/v2/logo.png')) {
+                if (!currentSrc.endsWith('/logo.png')) {
                   img.src = '/logo.png';
-                } else if (currentSrc.includes('/logo.png')) {
-                  img.src = '/v2/logo.png';
                 } else {
-                  console.error('Logo not found at any path');
+                  console.error('Logo not found');
                 }
               }}
             />
