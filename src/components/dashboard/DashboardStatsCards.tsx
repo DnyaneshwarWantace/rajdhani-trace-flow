@@ -56,7 +56,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
         ? 'Loading...'
         : `Pending: ${stats.ordersPending ?? 0} · Accepted: ${stats.ordersAccepted ?? 0} · Dispatched: ${stats.ordersDispatched ?? 0} · Delivered: ${stats.ordersDelivered ?? 0}`,
       subtextColor: 'text-gray-500',
-      onClick: undefined as (() => void) | undefined,
+      onClick: () => navigate('/orders'),
     },
     {
       title: 'Total Revenue',
@@ -78,7 +78,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
         ? 'Loading...'
         : `Planned: ${stats.productionPlanned ?? 0} · In progress: ${stats.productionInProgress ?? 0} · Completed: ${stats.productionCompleted ?? 0} · Cancelled: ${stats.productionCancelled ?? 0}`,
       subtextColor: 'text-gray-500',
-      onClick: undefined as (() => void) | undefined,
+      onClick: () => navigate('/production'),
     },
     {
       title: 'Raw Materials',
@@ -110,13 +110,11 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-6">
       {cards.map((card, idx) => {
         const Icon = card.icon;
-        const Wrapper = card.onClick ? 'button' : 'div';
         return (
-          <Wrapper
+          <div
             key={idx}
-            type={card.onClick ? 'button' : undefined}
             onClick={card.onClick}
-            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow min-h-[120px] flex flex-col text-left w-full focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${card.onClick ? 'cursor-pointer' : ''}`}
+            className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow min-h-[120px] flex flex-col text-left w-full ${card.onClick ? 'cursor-pointer' : ''}`}
           >
             {/* Top row: title + value on left, icon on right */}
             <div className="flex items-start justify-between gap-3">
@@ -132,7 +130,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
             <p className={`text-xs ${card.subtextColor} mt-3 pt-3 border-t border-gray-100`}>
               {card.subtext}
             </p>
-          </Wrapper>
+          </div>
         );
       })}
     </div>

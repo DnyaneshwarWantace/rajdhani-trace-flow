@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX, Info, AlertCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Key, Search, UserCheck, UserX, Info } from 'lucide-react';
 import { UserService } from '@/services/userService';
 import type { CreateUserData, UpdateUserData } from '@/services/userService';
 import type { User } from '@/types/auth';
@@ -40,7 +40,8 @@ export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles] = useState([
-    { value: 'admin', label: 'Admin', description: 'Administrator with full access' },
+    { value: 'super-admin', label: 'Super Admin', description: 'Can manage everything, including admins and roles' },
+    { value: 'admin', label: 'Admin', description: 'Administrator with full access (except super-admin accounts)' },
     { value: 'user', label: 'User', description: 'Standard user' },
   ]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,9 +59,12 @@ export default function UserManagement() {
     email: '',
     full_name: '',
     role: 'user',
+    password: '',
     phone: '',
     department: '',
   });
+  const [createPasswordConfirm, setCreatePasswordConfirm] = useState('');
+  const [createPasswordError, setCreatePasswordError] = useState<string | null>(null);
 
   const [editForm, setEditForm] = useState<UpdateUserData>({
     full_name: '',
@@ -114,21 +118,36 @@ export default function UserManagement() {
       });
       return;
     }
+    if (createForm.password && createForm.password !== createPasswordConfirm) {
+      setCreatePasswordError('Passwords do not match');
+      return;
+    }
+    setCreatePasswordError(null);
+    const payload: CreateUserData = {
+      ...createForm,
+      ...(createForm.password?.trim() ? { password: createForm.password.trim() } : {}),
+    };
+    if (!payload.password) delete (payload as { password?: string }).password;
 
     try {
-      await UserService.createUser(createForm);
+      const result = await UserService.createUser(payload);
       toast({
         title: 'Success',
-        description: 'User created successfully. A welcome email with temporary password has been sent.',
+        description: result.temporary_password
+          ? `User created. Share this temporary password with the user: ${result.temporary_password}`
+          : (result.message || 'User created with the password you set.'),
       });
       setShowCreateDialog(false);
       setCreateForm({
         email: '',
         full_name: '',
         role: 'user',
+        password: '',
         phone: '',
         department: '',
       });
+      setCreatePasswordConfirm('');
+      setCreatePasswordError(null);
       loadUsers();
     } catch (error) {
       toast({
@@ -197,16 +216,15 @@ export default function UserManagement() {
     if (!selectedUser) return;
 
     try {
-      // Generate a temporary password (8 characters)
-      const generatedPassword = Math.random().toString(36).slice(-8);
+      // Generate a temporary password (at least 9 chars to pass "more than 8" validation)
+      const generatedPassword = (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)).slice(0, 12);
       
-      // Update user password with the generated password
       await UserService.resetPassword(selectedUser.id, generatedPassword);
       
       setTempPassword(generatedPassword);
       toast({
         title: 'Success',
-        description: 'Password reset successfully. Temporary password generated.',
+        description: 'Copy the password below and share it with the user.',
       });
     } catch (error) {
       toast({
@@ -215,6 +233,12 @@ export default function UserManagement() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleCopyResetPassword = () => {
+    if (!tempPassword) return;
+    navigator.clipboard.writeText(tempPassword);
+    toast({ title: 'Copied', description: 'Password copied to clipboard.' });
   };
 
   const handleUpdateStatus = async (userId: string, status: 'active' | 'inactive' | 'suspended') => {
@@ -251,38 +275,9 @@ export default function UserManagement() {
     }
   };
 
-  // Check if current user can delete a specific user based on hierarchical rules
-  const canDeleteUser = (user: User): boolean => {
-    if (!currentUser) return false;
-    
-    // Cannot delete yourself
-    if (user.id === currentUser.id) return false;
-    
-    // Rule 1: Cannot delete your creator (hierarchical protection)
-    if (user.id === currentUser.created_by) return false;
-    
-    // Rule 2: Admins can delete any user they created (including other admins, but must demote first)
-    if (currentUser.role === 'admin' && user.created_by === currentUser.id) {
-      return true; // Show delete button, but will show warning if admin
-    }
-    
-    // Rule 3: Admins can delete any non-admin user (even if they didn't create them)
-    if (currentUser.role === 'admin' && user.role !== 'admin') {
-      return true;
-    }
-    
-    // Rule 4: Non-admin users can only delete users they created (and they must not be admin)
-    if (user.created_by === currentUser.id && user.role !== 'admin') {
-      return true;
-    }
-    
-    return false;
-  };
-
-  // Check if user needs to be demoted before deletion
-  const needsDemotionBeforeDelete = (user: User): boolean => {
-    if (!currentUser) return false;
-    return user.role === 'admin' && currentUser.role === 'admin' && user.created_by === currentUser.id;
+  const canManageUser = (user: User): boolean => {
+    if (!currentUser || user.id === currentUser.id) return false;
+    return Boolean(user.can_manage);
   };
 
   const filteredUsers = users.filter((user) =>
@@ -298,12 +293,11 @@ export default function UserManagement() {
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <h4 className="font-semibold text-blue-900 mb-2">User Deletion Rules</h4>
+              <h4 className="font-semibold text-blue-900 mb-2">User Management Rules</h4>
               <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                <li>You cannot delete your own account or the user who created your account</li>
-                <li>Admins can delete any non-admin user, even if they didn't create them</li>
-                <li>To delete an admin user you created: First change their role to "user", then delete them</li>
-                <li>Regular users can only delete users they created (and they must not be admins)</li>
+                <li>Admins can edit, delete, or reset password for any non-admin user; for another admin, only if that admin is in their hierarchy</li>
+                <li>Non-admins can only manage users in their hierarchy (users they created, or users created by someone they created)</li>
+                <li>You cannot delete or modify your own account; non-admins cannot delete the user who created their account</li>
               </ul>
             </div>
           </div>
@@ -393,53 +387,38 @@ export default function UserManagement() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditUser(user)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowResetPasswordDialog(true);
-                            }}
-                          >
-                            <Key className="w-4 h-4" />
-                          </Button>
-                          {user.status === 'active' ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(user.id, 'inactive')}
-                            >
-                              <UserX className="w-4 h-4 text-orange-600" />
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUpdateStatus(user.id, 'active')}
-                            >
-                              <UserCheck className="w-4 h-4 text-green-600" />
-                            </Button>
-                          )}
-                          {canDeleteUser(user) && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setShowDeleteDialog(true);
-                              }}
-                              title={needsDemotionBeforeDelete(user) ? 'Delete (requires demotion first)' : 'Delete user'}
-                              className={`${needsDemotionBeforeDelete(user) ? 'hover:bg-orange-50 hover:text-orange-700' : 'hover:bg-red-50 hover:text-red-700'}`}
-                            >
-                              <Trash2 className={`w-4 h-4 ${needsDemotionBeforeDelete(user) ? 'text-orange-600' : 'text-red-600'}`} />
-                            </Button>
+                          {canManageUser(user) && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Edit user">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setSelectedUser(user); setShowResetPasswordDialog(true); }}
+                                title="Reset password"
+                              >
+                                <Key className="w-4 h-4" />
+                              </Button>
+                              {user.status === 'active' ? (
+                                <Button variant="ghost" size="sm" onClick={() => handleUpdateStatus(user.id, 'inactive')} title="Suspend user">
+                                  <UserX className="w-4 h-4 text-orange-600" />
+                                </Button>
+                              ) : (
+                                <Button variant="ghost" size="sm" onClick={() => handleUpdateStatus(user.id, 'active')} title="Activate user">
+                                  <UserCheck className="w-4 h-4 text-green-600" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setSelectedUser(user); setShowDeleteDialog(true); }}
+                                title="Delete user"
+                                className="hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
@@ -458,7 +437,7 @@ export default function UserManagement() {
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
             <DialogDescription>
-              Create a new user account. A welcome email with temporary password will be sent.
+              Create a new user account. A temporary password will be shown after creation — share it with the user manually.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -501,6 +480,38 @@ export default function UserManagement() {
               />
             </div>
             <div>
+              <Label htmlFor="create-password">Password (optional)</Label>
+              <Input
+                id="create-password"
+                type="password"
+                value={createForm.password ?? ''}
+                onChange={(e) => {
+                  setCreateForm({ ...createForm, password: e.target.value });
+                  setCreatePasswordError(null);
+                }}
+                placeholder="Leave blank to auto-generate a temporary password"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                If set, must be more than 8 characters.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="create-password-confirm">Confirm Password</Label>
+              <Input
+                id="create-password-confirm"
+                type="password"
+                value={createPasswordConfirm}
+                onChange={(e) => {
+                  setCreatePasswordConfirm(e.target.value);
+                  setCreatePasswordError(null);
+                }}
+                placeholder="Re-enter password if you set one"
+              />
+              {createPasswordError && (
+                <p className="text-xs text-red-500 mt-1">{createPasswordError}</p>
+              )}
+            </div>
+            <div>
               <Label htmlFor="create-role">Role *</Label>
               <Select
                 value={createForm.role}
@@ -510,7 +521,7 @@ export default function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((role) => (
+                  {(currentUser?.role === 'super-admin' ? roles : roles.filter((role) => role.value !== 'super-admin')).map((role) => (
                     <SelectItem key={role.value} value={role.value}>
                       <div>
                         <div className="font-medium">{role.label}</div>
@@ -527,7 +538,7 @@ export default function UserManagement() {
                 id="create-phone"
                 value={createForm.phone}
                 onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
-                placeholder="+1234567890"
+                placeholder="+91 98765 43210"
               />
             </div>
             <div>
@@ -580,7 +591,7 @@ export default function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((role) => (
+                  {(currentUser?.role === 'super-admin' ? roles : roles.filter((role) => role.value !== 'super-admin')).map((role) => (
                     <SelectItem key={role.value} value={role.value}>
                       {role.label}
                     </SelectItem>
@@ -658,28 +669,6 @@ export default function UserManagement() {
                 </div>
               </div>
 
-              {needsDemotionBeforeDelete(selectedUser) && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-yellow-800 mb-2">
-                        ⚠️ Admin User - Demotion Required
-                      </p>
-                      <p className="text-xs text-yellow-700 mb-2">
-                        You cannot delete an admin user directly. Follow these steps:
-                      </p>
-                      <ol className="text-xs text-yellow-700 list-decimal list-inside space-y-1">
-                        <li>Click "Cancel" to close this dialog</li>
-                        <li>Click the "Edit" button for this user</li>
-                        <li>Change their role from "admin" to "user"</li>
-                        <li>Save the changes</li>
-                        <li>Then return here and delete the user</li>
-                      </ol>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           <DialogFooter className="gap-2">
@@ -689,18 +678,23 @@ export default function UserManagement() {
             <Button
               variant="destructive"
               onClick={handleDeleteUser}
-              disabled={selectedUser ? needsDemotionBeforeDelete(selectedUser) : false}
               className="bg-red-600 hover:bg-red-700"
             >
-              {selectedUser && needsDemotionBeforeDelete(selectedUser) ? 'Demote First' : 'Delete User'}
+              Delete User
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
-      <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
-        <DialogContent>
+      {/* Reset Password Dialog - stays open after reset so user can copy password */}
+      <Dialog open={showResetPasswordDialog} onOpenChange={(open) => {
+        if (!open) setTempPassword('');
+        setShowResetPasswordDialog(open);
+      }}>
+        <DialogContent
+          onInteractOutside={(e) => { if (tempPassword) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (tempPassword) e.preventDefault(); }}
+        >
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>
@@ -708,26 +702,28 @@ export default function UserManagement() {
             </DialogDescription>
           </DialogHeader>
           {tempPassword && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm font-medium text-green-800 mb-2">Temporary Password:</p>
-              <p className="text-lg font-mono font-bold text-green-900">{tempPassword}</p>
-              <p className="text-xs text-green-700 mt-2">
-                Please copy this password and share it securely with the user.
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+              <p className="text-sm font-medium text-green-800">Temporary Password:</p>
+              <p className="text-lg font-mono font-bold text-green-900 select-all">{tempPassword}</p>
+              <p className="text-xs text-green-700">
+                Copy this password and share it securely. Dialog stays open until you click Close.
               </p>
+              <Button type="button" size="sm" onClick={handleCopyResetPassword}>
+                Copy to clipboard
+              </Button>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowResetPasswordDialog(false);
-              setTempPassword('');
-            }}>
+            <Button variant="outline" onClick={() => { setShowResetPasswordDialog(false); setTempPassword(''); }}>
               {tempPassword ? 'Close' : 'Cancel'}
             </Button>
-            {!tempPassword && (
+            {!tempPassword ? (
               <Button onClick={handleResetPassword}>
                 <Key className="w-4 h-4 mr-2" />
                 Reset Password
               </Button>
+            ) : (
+              <Button onClick={handleCopyResetPassword}>Copy to clipboard</Button>
             )}
           </DialogFooter>
         </DialogContent>

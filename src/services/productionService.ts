@@ -195,6 +195,8 @@ export class ProductionService {
     priority?: string;
     order_id?: string;
     product_id?: string;
+    limit?: number;
+    offset?: number;
   }): Promise<{ data: ProductionBatch[] | null; error: string | null }> {
     try {
       const params = new URLSearchParams();
@@ -204,6 +206,8 @@ export class ProductionService {
       if (filters?.priority) params.append('priority', filters.priority);
       if (filters?.order_id) params.append('order_id', filters.order_id);
       if (filters?.product_id) params.append('product_id', filters.product_id);
+      if (filters?.limit != null) params.append('limit', String(filters.limit));
+      if (filters?.offset != null) params.append('offset', String(filters.offset));
 
       const response = await fetch(`${API_URL}/production/batches?${params}`, {
         headers: this.getHeaders(),

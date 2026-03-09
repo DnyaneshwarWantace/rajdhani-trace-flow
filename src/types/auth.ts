@@ -15,6 +15,8 @@ export interface User {
     full_name: string;
     email: string;
   };
+  /** True if current user can edit/delete/reset this user (creator hierarchy) */
+  can_manage?: boolean;
 }
 
 export interface LoginCredentials {

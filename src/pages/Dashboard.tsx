@@ -81,6 +81,7 @@ interface DashboardData {
   recentOrders: Order[];
   productionBatches: any[];
   lowStockProducts: Product[];
+  manageStockOrders: any[];
   topCustomers: any[];
   topSuppliers: any[];
 }
@@ -125,6 +126,7 @@ export default function Dashboard() {
     recentOrders: [],
     productionBatches: [],
     lowStockProducts: [],
+    manageStockOrders: [],
     topCustomers: [],
     topSuppliers: [],
   });
@@ -158,7 +160,7 @@ export default function Dashboard() {
         setLoading(true);
       }
 
-      // Fetch data in parallel (include material stats, manage stock stats, and order stats)
+      // Fetch only what dashboard needs (small limits = faster when empty or small data)
       const [
         productsResponse,
         ordersResponse,
@@ -168,15 +170,17 @@ export default function Dashboard() {
         materialStatsResponse,
         manageStockStatsResponse,
         orderStatsResponse,
+        manageStockOrdersResponse,
       ] = await Promise.all([
-        ProductService.getProducts({ limit: 1000 }),
-        OrderService.getOrders({ limit: 1000 }),
+        ProductService.getProducts({ limit: 50 }),
+        OrderService.getOrders({ limit: 50 }),
         ProductService.getProductStats(),
-        ProductionService.getBatches(),
+        ProductionService.getBatches({ limit: 50 }),
         SupplierService.getSuppliers(),
         MaterialService.getMaterialStats().catch(() => ({ totalMaterials: 0, inStock: 0, lowStock: 0, outOfStock: 0, overstock: 0, totalValue: 0, averageValue: 0 })),
         ManageStockService.getOrderStats().catch(() => ({ totalOrders: 0, totalValue: 0, pendingOrders: 0, approvedOrders: 0, shippedOrders: 0, deliveredOrders: 0 })),
         OrderService.getOrderStats().catch(() => ({ data: null, error: null })),
+        ManageStockService.getOrders({ limit: 5 }).catch(() => ({ data: [] })),
       ]);
 
       // Process products data
@@ -316,6 +320,7 @@ export default function Dashboard() {
           .sort((a: any, b: any) => new Date(b.orderDate || 0).getTime() - new Date(a.orderDate || 0).getTime()),
         productionBatches: enrichedBatches.slice(0, 10),
         lowStockProducts: lowStockProducts.slice(0, 10),
+        manageStockOrders: manageStockOrdersResponse?.data ?? [],
         topCustomers: customers,
         topSuppliers: Array.from(supplierStatsMap.values()),
       };
@@ -394,7 +399,7 @@ export default function Dashboard() {
             <InventoryAlerts products={dashboardData.lowStockProducts} loading={loading} />
           </div>
           <div className="min-h-0 flex flex-col">
-            <ManageStockOverview />
+            <ManageStockOverview orders={dashboardData.manageStockOrders} loading={loading} />
           </div>
         </div>
       </div>

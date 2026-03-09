@@ -11,12 +11,22 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   delivered: { label: 'Delivered', color: 'bg-green-100 text-green-700', icon: CheckCircle },
 };
 
-export default function ManageStockOverview() {
+interface ManageStockOverviewProps {
+  orders?: StockOrder[];
+  loading?: boolean;
+}
+
+export default function ManageStockOverview({ orders: ordersFromParent, loading: parentLoading }: ManageStockOverviewProps = {}) {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const useParentData = ordersFromParent !== undefined;
+  const displayOrders = useParentData ? (ordersFromParent ?? []) : orders;
+  const displayLoading = useParentData ? (parentLoading ?? false) : loading;
+
   useEffect(() => {
+    if (useParentData) return;
     let cancelled = false;
     ManageStockService.getOrders({ limit: 5 })
       .then(({ data }) => {
@@ -29,9 +39,9 @@ export default function ManageStockOverview() {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [useParentData]);
 
-  if (loading) {
+  if (displayLoading) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 h-full min-h-[280px] flex flex-col">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Manage Stock</h2>
@@ -55,14 +65,14 @@ export default function ManageStockOverview() {
         </button>
       </div>
 
-      {orders.length === 0 ? (
+      {displayOrders.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 py-8">
           <ClipboardList className="w-12 h-12 text-gray-400 mb-3" />
           <p className="text-gray-500">No stock orders yet</p>
         </div>
       ) : (
         <div className="space-y-3 flex-1">
-          {orders.map((order) => {
+          {displayOrders.map((order) => {
             const status = statusConfig[order.status] || statusConfig.pending;
             const StatusIcon = status.icon;
             return (
