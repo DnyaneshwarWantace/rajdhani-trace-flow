@@ -207,7 +207,6 @@ export default function RecipeCalculator() {
     try {
       const materialBreakdown = new Map<string, FinalMaterialBreakdown>();
       const steps: ProductionStep[] = [];
-      let stepCounter = 1;
 
       // Process each calculation item - each main product should have its own recipe group
       for (const item of calculationItems) {
