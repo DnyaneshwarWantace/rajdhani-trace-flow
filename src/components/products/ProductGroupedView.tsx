@@ -495,6 +495,7 @@ export default function ProductGroupedView({
           onClose={() => setSelectedImage(null)}
           imageUrl={selectedImage.url}
           alt={selectedImage.alt}
+          caption={selectedImage.alt}
         />
       )}
     </div>
