@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List, ArrowLeft } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ProductionStatsBoxes from '@/components/production/ProductionStatsBoxes';
 import ProductionSectionTabs from '@/components/production/ProductionSectionTabs';
 import ProductionFilters from '@/components/production/ProductionFilters';
@@ -36,6 +36,8 @@ export default function ProductionList() {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { productId: productIdFromPath } = useParams<{ productId?: string }>();
   const [allBatches, setAllBatches] = useState<ProductionBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductionBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,7 @@ export default function ProductionList() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
   const [totalBatches, setTotalBatches] = useState(0);
+  const [productNameForTitle, setProductNameForTitle] = useState<string | null>(null);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<ProductionBatch | null>(null);
@@ -69,9 +72,32 @@ export default function ProductionList() {
     cancelled: 0,
   });
 
+  // Product-scoped page: from path /production/product/:productId or query ?productId=
+  const searchParams = new URLSearchParams(location.search);
+  const productIdFilter = productIdFromPath || searchParams.get('productId') || '';
+  const isProductScoped = Boolean(productIdFilter);
+
   useEffect(() => {
     loadBatches();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productIdFilter]);
+
+  // Fetch product name for product-scoped page header
+  useEffect(() => {
+    if (!productIdFilter) {
+      setProductNameForTitle(null);
+      return;
+    }
+    let cancelled = false;
+    ProductService.getProductById(productIdFilter)
+      .then((p) => {
+        if (!cancelled) setProductNameForTitle(p.name);
+      })
+      .catch(() => {
+        if (!cancelled) setProductNameForTitle(null);
+      });
+    return () => { cancelled = true; };
+  }, [productIdFilter]);
 
   useEffect(() => {
     if (allBatches.length > 0) {
@@ -141,7 +167,9 @@ export default function ProductionList() {
   const loadBatches = async () => {
     try {
       setLoading(true);
-      const { data, error } = await ProductionService.getBatches({});
+      const { data, error } = await ProductionService.getBatches(
+        productIdFilter ? { product_id: productIdFilter } : {}
+      );
 
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
@@ -357,8 +385,28 @@ export default function ProductionList() {
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Production</h1>
-              <p className="text-sm text-gray-600">Manage production batches and track progress</p>
+              {isProductScoped ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mb-2 -ml-2 text-gray-600 hover:text-gray-900"
+                    onClick={() => navigate('/production')}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-1" />
+                    Back to Production
+                  </Button>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+                    Production history for {productNameForTitle ?? '…'}
+                  </h1>
+                  <p className="text-sm text-gray-600">All production batches for this product</p>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Production</h1>
+                  <p className="text-sm text-gray-600">Manage production batches and track progress</p>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {/* View Toggle - Hidden on mobile/tablet */}
@@ -380,10 +428,15 @@ export default function ProductionList() {
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
               </div>
-              <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Batch
-              </Button>
+              {!isProductScoped && (
+                <Button
+                  onClick={handleCreate}
+                  className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Batch
+                </Button>
+              )}
             </div>
           </div>
         </div>

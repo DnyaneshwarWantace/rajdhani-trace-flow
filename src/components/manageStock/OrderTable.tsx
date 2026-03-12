@@ -14,7 +14,7 @@ const statusConfig = {
   pending: { label: 'Pending', icon: Clock, color: 'bg-gray-100 text-gray-800' },
   approved: { label: 'Approved', icon: CheckCircle, color: 'bg-blue-100 text-blue-800' },
   shipped: { label: 'Shipped', icon: Truck, color: 'bg-yellow-100 text-yellow-800' },
-  delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
+  received: { label: 'Received', icon: CheckCircle, color: 'bg-green-100 text-green-800' },
 };
 
 export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: OrderTableProps) {
@@ -120,10 +120,10 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => onStatusUpdate(order.id, 'delivered')}
+                          onClick={() => onStatusUpdate(order.id, 'received')}
                           className="text-xs"
                         >
-                          Deliver
+                          Receive
                         </Button>
                       )}
                       <Button

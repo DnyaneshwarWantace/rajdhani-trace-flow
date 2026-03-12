@@ -21,7 +21,7 @@ export interface StockOrder {
   totalCost: number;
   orderDate: string;
   expectedDelivery: string;
-  status: 'pending' | 'approved' | 'shipped' | 'delivered';
+  status: 'pending' | 'approved' | 'shipped' | 'received';
   notes?: string;
   actualDelivery?: string;
   minThreshold?: number;
@@ -37,7 +37,7 @@ export interface CreateStockOrderData {
   order_date: string;
   expected_delivery: string;
   total_amount: number;
-  status: 'pending' | 'approved' | 'shipped' | 'delivered';
+  status: 'pending' | 'approved' | 'shipped' | 'received';
   material_details: {
     materialName: string;
     materialCategory?: string;
@@ -66,7 +66,7 @@ export interface OrderStats {
   pendingOrders: number;
   approvedOrders: number;
   shippedOrders: number;
-  deliveredOrders: number;
+  receivedOrders: number;
 }
 
 export class ManageStockService {
@@ -117,6 +117,7 @@ export class ManageStockService {
       // Transform MongoDB data to match frontend interface
       const transformedOrders = (result.data || []).map((order: any) => {
         const materialDetails = order.material_details || {};
+        const receivedSummary = order.received_details?.summary;
         
         // Calculate quantity and costPerUnit from items array if available
         let quantity = 0;
@@ -155,6 +156,22 @@ export class ManageStockService {
           }
         }
 
+        // Display quantity/totalCost: use received summary for received orders
+        let displayQuantity = quantity;
+        let displayTotalCost = order.total_amount || order.pricing?.total_amount || 0;
+        const isReceived = order.status === 'received' || order.status === 'delivered';
+        if (isReceived && receivedSummary) {
+          if (typeof receivedSummary.total_quantity === 'number') {
+            displayQuantity = receivedSummary.total_quantity;
+          }
+          if (typeof receivedSummary.total_amount === 'number') {
+            displayTotalCost = receivedSummary.total_amount;
+          }
+          if (displayQuantity > 0) {
+            costPerUnit = displayTotalCost / displayQuantity;
+          }
+        }
+
         return {
           id: order.id,
           order_number: order.order_number,
@@ -163,13 +180,13 @@ export class ManageStockService {
           materialBatchNumber: materialDetails.materialBatchNumber || `BATCH-${order.id}`,
           supplier: order.supplier_name,
           supplier_id: order.supplier_id,
-          quantity: quantity,
+          quantity: displayQuantity,
           unit: unit,
           costPerUnit: costPerUnit,
-          totalCost: order.total_amount || order.pricing?.total_amount || 0,
+          totalCost: displayTotalCost,
           orderDate: order.order_date,
           expectedDelivery: order.expected_delivery,
-          status: order.status,
+          status: (order.status === 'delivered' ? 'received' : order.status),
           notes: materialDetails.userNotes || materialDetails.notes || order.notes || '',
           actualDelivery: order.actual_delivery,
           minThreshold: materialDetails.minThreshold || 100,
@@ -205,6 +222,7 @@ export class ManageStockService {
       const result = await response.json();
       const order = result.data;
       const materialDetails = order.material_details || {};
+      const receivedSummary = order.received_details?.summary;
       
       // Calculate quantity and costPerUnit from items array if available
       let quantity = 0;
@@ -240,7 +258,7 @@ export class ManageStockService {
         totalCost: order.total_amount || order.pricing?.total_amount || 0,
         orderDate: order.order_date,
         expectedDelivery: order.expected_delivery,
-        status: order.status,
+        status: (order.status === 'delivered' ? 'received' : order.status),
         notes: materialDetails.userNotes || order.notes || '',
         actualDelivery: order.actual_delivery,
         minThreshold: materialDetails.minThreshold,
@@ -249,10 +267,33 @@ export class ManageStockService {
         created_by: order.created_by,
         createdAt: order.createdAt || order.created_at,
         created_at: order.created_at || order.createdAt,
-        status_history: order.status_history || []
+        status_history: order.status_history || [],
+        receivedQuantity: receivedSummary?.total_quantity,
+        receivedTotalCost: receivedSummary?.total_amount,
       } as StockOrder;
     } catch (error) {
       console.error('Error fetching order:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get raw purchase order payload (includes items array)
+   */
+  static async getRawPurchaseOrder(orderId: string): Promise<any | null> {
+    try {
+      const response = await fetch(`${API_URL}/purchase-orders/${orderId}`, {
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch order');
+      }
+
+      const result = await response.json();
+      return result.data || null;
+    } catch (error) {
+      console.error('Error fetching raw purchase order:', error);
       return null;
     }
   }
@@ -280,6 +321,32 @@ export class ManageStockService {
     } catch (error) {
       console.error('Error updating order status:', error);
       return { success: false, error: 'Failed to update order status' };
+    }
+  }
+
+  /**
+   * Receive order (confirmation step) and update stock
+   */
+  static async receiveOrder(
+    orderId: string,
+    payload: { items: Array<{ material_id: string; received_quantity: number }>; notes?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(`${API_URL}/purchase-orders/${orderId}/receive`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        return { success: false, error: result.error || 'Failed to receive order' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error receiving order:', error);
+      return { success: false, error: 'Failed to receive order' };
     }
   }
 
@@ -319,7 +386,7 @@ export class ManageStockService {
       const pendingOrders = orders.filter(order => order.status === 'pending').length;
       const approvedOrders = orders.filter(order => order.status === 'approved').length;
       const shippedOrders = orders.filter(order => order.status === 'shipped').length;
-      const deliveredOrders = orders.filter(order => order.status === 'delivered').length;
+      const receivedOrders = orders.filter(order => order.status === 'received').length;
 
       return {
         totalOrders,
@@ -327,7 +394,7 @@ export class ManageStockService {
         pendingOrders,
         approvedOrders,
         shippedOrders,
-        deliveredOrders,
+        receivedOrders,
       };
     } catch (error) {
       console.error('Error fetching order stats:', error);
@@ -337,7 +404,7 @@ export class ManageStockService {
         pendingOrders: 0,
         approvedOrders: 0,
         shippedOrders: 0,
-        deliveredOrders: 0,
+        receivedOrders: 0,
       };
     }
   }

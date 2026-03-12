@@ -15,7 +15,7 @@ const statusConfig = {
   pending: { label: 'Pending', icon: Clock, color: 'bg-gray-100 text-gray-700 border-gray-200' },
   approved: { label: 'Approved', icon: CheckCircle, color: 'bg-blue-100 text-blue-700 border-blue-200' },
   shipped: { label: 'Shipped', icon: Truck, color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  delivered: { label: 'Delivered', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
+  received: { label: 'Received', icon: CheckCircle, color: 'bg-green-100 text-green-700 border-green-200' },
 };
 
 export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: OrderCardNewProps) {
@@ -69,7 +69,7 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
           </div>
           {order.actualDelivery && (
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Delivered</span>
+              <span className="text-gray-500">Received</span>
               <span className="text-green-600 font-medium">{formatIndianDate(order.actualDelivery)}</span>
             </div>
           )}
@@ -105,11 +105,11 @@ export default function OrderCardNew({ order, onStatusUpdate, onViewDetails }: O
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onStatusUpdate(order.id, 'delivered')}
+                onClick={() => onStatusUpdate(order.id, 'received')}
                 className="flex-1 text-[10px] py-1 h-auto text-green-600 hover:bg-green-50 border-green-200"
               >
                 <CheckCircle className="w-3 h-3 mr-1" />
-                Deliver
+                Receive
               </Button>
             )}
             <Button

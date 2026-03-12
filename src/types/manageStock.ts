@@ -12,7 +12,7 @@ export interface StockOrder {
   totalCost: number;
   orderDate: string;
   expectedDelivery: string;
-  status: 'pending' | 'approved' | 'shipped' | 'delivered';
+  status: 'pending' | 'approved' | 'shipped' | 'received';
   notes?: string;
   actualDelivery?: string;
   minThreshold?: number;
@@ -21,6 +21,8 @@ export interface StockOrder {
   created_by?: string;
   createdAt?: string;
   created_at?: string;
+  receivedQuantity?: number;
+  receivedTotalCost?: number;
   status_history?: Array<{
     status: string;
     changed_by: string;
@@ -35,7 +37,7 @@ export interface OrderStats {
   pendingOrders: number;
   approvedOrders: number;
   shippedOrders: number;
-  deliveredOrders: number;
+  receivedOrders: number;
 }
 
 export interface OrderFilters {
