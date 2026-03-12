@@ -13,4 +13,3 @@ export function getApiError(response: Response, data: { error?: string } | null)
   }
   return data?.error || 'Something went wrong. Please try again.';
 }
-

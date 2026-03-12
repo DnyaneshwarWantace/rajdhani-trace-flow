@@ -73,11 +73,13 @@ export default function Permissions(_props: PermissionsProps) {
 
         if (cancelled) return;
 
+        // Filter users current admin can manage
         const manageableUsers = (usersRes || []).filter((u) => u.can_manage);
         setUsers(manageableUsers);
         setPages(pagesRes);
         setActionsMeta(actionsRes);
 
+        // Auto-select first manageable user if none selected
         if (!selectedUserId && manageableUsers.length > 0) {
           setSelectedUserId(manageableUsers[0].id);
         }
@@ -372,6 +374,7 @@ export default function Permissions(_props: PermissionsProps) {
                               <button
                                 key={action.key}
                                 type="button"
+
                                 disabled={isSelectedUserSuperAdmin}
                                 onClick={() => handleToggleAction(action.key, !checked)}
                                 className={`text-xs px-2 py-1 rounded-full border transition-colors ${

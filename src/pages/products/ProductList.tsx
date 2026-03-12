@@ -13,6 +13,7 @@ import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
 import { exportProductsToCSV, exportProductsToExcel } from '@/utils/exportProductUtils';
 import { useToast } from '@/hooks/use-toast';
+import { canCreate, canEdit, canDelete } from '@/utils/permissions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers } from 'lucide-react';
@@ -370,16 +371,18 @@ export default function ProductList() {
                   </PopoverContent>
                 </Popover>
 
-                {/* Add Product Button */}
-                <button
-                  onClick={handleCreate}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  <span className="font-medium">Add Product</span>
-                </button>
+                {/* Add Product Button - only if user has create permission */}
+                {canCreate('products') && (
+                  <button
+                    onClick={handleCreate}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="font-medium">Add Product</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -425,9 +428,11 @@ export default function ProductList() {
                       onView={handleView}
                       onEdit={handleEdit}
                       onDuplicate={handleDuplicate}
-            onStock={handleStock}
+                      onStock={handleStock}
                       onProduction={handleProduction}
-            onQRCode={handleQRCode}
+                      onQRCode={handleQRCode}
+                      canEdit={canEdit('products')}
+                      canDelete={canDelete('products')}
           />
         )}
 

@@ -32,6 +32,7 @@ interface InventoryTabProps {
   onProduction: (product: Product) => void;
   onQRCode?: (product: Product) => void;
   onDelete?: (product: Product) => void;
+  canEdit?: boolean;
   canDelete?: boolean;
 }
 
@@ -61,6 +62,7 @@ export default function InventoryTab({
   onProduction,
   onQRCode,
   onDelete,
+  canEdit = true,
   canDelete = false,
 }: InventoryTabProps) {
   return (
@@ -114,6 +116,7 @@ export default function InventoryTab({
                 onStock={onStock}
                 onProduction={onProduction}
                 onQRCode={onQRCode}
+                canEdit={canEdit}
               />
             ) : viewMode === 'grouped' ? (
               <ProductGroupedView
@@ -121,11 +124,12 @@ export default function InventoryTab({
                 onView={onView}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                canEdit={canEdit}
+                canDelete={canDelete}
                 onDuplicate={onDuplicate}
                 onStock={onStock}
                 onProduction={onProduction}
                 onQRCode={onQRCode}
-                canDelete={canDelete}
               />
             ) : (
               // Masonry-style grid using CSS columns
@@ -164,6 +168,7 @@ export default function InventoryTab({
                     onProduction={onProduction}
                     onQRCode={onQRCode}
                     onDelete={onDelete}
+                    canEdit={canEdit}
                     canDelete={canDelete}
                   />
                 </div>

@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { ProductionService, type CreateProductionBatchData } from '@/services/productionService';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { ProductionService, type CreateProductionBatchData, type ProductionBatch } from '@/services/productionService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Product } from '@/types/product';
@@ -23,6 +23,15 @@ export default function ProductionCreate() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedOrderDeliveryDate, setSelectedOrderDeliveryDate] = useState<string | null>(null);
+  const [productBatchSummary, setProductBatchSummary] = useState<{
+    total: number;
+    planned: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    latest: ProductionBatch[];
+  } | null>(null);
+  const [loadingProductBatches, setLoadingProductBatches] = useState(false);
   const [formData, setFormData] = useState<CreateProductionBatchData>({
     product_id: '',
     planned_quantity: 0,
@@ -101,6 +110,86 @@ export default function ProductionCreate() {
     })();
     return () => { cancelled = true; };
   }, [location.state?.fromOrder, location.state?.productId, user]);
+
+  // When product changes, load a quick summary of its existing production batches
+  useEffect(() => {
+    const productId = formData.product_id;
+    if (!productId) {
+      setProductBatchSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingProductBatches(true);
+        const { data, error } = await ProductionService.getBatches({
+          product_id: productId,
+          limit: 50,
+        });
+
+        if (cancelled) return;
+
+        if (error) {
+          console.error('Error loading product batch summary:', error);
+          // Do not block creation, just log and show a soft toast
+          toast({
+            title: 'Info',
+            description: 'Could not load existing production batches for this product.',
+          });
+          setProductBatchSummary(null);
+          return;
+        }
+
+        const batches = (data || []) as ProductionBatch[];
+        if (batches.length === 0) {
+          setProductBatchSummary(null);
+          return;
+        }
+
+        const planned = batches.filter((b) => b.status === 'planned').length;
+        const active = batches.filter((b) => {
+          const s = b.status?.toLowerCase();
+          return s === 'in_production' || s === 'in_progress';
+        }).length;
+        const completed = batches.filter((b) => b.status === 'completed').length;
+        const cancelledBatches = batches.filter((b) => b.status === 'cancelled').length;
+
+        // Sort by start_date (or created_at fallback) newest first
+        const sorted = [...batches].sort((a, b) => {
+          const aTime =
+            (a.start_date ? new Date(a.start_date).getTime() : 0) ||
+            (a.created_at ? new Date(a.created_at).getTime() : 0);
+          const bTime =
+            (b.start_date ? new Date(b.start_date).getTime() : 0) ||
+            (b.created_at ? new Date(b.created_at).getTime() : 0);
+          return bTime - aTime;
+        });
+
+        setProductBatchSummary({
+          total: batches.length,
+          planned,
+          active,
+          completed,
+          cancelled: cancelledBatches,
+          latest: sorted.slice(0, 5),
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error loading product batch summary:', error);
+          setProductBatchSummary(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProductBatches(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.product_id, toast]);
 
   // Handle back navigation based on where user came from
   const handleBack = () => {
@@ -271,6 +360,79 @@ export default function ProductionCreate() {
                     />
                   </CardContent>
                 </Card>
+
+                {selectedProduct && (
+                  <Card className="border border-blue-200 bg-blue-50">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-blue-500" />
+                        <CardTitle className="text-sm font-semibold text-blue-900">
+                          Current production for this product
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {loadingProductBatches && (
+                        <p className="text-xs text-blue-900/80">Checking ongoing and past batches…</p>
+                      )}
+                      {!loadingProductBatches && !productBatchSummary && (
+                        <p className="text-xs text-blue-900/80">
+                          No previous production batches found for this product.
+                        </p>
+                      )}
+                      {!loadingProductBatches && productBatchSummary && (
+                        <div className="space-y-2 text-xs text-blue-900/80">
+                          <p>
+                            Total: <strong>{productBatchSummary.total}</strong> · Planned:{' '}
+                            <strong>{productBatchSummary.planned}</strong> · Ongoing:{' '}
+                            <strong>{productBatchSummary.active}</strong> · Completed:{' '}
+                            <strong>{productBatchSummary.completed}</strong> · Cancelled:{' '}
+                            <strong>{productBatchSummary.cancelled}</strong>
+                          </p>
+                          {productBatchSummary.latest.length > 0 && (
+                            <div className="space-y-1">
+                              <p className="font-medium text-[11px] text-blue-900">
+                                Latest batches:
+                              </p>
+                              <ul className="space-y-0.5">
+                                {productBatchSummary.latest.map((b) => (
+                                  <li
+                                    key={b.id}
+                                    className="text-[11px] text-blue-900/80 flex justify-between gap-2"
+                                  >
+                                    <span className="truncate">
+                                      #{b.batch_number}{' '}
+                                      <span className="uppercase tracking-wide text-[10px] font-semibold">
+                                        {b.status}
+                                      </span>
+                                    </span>
+                                    <span className="text-blue-900/70">
+                                      Qty: {b.planned_quantity}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          <div className="pt-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (selectedProduct) {
+                                  navigate(`/production/product/${selectedProduct.id}`);
+                                }
+                              }}
+                            >
+                              View full production history
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 <div className="flex gap-3">
                   <Button

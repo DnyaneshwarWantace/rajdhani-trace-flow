@@ -12,6 +12,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 };
 
 interface ManageStockOverviewProps {
+  /** When provided, use this data and parent loading; no internal fetch. */
   orders?: StockOrder[];
   loading?: boolean;
 }

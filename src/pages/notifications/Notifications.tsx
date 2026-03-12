@@ -597,7 +597,7 @@ export default function Notifications() {
 
     setDeleting(true);
     try {
-      const deletePromises: Promise<unknown>[] = [];
+      const deletePromises = [];
 
       // Delete real notifications
       if (realNotificationIds.length > 0) {
@@ -611,16 +611,13 @@ export default function Notifications() {
         const activityLogObjectIds = activityLogIds.map(id => id.replace('activity_', ''));
         deletePromises.push(
           ...activityLogObjectIds.map(id =>
-            fetch(
-              `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/activity-logs/${id}`,
-              {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-                },
-              }
-            )
+            fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/activity-logs/${id}`, {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              },
+            })
           )
         );
       }
@@ -857,8 +854,8 @@ export default function Notifications() {
           />
         )}
 
-        {/* Admin: Select and Delete toolbar (only for real notifications, not Activity Logs) */}
-        {isAdmin && activeTab === 'all' && sortedNotifications.length > 0 && (
+        {/* Admin: Select and Delete toolbar */}
+        {isAdmin && sortedNotifications.length > 0 && (
           <Card className="mb-4">
             <CardContent className="p-3 flex flex-wrap items-center gap-2">
               <Button variant="outline" size="sm" onClick={selectAllOnPage}>

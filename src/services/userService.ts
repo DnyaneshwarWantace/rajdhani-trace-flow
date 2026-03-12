@@ -34,7 +34,6 @@ export class UserService {
     const response = await fetch(`${API_URL}/auth/admin/users`, {
       headers: this.getHeaders(),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -46,7 +45,6 @@ export class UserService {
     const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
       headers: this.getHeaders(),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -60,7 +58,6 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -78,7 +75,6 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify(userData),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -91,7 +87,6 @@ export class UserService {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
-
     const data = await response.json().catch(() => null);
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -104,7 +99,6 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify({ newPassword }),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));
@@ -117,7 +111,6 @@ export class UserService {
       headers: this.getHeaders(),
       body: JSON.stringify({ status }),
     });
-
     const data = await response.json();
     if (!response.ok) {
       throw new Error(getApiError(response, data));

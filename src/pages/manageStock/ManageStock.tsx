@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import OrderStatsBoxes from '@/components/manageStock/OrderStatsBoxes';
 import OrderFilters from '@/components/manageStock/OrderFilters';
@@ -9,6 +9,9 @@ import { ManageStockService } from '@/services/manageStockService';
 import type { StockOrder, OrderStats, OrderFilters as OrderFiltersType } from '@/types/manageStock';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Pagination,
   PaginationContent,
@@ -38,7 +41,7 @@ export default function ManageStock() {
     pendingOrders: 0,
     approvedOrders: 0,
     shippedOrders: 0,
-    deliveredOrders: 0,
+    receivedOrders: 0,
   });
   const [filters, setFilters] = useState<OrderFiltersType>({
     search: '',
@@ -48,6 +51,23 @@ export default function ManageStock() {
   });
   const [selectedOrder, setSelectedOrder] = useState<StockOrder | null>(null);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+
+  const [receiveDialogOpen, setReceiveDialogOpen] = useState(false);
+  const [receiving, setReceiving] = useState(false);
+  const [receiveOrder, setReceiveOrder] = useState<any | null>(null);
+  const [receiveNotes, setReceiveNotes] = useState('');
+
+  const receiveRows = useMemo(() => {
+    const items = (receiveOrder?.items || []) as Array<any>;
+    return items.map((it) => ({
+      material_id: it.material_id,
+      material_name: it.material_name,
+      unit: it.unit,
+      ordered_quantity: Number(it.quantity || 0),
+    }));
+  }, [receiveOrder]);
+
+  const [receivedQtyByMaterialId, setReceivedQtyByMaterialId] = useState<Record<string, string>>({});
 
   // Load stats only on mount – cards show overall counts; filtering/sorting does not reload them
   useEffect(() => {
@@ -103,6 +123,26 @@ export default function ManageStock() {
   };
 
   const handleStatusUpdate = async (orderId: string, newStatus: StockOrder['status']) => {
+    if (newStatus === 'received') {
+      const raw = await ManageStockService.getRawPurchaseOrder(orderId);
+      if (!raw) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load order items for receiving',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setReceiveOrder(raw);
+      setReceiveNotes('');
+      const next: Record<string, string> = {};
+      (raw.items || []).forEach((it: any) => {
+        next[it.material_id] = String(it.quantity ?? 0);
+      });
+      setReceivedQtyByMaterialId(next);
+      setReceiveDialogOpen(true);
+      return;
+    }
     try {
       const { success, error } = await ManageStockService.updateOrderStatus(orderId, newStatus);
 
@@ -307,6 +347,121 @@ export default function ManageStock() {
           }}
           onStatusUpdate={handleStatusUpdate}
         />
+
+        {/* Receive confirmation dialog */}
+        {receiveDialogOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              if (!receiving) setReceiveDialogOpen(false);
+            }}
+          >
+            <div
+              className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Confirm materials received</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Confirm the actual received quantity. Stock will be updated only after you confirm.
+                </p>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="space-y-3">
+                  {receiveRows.map((row) => (
+                    <div key={row.material_id} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-center border border-gray-200 rounded-lg p-3">
+                      <div className="sm:col-span-2">
+                        <div className="text-sm font-medium text-gray-900">{row.material_name}</div>
+                        <div className="text-xs text-gray-500">Material ID: {row.material_id}</div>
+                      </div>
+                      <div className="text-sm text-gray-700 sm:text-center">
+                        Ordered: <span className="font-semibold">{row.ordered_quantity}</span> {row.unit}
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-xs text-gray-600">Received</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={receivedQtyByMaterialId[row.material_id] ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setReceivedQtyByMaterialId((prev) => ({ ...prev, [row.material_id]: v }));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="text-xs text-gray-600">Notes (optional)</label>
+                  <Textarea value={receiveNotes} onChange={(e) => setReceiveNotes(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-200 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={receiving}
+                  onClick={() => setReceiveDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-primary-600 hover:bg-primary-700 text-white"
+                  disabled={receiving}
+                  onClick={async () => {
+                    if (!receiveOrder?.id) return;
+                    setReceiving(true);
+                    try {
+                      const items = receiveRows.map((row) => ({
+                        material_id: row.material_id,
+                        received_quantity: Number(receivedQtyByMaterialId[row.material_id] ?? 0),
+                      }));
+
+                      const invalid = items.some((it) => !Number.isFinite(it.received_quantity) || it.received_quantity < 0);
+                      if (invalid) {
+                        toast({
+                          title: 'Validation Error',
+                          description: 'Received quantity must be a number and cannot be negative.',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      const { success, error } = await ManageStockService.receiveOrder(receiveOrder.id, {
+                        items,
+                        notes: receiveNotes,
+                      });
+                      if (!success) {
+                        toast({
+                          title: 'Error',
+                          description: error || 'Failed to receive order',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+
+                      toast({ title: 'Success', description: 'Order received and stock updated.' });
+                      setReceiveDialogOpen(false);
+                      setReceiveOrder(null);
+                      await loadOrders();
+                      await loadStats();
+                    } finally {
+                      setReceiving(false);
+                    }
+                  }}
+                >
+                  Confirm received
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

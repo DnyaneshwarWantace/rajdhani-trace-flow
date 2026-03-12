@@ -34,7 +34,7 @@ export default function OrderFilters({
               { label: 'Pending', value: 'pending' },
               { label: 'Approved', value: 'approved' },
               { label: 'Shipped', value: 'shipped' },
-              { label: 'Delivered', value: 'delivered' },
+              { label: 'Received', value: 'received' },
             ]}
             selected={Array.isArray(filters.status) ? filters.status : filters.status === 'all' ? [] : [filters.status]}
             onChange={onStatusChange}

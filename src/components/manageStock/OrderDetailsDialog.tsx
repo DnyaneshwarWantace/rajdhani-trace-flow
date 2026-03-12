@@ -130,16 +130,32 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Quantity</p>
-                <p className="font-medium text-gray-900">{Number(order.quantity).toFixed(2)} {order.unit}</p>
+                <p className="text-sm text-gray-600">Ordered Quantity</p>
+                <p className="font-medium text-gray-900">
+                  {Number(order.quantity).toFixed(2)} {order.unit}
+                </p>
               </div>
+              {typeof order.receivedQuantity === 'number' && (
+                <div>
+                  <p className="text-sm text-gray-600">Received Quantity</p>
+                  <p className="font-medium text-gray-900">
+                    {Number(order.receivedQuantity).toFixed(2)} {order.unit}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-gray-600">Cost Per Unit</p>
                 <p className="font-medium text-gray-900">₹{order.costPerUnit}</p>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-sm text-gray-600">Total Cost</p>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(order.totalCost)}</p>
+                <p className="text-sm text-gray-600">
+                  Total Cost {typeof order.receivedTotalCost === 'number' ? '(received)' : '(ordered)'}
+                </p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {formatCurrency(
+                    typeof order.receivedTotalCost === 'number' ? order.receivedTotalCost : order.totalCost
+                  )}
+                </p>
               </div>
             </div>
           </div>
@@ -190,13 +206,13 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge className={`text-xs ${
-                            historyItem.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                            (historyItem.status === 'received' || historyItem.status === 'delivered') ? 'bg-green-100 text-green-800' :
                             historyItem.status === 'shipped' ? 'bg-yellow-100 text-yellow-800' :
                             historyItem.status === 'approved' ? 'bg-blue-100 text-blue-800' :
                             historyItem.status === 'pending' ? 'bg-gray-100 text-gray-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {historyItem.status}
+                            {historyItem.status === 'delivered' ? 'received' : historyItem.status}
                           </Badge>
                           <span className="text-xs text-gray-500">
                             {formatIndianDateTime(historyItem.changed_at)}
@@ -260,12 +276,12 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
               <Button
                 className="bg-primary-600 text-white hover:bg-primary-700"
                 onClick={() => {
-                  onStatusUpdate(order.id, 'delivered');
+                  onStatusUpdate(order.id, 'received');
                   onClose();
                 }}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Mark as Delivered
+                Mark as Received
               </Button>
             )}
           </div>

@@ -660,9 +660,8 @@ export default function OrderDetails() {
             {(order.status === 'dispatched' || order.status === 'delivered') && (
               <Card className={order.status === 'dispatched' ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'}>
                 <CardHeader>
-                  <CardTitle className={`flex items-center gap-2 ${
-                    order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'
-                  }`}>
+                  <CardTitle className={`flex items-center gap-2 ${order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'
+                    }`}>
                     <Package className="w-5 h-5" />
                     {order.status === 'dispatched' ? 'Shipping Information' : 'Delivery Information'}
                   </CardTitle>

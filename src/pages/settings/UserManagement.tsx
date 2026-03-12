@@ -275,6 +275,7 @@ export default function UserManagement() {
     }
   };
 
+  // Backend returns can_manage: you can only manage users in your creator chain (you created them or someone you created did)
   const canManageUser = (user: User): boolean => {
     if (!currentUser || user.id === currentUser.id) return false;
     return Boolean(user.can_manage);
@@ -389,30 +390,51 @@ export default function UserManagement() {
                         <div className="flex items-center justify-end gap-2">
                           {canManageUser(user) && (
                             <>
-                              <Button variant="ghost" size="sm" onClick={() => handleEditUser(user)} title="Edit user">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                                title="Edit user"
+                              >
                                 <Edit className="w-4 h-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => { setSelectedUser(user); setShowResetPasswordDialog(true); }}
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setShowResetPasswordDialog(true);
+                                }}
                                 title="Reset password"
                               >
                                 <Key className="w-4 h-4" />
                               </Button>
                               {user.status === 'active' ? (
-                                <Button variant="ghost" size="sm" onClick={() => handleUpdateStatus(user.id, 'inactive')} title="Suspend user">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateStatus(user.id, 'inactive')}
+                                  title="Suspend user"
+                                >
                                   <UserX className="w-4 h-4 text-orange-600" />
                                 </Button>
                               ) : (
-                                <Button variant="ghost" size="sm" onClick={() => handleUpdateStatus(user.id, 'active')} title="Activate user">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateStatus(user.id, 'active')}
+                                  title="Activate user"
+                                >
                                   <UserCheck className="w-4 h-4 text-green-600" />
                                 </Button>
                               )}
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => { setSelectedUser(user); setShowDeleteDialog(true); }}
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setShowDeleteDialog(true);
+                                }}
                                 title="Delete user"
                                 className="hover:bg-red-50 hover:text-red-700"
                               >
@@ -668,7 +690,6 @@ export default function UserManagement() {
                   </Badge>
                 </div>
               </div>
-
             </div>
           )}
           <DialogFooter className="gap-2">

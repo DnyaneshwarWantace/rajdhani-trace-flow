@@ -86,17 +86,17 @@ export default function OrderStatsBoxes({ stats, loading }: OrderStatsBoxesProps
         </CardContent>
       </Card>
 
-      {/* Delivered */}
+      {/* Received */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs sm:text-sm text-gray-600">Delivered</p>
+              <p className="text-xs sm:text-sm text-gray-600">Received</p>
               <p className="text-xl sm:text-2xl font-bold text-green-600">
                 {loading ? (
                   <span className="inline-block w-12 h-8 bg-gray-200 animate-pulse rounded"></span>
                 ) : (
-                  stats.deliveredOrders.toLocaleString()
+                  stats.receivedOrders.toLocaleString()
                 )}
               </p>
             </div>
