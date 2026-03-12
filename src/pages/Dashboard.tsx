@@ -275,7 +275,7 @@ export default function Dashboard() {
       const manageStockPending = manageStockStatsResponse?.pendingOrders ?? 0;
       const manageStockApproved = manageStockStatsResponse?.approvedOrders ?? 0;
       const manageStockShipped = manageStockStatsResponse?.shippedOrders ?? 0;
-      const manageStockDelivered = manageStockStatsResponse?.deliveredOrders ?? 0;
+      const manageStockDelivered = (manageStockStatsResponse as any)?.receivedOrders ?? 0;
       const manageStockTotalValue = manageStockStatsResponse?.totalValue ?? 0;
 
       const orderStatsData = orderStatsResponse?.data;

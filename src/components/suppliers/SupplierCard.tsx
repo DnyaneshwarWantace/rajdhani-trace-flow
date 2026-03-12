@@ -127,13 +127,18 @@ export default function SupplierCard({ supplier, orders, onEdit }: SupplierCardP
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{formatCurrency(order.totalCost)}</p>
-                      <Badge className={`text-xs ${
-                        order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
-                        order.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {order.status}
+                      <Badge
+                        className={`text-xs ${
+                          order.status === 'received'
+                            ? 'bg-green-100 text-green-800'
+                            : order.status === 'shipped'
+                            ? 'bg-orange-100 text-orange-800'
+                            : order.status === 'approved'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {order.status === 'received' ? 'received' : order.status}
                       </Badge>
                     </div>
                   </div>

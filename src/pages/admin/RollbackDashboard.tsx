@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import {
   Clock,
   Database,
@@ -16,21 +13,17 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle,
-  XCircle,
   Package,
   ShoppingCart,
   Box,
   Users,
-  ChevronRight,
   Eye,
   Download,
-  Calendar,
   Zap,
   GitBranch,
   X,
   AlertTriangle,
-  Layers,
-  Cpu
+  Layers
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';

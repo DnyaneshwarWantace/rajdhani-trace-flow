@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import {
   Shield,
   LayoutDashboard,
@@ -11,7 +10,6 @@ import {
   LogOut,
   Menu,
   X,
-  Activity,
   Lock,
   Bell,
   Search,
@@ -24,7 +22,6 @@ const AdminPortal: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searchFocused, setSearchFocused] = useState(false);
   const [time, setTime] = useState(new Date());
   const user = JSON.parse(localStorage.getItem('admin_user') || '{}');
 
@@ -254,8 +251,6 @@ const AdminPortal: React.FC = () => {
                 <input
                   type="text"
                   placeholder="Search system..."
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
                   className="admin-mono flex-1 bg-transparent border-0 outline-none text-gray-300 placeholder-gray-600 text-sm pl-3"
                 />
                 <div className="admin-mono text-[10px] text-gray-600 flex-shrink-0 bg-white/4 px-2 py-1 rounded-md border border-white/6">

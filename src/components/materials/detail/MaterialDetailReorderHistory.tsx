@@ -165,7 +165,7 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
     const totalOrders = orders.length;
     const totalQuantity = orders.reduce((sum, order) => sum + (order.quantity || 0), 0);
     const totalValue = orders.reduce((sum, order) => sum + (order.totalCost || 0), 0);
-    const deliveredOrders = orders.filter(o => o.status === 'delivered').length;
+    const deliveredOrders = orders.filter(o => o.status === 'received').length;
     
     return {
       totalOrders,
