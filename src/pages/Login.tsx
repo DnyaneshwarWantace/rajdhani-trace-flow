@@ -3,17 +3,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, Eye, EyeOff, ArrowLeft, LogIn, ShieldCheck } from 'lucide-react';
 
-/* ─── Google Fonts ─────────────────────────────────────────────────────────── */
-function injectFonts() {
-  if (document.getElementById('rajdhani-login-fonts')) return;
-  const link = document.createElement('link');
-  link.id = 'rajdhani-login-fonts';
-  link.rel = 'stylesheet';
-  link.href =
-    'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap';
-  document.head.appendChild(link);
-}
-
 /* ─── Styles ────────────────────────────────────────────────────────────────── */
 const CSS = `
   @keyframes fadeInUp {
@@ -33,7 +22,8 @@ const CSS = `
     box-sizing: border-box;
   }
   .login-root {
-    font-family: 'DM Sans', sans-serif;
+    /* Inherit main app font (Tailwind body font) */
+    font-family: inherit;
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -302,7 +292,6 @@ export default function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    injectFonts();
     const style = document.createElement('style');
     style.id = 'rajdhani-login-css';
     style.textContent = CSS;

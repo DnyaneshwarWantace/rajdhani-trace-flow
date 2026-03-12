@@ -5,7 +5,6 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { Toaster } from '@/components/ui/toaster';
 import { canAccessPage } from '@/utils/permissions';
 import Login from '@/pages/Login';
-import LandingPage from '@/pages/LandingPage';
 import Dashboard from '@/pages/Dashboard';
 import ProductList from '@/pages/products/ProductList';
 import ProductDetail from '@/pages/products/ProductDetail';
@@ -92,9 +91,8 @@ function HomeRedirect() {
     );
   }
 
-  // Unauthenticated users: show landing page
   if (!isAuthenticated) {
-    return <LandingPage />;
+    return <Navigate to="/login" />;
   }
 
   // Authenticated users: redirect to appropriate page
