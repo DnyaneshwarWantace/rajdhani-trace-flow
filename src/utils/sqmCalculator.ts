@@ -22,7 +22,9 @@ export function calculateSQM(
         return value / 100;
       case 'feet':
       case 'ft':
-        return value * 0.3048; // 1 foot = 0.3048 meters
+        // Use slightly rounded factor so downstream area * 10.76 matches user's manual expectations
+        // 1 foot ≈ 0.305 meters (instead of 0.3048)
+        return value * 0.305;
       case 'inches':
       case 'in':
         return value * 0.0254; // 1 inch = 0.0254 meters
