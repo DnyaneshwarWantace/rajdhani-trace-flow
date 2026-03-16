@@ -162,9 +162,6 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                         <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Material Name</th>
                         <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Quantity</th>
                         <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Unit</th>
-                        <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Waste Type</th>
-                        <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Category</th>
-                        <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Can Be Reused</th>
                         <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Status</th>
                         <th className="px-4 py-3 text-left font-semibold text-purple-900 border-b border-purple-200">Generated Date</th>
                       </tr>
@@ -178,25 +175,6 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                           </td>
                           <td className="px-4 py-3 text-gray-900 font-semibold">{formatIndianNumberWithDecimals(waste.quantity, 2)}</td>
                           <td className="px-4 py-3 text-gray-600">{waste.unit}</td>
-                          <td className="px-4 py-3 text-gray-900">{waste.waste_type}</td>
-                          <td className="px-4 py-3">
-                            <Badge className="bg-gray-100 text-gray-700 border-gray-300 text-xs">
-                              {waste.waste_category || 'N/A'}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            {waste.can_be_reused ? (
-                              <span className="text-green-600 flex items-center gap-1">
-                                <CheckCircle className="w-4 h-4" />
-                                Yes
-                              </span>
-                            ) : (
-                              <span className="text-red-600 flex items-center gap-1">
-                                <XCircle className="w-4 h-4" />
-                                No
-                              </span>
-                            )}
-                          </td>
                           <td className="px-4 py-3">{getStatusBadge(waste.status)}</td>
                           <td className="px-4 py-3 text-gray-600">
                             {waste.generation_date ? new Date(waste.generation_date).toLocaleDateString() : 'N/A'}
