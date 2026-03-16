@@ -302,7 +302,7 @@ export default function IndividualProductsTable({
           }
         }
 
-        // Get expected value and validate range
+        // Get expected value and compute range for warning only (±10 GSM, ±2 length/width)
         let expectedNumeric: number | null = null;
         let fieldName = '';
         
@@ -317,41 +317,43 @@ export default function IndividualProductsTable({
           fieldName = 'Width';
         }
 
-        // Validate range: GSM (weight) uses ±10, length and width use ±2
+        // Show warning if out of suggested range, but do NOT block saving
         if (expectedNumeric !== null && !isNaN(expectedNumeric)) {
           const range = col === 'final_weight' ? 10 : 2;
           const minValue = expectedNumeric - range;
           const maxValue = expectedNumeric + range;
           
-        if (valueToValidate < minValue || valueToValidate > maxValue) {
+          if (valueToValidate < minValue || valueToValidate > maxValue) {
+            const msg = `${fieldName} should ideally be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`;
+            toast({
+              title: 'Out of expected range',
+              description: msg,
+            });
+            setValidationError(msg);
+          } else {
+            setValidationError(null);
+          }
+        }
+      }
+
+      // Location is mandatory
+      if (col === 'location') {
+        if (!valueToSave) {
           toast({
-            title: 'Validation Error',
-            description: `${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`,
+            title: 'Location required',
+            description: 'Please select a storage location.',
             variant: 'destructive',
           });
           setSaving(null);
-          setValidationError(`${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`);
           return;
         }
       }
-    }
 
-    // Location is mandatory
-    if (col === 'location') {
-      if (!valueToSave) {
-        toast({
-          title: 'Location required',
-          description: 'Please select a storage location.',
-          variant: 'destructive',
-        });
-        setSaving(null);
-        return;
+      // Clear validation error for non-dimension fields
+      if (col !== 'final_weight' && col !== 'final_length' && col !== 'final_width') {
+        setValidationError(null);
       }
-    }
 
-    // Clear validation error on successful validation
-    setValidationError(null);
-      
       // For final_weight: user entered weight (kg) → convert to GSM and save (weight max 4 decimals)
       if (col === 'final_weight' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
         let weightKg = parseFloat(valueToSave.replace(/[^\d.]/g, ''));
@@ -366,25 +368,25 @@ export default function IndividualProductsTable({
           valueToSave = `${valueToSave} ${weightUnit}`;
         }
       } else if (col === 'final_width' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
-        const widthUnit = product?.width_unit || 
-          (product?.width?.includes('feet') ? 'feet' : 
+        const widthUnit = product?.width_unit ||
+          (product?.width?.includes('feet') ? 'feet' :
            product?.width?.includes('m') ? 'm' : 'm');
         valueToSave = `${valueToSave} ${widthUnit}`;
       } else if (col === 'final_length' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
-        const lengthUnit = product?.length_unit || 
-          (product?.length?.includes('feet') ? 'feet' : 
+        const lengthUnit = product?.length_unit ||
+          (product?.length?.includes('feet') ? 'feet' :
            product?.length?.includes('m') ? 'm' : 'm');
         valueToSave = `${valueToSave} ${lengthUnit}`;
       }
-      
+
       const updateData: any = {};
       updateData[col] = valueToSave;
-      
+
       // Update local state first
       const updated = [...localProducts];
       updated[row] = { ...updated[row], ...updateData };
       setLocalProducts(updated);
-      
+
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
         await IndividualProductService.updateIndividualProduct(productItem.id, updateData);
@@ -399,13 +401,13 @@ export default function IndividualProductsTable({
       } else if (productItem.id && productItem.id.startsWith('temp-')) {
         // For temp products, check if we have enough data to create it
         const tempProduct = updated[row];
-      const hasRequiredFields = tempProduct.final_weight && 
-                                  tempProduct.final_width && 
-                                  tempProduct.final_length &&
-                                  tempProduct.location &&
-                                  tempProduct.roll_number &&
-                                  productId;
-        
+        const hasRequiredFields = tempProduct.final_weight &&
+                                    tempProduct.final_width &&
+                                    tempProduct.final_length &&
+                                    tempProduct.location &&
+                                    tempProduct.roll_number &&
+                                    productId;
+
         // Only create if this is the last required field being filled
         if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'roll_number' || col === 'location')) {
           try {
@@ -425,11 +427,11 @@ export default function IndividualProductsTable({
               production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
               batch_number: batchId || '',
             });
-            
+
             // Update local state with the real product
             updated[row] = newProduct;
             setLocalProducts(updated);
-            
+
             toast({
               title: 'Success',
               description: 'Individual product created and added to stock',
@@ -445,7 +447,7 @@ export default function IndividualProductsTable({
           }
         }
       }
-      
+
       setEditingCell(null);
       setEditValue('');
       setValidationError(null);
