@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { QrCode, Ruler, Weight, MapPin, User } from 'lucide-react';
+import { QrCode, Ruler, Weight, MapPin, User, Hash } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
 function weightKgFromItem(item: IndividualProduct): number | null {
@@ -56,7 +56,7 @@ export default function IndividualProductCard({
       className={`hover:shadow-md transition-all cursor-pointer hover:border-primary-500 ${selected ? 'ring-2 ring-primary-500 border-primary-500' : ''}`}
     >
       <CardContent className="p-3">
-        {/* Header: Checkbox (when selection enabled) + QR Code & Status */}
+        {/* Header: Checkbox (when selection enabled) + ID/QR/Roll & Status */}
         <div className="flex items-start justify-between mb-2 gap-2">
           {onToggleSelect && (
             <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 pt-0.5">
@@ -67,15 +67,31 @@ export default function IndividualProductCard({
               />
             </div>
           )}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="w-8 h-8 bg-primary-50 rounded flex items-center justify-center flex-shrink-0">
-              <QrCode className="w-4 h-4 text-primary-600" />
+          <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 bg-gray-50 rounded flex items-center justify-center flex-shrink-0">
+                <Hash className="w-3 h-3 text-gray-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-gray-500">Serial</p>
+                <p className="text-[10px] font-mono font-medium text-gray-900 truncate">
+                  {individualProduct.serial_number || individualProduct.id}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[9px] text-gray-500">QR Code</p>
-              <p className="text-xs font-mono font-semibold text-gray-900 truncate">
-                {individualProduct.qr_code || individualProduct.id.slice(0, 8)}
-              </p>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 bg-primary-50 rounded flex items-center justify-center flex-shrink-0">
+                <QrCode className="w-3 h-3 text-primary-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[9px] text-gray-500">QR / Roll</p>
+                <p className="text-[10px] font-mono font-semibold text-gray-900 truncate">
+                  {individualProduct.qr_code || individualProduct.id.slice(0, 8)}
+                  {individualProduct.roll_number && (
+                    <span className="ml-1 text-[9px] text-gray-600">({individualProduct.roll_number})</span>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
           <Badge
@@ -109,7 +125,7 @@ export default function IndividualProductCard({
             </div>
           )}
 
-          {/* Weight: show GSM and (weight kg) like production detail */}
+          {/* Weight: show GSM and (weight kg) stacked */}
           {individualProduct.final_weight && (
             <div className="flex items-center justify-between">
               <span className="text-gray-500 flex items-center gap-1">
@@ -117,11 +133,13 @@ export default function IndividualProductCard({
                 Weight
               </span>
               <span className="font-medium text-gray-900 truncate ml-2">
-                {individualProduct.final_weight}
+                <span className="block">{individualProduct.final_weight}</span>
                 {(() => {
                   const wKg = weightKgFromItem(individualProduct);
                   return wKg !== null ? (
-                    <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                    <span className="block text-gray-500 text-[9px] mt-0.5">
+                      ({wKg.toFixed(4)} kg)
+                    </span>
                   ) : null;
                 })()}
               </span>

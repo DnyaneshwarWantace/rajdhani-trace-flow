@@ -10,7 +10,8 @@ function calculateSQM(length: string | number, width: string | number, lengthUni
     switch (unit.toLowerCase()) {
       case 'feet':
       case 'ft':
-        return value * 0.3048;
+        // Keep feet conversion consistent with sqmCalculator (1 ft ≈ 0.305 m)
+        return value * 0.305;
       case 'meters':
       case 'm':
         return value;

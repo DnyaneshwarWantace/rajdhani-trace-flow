@@ -66,7 +66,7 @@ export default function IndividualProductsTable({
   const [saving, setSaving] = useState<string | null>(null);
   const [localProducts, setLocalProducts] = useState<IndividualProduct[]>(individualProducts);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string} | null>(null);
+  const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string; roll_number?: string} | null>(null);
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [newLocationValue, setNewLocationValue] = useState('');
@@ -190,7 +190,7 @@ export default function IndividualProductsTable({
   useEffect(() => {
     if (!onCanCompleteChange) return;
 
-    const requiredFields = ['final_weight', 'final_width', 'final_length', 'location'];
+    const requiredFields = ['final_weight', 'final_width', 'final_length', 'location', 'roll_number'];
     const allRowsComplete = localProducts.length > 0 && localProducts.every(product => 
       requiredFields.every(field => {
         const value = product[field as keyof IndividualProduct];
@@ -246,6 +246,9 @@ export default function IndividualProductsTable({
         break;
       case 'location':
         value = productItem.location || 'Warehouse A - General Storage';
+        break;
+      case 'roll_number':
+        value = productItem.roll_number || '';
         break;
       case 'notes':
         value = productItem.notes || '';
@@ -396,19 +399,22 @@ export default function IndividualProductsTable({
       } else if (productItem.id && productItem.id.startsWith('temp-')) {
         // For temp products, check if we have enough data to create it
         const tempProduct = updated[row];
-        const hasRequiredFields = tempProduct.final_weight && 
+      const hasRequiredFields = tempProduct.final_weight && 
                                   tempProduct.final_width && 
                                   tempProduct.final_length &&
+                                  tempProduct.location &&
+                                  tempProduct.roll_number &&
                                   productId;
         
         // Only create if this is the last required field being filled
-        if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length')) {
+        if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'roll_number' || col === 'location')) {
           try {
             // Create the individual product
             const newProduct = await IndividualProductService.createIndividualProduct({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
+              roll_number: tempProduct.roll_number || '',
               status: tempProduct.status || 'available',
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
@@ -1361,8 +1367,11 @@ export default function IndividualProductsTable({
           <table className="w-full border-collapse border border-gray-200">
             <thead>
               <tr className="bg-gray-50">
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium w-32 max-w-[140px]">
+                  Serial Number
+                </th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Roll No</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
@@ -1375,11 +1384,34 @@ export default function IndividualProductsTable({
             <tbody>
               {localProducts.map((productItem, index) => (
                 <tr key={productItem.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-200 p-2 font-mono text-sm">
+                  <td className="border border-gray-200 p-2 font-mono text-sm w-32 max-w-[140px] truncate">
                     {productItem.serial_number || `#${index + 1}`}
                   </td>
                   <td className="border border-gray-200 p-2 font-mono text-sm">
                     {productItem.qr_code || '-'}
+                  </td>
+                  <td className="border border-gray-200 p-2">
+                    {editingCell?.row === index && editingCell?.col === 'roll_number' ? (
+                      <div>
+                        <Input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleCellSave}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                          autoFocus
+                          placeholder="Enter roll no"
+                          disabled={saving === productItem.id}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
+                        onClick={() => handleCellClick(index, 'roll_number')}
+                      >
+                        {productItem.roll_number || <span className="text-gray-400">Enter roll no</span>}
+                      </div>
+                    )}
                   </td>
                   <td className="border border-gray-200 p-2">
                     {editingCell?.row === index && editingCell?.col === 'final_length' ? (
@@ -1493,22 +1525,25 @@ export default function IndividualProductsTable({
                     ) : (
                       <div className="flex items-center gap-1">
                         <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
+                          className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-start flex-col"
                           onClick={() => handleCellClick(index, 'final_weight')}
                         >
                           {(() => {
                             const wKg = gsmToWeightKg(productItem);
-                            return productItem.final_weight ? (
+                            if (!productItem.final_weight) {
+                              return <span className="text-gray-400">Click to edit</span>;
+                            }
+                            return (
                               <>
-                                {productItem.final_weight}
+                                <span className="text-sm text-gray-900">
+                                  {productItem.final_weight}
+                                </span>
                                 {wKg !== null && (
-                                  <span className="text-gray-500 ml-1">
+                                  <span className="text-xs text-gray-500">
                                     ({wKg.toFixed(4)} kg)
                                   </span>
                                 )}
                               </>
-                            ) : (
-                              <span className="text-gray-400">Click to edit</span>
                             );
                           })()}
                         </div>

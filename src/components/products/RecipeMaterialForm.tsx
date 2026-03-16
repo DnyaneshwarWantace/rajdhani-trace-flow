@@ -95,27 +95,6 @@ export default function RecipeMaterialForm({
 
   return (
     <div className="bg-gray-50 p-4 rounded-lg mb-4">
-      {/* SQM Calculation Display */}
-      {targetProduct && targetProduct.length && targetProduct.width && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Calculator className="w-4 h-4 text-blue-600" />
-            <Label className="text-sm font-semibold text-blue-900">Product SQM Calculation</Label>
-          </div>
-          <div className="text-xs sm:text-sm text-blue-800 space-y-1">
-            <p>
-              <span className="font-medium">Dimensions:</span> {targetProduct.length} {targetProduct.length_unit} × {targetProduct.width} {targetProduct.width_unit}
-            </p>
-            <p>
-              <span className="font-medium">Area:</span> {formatSQMWithSquareFeet(targetSQM)}
-            </p>
-            <p className="text-xs text-blue-700 mt-2">
-              Recipe materials are calculated for <strong>1 SQM</strong> of this product. System will automatically scale based on production quantity.
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="space-y-4">
         <div>
           <Label htmlFor="materialSelect">Select Material or Product *</Label>
