@@ -11,13 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
@@ -54,8 +47,8 @@ export default function ProductWastageAutoDialog({
   const [loading, setLoading] = useState(false);
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set());
-  const [wasteTypes, setWasteTypes] = useState<string[]>([]);
-  const [wasteType, setWasteType] = useState('');
+  // Product wastage is always treated as disposable waste, not reusable
+  const wasteType = 'product_waste';
   const [notes, setNotes] = useState('');
   // Product wastage is not reused - fixed to disposable / No
   const wasteCategory = 'disposable';
@@ -68,7 +61,6 @@ export default function ProductWastageAutoDialog({
   useEffect(() => {
     if (isOpen && material.individual_product_ids?.length > 0) {
       loadIndividualProducts();
-      loadWasteTypes();
       // Don't auto-select - let user choose
       setSelectedProductIds(new Set());
     }
@@ -101,41 +93,6 @@ export default function ProductWastageAutoDialog({
     }
   };
 
-  const loadWasteTypes = async () => {
-    try {
-      const response = await fetch(`${API_URL}/dropdowns/category/waste_type`, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        console.log('🔍 Waste types response:', result);
-        
-        // Backend returns { success: true, data: [{ value: 'scrap', ... }, ...] }
-        if (result.success && Array.isArray(result.data)) {
-          const types = result.data
-            .filter((opt: any) => opt.is_active !== false)
-            .map((opt: any) => opt.value)
-            .filter((val: string) => val && typeof val === 'string');
-          console.log('✅ Loaded waste types:', types);
-          setWasteTypes(types);
-        } else {
-          console.warn('⚠️ Unexpected waste types response format:', result);
-          setWasteTypes([]);
-        }
-      } else {
-        const errorText = await response.text();
-        console.error('❌ Failed to load waste types:', response.status, errorText);
-        setWasteTypes([]);
-      }
-    } catch (error) {
-      console.error('❌ Error loading waste types:', error);
-      setWasteTypes([]);
-    }
-  };
-
   const handleToggleProduct = (productId: string) => {
     const newSelected = new Set(selectedProductIds);
     if (newSelected.has(productId)) {
@@ -149,15 +106,6 @@ export default function ProductWastageAutoDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!wasteType) {
-      toast({
-        title: 'Error',
-        description: 'Please select a waste type',
-        variant: 'destructive',
-      });
-      return;
-    }
 
     if (selectedProductIds.size === 0) {
       toast({
@@ -303,21 +251,12 @@ export default function ProductWastageAutoDialog({
             </div>
           </div>
 
-          {/* Waste Type Selection - Product wastage is not reused, so only waste type is configurable */}
+          {/* Waste Type - fixed for product wastage, not reusable */}
           <div className="space-y-2">
             <Label htmlFor="waste_type">Waste Type *</Label>
-            <Select value={wasteType} onValueChange={setWasteType}>
-              <SelectTrigger id="waste_type">
-                <SelectValue placeholder="Select waste type" />
-              </SelectTrigger>
-              <SelectContent>
-                {wasteTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm text-gray-800">
+              {wasteType}
+            </div>
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <span className="text-red-600">Can be reused: No</span> (product wastage is not reused)
             </p>

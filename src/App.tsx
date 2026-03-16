@@ -44,6 +44,7 @@ import AdminPortal from '@/pages/admin/AdminPortal';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import RollbackDashboard from '@/pages/admin/RollbackDashboard';
 import BackupDashboard from '@/pages/admin/BackupDashboard';
+import NotFound from '@/pages/NotFound';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -514,6 +515,8 @@ function AppRoutes() {
           }
         />
         <Route path="/" element={<HomeRedirect />} />
+        {/* Catch-all route for 404 */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
