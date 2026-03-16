@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, X, Calculator } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import MaterialSelectorDialog from './MaterialSelectorDialog';
-import { calculateSQM, formatSQMWithSquareFeet } from '@/utils/sqmCalculator';
+// import { calculateSQM } from '@/utils/sqmCalculator';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
@@ -39,16 +39,6 @@ export default function RecipeMaterialForm({
 }: RecipeMaterialFormProps) {
   const [showMaterialSelector, setShowMaterialSelector] = useState(false);
   const [selectedProductData, setSelectedProductData] = useState<any>(null);
-
-  // Calculate SQM for target product
-  const targetSQM = targetProduct 
-    ? calculateSQM(
-        targetProduct.length,
-        targetProduct.width,
-        targetProduct.length_unit,
-        targetProduct.width_unit
-      )
-    : 0;
 
   const handleMaterialSelect = async (selected: RecipeMaterial) => {
     // Populate the form with selected material
