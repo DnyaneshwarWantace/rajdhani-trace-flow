@@ -302,7 +302,7 @@ export default function IndividualProductsTable({
           }
         }
 
-        // Get expected value and validate range
+        // Get expected value and compute range for warning only (±10 GSM, ±2 length/width)
         let expectedNumeric: number | null = null;
         let fieldName = '';
         
@@ -317,41 +317,43 @@ export default function IndividualProductsTable({
           fieldName = 'Width';
         }
 
-        // Validate range: GSM (weight) uses ±10, length and width use ±2
+        // Show warning if out of suggested range, but do NOT block saving
         if (expectedNumeric !== null && !isNaN(expectedNumeric)) {
           const range = col === 'final_weight' ? 10 : 2;
           const minValue = expectedNumeric - range;
           const maxValue = expectedNumeric + range;
           
-        if (valueToValidate < minValue || valueToValidate > maxValue) {
+          if (valueToValidate < minValue || valueToValidate > maxValue) {
+            const msg = `${fieldName} should ideally be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`;
+            toast({
+              title: 'Out of expected range',
+              description: msg,
+            });
+            setValidationError(msg);
+          } else {
+            setValidationError(null);
+          }
+        }
+      }
+
+      // Location is mandatory
+      if (col === 'location') {
+        if (!valueToSave) {
           toast({
-            title: 'Validation Error',
-            description: `${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`,
+            title: 'Location required',
+            description: 'Please select a storage location.',
             variant: 'destructive',
           });
           setSaving(null);
-          setValidationError(`${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`);
           return;
         }
       }
-    }
 
-    // Location is mandatory
-    if (col === 'location') {
-      if (!valueToSave) {
-        toast({
-          title: 'Location required',
-          description: 'Please select a storage location.',
-          variant: 'destructive',
-        });
-        setSaving(null);
-        return;
+      // Clear validation error for non-dimension fields
+      if (col !== 'final_weight' && col !== 'final_length' && col !== 'final_width') {
+        setValidationError(null);
       }
-    }
 
-    // Clear validation error on successful validation
-    setValidationError(null);
-      
       // For final_weight: user entered weight (kg) → convert to GSM and save (weight max 4 decimals)
       if (col === 'final_weight' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
         let weightKg = parseFloat(valueToSave.replace(/[^\d.]/g, ''));
