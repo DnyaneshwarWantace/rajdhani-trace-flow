@@ -34,6 +34,13 @@ export default function IndividualProductDimensions({
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-4 text-sm">
+        {individualProduct.roll_number && (
+          <div>
+            <p className="text-gray-600">Roll No</p>
+            <p className="font-mono text-gray-900">{individualProduct.roll_number}</p>
+          </div>
+        )}
+
         {individualProduct.final_length && (
           <div>
             <p className="text-gray-600">Final Length</p>
@@ -62,11 +69,13 @@ export default function IndividualProductDimensions({
             <div>
               <p className="text-gray-600">Final Weight</p>
               <p className="font-medium text-gray-900">
-                {individualProduct.final_weight}
+                <span className="block">{individualProduct.final_weight}</span>
                 {(() => {
                   const wKg = weightKgFromItem(individualProduct);
                   return wKg !== null ? (
-                    <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                    <span className="block text-gray-500 text-sm mt-0.5">
+                      ({wKg.toFixed(4)} kg)
+                    </span>
                   ) : null;
                 })()}
               </p>

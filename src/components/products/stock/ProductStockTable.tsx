@@ -76,6 +76,7 @@ export default function ProductStockTable({
             )}
             <th className="text-left p-3 font-medium text-gray-600">ID</th>
             <th className="text-left p-3 font-medium text-gray-600">QR Code</th>
+            <th className="text-left p-3 font-medium text-gray-600">Roll No</th>
             <th className="text-left p-3 font-medium text-gray-600 hidden md:table-cell">
               Production Date
             </th>
@@ -128,6 +129,13 @@ export default function ProductStockTable({
                   )}
                 </div>
               </td>
+              <td className="p-3 text-sm">
+                {item.roll_number ? (
+                  <span className="font-mono text-xs text-gray-800">{item.roll_number}</span>
+                ) : (
+                  <span className="text-gray-400 text-xs">N/A</span>
+                )}
+              </td>
               <td className="p-3 text-sm hidden md:table-cell">
                 {item.production_date && item.production_date !== 'null'
                   ? new Date(item.production_date).toLocaleDateString()
@@ -151,16 +159,18 @@ export default function ProductStockTable({
               </td>
               <td className="p-3 text-sm">
                 {item.final_weight ? (
-                  <>
-                    {item.final_weight}
+                  <div className="flex flex-col">
+                    <span>{item.final_weight}</span>
                     {(() => {
                       const wKg = weightKgFromItem(item);
                       return wKg !== null ? (
-                        <span className="text-gray-500 ml-1">({wKg.toFixed(4)} kg)</span>
+                        <span className="text-gray-500 text-xs mt-0.5">({wKg.toFixed(4)} kg)</span>
                       ) : null;
                     })()}
-                  </>
-                ) : 'N/A'}
+                  </div>
+                ) : (
+                  'N/A'
+                )}
               </td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.location || 'N/A'}</td>
               <td className="p-3 text-sm hidden lg:table-cell">{item.inspector || 'N/A'}</td>

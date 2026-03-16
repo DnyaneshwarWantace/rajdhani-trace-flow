@@ -125,6 +125,7 @@ export interface IndividualProduct {
   product_name?: string;
   qr_code: string;
   serial_number?: string;
+  roll_number?: string;
 
   // Status
   status: 'available' | 'sold' | 'damaged' | 'in_production' | 'reserved' | 'used';
@@ -163,6 +164,7 @@ export interface IndividualProductFormData {
   product_id: string;
   qr_code?: string;
   serial_number?: string;
+  roll_number?: string;
   status: string;
   final_length?: string;
   final_width?: string;
