@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -153,16 +153,18 @@ const menuItems: MenuItem[] = [
 
 export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, permissionsVersion } = useAuth();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
 
   const isActive = (path: string) => location.pathname === path;
 
-  // Settings is visible to all logged-in users (profile + password); other items use permissions
-  const visibleMenuItems = menuItems.filter((item) =>
-    user && (item.path === '/settings' ? true : canAccessPage(item.pageKey))
+  // Re-compute when permissionsVersion changes so sidebar updates instantly
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => user && canAccessPage(item.pageKey)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, permissionsVersion]
   );
 
   useEffect(() => {

@@ -39,19 +39,30 @@ export class AuthService {
         },
       });
 
-      if (!response.ok) {
+      // Only logout on 401 (token invalid/expired) — not on network errors or 5xx
+      if (response.status === 401) {
         this.logout();
         return null;
+      }
+
+      if (!response.ok) {
+        // Server error or network issue — keep existing session, don't logout
+        const userStr = localStorage.getItem('user');
+        return userStr ? JSON.parse(userStr) : null;
       }
 
       const data = await response.json();
       if (data.data?.permissions) {
         localStorage.setItem('permissions', JSON.stringify(data.data.permissions));
       }
+      if (data.data?.user) {
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+      }
       return data.data.user;
-    } catch (error) {
-      this.logout();
-      return null;
+    } catch {
+      // Network failure — keep existing session from localStorage, don't logout
+      const userStr = localStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
     }
   }
 

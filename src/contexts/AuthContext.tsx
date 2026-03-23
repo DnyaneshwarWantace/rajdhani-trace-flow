@@ -9,6 +9,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  // Increments every time permissions are refreshed — PageAccessRoute watches this
+  permissionsVersion: number;
+  refreshPermissions: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [permissionsVersion, setPermissionsVersion] = useState(0);
 
   useEffect(() => {
     checkAuth();
@@ -30,11 +34,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const response = await AuthService.login({ email, password });
     setUser(response.data.user);
+    setPermissionsVersion(v => v + 1);
   };
 
   const logout = () => {
     AuthService.logout();
     setUser(null);
+  };
+
+  // Fetches latest permissions from server and updates localStorage + triggers re-render
+  const refreshPermissions = async () => {
+    const currentUser = await AuthService.getCurrentUser();
+    if (currentUser) setUser(currentUser);
+    setPermissionsVersion(v => v + 1);
   };
 
   return (
@@ -45,6 +57,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        permissionsVersion,
+        refreshPermissions,
       }}
     >
       {children}

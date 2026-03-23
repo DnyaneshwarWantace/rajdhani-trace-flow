@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
@@ -82,7 +82,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 }
 
 function HomeRedirect() {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -96,37 +96,33 @@ function HomeRedirect() {
     return <Navigate to="/login" />;
   }
 
-  // Authenticated users: redirect to appropriate page
-  if (user?.role === 'admin' || user?.role === 'super-admin') {
-    return <Navigate to="/dashboard" />;
-  }
+  // Navigate to the first page the user actually has access to
+  const fallbackPages = [
+    { key: 'dashboard', path: '/dashboard' },
+    { key: 'orders', path: '/orders' },
+    { key: 'production', path: '/production' },
+    { key: 'products', path: '/products' },
+    { key: 'materials', path: '/materials' },
+    { key: 'customers', path: '/customers' },
+    { key: 'suppliers', path: '/suppliers' },
+    { key: 'settings', path: '/settings' },
+  ];
 
-  return <Navigate to="/orders" />;
+  const firstAccessible = fallbackPages.find(p => canAccessPage(p.key));
+  return <Navigate to={firstAccessible?.path ?? '/settings'} />;
 }
 
 function PageAccessRoute({ pageKey, children }: { pageKey: string; children: React.ReactNode }) {
-  const hasAccess = canAccessPage(pageKey);
-
-  useEffect(() => {
-    if (!hasAccess) {
-      // Hard redirect so the app loads at /orders and never shows a white screen
-      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') || '';
-      window.location.replace(base ? `${base}/orders` : '/orders');
-    }
-  }, [hasAccess]);
+  const { permissionsVersion } = useAuth();
+  // Re-evaluate access every time permissionsVersion changes (after admin saves permissions)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const hasAccess = useMemo(() => canAccessPage(pageKey), [pageKey, permissionsVersion]);
 
   if (hasAccess) {
     return <>{children}</>;
   }
-  // Show spinner until redirect completes (avoids white screen)
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="flex flex-col items-center gap-3 text-gray-500">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-primary-600" />
-        <p className="text-sm">Redirecting…</p>
-      </div>
-    </div>
-  );
+
+  return <Navigate to="/orders" replace />;
 }
 
 function ScrollToTop() {

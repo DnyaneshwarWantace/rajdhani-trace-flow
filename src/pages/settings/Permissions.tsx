@@ -45,7 +45,7 @@ function SimpleSwitch({ checked, onCheckedChange, disabled }: SimpleSwitchProps)
 }
 
 export default function Permissions(_props: PermissionsProps) {
-  const { user } = useAuth();
+  const { user, refreshPermissions } = useAuth();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<User[]>([]);
@@ -187,6 +187,11 @@ export default function Permissions(_props: PermissionsProps) {
         title: 'Permissions saved',
         description: 'Permissions for this user have been updated.',
       });
+      // If the saved user is the currently logged-in user, refresh their
+      // permissions immediately so PageAccessRoute re-evaluates without logout
+      if (user && selectedUserId === user.id) {
+        await refreshPermissions();
+      }
     } catch (error) {
       console.error('Failed to save permissions', error);
       toast({
