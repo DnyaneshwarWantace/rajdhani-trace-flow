@@ -148,7 +148,7 @@ export default function Permissions(_props: PermissionsProps) {
       [pageKey]: enabled,
     }));
 
-    // Mirror backend behaviour: when page is enabled, turn on all non-delete actions for that module.
+    // When page is enabled, turn on all non-delete actions for that module.
     // When disabled, turn off all actions for that module.
     const moduleActions = actionsMeta[pageKey];
     if (moduleActions && moduleActions.length > 0) {
@@ -163,16 +163,61 @@ export default function Permissions(_props: PermissionsProps) {
             next[act.key] = false;
           }
         }
+        // Production page toggle also cascades to machine permissions
+        if (pageKey === 'production') {
+          next['machine_view'] = enabled;
+          next['machine_create'] = enabled;
+          next['machine_edit'] = enabled;
+        }
         return next;
       });
     }
   };
 
   const handleToggleAction = (actionKey: string, enabled: boolean) => {
-    setActionPermissions((prev) => ({
-      ...prev,
-      [actionKey]: enabled,
-    }));
+    setActionPermissions((prev) => {
+      const next = { ...prev, [actionKey]: enabled };
+
+      // If enabling create or edit, also force-enable view for that module
+      if (enabled && (actionKey.includes('_create') || actionKey.includes('_edit'))) {
+        const module = actionKey.split('_')[0];
+        next[`${module}_view`] = true;
+
+        // If enabling production create/edit, also enable machine permissions
+        if (module === 'production') {
+          next['machine_view'] = true;
+          next['machine_create'] = true;
+          next['machine_edit'] = true;
+        }
+      }
+
+      // If disabling view, also disable create and edit for that module
+      if (!enabled && actionKey.includes('_view')) {
+        const module = actionKey.split('_')[0];
+        next[`${module}_create`] = false;
+        next[`${module}_edit`] = false;
+
+        // If disabling production view, also disable machine permissions
+        if (module === 'production') {
+          next['machine_view'] = false;
+          next['machine_create'] = false;
+          next['machine_edit'] = false;
+        }
+      }
+
+      // If disabling production create AND edit, remove machine permissions
+      if (!enabled && (actionKey === 'production_create' || actionKey === 'production_edit')) {
+        const stillHasCreate = actionKey === 'production_create' ? false : !!prev['production_create'];
+        const stillHasEdit = actionKey === 'production_edit' ? false : !!prev['production_edit'];
+        if (!stillHasCreate && !stillHasEdit) {
+          next['machine_view'] = false;
+          next['machine_create'] = false;
+          next['machine_edit'] = false;
+        }
+      }
+
+      return next;
+    });
   };
 
   const handleSave = async () => {
@@ -373,20 +418,25 @@ export default function Permissions(_props: PermissionsProps) {
                           Actions for this page
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {moduleActions.map((action) => {
+                          {moduleActions.filter(a => !a.key.includes('_delete')).map((action) => {
                             const checked = !!actionPermissions[action.key];
+                            // View is locked on if create or edit is enabled
+                            const module = action.key.split('_')[0];
+                            const isViewLocked = action.key.includes('_view') &&
+                              (!!actionPermissions[`${module}_create`] || !!actionPermissions[`${module}_edit`]);
+                            const isDisabled = isSelectedUserSuperAdmin || isViewLocked;
                             return (
                               <button
                                 key={action.key}
                                 type="button"
-
-                                disabled={isSelectedUserSuperAdmin}
-                                onClick={() => handleToggleAction(action.key, !checked)}
+                                disabled={isDisabled}
+                                onClick={() => !isDisabled && handleToggleAction(action.key, !checked)}
+                                title={isViewLocked ? 'View is required when create or edit is enabled' : undefined}
                                 className={`text-xs px-2 py-1 rounded-full border transition-colors ${
                                   checked
                                     ? 'bg-blue-50 border-blue-500 text-blue-700'
                                     : 'bg-gray-50 border-gray-300 text-gray-600'
-                                } ${isSelectedUserSuperAdmin ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
                               >
                                 {action.label}
                               </button>

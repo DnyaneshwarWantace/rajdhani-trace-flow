@@ -1,4 +1,5 @@
 import type { Product, ProductFormData, ProductStats, ProductFilters } from '@/types/product';
+import { getServiceError } from '@/utils/apiHelpers';
 import { getApiUrl } from '@/utils/apiConfig';
 
 const API_URL = getApiUrl();
@@ -169,7 +170,7 @@ export class ProductService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create product');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -185,7 +186,7 @@ export class ProductService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to update product');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();

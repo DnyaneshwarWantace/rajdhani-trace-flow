@@ -1,4 +1,5 @@
 import type { IndividualProduct, IndividualProductFormData } from '@/types/product';
+import { getServiceError } from '@/utils/apiHelpers';
 
 import { getApiUrl } from '@/utils/apiConfig';
 
@@ -142,7 +143,7 @@ export class IndividualProductService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create individual product');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -161,7 +162,7 @@ export class IndividualProductService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to update individual product');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -202,7 +203,7 @@ export class IndividualProductService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create individual products');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();

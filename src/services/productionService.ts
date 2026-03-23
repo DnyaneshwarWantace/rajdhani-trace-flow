@@ -1,4 +1,5 @@
 import { getApiUrl } from '@/utils/apiConfig';
+import { getServiceError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -155,7 +156,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create production batch' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -179,7 +180,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to duplicate production batch' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -215,7 +216,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch production batches' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data || [], error: null };
@@ -233,7 +234,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Batch not found' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -254,7 +255,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to update batch' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -275,7 +276,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to cancel batch' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.success, error: null };
@@ -293,7 +294,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch production stats' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -311,7 +312,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch production flow' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -330,7 +331,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch material consumption' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data || [], error: null };
@@ -397,7 +398,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to save draft state' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -423,7 +424,7 @@ export class ProductionService {
       }
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch draft state' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -443,7 +444,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to delete draft state' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.success, error: null };
@@ -528,7 +529,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create machine' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -547,7 +548,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch production flow steps' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data || [], error: null };
@@ -567,7 +568,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to update production flow step' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -601,7 +602,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create material consumption' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -627,7 +628,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create production flow' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -660,7 +661,7 @@ export class ProductionService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create production flow step' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };

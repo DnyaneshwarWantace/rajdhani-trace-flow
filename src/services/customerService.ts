@@ -1,4 +1,5 @@
 import { getApiUrl } from '@/utils/apiConfig';
+import { getServiceError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -80,7 +81,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create customer' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -118,7 +119,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch customers' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -136,7 +137,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Customer not found' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -157,7 +158,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to update customer' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -177,7 +178,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to delete customer' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.success, error: null };
@@ -195,7 +196,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch customer stats' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -213,7 +214,7 @@ export class CustomerService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch customer orders' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data || [], error: null };

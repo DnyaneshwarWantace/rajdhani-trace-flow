@@ -13,6 +13,8 @@ import ProductionFilters from '@/components/production/ProductionFilters';
 import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
+import { canView, canDelete, canCreate, canEdit } from '@/utils/permissions';
+import PermissionDenied from '@/components/ui/PermissionDenied';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import ProductionDuplicateDialog from '@/components/production/ProductionDuplicateDialog';
 import {
@@ -379,6 +381,10 @@ export default function ProductionList() {
     }
   };
 
+  if (!canView('production')) {
+    return <Layout><PermissionDenied /></Layout>;
+  }
+
   return (
     <Layout>
       <div>
@@ -485,7 +491,7 @@ export default function ProductionList() {
             onView={handleView}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
-            canDelete={user?.role === 'admin' || false}
+            canDelete={canDelete('production')}
             allBatches={allBatches}
           />
         ) : (
@@ -493,7 +499,7 @@ export default function ProductionList() {
             batches={filteredBatches}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
-            canDelete={user?.role === 'admin' || false}
+            canDelete={canDelete('production')}
             allBatches={allBatches}
           />
         )}

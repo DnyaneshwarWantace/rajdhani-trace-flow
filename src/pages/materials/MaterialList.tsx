@@ -41,7 +41,8 @@ import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { canDelete } from '@/utils/permissions';
+import { canDelete, canView } from '@/utils/permissions';
+import PermissionDenied from '@/components/ui/PermissionDenied';
 
 type TabValue = 'inventory' | 'waste-recovery' | 'analytics' | 'notifications';
 
@@ -920,6 +921,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       console.error('Error refreshing materials:', err);
     }
   };
+
+  if (!canView('materials')) {
+    return <Layout><PermissionDenied /></Layout>;
+  }
 
   return (
     <Layout>

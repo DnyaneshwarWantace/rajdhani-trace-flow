@@ -13,7 +13,8 @@ import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
 import { exportProductsToCSV, exportProductsToExcel } from '@/utils/exportProductUtils';
 import { useToast } from '@/hooks/use-toast';
-import { canCreate, canEdit, canDelete } from '@/utils/permissions';
+import { canCreate, canEdit, canDelete, canView } from '@/utils/permissions';
+import PermissionDenied from '@/components/ui/PermissionDenied';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers } from 'lucide-react';
@@ -292,6 +293,10 @@ export default function ProductList() {
   };
 
   // Calculate unread notifications count
+
+  if (!canView('products')) {
+    return <Layout><PermissionDenied /></Layout>;
+  }
 
   return (
     <Layout>

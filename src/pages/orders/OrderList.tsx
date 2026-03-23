@@ -10,6 +10,8 @@ import OrderCard from '@/components/orders/OrderCard';
 import OrderFilters from '@/components/orders/OrderFilters';
 import OrderStatsBoxes from '@/components/orders/OrderStatsBoxes';
 import Pagination from '@/components/ui/pagination';
+import { canView } from '@/utils/permissions';
+import PermissionDenied from '@/components/ui/PermissionDenied';
 
 type ViewMode = 'table' | 'grid';
 
@@ -153,6 +155,10 @@ export default function OrderList() {
   const handlePageChange = (page: number) => {
     setFilters(prev => ({ ...prev, page }));
   };
+
+  if (!canView('orders')) {
+    return <Layout><PermissionDenied /></Layout>;
+  }
 
   return (
     <Layout>

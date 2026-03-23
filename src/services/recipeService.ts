@@ -1,4 +1,5 @@
 import type { Recipe, RecipeFilters } from '@/types/recipe';
+import { getServiceError } from '@/utils/apiHelpers';
 
 import { getApiUrl } from '@/utils/apiConfig';
 
@@ -94,7 +95,7 @@ export class RecipeService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create recipe');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -116,7 +117,7 @@ export class RecipeService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to update recipe');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();

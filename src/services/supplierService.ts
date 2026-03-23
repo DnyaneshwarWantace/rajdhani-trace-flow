@@ -1,4 +1,5 @@
 import { getApiUrl } from '@/utils/apiConfig';
+import { getServiceError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -61,7 +62,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch suppliers' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -79,7 +80,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Supplier not found' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -100,7 +101,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to create supplier' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -121,7 +122,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to update supplier' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };
@@ -141,7 +142,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to delete supplier' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.success, error: null };
@@ -159,7 +160,7 @@ export class SupplierService {
       const result = await response.json();
 
       if (!response.ok) {
-        return { data: null, error: result.error || 'Failed to fetch supplier stats' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data, error: null };

@@ -68,7 +68,23 @@ const moduleToActions: Record<string, { create: string; edit: string; delete: st
   suppliers: { create: 'supplier_create', edit: 'supplier_edit', delete: 'supplier_delete', view: 'supplier_view' },
   orders: { create: 'order_create', edit: 'order_edit', delete: 'order_delete', view: 'order_view' },
   production: { create: 'production_create', edit: 'production_edit', delete: 'production_delete', view: 'production_view' },
+  machines: { create: 'machine_create', edit: 'machine_edit', delete: 'machine_delete', view: 'machine_view' },
 };
+
+/** True if user can use machine features (linked to production create/edit). */
+export function canUseMachines(): boolean {
+  if (isSuperAdmin()) return true;
+  const p = getStoredPermissions();
+  if (!p?.action_permissions) return isAdmin();
+  // Machine access granted if user has machine_view OR production create/edit
+  return (
+    p.action_permissions['machine_view'] === true ||
+    p.action_permissions['machine_create'] === true ||
+    p.action_permissions['machine_edit'] === true ||
+    p.action_permissions['production_create'] === true ||
+    p.action_permissions['production_edit'] === true
+  );
+}
 
 export function canCreate(module: 'products' | 'materials' | 'customers' | 'suppliers' | 'recipes' | 'orders' | 'production'): boolean {
   if (isSuperAdmin()) return true;
@@ -100,5 +116,5 @@ export function canView(module: string): boolean {
 
 export { isAdmin };
 
-/** Message to show when API returns 403. */
-export const PERMISSION_DENIED_MESSAGE = "You don't have permission to perform this action.";
+/** Message to show when API returns 403. Re-exported from apiHelpers for convenience. */
+export { PERMISSION_DENIED_MESSAGE } from '@/utils/apiHelpers';

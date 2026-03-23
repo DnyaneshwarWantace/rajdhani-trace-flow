@@ -13,6 +13,8 @@ import SupplierFilters from '@/components/suppliers/SupplierFilters';
 import SupplierTable from '@/components/suppliers/SupplierTable';
 import SupplierGrid from '@/components/suppliers/SupplierGrid';
 import SupplierEmptyState from '@/components/suppliers/SupplierEmptyState';
+import { canView } from '@/utils/permissions';
+import PermissionDenied from '@/components/ui/PermissionDenied';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 import SupplierDeleteDialog from '@/components/suppliers/SupplierDeleteDialog';
 import {
@@ -259,6 +261,10 @@ export default function SupplierList() {
     }
   };
 
+
+  if (!canView('suppliers')) {
+    return <Layout><PermissionDenied /></Layout>;
+  }
 
   return (
     <Layout>

@@ -1,4 +1,5 @@
 import { getApiUrl } from '@/utils/apiConfig';
+import { getServiceError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
@@ -84,7 +85,7 @@ export class OrderService {
       const response = await fetch(`${API_URL}/orders/stats`, { headers: this.getHeaders() });
       const result = await response.json();
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to fetch order stats' };
+        return { data: null, error: getServiceError(response, result) };
       }
       const d = result.data || {};
       return {
@@ -139,7 +140,7 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to fetch orders' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       // Map backend orders to frontend format
@@ -200,7 +201,7 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to fetch order details' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       const order = result.data.order;
@@ -382,7 +383,7 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to update order status' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       // Map backend order to frontend format
@@ -453,7 +454,7 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to update payment' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       // Map backend order to frontend format
@@ -528,7 +529,7 @@ export class OrderService {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        return { data: null, error: result.error || 'Failed to fetch pending orders' };
+        return { data: null, error: getServiceError(response, result) };
       }
 
       return { data: result.data || [], error: null, count: result.count };

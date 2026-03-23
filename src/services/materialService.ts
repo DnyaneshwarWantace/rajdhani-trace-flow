@@ -1,4 +1,5 @@
 import type { RawMaterial, RawMaterialFormData, MaterialStats, MaterialFilters, PeriodicDueMaterial } from '@/types/material';
+import { getServiceError } from '@/utils/apiHelpers';
 
 import { getApiUrl } from '@/utils/apiConfig';
 
@@ -119,7 +120,7 @@ export class MaterialService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to create material');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -136,7 +137,7 @@ export class MaterialService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to update material');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
@@ -181,7 +182,7 @@ export class MaterialService {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Failed to adjust stock');
+      throw new Error(getServiceError(response, error));
     }
 
     const data = await response.json();
