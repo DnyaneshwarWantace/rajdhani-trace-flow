@@ -13,7 +13,7 @@ import ProductionFilters from '@/components/production/ProductionFilters';
 import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
-import { canView, canDelete, canCreate, canEdit } from '@/utils/permissions';
+import { canView, canDelete } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import ProductionDuplicateDialog from '@/components/production/ProductionDuplicateDialog';
@@ -36,7 +36,6 @@ import {
 
 export default function ProductionList() {
   const { toast } = useToast();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { productId: productIdFromPath } = useParams<{ productId?: string }>();

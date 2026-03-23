@@ -4,7 +4,6 @@
  */
 
 import { getApiUrl } from '@/utils/apiConfig';
-import { getServiceError } from '@/utils/apiHelpers';
 
 const API_URL = getApiUrl();
 
