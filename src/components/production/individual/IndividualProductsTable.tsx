@@ -1376,7 +1376,7 @@ export default function IndividualProductsTable({
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Roll No</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final GSM</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>

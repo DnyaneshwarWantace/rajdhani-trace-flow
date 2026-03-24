@@ -134,7 +134,7 @@ export const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                           {(item.length || item.width) && (
                             <p>Dimensions: {item.length}{item.length_unit} × {item.width}{item.width_unit}</p>
                           )}
-                          {item.weight && <p>Weight: {item.weight}{item.weight_unit}</p>}
+                          {item.weight && <p>GSM: {item.weight}{item.weight_unit}</p>}
                         </div>
                       )}
                       <p className="text-xs text-gray-500 mt-1">Price per: {item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : item.unit}</p>

@@ -177,7 +177,7 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                     )}
                     {product.weight && (
                       <p className="text-xs text-gray-500">
-                        Weight: {product.weight} {product.weight_unit}
+                        GSM: {product.weight} {product.weight_unit}
                       </p>
                     )}
                   </div>

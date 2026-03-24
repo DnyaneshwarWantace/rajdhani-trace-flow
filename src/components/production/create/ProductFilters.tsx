@@ -146,7 +146,7 @@ export default function ProductFilters({
 
       <div>
         <Label htmlFor="weight-filter" className="text-xs font-medium text-gray-700">
-          Weight
+          GSM
         </Label>
         <div className="mt-1">
           <MultiSelect

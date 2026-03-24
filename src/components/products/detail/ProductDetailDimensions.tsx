@@ -42,7 +42,7 @@ export default function ProductDetailDimensions({ product }: ProductDetailDimens
             <div className="space-y-1 md:col-span-3">
               <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
                 <Weight className="w-3 h-3 sm:w-4 sm:h-4" />
-                Weight
+                GSM
               </p>
               <p className="text-xs sm:text-sm font-medium text-gray-900">
                 {product.weight} {product.weight_unit}

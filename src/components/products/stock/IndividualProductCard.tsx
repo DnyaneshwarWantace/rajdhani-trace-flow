@@ -130,7 +130,7 @@ export default function IndividualProductCard({
             <div className="flex items-center justify-between">
               <span className="text-gray-500 flex items-center gap-1">
                 <Weight className="w-2.5 h-2.5" />
-                Weight
+                GSM
               </span>
               <span className="font-medium text-gray-900 truncate ml-2">
                 <span className="block">{individualProduct.final_weight}</span>
