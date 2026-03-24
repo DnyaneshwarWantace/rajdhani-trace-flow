@@ -5,7 +5,6 @@ import { Loader2, Plus, Grid3x3, List, ArrowLeft } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ProductionStatsBoxes from '@/components/production/ProductionStatsBoxes';
 import ProductionSectionTabs from '@/components/production/ProductionSectionTabs';
