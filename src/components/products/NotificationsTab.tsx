@@ -433,7 +433,7 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                                         )}
                                         {notification.related_data.product_details?.weight && (
                                           <div className="text-xs">
-                                            <span className="text-gray-500">Weight/GSM:</span>
+                                            <span className="text-gray-500">GSM:</span>
                                             <span className="text-gray-900 ml-1">
                                               {notification.related_data.product_details.weight}{notification.related_data.product_details.weight_unit || ''}
                                             </span>

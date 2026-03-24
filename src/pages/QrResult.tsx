@@ -448,7 +448,7 @@ export default function QrResult() {
                   )}
                   {individualProduct.final_weight && (
                     <div className="flex justify-between sm:block sm:space-y-1 py-2 border-b border-gray-100 sm:border-0">
-                      <span className="text-gray-600">Weight</span>
+                      <span className="text-gray-600">GSM</span>
                       <span className="font-medium text-gray-900 sm:block">{individualProduct.final_weight} {displayProduct.weight_unit || ''}</span>
                     </div>
                   )}
@@ -465,7 +465,7 @@ export default function QrResult() {
                   </div>
                   {displayProduct.weight && (
                     <div className="flex justify-between sm:block sm:space-y-1 py-2 border-b border-gray-100 sm:border-0">
-                      <span className="text-gray-600">Weight</span>
+                      <span className="text-gray-600">GSM</span>
                       <span className="font-medium text-gray-900 sm:block">{displayProduct.weight} {displayProduct.weight_unit || ''}</span>
                     </div>
                   )}

@@ -225,7 +225,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                               {/* Weight */}
                               {item.weight && (
                                 <div>
-                                  <span className="font-medium">Weight:</span> {item.weight} {item.weight_unit || 'kg'}
+                                  <span className="font-medium">GSM:</span> {item.weight} {item.weight_unit || 'kg'}
                                   {gsm && <span className="text-purple-600 ml-1">({gsm})</span>}
                                 </div>
                               )}

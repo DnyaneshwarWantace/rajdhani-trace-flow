@@ -472,7 +472,7 @@ export default function MaterialSelectionDialog({
                 )}
                 {material.weight && (
                   <div className="min-w-0">
-                    <p className="text-gray-500">Weight</p>
+                    <p className="text-gray-500">GSM</p>
                     <p className="font-medium text-gray-900 truncate">{material.weight} {material.weight_unit || ''}</p>
                   </div>
                 )}
@@ -770,7 +770,7 @@ export default function MaterialSelectionDialog({
                   options={productWeights.map(weight => ({ label: weight, value: weight }))}
                   selected={weightFilter}
                   onChange={(values) => { setWeightFilter(values); setCurrentPage(1); }}
-                  placeholder="All Weights"
+                  placeholder="All GSM"
                 />
               </div>
             </>
@@ -819,7 +819,7 @@ export default function MaterialSelectionDialog({
                         <>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dimensions</th>
                           <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Color/Pattern</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Weight</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">GSM</th>
                         </>
                       )}
                       <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Select</th>

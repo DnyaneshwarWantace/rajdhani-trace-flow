@@ -160,7 +160,7 @@ export default function ProductFormSections({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Weight</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">GSM</label>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"

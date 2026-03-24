@@ -178,7 +178,7 @@ export default function ProductCard({
             )}
             {product.weight && (
               <div className="flex items-center justify-between text-[10px]">
-                <span className="text-gray-500">Weight</span>
+                <span className="text-gray-500">GSM</span>
                 <span className="font-medium text-gray-900 truncate" title={`${product.weight} ${product.weight_unit || ''}`.trim()}>{product.weight} {product.weight_unit}</span>
               </div>
             )}

@@ -210,7 +210,7 @@ export default function InventoryFilters({
               options={weights.map(weight => ({ label: weight, value: weight }))}
               selected={Array.isArray(filters.weight) ? filters.weight : (filters.weight ? [filters.weight] : [])}
               onChange={onWeightChange}
-              placeholder="All Weights"
+              placeholder="All GSM"
               loading={loadingOptions}
             />
           )}

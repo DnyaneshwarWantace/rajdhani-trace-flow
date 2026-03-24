@@ -105,7 +105,7 @@ export default function ProductDimensionsSection({
       {/* Weight field - Full width */}
       <div>
         <ValueUnitDropdownField
-          label="Weight"
+          label="GSM"
           value={formData.weight || ''}
           unit={formData.weight_unit || ''}
           combinedValues={weights}
@@ -129,7 +129,7 @@ export default function ProductDimensionsSection({
         />
         {touchedFields.has('weight') && (weightEmpty || weightUnitEmpty) && (
           <p className="text-xs text-red-500 mt-1">
-            Weight and unit are required
+            GSM and unit are required
           </p>
         )}
       </div>

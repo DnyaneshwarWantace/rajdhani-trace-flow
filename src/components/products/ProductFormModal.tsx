@@ -383,7 +383,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       const weightUnitValue = formData.weight_unit ? String(formData.weight_unit).trim() : '';
       console.log('VALIDATION - Weight:', { weightValue, weightUnitValue, raw: { weight: formData.weight, weight_unit: formData.weight_unit } });
       if (!weightValue || !weightUnitValue) {
-        missingFields.push('Weight');
+        missingFields.push('GSM');
       }
       
       // base_quantity is required for create and duplicate, check if it's a valid number (not negative)

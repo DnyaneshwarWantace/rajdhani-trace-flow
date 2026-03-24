@@ -133,7 +133,7 @@ export default function ProductList({
                     <div className="flex gap-3 text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
                       <div className="w-[22%] pl-5">Category</div>
                       <div className="w-[22%]">Dimensions</div>
-                      <div className="w-[18%]">Weight</div>
+                      <div className="w-[18%]">GSM</div>
                       <div className="w-[25%]">Color / Pattern</div>
                       <div className="w-[13%]">Stock</div>
                     </div>

@@ -341,7 +341,7 @@ export default function ProductMaterialSelectionDialog({
               )}
               {item.weight && (
                 <div className="min-w-0">
-                  <p className="text-gray-500">Weight</p>
+                  <p className="text-gray-500">GSM</p>
                   <p className="font-medium text-gray-900 truncate">
                     {item.weight} {item.weight_unit || ''}
                   </p>

@@ -49,7 +49,7 @@ export interface ProductionCategoryConfig {
 
 export const productSections: SectionConfig[] = [
   {
-    title: 'Weight Options',
+    title: 'GSM Options',
     icon: Weight,
     valueCategory: 'weight',
     unitCategory: 'weight_units',

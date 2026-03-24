@@ -362,7 +362,7 @@ export function IndividualProductSelectionDialog({
                             )}
                             {product.weight && (
                               <div>
-                                <span className="font-medium">Weight:</span> {product.weight}
+                                <span className="font-medium">GSM:</span> {product.weight}
                               </div>
                             )}
                             {product.added_date && (

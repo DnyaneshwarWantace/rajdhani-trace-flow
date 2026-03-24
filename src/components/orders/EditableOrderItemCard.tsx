@@ -149,7 +149,7 @@ export function EditableOrderItemCard({
               )}
               {weight && (
                 <div>
-                  <span className="font-medium">Weight:</span> {weight}{weight_unit || ''}
+                  <span className="font-medium">GSM:</span> {weight}{weight_unit || ''}
                 </div>
               )}
               {color && (

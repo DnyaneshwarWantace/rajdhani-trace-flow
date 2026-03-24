@@ -442,12 +442,12 @@ export default function ProductSelectorDialog({
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">Weight</label>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">GSM</label>
                 <MultiSelect
                   options={weights.map((weight) => ({ label: weight, value: weight }))}
                   selected={selectedWeights}
                   onChange={setSelectedWeights}
-                  placeholder="All Weights"
+                  placeholder="All GSM"
                 />
               </div>
             </div>

@@ -763,7 +763,7 @@ export default function MaterialSelectorDialog({
                   </div>
 
                   <div>
-                    <Label className="text-sm font-medium">Weight</Label>
+                    <Label className="text-sm font-medium">GSM</Label>
                     <MultiSelect
                       options={getUniqueProductWeights()
                         .filter((weight) => weight && weight.trim() !== '')
@@ -773,7 +773,7 @@ export default function MaterialSelectorDialog({
                         setSelectedWeight(values);
                         setProductsPage(1);
                       }}
-                      placeholder="All Weights"
+                      placeholder="All GSM"
                     />
                   </div>
                 </div>

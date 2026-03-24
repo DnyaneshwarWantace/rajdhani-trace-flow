@@ -689,7 +689,7 @@ export default function RecipeMaterialSelectionDialog({
                                 )}
                                 {material.weight && (
                                   <div className="truncate">
-                                    <span className="font-medium">Weight:</span> {material.weight} {material.weight_unit}
+                                    <span className="font-medium">GSM:</span> {material.weight} {material.weight_unit}
                                   </div>
                                 )}
                               </>

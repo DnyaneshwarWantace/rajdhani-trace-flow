@@ -179,7 +179,7 @@ export default function OrderItemForm({
             )}
             {productWithUnits.weight && (
               <div>
-                <span className="font-medium text-gray-700">Weight:</span>
+                <span className="font-medium text-gray-700">GSM:</span>
                 <span className="ml-2 text-gray-900">
                   {productWithUnits.weight} {productWithUnits.weight_unit ? productWithUnits.weight_unit : ''}
                 </span>

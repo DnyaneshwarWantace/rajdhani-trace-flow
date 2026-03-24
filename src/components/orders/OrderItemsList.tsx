@@ -24,7 +24,7 @@ function CollapsedItemSummary({
   if (p?.length && (p.length_unit || p.length)) specs.push({ label: 'Length', value: `${p.length} ${p.length_unit || ''}`.trim() });
   if (p?.width && (p.width_unit || p.width)) specs.push({ label: 'Width', value: `${p.width} ${p.width_unit || ''}`.trim() });
   if (p?.height && (p.height_unit || p.height)) specs.push({ label: 'Height', value: `${p.height} ${p.height_unit || ''}`.trim() });
-  if (p?.weight && (p.weight_unit || p.weight)) specs.push({ label: 'Weight', value: `${p.weight} ${p.weight_unit || ''}`.trim() });
+  if (p?.weight && (p.weight_unit || p.weight)) specs.push({ label: 'GSM', value: `${p.weight} ${p.weight_unit || ''}`.trim() });
   if (p?.gsm) specs.push({ label: 'GSM', value: String(p.gsm) });
   if (p?.pattern) specs.push({ label: 'Pattern', value: p.pattern });
   if (p?.color) specs.push({ label: 'Color', value: p.color });
