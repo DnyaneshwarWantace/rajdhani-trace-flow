@@ -32,7 +32,7 @@ import {
 export default function ManageStock() {
   const { toast } = useToast();
   const [orders, setOrders] = useState<StockOrder[]>([]);
-  const [totalOrders, setTotalOrders] = useState(0);
+  const [, setTotalOrders] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [stats, setStats] = useState<OrderStats>({
@@ -82,11 +82,12 @@ export default function ManageStock() {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      // Fetch all orders without server-side status filter — status is mapped
+      // from 'delivered' → 'received' in the service transform, so we filter client-side
       const { data, count } = await ManageStockService.getOrders({
         search: filters.search,
-        status: filters.status,
-        limit: filters.limit,
-        offset: (filters.page - 1) * filters.limit,
+        limit: 1000,
+        offset: 0,
       });
       setOrders(data);
       setTotalOrders(count || data.length);
@@ -178,15 +179,24 @@ export default function ManageStock() {
     setIsDetailsDialogOpen(true);
   };
 
-  const filteredOrders = orders.filter((order) => {
+  const allFiltered = orders.filter((order) => {
     const matchesSearch =
+      !filters.search ||
       order.materialName.toLowerCase().includes(filters.search.toLowerCase()) ||
       order.supplier.toLowerCase().includes(filters.search.toLowerCase());
     const matchesStatus =
       filters.status === 'all' ||
-      (Array.isArray(filters.status) ? filters.status.includes(order.status) : order.status === filters.status);
+      (Array.isArray(filters.status)
+        ? filters.status.length === 0 || filters.status.includes(order.status)
+        : order.status === filters.status);
     return matchesSearch && matchesStatus;
   });
+
+  const filteredTotal = allFiltered.length;
+  const filteredOrders = allFiltered.slice(
+    (filters.page - 1) * filters.limit,
+    filters.page * filters.limit
+  );
 
   return (
     <Layout>
@@ -242,8 +252,8 @@ export default function ManageStock() {
         )}
 
         {/* Pagination */}
-        {!loading && totalOrders > 0 && (() => {
-          const totalPages = Math.ceil(totalOrders / filters.limit);
+        {!loading && filteredTotal > 0 && (() => {
+          const totalPages = Math.ceil(filteredTotal / filters.limit);
           const pages: (number | 'ellipsis')[] = [];
 
           if (totalPages <= 7) {
@@ -313,7 +323,7 @@ export default function ManageStock() {
 
               <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                  Showing {(filters.page - 1) * filters.limit + 1} to {Math.min(filters.page * filters.limit, totalOrders)} of {totalOrders} orders
+                  Showing {(filters.page - 1) * filters.limit + 1} to {Math.min(filters.page * filters.limit, filteredTotal)} of {filteredTotal} orders
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">Per page:</label>
