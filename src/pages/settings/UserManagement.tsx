@@ -161,6 +161,7 @@ export default function UserManagement() {
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
     setEditForm({
+      email: user.email,
       full_name: user.full_name,
       role: user.role,
       phone: (user as any).phone || '',
@@ -592,8 +593,19 @@ export default function UserManagement() {
           <div className="space-y-4">
             <div>
               <Label>Email</Label>
-              <Input value={selectedUser?.email || ''} disabled className="bg-gray-100" />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+              {currentUser?.role === 'super-admin' ? (
+                <Input
+                  value={editForm.email ?? selectedUser?.email ?? ''}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="mt-1"
+                  placeholder="Email address"
+                />
+              ) : (
+                <>
+                  <Input value={selectedUser?.email || ''} disabled className="bg-gray-100" />
+                  <p className="text-xs text-gray-500 mt-1">Only super admin can change email addresses</p>
+                </>
+              )}
             </div>
             <div>
               <Label htmlFor="edit-full_name">Full Name *</Label>

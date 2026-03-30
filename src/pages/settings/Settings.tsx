@@ -32,6 +32,7 @@ export default function Settings() {
   // Profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
+    email: '',
     full_name: '',
     phone: '',
     department: '',
@@ -42,6 +43,7 @@ export default function Settings() {
   useEffect(() => {
     if (user) {
       setProfileData({
+        email: user.email || '',
         full_name: user.full_name || '',
         phone: (user as any).phone || '',
         department: (user as any).department || '',
@@ -171,6 +173,7 @@ export default function Settings() {
   const handleCancelEdit = () => {
     if (user) {
       setProfileData({
+        email: user.email || '',
         full_name: user.full_name || '',
         phone: (user as any).phone || '',
         department: (user as any).department || '',
@@ -285,9 +288,21 @@ export default function Settings() {
                       </div>
 
                       <div>
-                        <Label className="text-sm font-medium text-gray-500">Email</Label>
-                        <p className="text-lg font-medium mt-1 text-gray-400">{user?.email}</p>
-                        <p className="text-xs text-gray-400 mt-1">Email cannot be changed</p>
+                        <Label htmlFor="email">Email</Label>
+                        {user?.role === 'super-admin' ? (
+                          <Input
+                            id="email"
+                            value={profileData.email ?? user?.email ?? ''}
+                            onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                            className="mt-1"
+                            placeholder="Email address"
+                          />
+                        ) : (
+                          <>
+                            <p className="text-lg font-medium mt-1 text-gray-400">{user?.email}</p>
+                            <p className="text-xs text-gray-400 mt-1">Only super admin can change email addresses</p>
+                          </>
+                        )}
                       </div>
 
                       <div>
