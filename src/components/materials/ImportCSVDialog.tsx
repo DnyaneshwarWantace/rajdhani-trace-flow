@@ -115,6 +115,8 @@ export default function ImportCSVDialog({
           total: 0,
           success: 0,
           failed: 0,
+          skipped: 0,
+          skippedNames: [],
           errors: [],
         });
       } catch (error) {
