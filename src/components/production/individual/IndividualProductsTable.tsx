@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,13 @@ export default function IndividualProductsTable({
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
   const [localProducts, setLocalProducts] = useState<IndividualProduct[]>(individualProducts);
+  // Ref stays in sync with localProducts so async handlers always read the latest value
+  // even when React state hasn't re-rendered yet (e.g. onBlur + onValueChange racing)
+  const localProductsRef = useRef<IndividualProduct[]>(individualProducts);
+  const setLocalProductsSync = (products: IndividualProduct[]) => {
+    localProductsRef.current = products;
+    setLocalProducts(products);
+  };
   const [validationError, setValidationError] = useState<string | null>(null);
   const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string; roll_number?: string} | null>(null);
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
@@ -180,7 +187,7 @@ export default function IndividualProductsTable({
     const localIds = localProducts.map(p => p.id).join(',');
     const mergedIds = merged.map(p => p.id).join(',');
     if (localIds !== mergedIds || merged.length !== localProducts.length) {
-      setLocalProducts(merged);
+      setLocalProductsSync(merged);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [individualProducts, plannedQuantity, productId, batchId]);
@@ -252,9 +259,10 @@ export default function IndividualProductsTable({
 
   const handleCellSave = async () => {
     if (!editingCell) return;
-    
+
     const { row, col } = editingCell;
-    const productItem = localProducts[row];
+    // Use ref so we always get the latest state even if a select change fired just before blur
+    const productItem = localProductsRef.current[row];
     
     try {
       setSaving(productItem.id);
@@ -328,7 +336,7 @@ export default function IndividualProductsTable({
       // Update local state first
       const updated = [...localProducts];
       updated[row] = { ...updated[row], ...updateData };
-      setLocalProducts(updated);
+      setLocalProductsSync(updated);
       
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
@@ -388,7 +396,7 @@ export default function IndividualProductsTable({
 
             // Update local state with the real product
             updated[row] = newProduct;
-            setLocalProducts(updated);
+            setLocalProductsSync(updated);
 
             toast({
               title: 'Saved to Stock',
@@ -419,14 +427,15 @@ export default function IndividualProductsTable({
       // Revert local state on error
       const reverted = [...localProducts];
       reverted[row] = productItem;
-      setLocalProducts(reverted);
+      setLocalProductsSync(reverted);
     } finally {
       setSaving(null);
     }
   };
 
   const handleSelectChange = async (row: number, field: string, value: string) => {
-    const productItem = localProducts[row];
+    // Use ref to get latest state — cell input blur may have updated state just before this fires
+    const productItem = localProductsRef.current[row];
     
     try {
       setSaving(productItem.id);
@@ -437,7 +446,7 @@ export default function IndividualProductsTable({
       // Update local state first
       const updated = [...localProducts];
       updated[row] = { ...updated[row], ...updateData };
-      setLocalProducts(updated);
+      setLocalProductsSync(updated);
       
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
@@ -488,7 +497,7 @@ export default function IndividualProductsTable({
 
             // Update local state with the real product
             updated[row] = newProduct;
-            setLocalProducts(updated);
+            setLocalProductsSync(updated);
 
             toast({
               title: 'Saved to Stock',
@@ -515,7 +524,7 @@ export default function IndividualProductsTable({
       // Revert local state on error
       const reverted = [...localProducts];
       reverted[row] = productItem;
-      setLocalProducts(reverted);
+      setLocalProductsSync(reverted);
     } finally {
       setSaving(null);
     }
@@ -528,20 +537,20 @@ export default function IndividualProductsTable({
       product_id: productId || '',
       qr_code: '',
       serial_number: '',
+      roll_number: '',
       status: 'available', // Default to available
       production_date: new Date().toISOString().split('T')[0],
       batch_number: batchId || '',
       final_weight: '',
       final_width: '',
       final_length: '',
-  
       inspector: '',
       location: '',
       notes: '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setLocalProducts([...localProducts, newProduct]);
+    setLocalProductsSync([...localProducts, newProduct]);
   };
 
   const handleCopyRow = (index: number) => {
@@ -598,7 +607,7 @@ export default function IndividualProductsTable({
       [field]: cleanValue,
     };
 
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
 
     // Check if all required fields are now filled after this update
     const tempProduct = updated[targetIndex];
@@ -626,7 +635,7 @@ export default function IndividualProductsTable({
           variant: 'destructive',
         });
         // Revert on error
-        setLocalProducts(localProducts);
+        setLocalProductsSync(localProducts);
       }
     } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled, create the product
@@ -648,7 +657,7 @@ export default function IndividualProductsTable({
         
         // Update local state with the real product
         updated[targetIndex] = newProduct;
-        setLocalProducts(updated);
+        setLocalProductsSync(updated);
         
         toast({
           title: 'Filled Down & Created',
@@ -703,7 +712,7 @@ export default function IndividualProductsTable({
       location: cleanLocation,
     };
 
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
 
     const tempProduct = updated[targetIndex];
     const hasRequiredFields =
@@ -732,7 +741,7 @@ export default function IndividualProductsTable({
           variant: 'destructive',
         });
         // Revert on error
-        setLocalProducts(localProducts);
+        setLocalProductsSync(localProducts);
       }
     } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled (including location), create the product
@@ -753,7 +762,7 @@ export default function IndividualProductsTable({
         });
 
         updated[targetIndex] = newProduct;
-        setLocalProducts(updated);
+        setLocalProductsSync(updated);
 
         toast({
           title: 'Location Filled Down & Created',
@@ -821,7 +830,7 @@ export default function IndividualProductsTable({
       ...updateData,
     };
 
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
 
     // Check if target row (temp) now has all required fields for auto-create
     const tempProduct = updated[targetIndex];
@@ -865,7 +874,7 @@ export default function IndividualProductsTable({
           batch_number: batchId || '',
         });
         updated[targetIndex] = newProduct;
-        setLocalProducts(updated);
+        setLocalProductsSync(updated);
         toast({
           title: 'Filled Down & Created',
           description: 'Row copied to next row and product created successfully. QR code generated.',
@@ -914,7 +923,7 @@ export default function IndividualProductsTable({
       location: cleanLocation,
     }));
 
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
 
     // Save location for all existing (non-temp) rows
     try {
@@ -977,7 +986,7 @@ export default function IndividualProductsTable({
       ...updated[index],
       ...updateData,
     };
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
 
     // Check if all required fields are now filled
     const tempProduct = updated[index];
@@ -1003,7 +1012,7 @@ export default function IndividualProductsTable({
           variant: 'destructive',
         });
         // Revert on error
-        setLocalProducts(localProducts);
+        setLocalProductsSync(localProducts);
       }
     } else if (productItem.id && productItem.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled, create the product
@@ -1025,7 +1034,7 @@ export default function IndividualProductsTable({
         
         // Update local state with the real product
         updated[index] = newProduct;
-        setLocalProducts(updated);
+        setLocalProductsSync(updated);
         
         toast({
           title: 'Pasted & Created',
@@ -1072,7 +1081,7 @@ export default function IndividualProductsTable({
     const updated = localProducts.map((row, i) =>
       i === sourceIndex ? row : { ...row, ...template }
     );
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
     toast({
       title: 'Applied to all rows',
       description: `Same Weight, Width, Length and Location applied to all ${localProducts.length} row(s). Save or edit as needed.`,
@@ -1102,7 +1111,7 @@ export default function IndividualProductsTable({
     // (e.g., due to defects or measurement variations)
     const productToRemove = localProducts[index];
     const updated = localProducts.filter((_, i) => i !== index);
-    setLocalProducts(updated);
+    setLocalProductsSync(updated);
     
     // If it's a real product (not temp), delete from backend
     // Local state is already updated above, no need to refresh
@@ -1123,7 +1132,7 @@ export default function IndividualProductsTable({
             variant: 'destructive',
           });
           // Revert local state on error
-          setLocalProducts(localProducts);
+          setLocalProductsSync(localProducts);
         });
     }
   };
