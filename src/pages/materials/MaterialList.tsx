@@ -42,8 +42,9 @@ import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { canDelete, canView } from '@/utils/permissions';
+import { canCreate, canDelete, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 type TabValue = 'inventory' | 'assigned-tasks' | 'waste-recovery' | 'analytics' | 'notifications';
 
@@ -697,6 +698,21 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     }
   };
 
+  useLiveSyncRefresh({
+    modules: ['materials', 'manage_stock', 'orders'],
+    onRefresh: () => {
+      loadAssignedTasks();
+      if (activeTab === 'inventory') {
+        loadMaterialsFast();
+      }
+      if (activeTab === 'notifications') {
+        loadNotifications(true);
+      }
+      loadStats();
+    },
+    pollingMs: 6000,
+  });
+
   const handleCreateOrderFromAssignedTask = async (task: any) => {
     const shortages = task?.related_data?.shortages || [];
     const primary = shortages[0] || {
@@ -1012,10 +1028,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         <MaterialHeader
           title={pageTitle}
           subtitle={pageSubtitle}
-          onImportCSV={activeTab === 'inventory' ? handleImportCSV : undefined}
+          onImportCSV={activeTab === 'inventory' && canCreate('materials') ? handleImportCSV : undefined}
           onExport={activeTab === 'inventory' ? handleExport : undefined}
           onAddToInventory={activeTab === 'inventory' ? handleAddToInventory : undefined}
-          onAddMaterial={handleCreate}
+          onAddMaterial={canCreate('materials') ? handleCreate : undefined}
           viewMode={viewMode}
           onViewModeChange={activeTab === 'inventory' ? setViewMode : undefined}
         />
