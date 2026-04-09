@@ -23,6 +23,63 @@ export default function ProductionTable({
   canDelete,
   allBatches = [],
 }: ProductionTableProps) {
+  const getAttachedOrderNumbers = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Orders:\s*(.+)$/i);
+    if (!match?.[1]) return [];
+    const raw = match[1]
+      .split('·')[0]
+      .trim();
+    const idMatches = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+    const parsed = (idMatches.length > 0 ? idMatches : raw.split(','))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set(parsed));
+  };
+  const getAttachedOrderCustomers = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Customers:\s*(.+)$/i);
+    if (match?.[1]) {
+      const parsed = match[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((entry) => entry.split(':').slice(1).join(':').trim())
+        .filter(Boolean);
+      if (parsed.length > 0) return Array.from(new Set(parsed));
+    }
+    const fallback = notes.match(/Order\s+[A-Z]{2,}-\d{6}-\d{3,}\s+For\s+(.+?)(?:\s*·|$)/i)?.[1]?.trim();
+    return fallback ? [fallback] : [];
+  };
+  const getAttachedOrderCustomerMap = (notes?: string): Record<string, string> => {
+    if (!notes) return {};
+    const map: Record<string, string> = {};
+    const orderIds = getAttachedOrderNumbers(notes);
+    const customersRawMatch = notes.match(/Attached Customers:\s*(.+)$/i);
+    const customersRaw = customersRawMatch?.[1] || '';
+    if (customersRaw) {
+      const entries = customersRaw.split(',').map((s) => s.trim()).filter(Boolean);
+      entries.forEach((entry, idx) => {
+        const [left, ...rightParts] = entry.split(':');
+        const possibleOrderId = (left || '').trim();
+        const possibleCustomer = rightParts.join(':').trim();
+        if (possibleCustomer && /[A-Z]{2,}-\d{6}-\d{3,}/.test(possibleOrderId)) {
+          map[possibleOrderId] = possibleCustomer;
+          return;
+        }
+        if (orderIds[idx] && entry) {
+          map[orderIds[idx]] = possibleCustomer || entry;
+        }
+      });
+    }
+    if (Object.keys(map).length === 0) {
+      const fallback = notes.match(/Order\s+([A-Z]{2,}-\d{6}-\d{3,})\s+For\s+(.+?)(?:\s*·|$)/i);
+      if (fallback?.[1] && fallback?.[2]) {
+        map[fallback[1].trim()] = fallback[2].trim();
+      }
+    }
+    return map;
+  };
   const navigate = useNavigate();
 
   const isOverdue = (batch: ProductionBatch): boolean => {
@@ -222,6 +279,9 @@ export default function ProductionTable({
                 Product
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Order Info
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quantity
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -238,6 +298,9 @@ export default function ProductionTable({
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Stage
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Assigned To
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -258,6 +321,38 @@ export default function ProductionTable({
                 </td>
                 <td className="px-4 py-4">
                   <TruncatedText text={batch.product_name || 'N/A'} maxLength={30} className="text-sm text-gray-900" />
+                  <div className="text-[11px] text-gray-500 mt-1">
+                    Final Target: {(batch.final_target_display || batch.product_name || 'Product')} ({batch.planned_quantity})
+                  </div>
+                </td>
+                <td className="px-4 py-4">
+                  {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
+                    <div className="space-y-0.5">
+                      {(() => {
+                        const attachedOrders = getAttachedOrderNumbers(batch.notes);
+                        const orderCustomerMap = getAttachedOrderCustomerMap(batch.notes);
+                        const primaryOrder = batch.order_number || attachedOrders[0] || 'Linked Order';
+                        const primaryCustomer =
+                          batch.customer_name ||
+                          orderCustomerMap[primaryOrder] ||
+                          getAttachedOrderCustomers(batch.notes)[0] ||
+                          'Customer not linked';
+                        return (
+                          <>
+                            <div className="text-xs font-medium text-gray-900">{primaryOrder}</div>
+                            <div className="text-xs text-gray-600">{primaryCustomer}</div>
+                          </>
+                        );
+                      })()}
+                      {getAttachedOrderNumbers(batch.notes).length > 1 && (
+                        <div className="text-[11px] text-indigo-700">
+                          +{getAttachedOrderNumbers(batch.notes).length - 1} more attached order(s)
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">No order linked</span>
+                  )}
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900" data-quantity={batch.planned_quantity}>
                   {batch.planned_quantity}
@@ -300,6 +395,22 @@ export default function ProductionTable({
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   {getStageButton(batch)}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap">
+                  {(() => {
+                    const name = batch.current_stage_assigned_to_name || batch.assigned_to_name;
+                    if (name) {
+                      return (
+                        <span className="flex items-center gap-1.5 text-xs text-gray-700">
+                          <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-xs shrink-0">
+                            {name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="truncate max-w-[100px]">{name}</span>
+                        </span>
+                      );
+                    }
+                    return <span className="text-xs text-gray-400">—</span>;
+                  })()}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>

@@ -418,6 +418,7 @@ export default function ProductionIndividualProducts() {
           actionLabel="Proceed to Wastage"
         />
       </div>
+
     </Layout>
   );
 }

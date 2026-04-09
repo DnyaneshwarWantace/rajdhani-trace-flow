@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { canAccessPage } from '@/utils/permissions';
+import { ProductionService } from '@/services/productionService';
+import { OrderService } from '@/services/orderService';
 
 interface MenuItem {
   name: string;
@@ -157,6 +159,8 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(null);
   const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+  const [productionAssignedCount, setProductionAssignedCount] = useState(0);
+  const [materialsAssignedCount, setMaterialsAssignedCount] = useState(0);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -181,6 +185,58 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
       setTooltipPosition(null);
     }
   }, [hoveredItem]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSidebarTaskCounts = async () => {
+      if (!user?.id) {
+        if (!cancelled) {
+          setProductionAssignedCount(0);
+          setMaterialsAssignedCount(0);
+        }
+        return;
+      }
+
+      const [productionResult, materialResult] = await Promise.all([
+        canAccessPage('production')
+          ? ProductionService.getTasks({ assigned_to: user.id, limit: 300 })
+          : Promise.resolve({ data: [], error: null } as any),
+        canAccessPage('materials')
+          ? OrderService.getMyMaterialProcurementTasks()
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (cancelled) return;
+
+      const productionActive = (productionResult?.data || []).filter((task: any) =>
+        String(task?.status || '').toLowerCase() === 'assigned'
+      ).length;
+      const materialsPending = (materialResult?.data || []).filter((task: any) => {
+        const taskStatus = String(task?.related_data?.task_status || '').toLowerCase();
+        const notificationStatus = String(task?.status || '').toLowerCase();
+        const hasCreatedPurchaseOrder = Boolean(task?.related_data?.purchase_order_id);
+
+        // Hide from count once completed/cancelled/dismissed or order already created.
+        if (hasCreatedPurchaseOrder) return false;
+        if (notificationStatus === 'dismissed') return false;
+        if (taskStatus === 'completed' || taskStatus === 'cancelled') return false;
+
+        // Default visible only for active task states.
+        return taskStatus === 'assigned' || taskStatus === 'in_progress' || taskStatus === '';
+      }).length;
+
+      setProductionAssignedCount(productionActive);
+      setMaterialsAssignedCount(materialsPending);
+    };
+
+    loadSidebarTaskCounts();
+    const interval = window.setInterval(loadSidebarTaskCounts, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [user?.id, permissionsVersion]);
 
   return (
     <>
@@ -265,8 +321,31 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
                 {/* Text - Show when sidebar is open */}
                 {isOpen && (
-                  <span className="font-medium text-sm whitespace-nowrap">
-                    {item.name}
+                  <div className="flex items-center justify-between w-full min-w-0">
+                    <span className="font-medium text-sm whitespace-nowrap">
+                      {item.name}
+                    </span>
+                    {item.name === 'Production' && productionAssignedCount > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-700 rounded-full">
+                        {productionAssignedCount}
+                      </span>
+                    )}
+                    {item.name === 'Materials' && materialsAssignedCount > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-700 rounded-full">
+                        {materialsAssignedCount}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {!isOpen && item.name === 'Production' && productionAssignedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold bg-indigo-600 text-white rounded-full">
+                    {productionAssignedCount}
+                  </span>
+                )}
+                {!isOpen && item.name === 'Materials' && materialsAssignedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-semibold bg-indigo-600 text-white rounded-full">
+                    {materialsAssignedCount}
                   </span>
                 )}
 

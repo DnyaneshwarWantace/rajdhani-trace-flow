@@ -58,6 +58,7 @@ export interface CreateStockOrderData {
     unit_price: number;
     total_price: number;
   }>;
+  procurement_task_id?: string;
 }
 
 export interface OrderStats {

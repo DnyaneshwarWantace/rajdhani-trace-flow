@@ -3,6 +3,25 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// Prevent accidental mouse-wheel increments on number inputs globally.
+if (typeof window !== 'undefined') {
+  document.addEventListener(
+    'wheel',
+    (e) => {
+      const activeElement = document.activeElement;
+      if (
+        activeElement &&
+        activeElement instanceof HTMLInputElement &&
+        activeElement.type === 'number'
+      ) {
+        e.preventDefault();
+        activeElement.blur();
+      }
+    },
+    { passive: false }
+  );
+}
+
 // Prevent text selection on single tap (mobile only)
 // Allow selection on long press
 if (typeof window !== 'undefined' && window.innerWidth < 1024) {

@@ -714,6 +714,9 @@ export default function OrderDetails() {
               currentStatus={order.status}
             />
 
+            {/* Production Information - moved to main flow below timeline */}
+            <OrderProductionInfo order={order} />
+
             {/* Special Instructions */}
             {order.special_instructions && (
               <Card>
@@ -758,9 +761,6 @@ export default function OrderDetails() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Production Information - Show for pending/accepted orders */}
-            <OrderProductionInfo order={order} />
 
             {/* Payment Summary - no edit when order is cancelled */}
             <EditablePaymentCard

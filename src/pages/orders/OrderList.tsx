@@ -51,9 +51,9 @@ export default function OrderList() {
     loadOrders();
   }, [filters]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (showLoader = true) => {
     try {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       const searchQuery = filters.search?.trim();
       const { data, error, count } = await OrderService.getOrders({
         search: searchQuery && searchQuery.length >= 3 ? searchQuery : undefined,
@@ -86,7 +86,7 @@ export default function OrderList() {
       });
       setOrders([]);
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
@@ -128,7 +128,23 @@ export default function OrderList() {
         description: `Order status updated to ${newStatus}`,
       });
 
-      loadOrders();
+      // Optimistic row update to avoid full list reload flicker.
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId
+            ? {
+                ...order,
+                status: newStatus,
+                ...(newStatus === 'accepted' ? { acceptedAt: new Date().toISOString() } : {}),
+                ...(newStatus === 'dispatched' ? { dispatchedAt: new Date().toISOString() } : {}),
+                ...(newStatus === 'delivered' ? { deliveredAt: new Date().toISOString() } : {}),
+              }
+            : order
+        )
+      );
+
+      // Refresh data silently in background so table stays stable.
+      loadOrders(false);
       loadStats();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -142,6 +158,24 @@ export default function OrderList() {
 
   const handleViewDetails = (order: Order) => {
     navigate(`/orders/${order.id}`);
+  };
+
+  const handleCreateMaterialTask = async (order: Order, payload: { assigned_to_id?: string; material_id?: string }) => {
+    const result = await OrderService.createMaterialProcurementTask(order.id, payload);
+    if (!result.success) {
+      toast({
+        title: 'Error',
+        description: result.error || 'Failed to assign material task',
+        variant: 'destructive',
+      });
+      return;
+    }
+    toast({
+      title: 'Task Assigned',
+      description: payload.assigned_to_id
+        ? 'Material task assigned successfully.'
+        : 'Material task sent to all eligible users.',
+    });
   };
 
   const handleFilterChange = (key: string, value: any) => {
@@ -246,6 +280,7 @@ export default function OrderList() {
                   orders={orders}
                   onStatusUpdate={handleStatusUpdate}
                   onViewDetails={handleViewDetails}
+                  onCreateMaterialTask={handleCreateMaterialTask}
                 />
               ) : (
                 <div className="columns-1 lg:columns-2 xl:columns-3 gap-4 space-y-4">
@@ -255,6 +290,7 @@ export default function OrderList() {
                         order={order}
                         onStatusUpdate={handleStatusUpdate}
                         onViewDetails={handleViewDetails}
+                        onCreateMaterialTask={handleCreateMaterialTask}
                       />
                     </div>
                   ))}
@@ -271,6 +307,7 @@ export default function OrderList() {
                     order={order}
                     onStatusUpdate={handleStatusUpdate}
                     onViewDetails={handleViewDetails}
+                    onCreateMaterialTask={handleCreateMaterialTask}
                   />
                 ))}
               </div>

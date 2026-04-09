@@ -19,6 +19,21 @@ export interface ProductionBatch {
   operator?: string;
   supervisor?: string;
   notes?: string;
+  // Order linkage
+  order_number?: string;
+  customer_name?: string;
+  final_target_display?: string;
+  final_targets?: Array<{
+    order_number: string;
+    product_names: string[];
+  }>;
+  // Assignment / forwarding fields
+  assigned_to?: string;
+  assigned_to_name?: string;
+  assigned_to_email?: string;
+  current_stage_assigned_to?: string;
+  current_stage_assigned_to_name?: string;
+  current_stage?: string;
   cancellation_details?: {
     cancelled_by?: string;
     cancelled_at?: string;
@@ -90,6 +105,28 @@ export interface CreateProductionBatchData {
   supervisor?: string;
   notes?: string;
   machine_id?: string;
+}
+
+export interface ProductionTask {
+  id: string;
+  order_id: string;
+  order_number?: string;
+  customer_name?: string;
+  stage_product_id: string;
+  stage_product_name: string;
+  final_product_id: string;
+  final_product_name: string;
+  planned_quantity: number;
+  assigned_to_id: string;
+  assigned_to_name: string;
+  created_by?: string;
+  created_by_name?: string;
+  status: 'assigned' | 'in_progress' | 'planning' | 'completed' | 'cancelled';
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface UpdateProductionBatchData extends Partial<CreateProductionBatchData> {
@@ -669,6 +706,155 @@ export class ProductionService {
       console.error('Error in createProductionFlowStep:', error);
       return { data: null, error: 'Failed to create production flow step' };
     }
+  }
+
+  // Assignment methods
+  static async assignBatch(batchId: string, userId: string, userName: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          assigned_to: userId,
+          assigned_to_name: userName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: getServiceError(response, result) };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in assignBatch:', error);
+      return { data: null, error: 'Failed to assign batch' };
+    }
+  }
+
+  static async assignStage(batchId: string, stage: string, userId: string, userName: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          current_stage: stage,
+          current_stage_assigned_to: userId,
+          current_stage_assigned_to_name: userName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: getServiceError(response, result) };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in assignStage:', error);
+      return { data: null, error: 'Failed to assign stage' };
+    }
+  }
+
+  // Production Task methods (assignment-first workflow)
+  static async createTask(taskData: {
+    order_id: string;
+    order_number?: string;
+    customer_name?: string;
+    stage_product_id: string;
+    stage_product_name: string;
+    final_product_id: string;
+    final_product_name: string;
+    planned_quantity: number;
+    assigned_to_id: string;
+    assigned_to_name: string;
+    notes?: string;
+  }): Promise<{ data: ProductionTask | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/tasks`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(taskData),
+      });
+      const result = await response.json();
+      if (!response.ok) return { data: null, error: getServiceError(response, result) };
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in createTask:', error);
+      return { data: null, error: 'Failed to create production task' };
+    }
+  }
+
+  static async getTasks(filters?: {
+    assigned_to?: string;
+    status?: 'assigned' | 'in_progress' | 'planning' | 'completed' | 'cancelled';
+    order_id?: string;
+    stage_product_id?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ data: ProductionTask[] | null; error: string | null; count?: number }> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.assigned_to) params.append('assigned_to', filters.assigned_to);
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.order_id) params.append('order_id', filters.order_id);
+      if (filters?.stage_product_id) params.append('stage_product_id', filters.stage_product_id);
+      if (filters?.limit != null) params.append('limit', String(filters.limit));
+      if (filters?.offset != null) params.append('offset', String(filters.offset));
+
+      const response = await fetch(`${API_URL}/production/tasks?${params}`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+      if (!response.ok) return { data: null, error: getServiceError(response, result) };
+      return { data: result.data || [], error: null, count: result.count };
+    } catch (error) {
+      console.error('Error in getTasks:', error);
+      return { data: null, error: 'Failed to fetch production tasks' };
+    }
+  }
+
+  static async updateTaskStatus(taskId: string, status: 'assigned' | 'in_progress' | 'planning' | 'completed' | 'cancelled'): Promise<{ data: ProductionTask | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/tasks/${taskId}/status`, {
+        method: 'PATCH',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json();
+      if (!response.ok) return { data: null, error: getServiceError(response, result) };
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in updateTaskStatus:', error);
+      return { data: null, error: 'Failed to update task status' };
+    }
+  }
+
+  static async linkOrderToBatch(batchId: string, orderId: string): Promise<{ data: ProductionBatch | null; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ order_id: orderId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: getServiceError(response, result) };
+      }
+
+      return { data: result.data, error: null };
+    } catch (error) {
+      console.error('Error in linkOrderToBatch:', error);
+      return { data: null, error: 'Failed to link order to batch' };
+    }
+  }
+
+  static async getBatchesByOrderId(orderId: string): Promise<{ data: ProductionBatch[] | null; error: string | null }> {
+    return this.getBatches({ order_id: orderId });
   }
 }
 

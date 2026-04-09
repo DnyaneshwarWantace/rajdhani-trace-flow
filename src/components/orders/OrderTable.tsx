@@ -1,14 +1,20 @@
-import { ShoppingCart, User, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ShoppingCart, User, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
-import type { Order } from '@/services/orderService';
+import { OrderService, type Order, type OrderItem } from '@/services/orderService';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import OrderProductionInfo from './OrderProductionInfo';
+import SendToProductionModal from '@/components/production/SendToProductionModal';
+import AssignMaterialTaskModal from '@/components/orders/AssignMaterialTaskModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { ProductionService } from '@/services/productionService';
 
 interface OrderTableProps {
   orders: Order[];
   onStatusUpdate: (orderId: string, newStatus: string) => void;
   onViewDetails: (order: Order) => void;
+  onCreateMaterialTask: (order: Order, payload: { assigned_to_id?: string; material_id?: string }) => Promise<void>;
 }
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -21,9 +27,216 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
-export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: OrderTableProps) {
+export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCreateMaterialTask }: OrderTableProps) {
+  const [sendToProductionOrder, setSendToProductionOrder] = useState<Order | null>(null);
+  const [sendToProductionItem, setSendToProductionItem] = useState<OrderItem | null>(null);
+  const [pickProductionOrder, setPickProductionOrder] = useState<Order | null>(null);
+  const [materialTaskOrder, setMaterialTaskOrder] = useState<Order | null>(null);
+  const [pickRawMaterialOrder, setPickRawMaterialOrder] = useState<Order | null>(null);
+  const [selectedRawMaterialId, setSelectedRawMaterialId] = useState<string | null>(null);
+  const [orderResponsibleUsers, setOrderResponsibleUsers] = useState<Record<string, string>>({});
+  const [orderStageInfo, setOrderStageInfo] = useState<Record<string, { stage: string; assignedTo?: string; status: string }>>({});
+  const [orderProductProgress, setOrderProductProgress] = useState<Record<string, Record<string, { required: number; produced: number }>>>({});
+  const [batchesByOrder, setBatchesByOrder] = useState<Record<string, any[]>>({});
+  const [productionInfoOrder, setProductionInfoOrder] = useState<Order | null>(null);
+  const [rawMaterialStatusByOrder, setRawMaterialStatusByOrder] = useState<Record<string, any[]>>({});
+
+  const getAttachedOrderNumbers = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Orders:\s*(.+)$/i);
+    if (!match?.[1]) return [];
+    const raw = match[1].split('·')[0].trim();
+    const orderNos = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+    return Array.from(new Set(orderNos.map((v) => v.trim()).filter(Boolean)));
+  };
+
+  const getAttachedOrderIds = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+    if (!match?.[1]) return [];
+    return Array.from(
+      new Set(
+        match[1]
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const activeOrderIds = orders
+          .filter((o) => o.status === 'pending' || o.status === 'accepted')
+          .map((o) => o.id);
+        const [taskRequests, batchesResult] = await Promise.all([
+          activeOrderIds.length > 0
+            ? Promise.all(activeOrderIds.map((orderId) => ProductionService.getTasks({ order_id: orderId, limit: 100 })))
+            : Promise.resolve([]),
+          ProductionService.getBatches({ limit: 500 }),
+        ]);
+        if (cancelled) return;
+        const ownerMap: Record<string, string> = {};
+        const stageMap: Record<string, { stage: string; assignedTo?: string; status: string }> = {};
+        const orderNumberToId: Record<string, string> = {};
+        orders.forEach((o) => {
+          if (o.orderNumber) orderNumberToId[o.orderNumber] = o.id;
+        });
+        activeOrderIds.forEach((orderId, index) => {
+          const taskResponse = taskRequests[index] as Awaited<ReturnType<typeof ProductionService.getTasks>> | undefined;
+          const tasks = taskResponse?.data || [];
+          const activeTask = tasks.find((t) => t.status === 'assigned' || t.status === 'in_progress');
+          if (activeTask?.assigned_to_name) {
+            ownerMap[orderId] = activeTask.assigned_to_name;
+          }
+          const latestTask = tasks[0];
+          if (latestTask) {
+            stageMap[orderId] = {
+              stage: latestTask.stage_product_name || 'Production Stage',
+              assignedTo: latestTask.assigned_to_name,
+              status: latestTask.status,
+            };
+          }
+        });
+
+        // Include attached orders from batch notes so linked extra orders are also locked/visible.
+        const allBatches = batchesResult.data || [];
+        const allOrderBatchMap: Record<string, any[]> = {};
+        const progressMap: Record<string, Record<string, { required: number; produced: number }>> = {};
+
+        orders.forEach((order) => {
+          const productNeeds: Record<string, { required: number; produced: number }> = {};
+          (order.items || [])
+            .filter((item) => item.productType === 'product' && item.productId)
+            .forEach((item) => {
+              productNeeds[item.productId!] = {
+                required: Number(item.quantity || 0),
+                produced: 0,
+              };
+            });
+          progressMap[order.id] = productNeeds;
+          allOrderBatchMap[order.id] = [];
+        });
+
+        allBatches.forEach((batch) => {
+          const notes = batch.notes || '';
+          const attachedOrderNumbers = getAttachedOrderNumbers(notes);
+          const attachedOrderIds = getAttachedOrderIds(notes);
+          const linkedOrderIds = Array.from(
+            new Set([
+              ...(batch.order_id ? [batch.order_id] : []),
+              ...attachedOrderIds,
+              ...attachedOrderNumbers.map((orderNo) => orderNumberToId[orderNo]).filter(Boolean),
+            ])
+          );
+
+          linkedOrderIds.forEach((orderId) => {
+            if (!allOrderBatchMap[orderId]) allOrderBatchMap[orderId] = [];
+            allOrderBatchMap[orderId].push(batch);
+          });
+
+          attachedOrderNumbers.forEach((orderNumber) => {
+            const orderId = orderNumberToId[orderNumber];
+            if (!orderId) return;
+            if (!ownerMap[orderId]) {
+              ownerMap[orderId] = batch.current_stage_assigned_to_name || batch.assigned_to_name || batch.operator || '';
+            }
+            if (!stageMap[orderId]) {
+              stageMap[orderId] = {
+                stage: batch.product_name || 'Production Stage',
+                assignedTo: batch.current_stage_assigned_to_name || batch.assigned_to_name || batch.operator,
+                status: batch.status,
+              };
+            }
+          });
+        });
+
+        // Aggregate completed quantity per order + final product.
+        orders.forEach((order) => {
+          const linkedBatches = allOrderBatchMap[order.id] || [];
+          linkedBatches
+            .filter((b) => b.status === 'completed')
+            .forEach((b) => {
+              const productId = b.product_id;
+              if (!productId || !progressMap[order.id]?.[productId]) return;
+              const completedQty = Number(b.actual_quantity || b.planned_quantity || 0);
+              progressMap[order.id][productId].produced += completedQty;
+            });
+        });
+
+        // If order is fully completed for first product, show stage as Completed.
+        orders.forEach((order) => {
+          const firstProductItem = order.items?.find((item) => item.productType === 'product' && item.productId);
+          if (!firstProductItem?.productId) return;
+          const productProgress = progressMap[order.id]?.[firstProductItem.productId];
+          if (!productProgress) return;
+          if (productProgress.produced >= productProgress.required && productProgress.required > 0) {
+            stageMap[order.id] = {
+              stage: 'Production Completed',
+              assignedTo: stageMap[order.id]?.assignedTo,
+              status: 'completed',
+            };
+          }
+        });
+
+        setOrderResponsibleUsers(ownerMap);
+        setOrderStageInfo(stageMap);
+        setOrderProductProgress(progressMap);
+        setBatchesByOrder(allOrderBatchMap);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error loading order responsible users:', error);
+          setOrderResponsibleUsers({});
+          setOrderStageInfo({});
+          setOrderProductProgress({});
+          setBatchesByOrder({});
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orders]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const activeOrderIds = orders
+          .filter((o) => o.status === 'pending' || o.status === 'accepted')
+          .map((o) => o.id);
+        if (activeOrderIds.length === 0) {
+          if (!cancelled) setRawMaterialStatusByOrder({});
+          return;
+        }
+        const responses = await Promise.all(activeOrderIds.map((id) => OrderService.getOrderRawMaterialStatus(id)));
+        if (cancelled) return;
+        const nextMap: Record<string, any[]> = {};
+        activeOrderIds.forEach((id, idx) => {
+          nextMap[id] = responses[idx]?.data || [];
+        });
+        setRawMaterialStatusByOrder(nextMap);
+      } catch {
+        if (!cancelled) setRawMaterialStatusByOrder({});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [orders]);
+
+  const handleSendToProduction = (e: React.MouseEvent, order: Order, productItem?: OrderItem) => {
+    e.stopPropagation();
+    const selectedItem = productItem || order.items?.find(item => item.productType === 'product' && item.productId);
+    if (!selectedItem) return;
+    setSendToProductionOrder(order);
+    setSendToProductionItem(selectedItem);
+  };
 
   return (
+    <>
+
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full table-fixed">
@@ -42,7 +255,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                 Status
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[22%] min-w-[220px]">
-                Date & Production
+                Date
               </th>
               <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[16%] min-w-[120px]">
                 Actions
@@ -53,6 +266,45 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
             {orders.map((order) => {
               const status = statusConfig[order.status] || statusConfig.pending;
               const StatusIcon = status.icon;
+              const firstProductItem = order.items?.find(item => item.productType === 'product' && item.productId);
+              const firstProductProgress = firstProductItem?.productId
+                ? orderProductProgress[order.id]?.[firstProductItem.productId]
+                : undefined;
+              const requiredQty = Number(firstProductProgress?.required || firstProductItem?.quantity || 0);
+              const producedQty = Number(firstProductProgress?.produced || 0);
+              const canProduceMore = requiredQty > 0 ? producedQty < requiredQty : true;
+              const canShowProduceButton =
+                (order.status === 'pending' || order.status === 'accepted') &&
+                !!firstProductItem?.productId &&
+                canProduceMore;
+              const producibleItems = (order.items || []).filter((item) => {
+                if (!(item.productType === 'product' && item.productId)) return false;
+                const itemProgress = orderProductProgress[order.id]?.[item.productId || ''];
+                const itemRequired = Number(itemProgress?.required || item.quantity || 0);
+                const itemProduced = Number(itemProgress?.produced || 0);
+                return itemRequired > 0 ? itemProduced < itemRequired : true;
+              });
+              const rawStatuses = rawMaterialStatusByOrder[order.id] || [];
+              const rawStatusByKey = new Map<string, any>();
+              rawStatuses.forEach((s) => {
+                rawStatusByKey.set(String(s.material_id || ''), s);
+                rawStatusByKey.set(String(s.material_name || ''), s);
+              });
+              const rawItems = (order.items || []).filter((item) => item.productType === 'raw_material');
+              const pendingRawItems = rawItems.filter((item) => {
+                const statusInfo =
+                  rawStatusByKey.get(String(item.rawMaterialId || '')) ||
+                  rawStatusByKey.get(String(item.productName || ''));
+                const ps = String(statusInfo?.procurement_status || 'not_started');
+                return ps === 'not_started';
+              });
+              const hasRawNotStarted = rawItems.some((item) => {
+                const statusInfo =
+                  rawStatusByKey.get(String(item.rawMaterialId || '')) ||
+                  rawStatusByKey.get(String(item.productName || ''));
+                const ps = String(statusInfo?.procurement_status || 'not_started');
+                return ps === 'not_started';
+              });
 
               return (
                 <tr key={order.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewDetails(order)}>
@@ -74,7 +326,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                       <User className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                       <div className="min-w-0">
                         <div className="text-sm text-gray-900 truncate">
-                          <TruncatedText text={order.customerName} maxLength={18} as="span" />
+                          <TruncatedText text={order.customerName} maxLength={18} as="span" showTooltip={false} />
                         </div>
                         <div className="text-sm font-medium text-gray-900 mt-1">
                           {formatCurrency(order.totalAmount, { full: true })}
@@ -94,7 +346,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                           {order.items.slice(0, 2).map((item, idx) => (
                             <div key={idx} className="text-xs">
                               <div className="font-medium text-gray-900 truncate">
-                                <TruncatedText text={item.productName} maxLength={25} as="span" />
+                                <TruncatedText text={item.productName} maxLength={25} as="span" showTooltip={false} />
                               </div>
                               <div className="text-gray-600 truncate">
                                 Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}
@@ -141,18 +393,29 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                             </div>
                           );
                         })()}
+                        {orderStageInfo[order.id] && (
+                          <div className="text-xs text-indigo-700 mt-1">
+                            Stage: {orderStageInfo[order.id].stage}
+                            {orderStageInfo[order.id].assignedTo ? ` · ${orderStageInfo[order.id].assignedTo}` : ''}
+                          </div>
+                        )}
+                        {rawStatuses.length > 0 && (
+                          <div className="text-xs text-amber-700 mt-1 space-y-0.5">
+                            {rawStatuses.slice(0, 2).map((s, idx) => (
+                              <div key={`${order.id}-raw-${idx}`}>
+                                Raw: {s.material_name} · {String(s.procurement_status || 'not_started').replace('_', ' ')}
+                              </div>
+                            ))}
+                            {rawStatuses.length > 2 && (
+                              <div>+{rawStatuses.length - 2} more raw items</div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {(order.status === 'pending' || order.status === 'accepted') ? (
-                        <div className="text-xs">
-                          <OrderProductionInfo order={order} compact />
-                        </div>
-                      ) : (
-                        <div className="min-h-[3.5rem]" aria-hidden />
-                      )}
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
                       {order.status === 'pending' && (
                         <Button
                           size="sm"
@@ -164,6 +427,46 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                         >
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Accept
+                        </Button>
+                      )}
+                      {canShowProduceButton && (
+                        <Button
+                          size="sm"
+                          onClick={(e) => {
+                            if (producibleItems.length > 1) {
+                              e.stopPropagation();
+                              setPickProductionOrder(order);
+                              return;
+                            }
+                            handleSendToProduction(e, order, producibleItems[0]);
+                          }}
+                          disabled={!!orderResponsibleUsers[order.id]}
+                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                          title={
+                            orderResponsibleUsers[order.id]
+                              ? `Already handled by ${orderResponsibleUsers[order.id]}`
+                              : `Send to Production (${producibleItems.length} product${producibleItems.length > 1 ? 's' : ''})`
+                          }
+                        >
+                          <Factory className="w-3 h-3 mr-1" />
+                          {orderResponsibleUsers[order.id]
+                            ? `Handled by ${orderResponsibleUsers[order.id]}`
+                            : (producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce')}
+                        </Button>
+                      )}
+                      {!!firstProductItem?.productId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProductionInfoOrder(order);
+                          }}
+                          className="text-xs"
+                          title="View production progress"
+                        >
+                          <Info className="w-3 h-3 mr-1" />
+                          Production Info
                         </Button>
                       )}
                       {order.status === 'accepted' && (() => {
@@ -218,6 +521,28 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
                           Deliver
                         </Button>
                       )}
+                      {(order.status === 'pending' || order.status === 'accepted') &&
+                        order.items?.some((item) => item.productType === 'raw_material') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (pendingRawItems.length > 1) {
+                                setPickRawMaterialOrder(order);
+                              } else {
+                                setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null);
+                                setMaterialTaskOrder(order);
+                              }
+                            }}
+                            disabled={!hasRawNotStarted}
+                            className="text-xs"
+                          >
+                            {hasRawNotStarted
+                              ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}`
+                              : 'Stock Task Active'}
+                          </Button>
+                        )}
                       <Button
                         size="sm"
                         variant="secondary"
@@ -239,6 +564,172 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails }: Or
         </table>
       </div>
     </div>
+
+    {sendToProductionOrder && sendToProductionItem && (
+      <SendToProductionModal
+        open={!!(sendToProductionOrder && sendToProductionItem)}
+        onClose={() => { setSendToProductionOrder(null); setSendToProductionItem(null); }}
+        order={sendToProductionOrder}
+        productItem={sendToProductionItem}
+      />
+    )}
+    <AssignMaterialTaskModal
+      open={!!materialTaskOrder}
+      order={materialTaskOrder}
+      onClose={() => setMaterialTaskOrder(null)}
+      onConfirm={async (payload) => {
+        if (!materialTaskOrder) return;
+        await onCreateMaterialTask(materialTaskOrder, {
+          ...payload,
+          material_id: selectedRawMaterialId || undefined,
+        });
+        setMaterialTaskOrder(null);
+        setSelectedRawMaterialId(null);
+      }}
+    />
+    <Dialog open={!!pickRawMaterialOrder} onOpenChange={(open) => { if (!open) setPickRawMaterialOrder(null); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Select Raw Material to Order</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          {(pickRawMaterialOrder?.items || [])
+            .filter((item) => item.productType === 'raw_material')
+            .filter((item) => {
+              const statuses = rawMaterialStatusByOrder[pickRawMaterialOrder?.id || ''] || [];
+              const byKey = new Map<string, any>();
+              statuses.forEach((s) => {
+                byKey.set(String(s.material_id || ''), s);
+                byKey.set(String(s.material_name || ''), s);
+              });
+              const statusInfo = byKey.get(String(item.rawMaterialId || '')) || byKey.get(String(item.productName || ''));
+              return String(statusInfo?.procurement_status || 'not_started') === 'not_started';
+            })
+            .map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full text-left border rounded p-3 hover:bg-gray-50"
+                onClick={() => {
+                  setSelectedRawMaterialId(item.rawMaterialId || null);
+                  setMaterialTaskOrder(pickRawMaterialOrder);
+                  setPickRawMaterialOrder(null);
+                }}
+              >
+                <div className="text-sm font-medium text-gray-900">{item.productName}</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Qty: {Number(item.quantity || 0).toFixed(2)} {item.unit || 'units'}
+                </div>
+              </button>
+            ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={!!pickProductionOrder} onOpenChange={(open) => { if (!open) setPickProductionOrder(null); }}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Select Product to Produce</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          {(pickProductionOrder?.items || [])
+            .filter((item) => item.productType === 'product' && item.productId)
+            .filter((item) => {
+              const itemProgress = orderProductProgress[pickProductionOrder?.id || '']?.[item.productId || ''];
+              const itemRequired = Number(itemProgress?.required || item.quantity || 0);
+              const itemProduced = Number(itemProgress?.produced || 0);
+              return itemRequired > 0 ? itemProduced < itemRequired : true;
+            })
+            .map((item) => {
+              const itemProgress = orderProductProgress[pickProductionOrder?.id || '']?.[item.productId || ''];
+              const itemRequired = Number(itemProgress?.required || item.quantity || 0);
+              const itemProduced = Number(itemProgress?.produced || 0);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="w-full text-left border rounded p-3 hover:bg-gray-50"
+                  onClick={(e) => {
+                    if (!pickProductionOrder) return;
+                    handleSendToProduction(e as any, pickProductionOrder, item);
+                    setPickProductionOrder(null);
+                  }}
+                >
+                  <div className="text-sm font-medium text-gray-900">{item.productName}</div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Required: {itemRequired} {item.count_unit || item.unit || 'units'} · Produced: {itemProduced} {item.count_unit || item.unit || 'units'}
+                  </div>
+                </button>
+              );
+            })}
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={!!productionInfoOrder} onOpenChange={(open) => { if (!open) setProductionInfoOrder(null); }}>
+      <DialogContent className="max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <DialogHeader>
+          <DialogTitle>
+            Production Info - {productionInfoOrder?.orderNumber || productionInfoOrder?.id}
+          </DialogTitle>
+        </DialogHeader>
+        {productionInfoOrder && (
+          <div className="space-y-3">
+            {(productionInfoOrder.items || [])
+              .filter((item) => item.productType === 'product' && item.productId)
+              .map((item) => {
+                const progress = orderProductProgress[productionInfoOrder.id]?.[item.productId || ''];
+                const required = Number(progress?.required || item.quantity || 0);
+                const produced = Number(progress?.produced || 0);
+                const relatedBatches = (batchesByOrder[productionInfoOrder.id] || []).filter(
+                  (batch) => String(batch.product_id || '') === String(item.productId || '')
+                );
+                const done = required > 0 && produced >= required;
+                const inProgress = !done && (produced > 0 || relatedBatches.length > 0);
+                const stageLabel = done ? 'Completed' : inProgress ? 'In Progress' : 'Not Started';
+                const stageClass = done
+                  ? 'bg-green-100 text-green-700 border-green-300'
+                  : inProgress
+                    ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+                    : 'bg-gray-100 text-gray-700 border-gray-300';
+                return (
+                  <div key={item.id} className="rounded border p-3 bg-gray-50">
+                    <div className="text-sm font-medium text-gray-900">{item.productName}</div>
+                    <div className="text-xs text-gray-700 mt-1">
+                      Required: {required} {item.count_unit || item.unit || 'units'} · Produced: {produced} {item.count_unit || item.unit || 'units'}
+                    </div>
+                    <div className="mt-2">
+                      <Badge className={stageClass}>
+                        {stageLabel}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            <div className="rounded border p-3">
+              <div className="text-sm font-medium text-gray-900 mb-2">Batches</div>
+              {(batchesByOrder[productionInfoOrder.id] || []).length === 0 ? (
+                <div className="text-xs text-gray-500">No production batches found for this order.</div>
+              ) : (
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {(batchesByOrder[productionInfoOrder.id] || []).map((batch) => (
+                    <div key={batch.id} className="text-xs border rounded p-2 bg-white">
+                      <div className="font-medium text-gray-900">{batch.batch_number} · {batch.product_name || batch.product_id}</div>
+                      <div className="text-gray-700 mt-0.5">
+                        Qty: {Number(batch.actual_quantity || batch.planned_quantity || 0)} · Status: {String(batch.status || '').replace('_', ' ')}
+                      </div>
+                      <div className="text-gray-600 mt-0.5">
+                        Stage: {batch.current_stage || '-'} · Assigned: {batch.current_stage_assigned_to_name || batch.assigned_to_name || batch.operator || '-'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

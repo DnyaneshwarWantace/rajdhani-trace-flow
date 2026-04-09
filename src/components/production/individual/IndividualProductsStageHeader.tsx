@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2, User } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface IndividualProductsStageHeaderProps {
@@ -17,6 +17,8 @@ export default function IndividualProductsStageHeader({
   onRefresh,
   canProceed = false,
 }: IndividualProductsStageHeaderProps) {
+  const assignedName = batch.current_stage_assigned_to_name || batch.assigned_to_name;
+
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
@@ -24,7 +26,15 @@ export default function IndividualProductsStageHeader({
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Individual Product Details</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-gray-900">Individual Product Details</h1>
+            {assignedName && (
+              <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
+                <User className="w-3 h-3" />
+                {assignedName}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-600 mt-1">
             Batch: {batch.batch_number} • Product: {batch.product_name || 'N/A'}
           </p>
@@ -53,4 +63,3 @@ export default function IndividualProductsStageHeader({
     </div>
   );
 }
-

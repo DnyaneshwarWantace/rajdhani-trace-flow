@@ -120,6 +120,11 @@ export class MaterialService {
 
     if (!response.ok) {
       const error = await response.json();
+      if (response.status === 409) {
+        const err = new Error(error.error || 'Duplicate material');
+        (err as any).isDuplicate = true;
+        throw err;
+      }
       throw new Error(getServiceError(response, error));
     }
 

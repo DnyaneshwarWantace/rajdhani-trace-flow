@@ -23,6 +23,7 @@ import MachineSelectionDialog from '@/components/production/planning/MachineSele
 import IndividualProductSelectionDialog from '@/components/production/planning/IndividualProductSelectionDialog';
 import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import AssignUserModal from '@/components/production/AssignUserModal';
 
 export default function PlanningStage() {
   const navigate = useNavigate();
@@ -57,6 +58,43 @@ export default function PlanningStage() {
   const [showRemoveMaterialDialog, setShowRemoveMaterialDialog] = useState(false);
   const [materialToRemove, setMaterialToRemove] = useState<{id: string, name: string} | null>(null);
   const skipRecalcAfterRemoveRef = useRef(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const actorName = (() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return 'User';
+      const parsed = JSON.parse(raw);
+      return parsed?.full_name || parsed?.email || 'User';
+    } catch {
+      return 'User';
+    }
+  })();
+
+  const [subProductionMaterial, setSubProductionMaterial] = useState<{ id: string; name: string } | null>(null);
+  const [showSubProductionModal, setShowSubProductionModal] = useState(false);
+
+  const getAttachedOrderIdsFromNotes = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+    if (!match?.[1]) return [];
+    return Array.from(
+      new Set(
+        match[1]
+          .split(',')
+          .map((v) => v.trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const getAttachedOrderNumbersFromNotes = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Orders:\s*(.+)$/i);
+    if (!match?.[1]) return [];
+    const raw = match[1].split('·')[0].trim();
+    const orderNos = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+    return Array.from(new Set(orderNos.map((v) => v.trim()).filter(Boolean)));
+  };
 
   // Check if batchId was passed via query params or product was passed from product selection
   useEffect(() => {
@@ -136,6 +174,24 @@ export default function PlanningStage() {
       setConsumedMaterials(updated);
     }
   }, [formData.planned_quantity, selectedProduct, consumedMaterials]);
+
+  // Auto-save recipe changes so newly added recipe materials are not lost on refresh.
+  useEffect(() => {
+    if (!selectedProduct) return;
+    if (!recipeModified) return;
+    if (materials.length === 0) return;
+
+    const timeout = setTimeout(async () => {
+      try {
+        await updateRecipeInDatabase(materials, true);
+        setRecipeModified(false);
+      } catch (error) {
+        console.error('Auto-save recipe failed:', error);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [recipeModified, materials, selectedProduct]);
 
   // Send low stock notification to backend for material section
   const sendLowStockNotification = async (material: any) => {
@@ -508,7 +564,7 @@ export default function PlanningStage() {
     }
   };
 
-  const updateRecipeInDatabase = async (updatedMaterials: any[]) => {
+  const updateRecipeInDatabase = async (updatedMaterials: any[], silent: boolean = false) => {
     if (!selectedProduct) return;
 
     try {
@@ -584,21 +640,26 @@ export default function PlanningStage() {
 
       setRecipe(updatedRecipe);
 
-      toast({
-        title: recipe ? 'Recipe Updated' : 'Recipe Created',
-        description: recipe 
-          ? 'Recipe has been automatically updated'
-          : 'Recipe has been automatically created',
-      });
+      if (!silent) {
+        toast({
+          title: recipe ? 'Recipe Updated' : 'Recipe Created',
+          description: recipe
+            ? 'Recipe has been automatically updated'
+            : 'Recipe has been automatically created',
+        });
+      }
     } catch (error) {
       console.error('Error saving recipe:', error);
-      toast({
-        title: 'Error',
-        description: recipe 
-          ? 'Failed to update recipe automatically'
-          : 'Failed to create recipe automatically',
-        variant: 'destructive',
-      });
+      if (!silent) {
+        toast({
+          title: 'Error',
+          description: recipe
+            ? 'Failed to update recipe automatically'
+            : 'Failed to create recipe automatically',
+          variant: 'destructive',
+        });
+      }
+      throw error;
     }
   };
 
@@ -877,10 +938,29 @@ export default function PlanningStage() {
 
     setSubmitting(true);
     try {
-      // 1. Persist latest recipe changes only when user confirms add
-      if (recipeModified) {
+      // 1. Persist recipe first (critical for first-time setup and sub-production chain).
+      // Always save when:
+      // - recipe was modified, OR
+      // - no recipe exists yet but user has materials in planning section.
+      const mustCreateInitialRecipe = !recipe && materials.length > 0;
+      if (recipeModified || mustCreateInitialRecipe) {
         await updateRecipeInDatabase(materials);
         setRecipeModified(false);
+      }
+
+      // 1.1 Hard verification: recipe must exist after save attempt.
+      if (!recipe) {
+        const verifiedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
+        if (!verifiedRecipe) {
+          toast({
+            title: 'Recipe Not Saved',
+            description: 'Could not save recipe for this product. Please try again before adding to production.',
+            variant: 'destructive',
+          });
+          setSubmitting(false);
+          return;
+        }
+        setRecipe(verifiedRecipe);
       }
 
       // 2. Check for insufficient materials and SEND NOTIFICATION (but DON'T block)
@@ -1089,12 +1169,12 @@ export default function PlanningStage() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        <PlanningStageHeader 
+        <PlanningStageHeader
           onBack={() => {
             // Check where we came from based on location state
             const from = location.state?.from;
             const batchId = currentBatch?.id;
-            
+
             if (from === 'production-detail' && batchId) {
               // If we came from production detail page, go back to production detail
               navigate(`/production/${batchId}`);
@@ -1102,8 +1182,9 @@ export default function PlanningStage() {
               // Default: go to production list
               navigate('/production');
             }
-          }} 
+          }}
           onEdit={handleEdit}
+          onAssign={currentBatch ? () => setShowAssignModal(true) : undefined}
           batch={currentBatch}
         />
 
@@ -1146,6 +1227,25 @@ export default function PlanningStage() {
                 });
                 setShowIndividualProductDialog(true);
               }
+            }}
+            onStartSubProduction={(materialId, materialName) => {
+              setSubProductionMaterial({ id: materialId, name: materialName });
+              setShowSubProductionModal(true);
+            }}
+            onOrderRawMaterial={(materialId, materialName) => {
+              // Keep this action explicit: open manage stock where PO is tracked/created.
+              navigate('/manage-stock', {
+                state: {
+                  fromProductionLowStock: true,
+                  materialId,
+                  materialName,
+                  batchId: currentBatchId,
+                },
+              });
+              toast({
+                title: 'Order Stock',
+                description: `Open Manage Stock to create/track purchase order for ${materialName}.`,
+              });
             }}
           />
 
@@ -1838,12 +1938,12 @@ export default function PlanningStage() {
               planning_stage: {
                 status: 'completed',
                 completed_at: new Date().toISOString(),
-                completed_by: 'User', // You can get this from auth context
+                completed_by: actorName,
               },
               machine_stage: {
                 status: 'in_progress',
                 started_at: new Date().toISOString(),
-                started_by: 'User', // You can get this from auth context
+                started_by: actorName,
               },
             });
 
@@ -1910,6 +2010,86 @@ export default function PlanningStage() {
           onSubmit={handleEditSuccess}
           selectedBatch={currentBatch}
           submitting={isEditing}
+        />
+      )}
+
+      {/* Sub-Production Modal — start production for a low-stock material */}
+      {subProductionMaterial && (
+        <AssignUserModal
+          open={showSubProductionModal}
+          onClose={() => { setShowSubProductionModal(false); setSubProductionMaterial(null); }}
+          title={`Sub-Produce: ${subProductionMaterial.name}`}
+          description={`"${subProductionMaterial.name}" is low or out of stock. Select a user to start a production batch for this material.`}
+          confirmLabel="Start Sub-Production"
+          onAssign={async (_userId, _userName) => {
+            if (!selectedProduct) {
+              throw new Error('Current product not found for sub-production assignment');
+            }
+
+            // Assignment-first flow: create production task for selected user.
+            // Do not navigate to New Batch page here.
+            const attachedOrderIds = getAttachedOrderIdsFromNotes(currentBatch?.notes);
+            const attachedOrderNumbers = getAttachedOrderNumbersFromNotes(currentBatch?.notes);
+            const primaryOrderId = currentBatch?.order_id || attachedOrderIds[0];
+            const primaryOrderNumber = currentBatch?.order_number || attachedOrderNumbers[0];
+            const orderId = primaryOrderId || `SUB-${selectedProduct.id}`;
+            const orderNumber = primaryOrderNumber || currentBatch?.batch_number || 'SUB-PRODUCTION';
+            const customerName = (currentBatch as any)?.customer_name || '';
+            const plannedQty =
+              Math.max(
+                1,
+                Math.ceil(
+                  Number(
+                    materials.find((m) => m.material_id === subProductionMaterial.id)?.required_quantity || 0
+                  )
+                )
+              );
+
+            const { error } = await ProductionService.createTask({
+              order_id: orderId,
+              order_number: orderNumber,
+              customer_name: customerName,
+              stage_product_id: subProductionMaterial.id,
+              stage_product_name: subProductionMaterial.name,
+              final_product_id: selectedProduct.id,
+              final_product_name: selectedProduct.name,
+              planned_quantity: plannedQty,
+              assigned_to_id: _userId,
+              assigned_to_name: _userName,
+              notes: `Sub-production task created from planning stage for "${selectedProduct.name}".`,
+            });
+
+            if (error) {
+              throw new Error(error);
+            }
+
+            toast({
+              title: 'Task Assigned',
+              description: `${subProductionMaterial.name} assigned to ${_userName}.`,
+            });
+          }}
+        />
+      )}
+
+      {/* Assign to Next Person Modal */}
+      {currentBatch && (
+        <AssignUserModal
+          open={showAssignModal}
+          onClose={() => setShowAssignModal(false)}
+          title="Forward Planning Stage"
+          description="Select a user to forward this planning stage work to."
+          confirmLabel="Forward"
+          onAssign={async (userId, userName) => {
+            const { error } = await ProductionService.assignStage(currentBatch.id, 'planning', userId, userName);
+            if (error) throw new Error(error);
+            setCurrentBatch(prev => prev ? {
+              ...prev,
+              current_stage: 'planning',
+              current_stage_assigned_to: userId,
+              current_stage_assigned_to_name: userName,
+            } : prev);
+            toast({ title: 'Forwarded', description: `Planning stage forwarded to ${userName}` });
+          }}
         />
       )}
 

@@ -1,16 +1,20 @@
 import { ShoppingCart, User, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
-import type { Order } from '@/services/orderService';
+import { OrderService, type Order } from '@/services/orderService';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { useNavigate } from 'react-router-dom';
 import { calculateSQM } from '@/utils/sqmCalculator';
-import OrderProductionInfo from './OrderProductionInfo';
+import { useEffect, useState } from 'react';
+import SendToProductionModal from '@/components/production/SendToProductionModal';
+import AssignMaterialTaskModal from '@/components/orders/AssignMaterialTaskModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface OrderCardProps {
   order: Order;
   onStatusUpdate: (orderId: string, newStatus: string) => void;
   onViewDetails: (order: Order) => void;
+  onCreateMaterialTask: (order: Order, payload: { assigned_to_id?: string; material_id?: string }) => Promise<void>;
 }
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
@@ -23,10 +27,16 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
-export default function OrderCard({ order, onStatusUpdate, onViewDetails }: OrderCardProps) {
+export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCreateMaterialTask }: OrderCardProps) {
   const status = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   const navigate = useNavigate();
+  const [rawStatuses, setRawStatuses] = useState<any[]>([]);
+  const [sendToProductionItem, setSendToProductionItem] = useState<any | null>(null);
+  const [pickProductOpen, setPickProductOpen] = useState(false);
+  const [materialTaskOpen, setMaterialTaskOpen] = useState(false);
+  const [pickRawOpen, setPickRawOpen] = useState(false);
+  const [selectedRawMaterialId, setSelectedRawMaterialId] = useState<string | null>(null);
 
   // Check if order needs individual product selection (for products, not raw materials)
   const needsIndividualProductSelection = (order: Order) => {
@@ -55,6 +65,36 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
     e.stopPropagation();
     onStatusUpdate(order.id, 'delivered');
   };
+
+  const producibleItems = (order.items || []).filter((item) => item.productType === 'product' && item.productId);
+  const rawItems = (order.items || []).filter((item) => item.productType === 'raw_material');
+  const rawStatusByKey = new Map<string, any>();
+  rawStatuses.forEach((s) => {
+    rawStatusByKey.set(String(s.material_id || ''), s);
+    rawStatusByKey.set(String(s.material_name || ''), s);
+  });
+  const pendingRawItems = rawItems.filter((item) => {
+    const statusInfo = rawStatusByKey.get(String((item as any).rawMaterialId || '')) || rawStatusByKey.get(String(item.productName || ''));
+    return String(statusInfo?.procurement_status || 'not_started') === 'not_started';
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!(order.status === 'pending' || order.status === 'accepted')) {
+        if (!cancelled) setRawStatuses([]);
+        return;
+      }
+      const hasRawItems = (order.items || []).some((item) => item.productType === 'raw_material');
+      if (!hasRawItems) {
+        if (!cancelled) setRawStatuses([]);
+        return;
+      }
+      const result = await OrderService.getOrderRawMaterialStatus(order.id);
+      if (!cancelled) setRawStatuses(result.data || []);
+    })();
+    return () => { cancelled = true; };
+  }, [order.id, order.status, order.items]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => onViewDetails(order)}>
@@ -121,10 +161,28 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           </div>
         )}
 
-        {/* Production Info - Show for pending/accepted orders */}
+        {/* Action Status Summary - Show for pending/accepted orders */}
         {(order.status === 'pending' || order.status === 'accepted') && (
           <div className="mb-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-            <OrderProductionInfo order={order} compact />
+            <div className="text-xs text-blue-800 font-medium">
+              Products pending: {(order.items || []).filter((item) => item.productType === 'product').length}
+            </div>
+            {(order.items || []).some((item) => item.productType === 'raw_material') && (
+              <div className="text-xs text-amber-800 mt-1 space-y-0.5">
+                {rawStatuses.length > 0 ? (
+                  <>
+                    {rawStatuses.slice(0, 2).map((s, idx) => (
+                      <div key={`${order.id}-raw-${idx}`}>
+                        Raw: {s.material_name} · {String(s.procurement_status || 'not_started').replace('_', ' ')}
+                      </div>
+                    ))}
+                    {rawStatuses.length > 2 && <div>+{rawStatuses.length - 2} more raw items</div>}
+                  </>
+                ) : (
+                  <div>Raw material status: not started</div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -311,6 +369,38 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
               <CheckCircle className="w-4 h-4 mr-2" />
               Accept Order
             </Button>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {producibleItems.length > 0 && (
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (producibleItems.length === 1) setSendToProductionItem(producibleItems[0]);
+                    else setPickProductOpen(true);
+                  }}
+                >
+                  Produce{producibleItems.length > 1 ? ` (${producibleItems.length})` : ''}
+                </Button>
+              )}
+              {rawItems.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pendingRawItems.length === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pendingRawItems.length > 1) setPickRawOpen(true);
+                    else {
+                      setSelectedRawMaterialId((pendingRawItems[0] as any)?.rawMaterialId || null);
+                      setMaterialTaskOpen(true);
+                    }
+                  }}
+                >
+                  {pendingRawItems.length > 0 ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}` : 'Stock Task Active'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -344,6 +434,38 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
                 </div>
               </>
             )}
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              {producibleItems.length > 0 && (
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (producibleItems.length === 1) setSendToProductionItem(producibleItems[0]);
+                    else setPickProductOpen(true);
+                  }}
+                >
+                  Produce{producibleItems.length > 1 ? ` (${producibleItems.length})` : ''}
+                </Button>
+              )}
+              {rawItems.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pendingRawItems.length === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pendingRawItems.length > 1) setPickRawOpen(true);
+                    else {
+                      setSelectedRawMaterialId((pendingRawItems[0] as any)?.rawMaterialId || null);
+                      setMaterialTaskOpen(true);
+                    }
+                  }}
+                >
+                  {pendingRawItems.length > 0 ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}` : 'Stock Task Active'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -402,6 +524,71 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails }: Orde
           View Details
         </Button>
       </div>
+      {sendToProductionItem && (
+        <SendToProductionModal
+          open={!!sendToProductionItem}
+          onClose={() => setSendToProductionItem(null)}
+          order={order}
+          productItem={sendToProductionItem as any}
+        />
+      )}
+      <AssignMaterialTaskModal
+        open={materialTaskOpen}
+        order={order}
+        onClose={() => setMaterialTaskOpen(false)}
+        onConfirm={async (payload) => {
+          await onCreateMaterialTask(order, { ...payload, material_id: selectedRawMaterialId || undefined });
+          setMaterialTaskOpen(false);
+          setSelectedRawMaterialId(null);
+        }}
+      />
+      <Dialog open={pickProductOpen} onOpenChange={setPickProductOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Select Product to Produce</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            {producibleItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full text-left border rounded p-3 hover:bg-gray-50"
+                onClick={() => {
+                  setSendToProductionItem(item);
+                  setPickProductOpen(false);
+                }}
+              >
+                <div className="text-sm font-medium text-gray-900">{item.productName}</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Qty: {Number(item.quantity || 0).toFixed(2)} {(item as any).count_unit || item.unit || 'units'}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={pickRawOpen} onOpenChange={setPickRawOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Select Raw Material to Order</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            {pendingRawItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full text-left border rounded p-3 hover:bg-gray-50"
+                onClick={() => {
+                  setSelectedRawMaterialId((item as any).rawMaterialId || null);
+                  setMaterialTaskOpen(true);
+                  setPickRawOpen(false);
+                }}
+              >
+                <div className="text-sm font-medium text-gray-900">{item.productName}</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Qty: {Number(item.quantity || 0).toFixed(2)} {item.unit || 'units'}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

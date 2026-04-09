@@ -12,8 +12,9 @@ import ProductionCreateHeader from '@/components/production/create/ProductionCre
 import ProductSearchSection from '@/components/production/create/ProductSearchSection';
 import SelectedProductCard from '@/components/production/create/SelectedProductCard';
 import BatchDetailsForm from '@/components/production/create/BatchDetailsForm';
-import AllPendingOrdersSection from '@/components/production/create/AllPendingOrdersSection';
 import { ProductService } from '@/services/productService';
+import { OrderService, type Order } from '@/services/orderService';
+import { RecipeService } from '@/services/recipeService';
 
 export default function ProductionCreate() {
   const navigate = useNavigate();
@@ -32,6 +33,13 @@ export default function ProductionCreate() {
     latest: ProductionBatch[];
   } | null>(null);
   const [loadingProductBatches, setLoadingProductBatches] = useState(false);
+  const [allPendingOrders, setAllPendingOrders] = useState<Order[]>([]);
+  const [loadingAllPendingOrders, setLoadingAllPendingOrders] = useState(false);
+  const [filteredOrderOptions, setFilteredOrderOptions] = useState<Order[]>([]);
+  const [filteringOrderOptions, setFilteringOrderOptions] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [quantityAutoReason, setQuantityAutoReason] = useState<string>('');
+  const [minimumRequiredQuantity, setMinimumRequiredQuantity] = useState<number>(0);
   const [formData, setFormData] = useState<CreateProductionBatchData>({
     product_id: '',
     planned_quantity: 0,
@@ -68,10 +76,10 @@ export default function ProductionCreate() {
     }
   }, [location.state, user]);
 
-  // Pre-fill from order page "Go to Production" (order details: product, qty, completion date)
+  // Pre-fill from order/task context (product, qty, completion date/order linkage)
   useEffect(() => {
     const state = location.state as any;
-    if (!state?.fromOrder || !state?.productId) return;
+    if ((!state?.fromOrder && !state?.fromTask) || !state?.productId) return;
 
     const productId = state.productId as string;
     const plannedQuantity = Number(state.planned_quantity) || 0;
@@ -95,6 +103,7 @@ export default function ProductionCreate() {
         }
 
         setSelectedOrderDeliveryDate(expectedDelivery || null);
+        setSelectedOrderIds(state.orderId ? [state.orderId] : []);
         setFormData((prev) => ({
           ...prev,
           product_id: productId,
@@ -109,7 +118,184 @@ export default function ProductionCreate() {
       }
     })();
     return () => { cancelled = true; };
-  }, [location.state?.fromOrder, location.state?.productId, user]);
+  }, [location.state?.fromOrder, location.state?.fromTask, location.state?.productId, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingAllPendingOrders(true);
+      try {
+        const { data } = await OrderService.getOrders({
+          status: ['pending', 'accepted'],
+          limit: 500,
+          sortBy: 'expected_delivery',
+          sortOrder: 'asc',
+        });
+        if (cancelled) return;
+        setAllPendingOrders(data || []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error loading all pending orders:', error);
+          setAllPendingOrders([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingAllPendingOrders(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProduct?.id) {
+      setQuantityAutoReason('');
+      setFilteredOrderOptions([]);
+    }
+  }, [selectedProduct?.id]);
+
+  useEffect(() => {
+    if (!selectedProduct?.id) {
+      setFilteredOrderOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setFilteringOrderOptions(true);
+      try {
+        const targetProductId = selectedProduct.id;
+        const recipeCache: Record<string, Awaited<ReturnType<typeof RecipeService.getRecipeByProductId>>> = {};
+
+        const requiresTargetProduct = async (productId: string, visited = new Set<string>()): Promise<boolean> => {
+          if (!productId) return false;
+          if (productId === targetProductId) return true;
+          if (visited.has(productId)) return false;
+          visited.add(productId);
+
+          if (!recipeCache[productId]) {
+            recipeCache[productId] = await RecipeService.getRecipeByProductId(productId);
+          }
+          const recipe = recipeCache[productId];
+          const productMaterials = (recipe?.materials || []).filter((m) => m.material_type === 'product');
+          for (const material of productMaterials) {
+            if (material.material_id === targetProductId) return true;
+            if (await requiresTargetProduct(material.material_id, visited)) return true;
+          }
+          return false;
+        };
+
+        const relevantOrders: Order[] = [];
+        for (const order of allPendingOrders) {
+          let includeOrder = false;
+          for (const item of order.items || []) {
+            if (!item.productId) continue;
+            if (await requiresTargetProduct(item.productId)) {
+              includeOrder = true;
+              break;
+            }
+          }
+          if (includeOrder) relevantOrders.push(order);
+        }
+
+        if (!cancelled) {
+          setFilteredOrderOptions(relevantOrders);
+          setSelectedOrderIds((prev) => prev.filter((id) => relevantOrders.some((o) => o.id === id) || (lockedOrderId && id === lockedOrderId)));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error filtering relevant orders:', error);
+          setFilteredOrderOptions([]);
+        }
+      } finally {
+        if (!cancelled) setFilteringOrderOptions(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProduct?.id, allPendingOrders]);
+
+  // Auto-calculate planned quantity from selected attached orders.
+  useEffect(() => {
+    if (!selectedProduct?.id || selectedOrderIds.length === 0) {
+      setQuantityAutoReason('');
+      setMinimumRequiredQuantity(0);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const selectedOrders = allPendingOrders.filter((o) => selectedOrderIds.includes(o.id));
+        if (selectedOrders.length === 0) {
+          setQuantityAutoReason('');
+          return;
+        }
+
+        const recipeMultiplierCache: Record<string, number> = {};
+        const getMultiplier = async (finalProductId?: string) => {
+          if (!finalProductId) return 0;
+          if (finalProductId === selectedProduct.id) return 1;
+          if (recipeMultiplierCache[finalProductId] !== undefined) return recipeMultiplierCache[finalProductId];
+          try {
+            const recipe = await RecipeService.getRecipeByProductId(finalProductId);
+            const directMaterial = recipe?.materials?.find(
+              (m) => m.material_type === 'product' && m.material_id === selectedProduct.id
+            );
+            const multiplier = Number(directMaterial?.quantity_per_sqm || 0);
+            recipeMultiplierCache[finalProductId] = multiplier;
+            return multiplier;
+          } catch {
+            recipeMultiplierCache[finalProductId] = 0;
+            return 0;
+          }
+        };
+
+        let totalRequired = 0;
+        for (const order of selectedOrders) {
+          for (const item of order.items || []) {
+            const mult = await getMultiplier(item.productId);
+            if (mult > 0 && Number(item.quantity) > 0) {
+              totalRequired += mult * Number(item.quantity);
+            }
+          }
+        }
+
+        if (cancelled) return;
+
+        if (totalRequired > 0) {
+          const roundedRequired = Math.ceil(totalRequired * 1000) / 1000;
+          setMinimumRequiredQuantity(roundedRequired);
+          if (formData.planned_quantity >= roundedRequired) {
+            setQuantityAutoReason(
+              `Required from attached orders: ${roundedRequired}. Current planned quantity (${formData.planned_quantity}) is valid.`
+            );
+          } else {
+            setQuantityAutoReason(
+              `Required from attached orders: ${roundedRequired}. Increase planned quantity to at least ${roundedRequired}.`
+            );
+          }
+        } else {
+          setMinimumRequiredQuantity(0);
+          setQuantityAutoReason(
+            `No direct recipe linkage found for selected orders to ${selectedProduct.name}. Set quantity manually.`
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error auto-calculating planned quantity:', error);
+          setQuantityAutoReason('');
+          setMinimumRequiredQuantity(0);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedOrderIds, selectedProduct?.id, allPendingOrders, selectedProduct?.name, formData.planned_quantity]);
 
   // When product changes, load a quick summary of its existing production batches
   useEffect(() => {
@@ -223,57 +409,32 @@ export default function ProductionCreate() {
     setSelectedProduct(null);
     // Also clear any order-based delivery constraint
     setSelectedOrderDeliveryDate(null);
+    setSelectedOrderIds([]);
     setFormData((prev) => ({ ...prev, product_id: '' }));
   };
 
-  const handleFormChange = (data: CreateProductionBatchData) => {
-    setFormData(data);
+  const state = location.state as any;
+  const lockedOrderId: string | null =
+    (state?.fromTask || state?.fromOrder) && state?.orderId ? String(state.orderId) : null;
+
+  const toggleOrderSelection = (orderId: string) => {
+    if (lockedOrderId && orderId === lockedOrderId) return;
+    setSelectedOrderIds((prev) =>
+      prev.includes(orderId) ? prev.filter((id) => id !== orderId) : [...prev, orderId]
+    );
   };
 
-  const handleSelectOrder = async (order: any, productId: string) => {
-    try {
-      // Fetch product details
-      const product = await ProductService.getProductById(productId);
+  const orderOptions = filteredOrderOptions.map((order) => ({
+    id: order.id,
+    orderNumber: order.orderNumber || order.id,
+    customerName: order.customerName || 'Customer',
+    expectedDelivery: order.expectedDelivery,
+    status: order.status,
+    productNames: (order.items || []).map((item) => item.productName).filter(Boolean),
+  }));
 
-      if (product) {
-        setSelectedProduct(product);
-
-        const deliveryDate = new Date(order.expected_delivery);
-        const completionDate = new Date(deliveryDate);
-        completionDate.setDate(completionDate.getDate() - 2);
-        const formattedDate = completionDate.toISOString().split('T')[0];
-
-        setSelectedOrderDeliveryDate(order.expected_delivery);
-
-        setFormData({
-          product_id: productId,
-          planned_quantity: order.quantity_needed,
-          completion_date: formattedDate,
-          priority: order.priority || 'medium',
-          notes: `Order ${order.order_number} for ${order.customer_name}`,
-          operator: user?.full_name || user?.email || '',
-          supervisor: user?.full_name || user?.email || '',
-        });
-
-        toast({
-          title: 'Order Selected',
-          description: `Product: ${product.name}, Qty: ${order.quantity_needed}`,
-          duration: 4000,
-        });
-
-        // Scroll to form
-        setTimeout(() => {
-          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-        }, 100);
-      }
-    } catch (error) {
-      console.error('Error loading product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load product details',
-        variant: 'destructive',
-      });
-    }
+  const handleFormChange = (data: CreateProductionBatchData) => {
+    setFormData(data);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,15 +455,75 @@ export default function ProductionCreate() {
       });
       return;
     }
+    if (selectedOrderIds.length > 0 && minimumRequiredQuantity > 0 && Number(formData.planned_quantity) < minimumRequiredQuantity) {
+      toast({
+        title: 'Quantity too low',
+        description: `You attached orders that require at least ${minimumRequiredQuantity}. Please increase planned quantity.`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       setSubmitting(true);
-      const { data, error } = await ProductionService.createBatch(formData);
+      const state = location.state as any;
+      const selectedOrders = allPendingOrders.filter((order) => selectedOrderIds.includes(order.id));
+      const lockedOrderIdFromState: string | undefined =
+        (state?.fromTask || state?.fromOrder) && state?.orderId ? String(state.orderId) : undefined;
+      const fallbackLockedOrder =
+        selectedOrders.length === 0 && lockedOrderIdFromState
+          ? {
+              id: lockedOrderIdFromState,
+              orderNumber: String(state?.order_number || state?.orderNumber || lockedOrderIdFromState),
+              customerName: String(state?.customer_name || state?.customerName || ''),
+            }
+          : null;
+
+      const primaryOrderId = selectedOrders[0]?.id || fallbackLockedOrder?.id;
+
+      const attachedOrderNumbers = [
+        ...selectedOrders.map((order) => order.orderNumber || order.id),
+        ...(fallbackLockedOrder ? [fallbackLockedOrder.orderNumber] : []),
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      const attachedOrderIds = [
+        ...selectedOrders.map((order) => order.id),
+        ...(fallbackLockedOrder ? [fallbackLockedOrder.id] : []),
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      const attachedOrderCustomers = [
+        ...selectedOrders.map((order) => `${order.orderNumber || order.id}:${order.customerName || 'Customer'}`),
+        ...(fallbackLockedOrder ? [`${fallbackLockedOrder.orderNumber}:${fallbackLockedOrder.customerName || 'Customer'}`] : []),
+      ]
+        .join(', ');
+
+      const payload: CreateProductionBatchData = {
+        ...formData,
+        order_id: primaryOrderId,
+        notes: attachedOrderNumbers
+          ? `${formData.notes ? `${formData.notes} · ` : ''}Attached Orders: ${attachedOrderNumbers}${attachedOrderIds ? ` · Attached Order IDs: ${attachedOrderIds}` : ''}${attachedOrderCustomers ? ` · Attached Customers: ${attachedOrderCustomers}` : ''}`
+          : formData.notes,
+      };
+
+      const { data, error } = await ProductionService.createBatch(payload);
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
         return;
       }
       if (data) {
+        const assignedToId = state?.assigned_to_id || user?.id;
+        const assignedToName = state?.assigned_to_name || user?.full_name || user?.email || 'User';
+        if (assignedToId && assignedToName) {
+          await ProductionService.assignBatch(data.id, assignedToId, assignedToName);
+          await ProductionService.assignStage(data.id, 'planning', assignedToId, assignedToName);
+        }
+        if (state?.fromTask && state?.taskId) {
+          await ProductionService.updateTaskStatus(state.taskId, 'planning');
+        }
         toast({ title: 'Success', description: 'Production batch created successfully' });
         navigate(`/production/planning?batchId=${data.id}`);
       }
@@ -320,17 +541,6 @@ export default function ProductionCreate() {
         <ProductionCreateHeader onBack={handleBack} />
 
         <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
-          {/* ALL PENDING ORDERS SECTION - AT TOP */}
-          <AllPendingOrdersSection onSelectOrder={handleSelectOrder} />
-
-          {/* SEPARATOR */}
-          <div className="py-4">
-            <hr className="border-t-2 border-gray-300" />
-            <p className="text-center text-gray-600 font-semibold mt-4 text-lg">
-              OR Create Batch for Any Other Product Below
-            </p>
-          </div>
-
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Product Selection */}
@@ -343,6 +553,7 @@ export default function ProductionCreate() {
                 {selectedProduct && (
                   <SelectedProductCard product={selectedProduct} onClear={handleProductClear} />
                 )}
+
               </div>
 
               {/* Right Column - Batch Details */}
@@ -357,7 +568,17 @@ export default function ProductionCreate() {
                       onChange={handleFormChange}
                       selectedProduct={selectedProduct}
                       orderDeliveryDate={selectedOrderDeliveryDate}
+                      orderOptions={orderOptions}
+                      selectedOrderIds={selectedOrderIds}
+                      onToggleOrder={toggleOrderSelection}
+                      lockedOrderId={lockedOrderId}
+                      ordersLoading={loadingAllPendingOrders || filteringOrderOptions}
                     />
+                    {quantityAutoReason && (
+                      <p className={`mt-2 text-xs ${minimumRequiredQuantity > 0 && Number(formData.planned_quantity) < minimumRequiredQuantity ? 'text-red-700' : 'text-blue-700'}`}>
+                        {quantityAutoReason}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
 

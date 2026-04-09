@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import type { PricingUnit } from '@/utils/unitConverter';
+import { calculatePricingUnitQuantity } from '@/utils/unitConverter';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import { useState, useEffect } from 'react';
 import { IndividualProductService } from '@/services/individualProductService';
@@ -114,6 +115,19 @@ export default function OrderItemForm({
     }
   };
 
+  const countUnitLabel =
+    item.product_type === 'raw_material'
+      ? (productWithUnits?.unit || 'units')
+      : (productWithUnits?.count_unit || 'rolls');
+  const pricingUnitLabel = item.pricing_unit === 'unit' ? countUnitLabel : item.pricing_unit;
+  const convertedPricingQuantity = calculatePricingUnitQuantity(
+    Number(item.quantity || 0),
+    item.pricing_unit || 'unit',
+    item.product_dimensions || {},
+    (item as any).length_unit,
+    (item as any).width_unit
+  );
+
   return (
     <div className="p-4 border rounded-lg space-y-4">
       <div className="flex items-center justify-between">
@@ -165,7 +179,7 @@ export default function OrderItemForm({
               <span className="font-medium text-gray-700">Your Price:</span>
               <span className="ml-2 text-gray-900">
                 {item.unit_price > 0
-                  ? `₹${item.unit_price.toFixed(2)} / ${item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : item.product_type === 'product' ? (selectedProduct?.count_unit || 'roll') : (selectedProduct?.unit || 'unit')}`
+                  ? `₹${item.unit_price.toFixed(2)} / ${pricingUnitLabel}`
                   : 'Not set'}
               </span>
             </div>
@@ -235,243 +249,269 @@ export default function OrderItemForm({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label>Product Type</Label>
-          <Select
-            value={item.product_type}
-            onValueChange={(value: 'product' | 'raw_material') => onUpdate(item.id, 'product_type', value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="product">Product</SelectItem>
-              <SelectItem value="raw_material">Raw Material</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Product Type</Label>
+            <Select
+              value={item.product_type}
+              onValueChange={(value: 'product' | 'raw_material') => onUpdate(item.id, 'product_type', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="product">Product</SelectItem>
+                <SelectItem value="raw_material">Raw Material</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-2 md:col-span-2 lg:col-span-2">
-          <Label>Product/Material</Label>
-          <Button
-            variant="outline"
-            className="w-full justify-start"
-            onClick={() => onSelectProduct(item)}
-            title={item.product_name || 'Select Product/Material'}
-          >
-            <Search className="w-4 h-4 mr-2 flex-shrink-0" />
-            <span className="truncate">{item.product_name || 'Select Product/Material'}</span>
-          </Button>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Quantity</Label>
-          <Input
-            type="number"
-            value={item.quantity || 0}
-            onChange={e => {
-              const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
-              onUpdate(item.id, 'quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
-            }}
-            onBlur={() => {
-              setTouchedFields(prev => new Set(prev).add('quantity'));
-            }}
-            onFocus={() => {
-              setTouchedFields(prev => new Set(prev).add('quantity'));
-            }}
-            min="1"
-            max="99999"
-            step="1"
-            placeholder="Enter quantity"
-            className={touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-          />
-          {touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) && (
-            <p className="text-xs text-red-500 mt-1">Quantity is required</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label>Pricing Unit</Label>
-          <Select
-            value={item.pricing_unit}
-            onValueChange={(value: PricingUnit) => onUpdate(item.id, 'pricing_unit', value)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {item.product_type === 'raw_material' ? (
-                // For raw materials, show per unit (always show so Select has a matching option when value is "unit")
-                selectedProduct && (
-                  <SelectItem value="unit">
-                    Per {selectedProduct.unit || 'units'}
-                  </SelectItem>
-                )
-              ) : (
-                // For products, show count_unit + all calculation units (always show "unit" so it auto-selects when product has count_unit from backend)
-                <>
-                  {selectedProduct && (
-                    <SelectItem value="unit">Per {selectedProduct.count_unit || 'rolls'}</SelectItem>
-                  )}
-                  <SelectItem value="sqm">SQM</SelectItem>
-                  <SelectItem value="sqft">SQFT</SelectItem>
-                  <SelectItem value="gsm">GSM</SelectItem>
-                  <SelectItem value="kg">KG</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Unit Price</Label>
-          <Input
-            type="number"
-            value={item.unit_price || ''}
-            onChange={e => {
-              const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
-              onUpdate(item.id, 'unit_price', validation.value === '' ? 0 : parseFloat(validation.value) || 0);
-            }}
-            onBlur={() => {
-              setTouchedFields(prev => new Set(prev).add('unit_price'));
-            }}
-            onFocus={() => {
-              setTouchedFields(prev => new Set(prev).add('unit_price'));
-            }}
-            min="0"
-            max="9999999.99"
-            step="0.01"
-            className={touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-          />
-          {touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) && (
-            <p className="text-xs text-red-500 mt-1">Unit price is required</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label>GST Rate (%)</Label>
-          <Input
-            type="number"
-            value={item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : ''}
-            onChange={e => {
-              const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
-              const inputValue = validation.value;
-              
-              // Allow empty string - user can clear the field completely
-              if (inputValue === '') {
-                onUpdate(item.id, 'gst_rate', undefined);
-                onUpdate(item.id, 'gst_included', false);
-                return;
-              }
-              
-              const numValue = parseFloat(inputValue);
-              if (!isNaN(numValue)) {
-                // Validate range: 5 to 18 only
-                if (numValue < 5) {
-                  // If less than 5, set to 0 and uncheck GST included
-                  onUpdate(item.id, 'gst_rate', 0);
-                  onUpdate(item.id, 'gst_included', false);
-                  return;
-                }
-                if (numValue > 18) {
-                  // If greater than 18, cap at 18
-                  onUpdate(item.id, 'gst_rate', 18);
-                  onUpdate(item.id, 'gst_included', true);
-                  return;
-                }
-                
-                // Valid range: 5-18
-                onUpdate(item.id, 'gst_rate', numValue);
-                // If GST rate is between 5-18, automatically check the checkbox
-                if (numValue >= 5 && numValue <= 18) {
-                  onUpdate(item.id, 'gst_included', true);
-                }
-              }
-            }}
-            onBlur={e => {
-              // When field loses focus and is empty, set to 0
-              if (e.target.value === '' && (item.gst_rate === undefined || item.gst_rate === null)) {
-                onUpdate(item.id, 'gst_rate', 0);
-                onUpdate(item.id, 'gst_included', false);
-              }
-            }}
-            min="5"
-            max="18"
-            step="0.01"
-            placeholder={item.gst_included ? "5-18" : "0"}
-          />
-          {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 0 && item.gst_rate < 5 && item.gst_included && (
-            <p className="text-xs text-red-500 mt-1">GST rate must be between 5% and 18%</p>
-          )}
-          {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 18 && item.gst_included && (
-            <p className="text-xs text-red-500 mt-1">GST rate cannot exceed 18%</p>
-          )}
-          <p className="text-xs text-gray-500 mt-1">
-            GST rate can be between 5% and 18% when included. Leave unchecked for no GST on this item.
-          </p>
-        </div>
-
-        <div className="space-y-2 flex items-end">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id={`gst-included-${item.id}`}
-              checked={item.gst_included === true}
-              onCheckedChange={(checked) => {
-                onUpdate(item.id, 'gst_included', checked);
-                // If checkbox is unchecked, set GST rate to 0
-                if (!checked) {
-                  onUpdate(item.id, 'gst_rate', 0);
-                } else if (checked && (item.gst_rate === undefined || item.gst_rate === null || item.gst_rate === 0)) {
-                  // If checkbox is checked and rate is empty/0, set to 18
-                  onUpdate(item.id, 'gst_rate', 18);
-                } else if (checked) {
-                  const currentRate = item.gst_rate ?? 0;
-                  if (currentRate > 0 && currentRate < 5) {
-                    // If checkbox is checked but rate is less than 5, set to 18
-                    onUpdate(item.id, 'gst_rate', 18);
-                  } else if (currentRate > 18) {
-                    // If checkbox is checked but rate is greater than 18, cap at 18
-                    onUpdate(item.id, 'gst_rate', 18);
-                  }
-                }
-              }}
-            />
-            <Label htmlFor={`gst-included-${item.id}`} className="text-sm font-normal cursor-pointer">
-              GST Included
-            </Label>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Product/Material</Label>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => onSelectProduct(item)}
+              title={item.product_name || 'Select Product/Material'}
+            >
+              <Search className="w-4 h-4 mr-2 flex-shrink-0" />
+              <span className="truncate">{item.product_name || 'Select Product/Material'}</span>
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Subtotal (Before GST)</Label>
-          <Input
-            type="number"
-            value={(item.subtotal || 0).toFixed(2)}
-            readOnly
-            className="bg-gray-50"
-          />
+        <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                value={item.quantity || 0}
+                onChange={e => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRODUCT_QUANTITY);
+                  onUpdate(item.id, 'quantity', validation.value === '' ? 0 : parseInt(validation.value) || 0);
+                }}
+                onBlur={() => {
+                  setTouchedFields(prev => new Set(prev).add('quantity'));
+                }}
+                onFocus={() => {
+                  setTouchedFields(prev => new Set(prev).add('quantity'));
+                }}
+                min="1"
+                max="99999"
+                step="1"
+                placeholder="Enter quantity"
+                className={touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
+              />
+              {touchedFields.has('quantity') && (!item.quantity || item.quantity === 0) && (
+                <p className="text-xs text-red-500 mt-1">Quantity is required</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Quantity Unit</Label>
+              <Input
+                value={countUnitLabel}
+                readOnly
+                className="bg-white"
+                placeholder="Unit"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto from selected {item.product_type === 'raw_material' ? 'material' : 'product'}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Pricing Unit</Label>
+              <Select
+                value={item.pricing_unit}
+                onValueChange={(value: PricingUnit) => onUpdate(item.id, 'pricing_unit', value)}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {item.product_type === 'raw_material' ? (
+                    selectedProduct && (
+                      <SelectItem value="unit">
+                        Per {selectedProduct.unit || 'units'}
+                      </SelectItem>
+                    )
+                  ) : (
+                    <>
+                      {selectedProduct && (
+                        <SelectItem value="unit">Per {selectedProduct.count_unit || 'rolls'}</SelectItem>
+                      )}
+                      <SelectItem value="sqm">SQM</SelectItem>
+                      <SelectItem value="sqft">SQFT</SelectItem>
+                      <SelectItem value="gsm">GSM</SelectItem>
+                      <SelectItem value="kg">KG</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Unit Price</Label>
+              <Input
+                type="number"
+                value={item.unit_price || ''}
+                onChange={e => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
+                  onUpdate(item.id, 'unit_price', validation.value === '' ? 0 : parseFloat(validation.value) || 0);
+                }}
+                onBlur={() => {
+                  setTouchedFields(prev => new Set(prev).add('unit_price'));
+                }}
+                onFocus={() => {
+                  setTouchedFields(prev => new Set(prev).add('unit_price'));
+                }}
+                min="0"
+                max="9999999.99"
+                step="0.01"
+                className={`bg-white ${touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+              />
+              {touchedFields.has('unit_price') && (!item.unit_price || item.unit_price === 0) && (
+                <p className="text-xs text-red-500 mt-1">Unit price is required</p>
+              )}
+            </div>
+          </div>
+          {!!item.quantity && (
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+              <span className="font-medium">Converted quantity:</span>{' '}
+              {item.quantity} {countUnitLabel} = {convertedPricingQuantity.toFixed(2)} {pricingUnitLabel}
+            </div>
+          )}
         </div>
 
-        <div className="space-y-2">
-          <Label>GST Amount</Label>
-          <Input
-            type="number"
-            value={(item.gst_amount || 0).toFixed(2)}
-            readOnly
-            className="bg-gray-50"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>GST Rate (%)</Label>
+            <Input
+              type="number"
+              value={item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : ''}
+              onChange={e => {
+                const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
+                const inputValue = validation.value;
+
+                if (inputValue === '') {
+                  onUpdate(item.id, 'gst_rate', undefined);
+                  onUpdate(item.id, 'gst_included', false);
+                  return;
+                }
+
+                const numValue = parseFloat(inputValue);
+                if (!isNaN(numValue)) {
+                  if (numValue < 5) {
+                    onUpdate(item.id, 'gst_rate', 0);
+                    onUpdate(item.id, 'gst_included', false);
+                    return;
+                  }
+                  if (numValue > 18) {
+                    onUpdate(item.id, 'gst_rate', 18);
+                    onUpdate(item.id, 'gst_included', true);
+                    return;
+                  }
+
+                  onUpdate(item.id, 'gst_rate', numValue);
+                  if (numValue >= 5 && numValue <= 18) {
+                    onUpdate(item.id, 'gst_included', true);
+                  }
+                }
+              }}
+              onBlur={e => {
+                if (e.target.value === '' && (item.gst_rate === undefined || item.gst_rate === null)) {
+                  onUpdate(item.id, 'gst_rate', 0);
+                  onUpdate(item.id, 'gst_included', false);
+                }
+              }}
+              min="5"
+              max="18"
+              step="0.01"
+              placeholder={item.gst_included ? '5-18' : '0'}
+            />
+            {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 0 && item.gst_rate < 5 && item.gst_included && (
+              <p className="text-xs text-red-500 mt-1">GST rate must be between 5% and 18%</p>
+            )}
+            {item.gst_rate !== undefined && item.gst_rate !== null && item.gst_rate > 18 && item.gst_included && (
+              <p className="text-xs text-red-500 mt-1">GST rate cannot exceed 18%</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              GST can be 5% to 18%. Uncheck GST Included to keep GST at 0.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>GST Option</Label>
+            <div className="h-10 px-3 rounded-md border bg-white flex items-center">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`gst-included-${item.id}`}
+                  checked={item.gst_included === true}
+                  onCheckedChange={(checked) => {
+                    onUpdate(item.id, 'gst_included', checked);
+                    if (!checked) {
+                      onUpdate(item.id, 'gst_rate', 0);
+                    } else if (checked && (item.gst_rate === undefined || item.gst_rate === null || item.gst_rate === 0)) {
+                      onUpdate(item.id, 'gst_rate', 18);
+                    } else if (checked) {
+                      const currentRate = item.gst_rate ?? 0;
+                      if (currentRate > 0 && currentRate < 5) {
+                        onUpdate(item.id, 'gst_rate', 18);
+                      } else if (currentRate > 18) {
+                        onUpdate(item.id, 'gst_rate', 18);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor={`gst-included-${item.id}`} className="text-sm font-normal cursor-pointer">
+                  GST Included
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Price Summary</Label>
+            <div className="h-10 px-3 rounded-md border bg-white flex items-center text-sm text-gray-700">
+              {item.unit_price > 0 ? `₹${item.unit_price.toFixed(2)} / ${pricingUnitLabel}` : 'Set unit price to calculate'}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <Label>Total Price (Inc. GST)</Label>
-          <Input
-            type="number"
-            value={(item.total_price || 0).toFixed(2)}
-            readOnly
-            className="bg-gray-50 font-semibold"
-          />
-     </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Subtotal (Before GST)</Label>
+            <Input
+              type="number"
+              value={(item.subtotal || 0).toFixed(2)}
+              readOnly
+              className="bg-gray-50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>GST Amount</Label>
+            <Input
+              type="number"
+              value={(item.gst_amount || 0).toFixed(2)}
+              readOnly
+              className="bg-gray-50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Total Price (Inc. GST)</Label>
+            <Input
+              type="number"
+              value={(item.total_price || 0).toFixed(2)}
+              readOnly
+              className="bg-blue-50 border-blue-200 font-semibold text-blue-900"
+            />
+          </div>
+        </div>
       </div>
 
       {item.errorMessage && (

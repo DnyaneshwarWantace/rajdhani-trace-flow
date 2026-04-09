@@ -246,7 +246,8 @@ export function IndividualProductSelectionDialog({
       const matchesSearch = searchQuery === '' ||
         product.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.qr_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.serial_number?.toLowerCase().includes(searchQuery.toLowerCase());
+        product.serial_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.roll_number?.toLowerCase().includes(searchQuery.toLowerCase());
 
       return matchesSearch;
     })
@@ -282,7 +283,7 @@ export function IndividualProductSelectionDialog({
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
-              placeholder="Search by ID, QR Code, or Serial..."
+              placeholder="Search by roll no, ID, QR code, or serial..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -354,6 +355,12 @@ export function IndividualProductSelectionDialog({
                               {product.status}
                             </Badge>
                           </div>
+                          {product.roll_number && (
+                            <div className="mb-1 text-xs">
+                              <span className="font-medium text-gray-700">Roll No:</span>{' '}
+                              <span className="font-mono text-gray-900">{product.roll_number}</span>
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-600">
                             {product.length && product.width && (
                               <div>
@@ -484,6 +491,12 @@ export function IndividualProductSelectionDialog({
                   <div className="flex justify-between">
                     <span className="text-gray-600">Serial Number:</span>
                     <span className="font-medium">{selectedQrProduct.serial_number}</span>
+                  </div>
+                )}
+                {selectedQrProduct.roll_number && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Roll No:</span>
+                    <span className="font-medium font-mono">{selectedQrProduct.roll_number}</span>
                   </div>
                 )}
                 {selectedQrProduct.status && (

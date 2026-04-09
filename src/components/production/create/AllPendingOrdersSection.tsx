@@ -1,376 +1,331 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShoppingCart, Calendar, User, Box, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Loader2,
+  ShoppingCart,
+  Calendar,
+  User,
+  Package,
+  AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
+  Clock,
+} from 'lucide-react';
 import { ProductService } from '@/services/productService';
+import { OrderService } from '@/services/orderService';
 import { formatIndianDate } from '@/utils/formatHelpers';
-import { getApiUrl } from '@/utils/apiConfig';
 
 interface PendingOrder {
   order_id: string;
   order_number: string;
   customer_name: string;
-  customer_email?: string;
-  customer_phone?: string;
   order_date: string;
   expected_delivery: string;
   status: string;
   priority: string;
   quantity_needed: number;
-  product_value: number;
   product_id?: string;
   product_name?: string;
   current_stock?: number;
   shortage?: number;
-  order_items: Array<{
-    id: string;
-    product_name: string;
-    quantity: number;
-    unit: string;
-    unit_price: string;
-    total_price: string;
-    specifications?: string;
-  }>;
 }
 
 interface Props {
   onSelectOrder: (order: PendingOrder, productId: string) => void;
 }
 
+const PRIORITY_CONFIG = {
+  urgent: { label: 'Urgent', className: 'bg-red-100 text-red-700 border-red-200' },
+  high: { label: 'High', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+  medium: { label: 'Medium', className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  low: { label: 'Low', className: 'bg-gray-100 text-gray-600 border-gray-200' },
+} as const;
+
+const STATUS_CONFIG = {
+  pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700' },
+  accepted: { label: 'Accepted', className: 'bg-blue-100 text-blue-700' },
+  in_production: { label: 'In Production', className: 'bg-purple-100 text-purple-700' },
+  ready: { label: 'Ready', className: 'bg-green-100 text-green-700' },
+} as const;
+
+function getDaysUntil(dateStr: string): number {
+  const delivery = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function DeliveryBadge({ dateStr }: { dateStr: string }) {
+  const days = getDaysUntil(dateStr);
+  if (days < 0) {
+    return (
+      <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+        <AlertTriangle className="h-3 w-3" />
+        {Math.abs(days)}d overdue
+      </span>
+    );
+  }
+  if (days === 0) {
+    return (
+      <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+        <Clock className="h-3 w-3" />
+        Due today
+      </span>
+    );
+  }
+  if (days <= 3) {
+    return (
+      <span className="flex items-center gap-1 text-xs font-semibold text-red-500">
+        <Clock className="h-3 w-3" />
+        {days}d left
+      </span>
+    );
+  }
+  if (days <= 7) {
+    return (
+      <span className="flex items-center gap-1 text-xs font-semibold text-orange-500">
+        <Clock className="h-3 w-3" />
+        {days}d left
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-1 text-xs text-gray-500">
+      <Calendar className="h-3 w-3" />
+      {days}d left
+    </span>
+  );
+}
+
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
-  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(false); // collapsed by default when page loads
-  const [sortBy] = useState<'delivery_date' | 'order_number' | 'product_name' | 'priority' | 'shortage'>('delivery_date');
-  const [sortOrder] = useState<'asc' | 'desc'>('asc');
-  const scrollPositionRef = useRef<number>(0);
-  const isInitialLoadRef = useRef<boolean>(true);
 
   useEffect(() => {
-    loadAllOrders();
-  }, []);
+    let cancelled = false;
 
-  // Preserve scroll position when orders update
-  useEffect(() => {
-    if (!isInitialLoadRef.current && scrollPositionRef.current > 0 && allOrders.length > 0) {
-      // Restore scroll position after orders are rendered
-      requestAnimationFrame(() => {
-        window.scrollTo({
-          top: scrollPositionRef.current,
-          behavior: 'instant' as ScrollBehavior,
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await OrderService.getOrders({
+          status: ['pending', 'accepted', 'in_production', 'ready'],
+          sortBy: 'expected_delivery',
+          sortOrder: 'asc',
         });
-      });
-    }
-  }, [allOrders]);
 
-  // Sort orders when sortBy or sortOrder changes
-  useEffect(() => {
-    if (allOrders.length === 0) return;
+        if (cancelled || error || !data) return;
 
-    // Save scroll position before sorting
-    const currentScroll = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-    
-    const sorted = [...allOrders].sort((a, b) => {
-      let compareValue = 0;
-
-      switch (sortBy) {
-        case 'delivery_date':
-          const aDate = new Date(a.expected_delivery).getTime();
-          const bDate = new Date(b.expected_delivery).getTime();
-          compareValue = aDate - bDate;
-          break;
-        case 'order_number':
-          compareValue = (a.order_number || '').localeCompare(b.order_number || '');
-          break;
-        case 'product_name':
-          compareValue = (a.product_name || '').localeCompare(b.product_name || '');
-          break;
-        case 'priority':
-          const priorityOrder: Record<string, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
-          compareValue = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
-          break;
-        case 'shortage':
-          const aShortage = a.shortage ?? 0;
-          const bShortage = b.shortage ?? 0;
-          // First sort by whether they have shortage (shortage > 0 first)
-          if (aShortage > 0 && bShortage === 0) return -1;
-          if (aShortage === 0 && bShortage > 0) return 1;
-          // Then sort by shortage amount
-          compareValue = bShortage - aShortage;
-          break;
-        default:
-          compareValue = 0;
-      }
-
-      return sortOrder === 'asc' ? compareValue : -compareValue;
-    });
-
-    setAllOrders(sorted);
-    
-    // Restore scroll position after sorting
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        top: currentScroll,
-        behavior: 'instant' as ScrollBehavior,
-      });
-    });
-  }, [sortBy, sortOrder]);
-
-  const loadAllOrders = async () => {
-    // Save scroll position before loading (only if not initial load)
-    if (!isInitialLoadRef.current) {
-      scrollPositionRef.current = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-    }
-    
-    setLoading(true);
-    try {
-      console.log('🔍 Loading ALL orders...');
-
-      // Get orders with status: pending, accepted, in_production, ready (NOT dispatched, delivered, cancelled)
-      const response = await fetch(`${getApiUrl()}/orders`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-        },
-      });
-      const result = await response.json();
-
-      console.log('📦 Orders API response:', result);
-
-      if (result.success && result.data) {
-        // Filter orders by status (exclude dispatched, delivered, cancelled)
-        const validOrders = result.data.filter((order: any) =>
-          ['pending', 'accepted', 'in_production', 'ready'].includes(order.status)
-        );
-
-        console.log('✅ Valid orders after filter:', validOrders.length);
-
-        // Get order items for each order (items are already included in order data)
-        const ordersWithProducts: any[] = [];
-
-        for (const order of validOrders) {
-          // Use order_items that are already included in the order response
-          const orderItems = order.order_items || [];
-
-          // Filter only product items (not raw materials)
-          const productItems = orderItems.filter((item: any) => item.product_type === 'product');
-
-          // Fetch product details to get current stock for each item
+        // Flatten to one row per product item
+        const productRows: Array<Omit<PendingOrder, 'current_stock' | 'shortage'> & { product_id?: string }> = [];
+        for (const order of data) {
+          const productItems = order.items.filter((item) => item.productType === 'product');
           for (const item of productItems) {
-            let currentStock = 0;
-            let shortage = 0;
-
-            if (item.product_id) {
-              try {
-                const product = await ProductService.getProductById(item.product_id);
-                currentStock = product.current_stock || 0;
-                shortage = Math.max(0, item.quantity - currentStock);
-              } catch (error) {
-                console.error(`Error fetching product ${item.product_id}:`, error);
-                // Continue with 0 stock if product fetch fails
-              }
-            }
-
-            ordersWithProducts.push({
+            productRows.push({
               order_id: order.id,
-              order_number: order.order_number || order.id,
-              customer_name: order.customer_name,
-              customer_email: order.customer_email,
-              customer_phone: order.customer_phone,
-              order_date: order.order_date,
-              expected_delivery: order.expected_delivery,
+              order_number: order.orderNumber,
+              customer_name: order.customerName,
+              order_date: order.orderDate,
+              expected_delivery: order.expectedDelivery || '',
               status: order.status,
-              priority: order.priority || 'medium',
-              product_id: item.product_id,
-              product_name: item.product_name,
+              priority: (order as any).priority || 'medium',
               quantity_needed: item.quantity,
-              product_value: parseFloat(item.total_price || '0'),
-              current_stock: currentStock,
-              shortage: shortage,
+              product_id: item.productId,
+              product_name: item.productName,
             });
           }
         }
 
-        console.log('📋 Total orders with products:', ordersWithProducts.length);
+        if (cancelled) return;
 
-        setAllOrders(ordersWithProducts);
-      }
-    } catch (error) {
-      console.error('❌ Error loading orders:', error);
-    } finally {
-      setLoading(false);
-      isInitialLoadRef.current = false;
-      
-      // Restore scroll position after a short delay to ensure DOM is updated
-      if (scrollPositionRef.current > 0) {
-        requestAnimationFrame(() => {
-          window.scrollTo({
-            top: scrollPositionRef.current,
-            behavior: 'instant' as ScrollBehavior,
-          });
+        // Fetch stock for all products in parallel
+        const uniqueProductIds = [...new Set(productRows.map((r) => r.product_id).filter(Boolean))] as string[];
+        const stockMap: Record<string, number> = {};
+        await Promise.all(
+          uniqueProductIds.map(async (productId) => {
+            try {
+              const product = await ProductService.getProductById(productId);
+              stockMap[productId] = product?.current_stock ?? 0;
+            } catch {
+              stockMap[productId] = 0;
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const enriched: PendingOrder[] = productRows.map((row) => {
+          const stock = row.product_id ? (stockMap[row.product_id] ?? 0) : 0;
+          return {
+            ...row,
+            current_stock: stock,
+            shortage: Math.max(0, row.quantity_needed - stock),
+          };
         });
+
+        setOrders(enriched);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    }
-  };
+    })();
 
-  const getPriorityColor = (priority: string) => {
-    const colors = {
-      urgent: 'bg-red-500 text-white',
-      high: 'bg-orange-500 text-white',
-      medium: 'bg-blue-500 text-white',
-      low: 'bg-gray-500 text-white',
-    };
-    return colors[priority as keyof typeof colors] || colors.low;
-  };
+    return () => { cancelled = true; };
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      pending: 'bg-yellow-500 text-white',
-      accepted: 'bg-blue-500 text-white',
-      in_production: 'bg-purple-500 text-white',
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-500 text-white';
-  };
-
-  const isUrgent = (deliveryDate: string) => {
-    const delivery = new Date(deliveryDate);
-    const today = new Date();
-    const days = Math.ceil((delivery.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return days <= 7;
-  };
-
-  const header = (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => setExpanded((e) => !e)}
-      onKeyDown={(ev) => ev.key === 'Enter' && setExpanded((e) => !e)}
-      className="flex items-center justify-between gap-4 cursor-pointer hover:bg-orange-100/70 rounded-lg p-3 -m-1 transition-colors"
-    >
-      <div className="flex items-center gap-2 min-w-0">
-        {expanded ? (
-          <ChevronDown className="h-6 w-6 text-orange-700 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="h-6 w-6 text-orange-700 flex-shrink-0" />
-        )}
-        <h2 className="text-xl sm:text-2xl font-bold text-orange-900 flex items-center gap-2 truncate">
-          <ShoppingCart className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
-          ALL PENDING ORDERS - CREATE PRODUCTION BATCH
-        </h2>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-3 py-10 text-gray-500">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span className="text-sm">Loading pending orders…</span>
       </div>
-      <Badge variant="secondary" className="text-lg px-4 py-1.5 bg-orange-600 text-white flex-shrink-0">
-        {loading ? '...' : `${allOrders.length} Orders`}
-      </Badge>
-    </div>
-  );
+    );
+  }
+
+  if (orders.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-10 text-center">
+        <CheckCircle2 className="h-10 w-10 text-green-400" />
+        <p className="font-semibold text-gray-700">All caught up!</p>
+        <p className="text-sm text-gray-500">No pending orders need production right now.</p>
+      </div>
+    );
+  }
+
+  const urgentCount = orders.filter((o) => getDaysUntil(o.expected_delivery) <= 3).length;
+  const shortageCount = orders.filter((o) => (o.shortage ?? 0) > 0).length;
 
   return (
-    <Card className="p-6 border-4 border-orange-500 bg-orange-50">
-      <div className="space-y-4">
-        {header}
-        {!expanded && (
-          <p className="text-sm text-orange-600 pl-8">Click above to expand and see pending orders</p>
-        )}
-        {expanded && (
-          <>
-            {loading ? (
-              <div className="flex items-center justify-center py-12 border-2 border-orange-200 rounded-lg bg-white">
-                <Loader2 className="h-6 w-6 animate-spin text-blue-600 mr-3" />
-                <span className="text-lg text-gray-700">Loading all pending orders...</span>
-              </div>
-            ) : allOrders.length === 0 ? (
-              <div className="flex items-center gap-4 py-8 px-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                <ShoppingCart className="h-8 w-8 text-green-600 flex-shrink-0" />
-                <div>
-                  <h3 className="text-xl font-bold text-green-900">All Orders Completed!</h3>
-                  <p className="text-green-700">No pending orders at the moment. Create a batch for any product below.</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-orange-700 font-semibold">Click on any order below to create a production batch for that product</p>
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {allOrders.map((order, index) => (
-            <Card
-              key={`${order.order_id}-${index}`}
-              className="p-4 hover:shadow-xl transition-all cursor-pointer border-2 hover:border-orange-600 bg-white"
-              onClick={() => onSelectOrder(order, order.product_id)}
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-gray-900 text-lg">{order.order_number}</h4>
-                    <div className="flex gap-1 mt-1 flex-wrap">
-                      <Badge className={getStatusColor(order.status)} variant="secondary">
-                        {order.status.replace('_', ' ')}
-                      </Badge>
-                      <Badge className={getPriorityColor(order.priority)} variant="secondary">
-                        {order.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-sm">
-                    <Box className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <span className="font-bold text-blue-900 break-words">{order.product_name}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <User className="h-4 w-4 flex-shrink-0" />
-                    <span className="truncate">{order.customer_name}</span>
-                  </div>
-
-                  <div className="space-y-2 pt-2 pb-2 bg-gray-50 rounded p-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Order Qty:</span>
-                      <span className="font-bold text-gray-900">{order.quantity_needed}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Current Stock:</span>
-                      <span className={`font-bold ${order.current_stock && order.current_stock > 0 ? 'text-green-600' : 'text-gray-900'}`}>
-                        {order.current_stock ?? 'N/A'}
-                      </span>
-                    </div>
-                    {order.shortage !== undefined && order.shortage > 0 && (
-                      <div className="flex items-center justify-between text-sm pt-1 border-t border-red-200">
-                        <span className="text-red-600 font-semibold flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          Need to Make:
-                        </span>
-                        <span className="font-bold text-red-600">{order.shortage}</span>
-                      </div>
-                    )}
-                    {order.shortage !== undefined && order.shortage === 0 && order.current_stock !== undefined && (
-                      <div className="flex items-center justify-between text-sm pt-1 border-t border-green-200">
-                        <span className="text-green-600 font-semibold">Stock Available:</span>
-                        <span className="font-bold text-green-600">✓</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={`flex items-center gap-2 text-sm font-semibold ${isUrgent(order.expected_delivery) ? 'text-red-600' : 'text-gray-600'}`}>
-                    <Calendar className="h-4 w-4 flex-shrink-0" />
-                    <span>Deliver: {formatIndianDate(order.expected_delivery)}</span>
-                    {isUrgent(order.expected_delivery) && <span className="text-red-600">⚠️ URGENT</span>}
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <div className="text-sm text-center font-bold text-orange-700 bg-orange-100 py-2 rounded">
-                      Click to Create Batch
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
+    <div className="space-y-4">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ShoppingCart className="h-5 w-5 text-gray-600" />
+          <h3 className="text-base font-semibold text-gray-800">Pending Orders</h3>
+          <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+            {orders.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {urgentCount > 0 && (
+            <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
+              <Clock className="h-3 w-3" />
+              {urgentCount} urgent
+            </span>
+          )}
+          {shortageCount > 0 && (
+            <span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
+              <AlertTriangle className="h-3 w-3" />
+              {shortageCount} need production
+            </span>
+          )}
+        </div>
       </div>
-    </Card>
+
+      {/* Order cards */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {orders.map((order, index) => {
+          const days = getDaysUntil(order.expected_delivery);
+          const isOverdue = days < 0;
+          const isVeryUrgent = days >= 0 && days <= 3;
+          const hasShortage = (order.shortage ?? 0) > 0;
+          const priorityConf = PRIORITY_CONFIG[order.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium;
+          const statusConf = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+
+          return (
+            <div
+              key={`${order.order_id}-${index}`}
+              className={`group relative bg-white rounded-xl border transition-all duration-150 hover:shadow-md cursor-pointer overflow-hidden ${
+                isOverdue
+                  ? 'border-red-300 hover:border-red-400'
+                  : isVeryUrgent
+                  ? 'border-orange-300 hover:border-orange-400'
+                  : 'border-gray-200 hover:border-blue-300'
+              }`}
+              onClick={() => onSelectOrder(order, order.product_id ?? '')}
+            >
+              {/* Top accent bar */}
+              <div
+                className={`h-1 w-full ${
+                  isOverdue ? 'bg-red-500' : isVeryUrgent ? 'bg-orange-400' : 'bg-blue-400'
+                }`}
+              />
+
+              <div className="p-4 space-y-3">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 tracking-wide uppercase">
+                      {order.order_number}
+                    </p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5 flex items-center gap-1">
+                      <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      {order.customer_name}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className={`text-[10px] px-1.5 py-0.5 border ${priorityConf.className}`}>
+                      {priorityConf.label}
+                    </Badge>
+                    <Badge className={`text-[10px] px-1.5 py-0.5 ${statusConf.className}`}>
+                      {statusConf.label}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Product */}
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                  <Package className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  <p className="text-sm font-medium text-gray-800 truncate">{order.product_name}</p>
+                </div>
+
+                {/* Qty / Stock / Shortage */}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Ordered</p>
+                    <p className="text-sm font-bold text-gray-800">{order.quantity_needed}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">In Stock</p>
+                    <p className={`text-sm font-bold ${(order.current_stock ?? 0) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                      {order.current_stock ?? 0}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg p-2 ${hasShortage ? 'bg-red-50' : 'bg-green-50'}`}>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+                      {hasShortage ? 'Make' : 'Status'}
+                    </p>
+                    {hasShortage ? (
+                      <p className="text-sm font-bold text-red-600">{order.shortage}</p>
+                    ) : (
+                      <p className="text-sm font-bold text-green-600">✓</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Delivery + CTA */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                    <span className="text-xs text-gray-600">{formatIndianDate(order.expected_delivery)}</span>
+                    <DeliveryBadge dateStr={order.expected_delivery} />
+                  </div>
+                  <Button
+                    size="sm"
+                    className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 group-hover:translate-x-0.5 transition-transform"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectOrder(order, order.product_id ?? '');
+                    }}
+                  >
+                    Create Batch
+                    <ArrowRight className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

@@ -282,6 +282,70 @@ export function calculateTotalPrice(
 }
 
 /**
+ * Calculate total billable quantity in selected pricing unit.
+ * Example: 2 rolls -> 31.20 sqm (when pricing unit is sqm).
+ */
+export function calculatePricingUnitQuantity(
+  quantity: number,
+  pricingUnit: PricingUnit,
+  productDimensions: ProductDimensions,
+  lengthUnit?: string,
+  widthUnit?: string
+): number {
+  const safeQuantity = Number(quantity || 0);
+  if (safeQuantity <= 0) return 0;
+
+  if (pricingUnit === 'unit' || !pricingUnit) {
+    return safeQuantity;
+  }
+
+  if (pricingUnit === 'sqm') {
+    if (!productDimensions.length || !productDimensions.width) {
+      return safeQuantity;
+    }
+    const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
+    const widthInM = convertToMeters(productDimensions.width, widthUnit || 'm');
+    return lengthInM * widthInM * safeQuantity;
+  }
+
+  if (pricingUnit === 'sqft') {
+    if (!productDimensions.length || !productDimensions.width) {
+      return safeQuantity;
+    }
+    const lengthInFt = convertToFeet(productDimensions.length, lengthUnit || 'm');
+    const widthInFt = convertToFeet(productDimensions.width, widthUnit || 'm');
+    return lengthInFt * widthInFt * safeQuantity;
+  }
+
+  if (pricingUnit === 'gsm') {
+    const gsm = productDimensions.gsm || parseFloat(String(productDimensions.weight || '0').replace(/[^\d.-]/g, '')) || 0;
+    if (gsm <= 0) return safeQuantity;
+
+    if (productDimensions.length && productDimensions.width) {
+      const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
+      const widthInM = convertToMeters(productDimensions.width, widthUnit || 'm');
+      const sqmPerProduct = lengthInM * widthInM;
+      return gsm * sqmPerProduct * safeQuantity;
+    }
+    return gsm * safeQuantity;
+  }
+
+  if (pricingUnit === 'kg') {
+    const gsm = productDimensions.gsm || parseFloat(String(productDimensions.weight || '0').replace(/[^\d.-]/g, '')) || 0;
+    if (productDimensions.length && productDimensions.width && gsm > 0) {
+      const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
+      const widthInM = convertToMeters(productDimensions.width, widthUnit || 'm');
+      const sqmPerProduct = lengthInM * widthInM;
+      const weightPerProductKg = (gsm * sqmPerProduct) / 1000;
+      return weightPerProductKg * safeQuantity;
+    }
+    return safeQuantity;
+  }
+
+  return safeQuantity;
+}
+
+/**
  * Convert value to meters
  */
 function convertToMeters(value: number, unit: string): number {

@@ -221,19 +221,8 @@ export default function IndividualProductsTable({
     
     switch (col) {
       case 'final_weight': {
-        // Show weight (kg) for editing when length+width exist; else show GSM number. Max 4 decimals.
-        const lw = getLengthWidthMeters(productItem);
-        if (lw) {
-          const wKg = gsmToWeightKg(productItem);
-          if (wKg !== null) {
-            const rounded = Math.round(wKg * 1e4) / 1e4;
-            value = String(rounded);
-          } else {
-            value = (productItem.final_weight || '').replace(/[^\d.]/g, '');
-          }
-        } else {
-          value = (productItem.final_weight || '').replace(/[^\d.]/g, '');
-        }
+        // GSM only input (no kg conversion input).
+        value = (productItem.final_weight || '').replace(/[^\d.]/g, '');
         break;
       }
       case 'final_width':
@@ -272,7 +261,7 @@ export default function IndividualProductsTable({
       
       let valueToSave = editValue.trim();
       
-      // Validate final_weight, final_length, final_width against expected values (±2 range)
+      // Validate numeric input only (no expected-range restrictions).
       if (col === 'final_weight' || col === 'final_length' || col === 'final_width') {
         if (!valueToSave) {
           setSaving(null);
@@ -292,48 +281,7 @@ export default function IndividualProductsTable({
           return;
         }
 
-        // For final_weight: user enters weight (kg); we convert to GSM when length+width present
-        let valueToValidate = enteredNumeric;
-        if (col === 'final_weight') {
-          const lw = getLengthWidthMeters(productItem);
-          if (lw) {
-            const gsm = weightKgToGsm(enteredNumeric, productItem);
-            if (gsm !== null) valueToValidate = gsm; // validate GSM range
-          }
-        }
-
-        // Get expected value and compute range for warning only (±10 GSM, ±2 length/width)
-        let expectedNumeric: number | null = null;
-        let fieldName = '';
-        
-        if (col === 'final_weight' && product?.weight) {
-          expectedNumeric = parseFloat(product.weight.toString().replace(/[^\d.]/g, ''));
-          fieldName = 'GSM';
-        } else if (col === 'final_length' && product?.length) {
-          expectedNumeric = parseFloat(product.length.toString().replace(/[^\d.]/g, ''));
-          fieldName = 'Length';
-        } else if (col === 'final_width' && product?.width) {
-          expectedNumeric = parseFloat(product.width.toString().replace(/[^\d.]/g, ''));
-          fieldName = 'Width';
-        }
-
-        // Show warning if out of suggested range, but do NOT block saving
-        if (expectedNumeric !== null && !isNaN(expectedNumeric)) {
-          const range = col === 'final_weight' ? 10 : 2;
-          const minValue = expectedNumeric - range;
-          const maxValue = expectedNumeric + range;
-          
-          if (valueToValidate < minValue || valueToValidate > maxValue) {
-            const msg = `${fieldName} should ideally be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`;
-            toast({
-              title: 'Out of expected range',
-              description: msg,
-            });
-            setValidationError(msg);
-          } else {
-            setValidationError(null);
-          }
-        }
+        setValidationError(null);
       }
 
       // Location is mandatory
@@ -354,15 +302,10 @@ export default function IndividualProductsTable({
         setValidationError(null);
       }
 
-      // For final_weight: user entered weight (kg) → convert to GSM and save (weight max 4 decimals)
+      // For final_weight: GSM-only input.
       if (col === 'final_weight' && valueToSave && !valueToSave.match(/[a-zA-Z]/)) {
-        let weightKg = parseFloat(valueToSave.replace(/[^\d.]/g, ''));
-        if (!isNaN(weightKg)) weightKg = Math.round(weightKg * 1e4) / 1e4;
-        const lw = getLengthWidthMeters(productItem);
-        if (lw && !isNaN(weightKg)) {
-          const gsm = weightKgToGsm(weightKg, productItem);
-          valueToSave = gsm !== null ? `${gsm.toFixed(2)} GSM` : valueToSave;
-        }
+        const gsmValue = parseFloat(valueToSave.replace(/[^\d.]/g, ''));
+        if (!isNaN(gsmValue)) valueToSave = gsmValue.toString();
         if (!valueToSave.includes('GSM')) {
           const weightUnit = product?.weight_unit || (product?.weight?.includes('GSM') ? 'GSM' : 'GSM');
           valueToSave = `${valueToSave} ${weightUnit}`;
@@ -401,8 +344,8 @@ export default function IndividualProductsTable({
       } else if (productItem.id && productItem.id.startsWith('temp-')) {
         // For temp products, check if we have enough data to create it
         const tempProduct = updated[row];
-      const hasRequiredFields = tempProduct.final_weight && 
-                                  tempProduct.final_width && 
+        const hasRequiredFields = tempProduct.final_weight &&
+                                  tempProduct.final_width &&
                                   tempProduct.final_length &&
                                   tempProduct.location &&
                                   tempProduct.roll_number &&
@@ -410,14 +353,29 @@ export default function IndividualProductsTable({
         
         // Only create if this is the last required field being filled
         if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'roll_number' || col === 'location')) {
+          // Check for duplicate roll_number within this batch
+          const duplicate = localProducts.find(
+            (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
+          );
+          if (duplicate) {
+            toast({
+              title: 'Duplicate Roll Number',
+              description: `Roll number "${tempProduct.roll_number}" is already used in this batch. Please use a unique roll number.`,
+              variant: 'destructive',
+            });
+            setSaving(null);
+            setEditingCell(null);
+            setEditValue('');
+            return;
+          }
           try {
-            // Create the individual product
+            // Create the individual product — always available immediately
             const newProduct = await IndividualProductService.createIndividualProduct({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
               roll_number: tempProduct.roll_number || '',
-              status: tempProduct.status || 'available',
+              status: 'available',
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
               final_weight: tempProduct.final_weight || '',
@@ -427,21 +385,21 @@ export default function IndividualProductsTable({
               production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
               batch_number: batchId || '',
             });
-            
+
             // Update local state with the real product
             updated[row] = newProduct;
             setLocalProducts(updated);
-            
+
             toast({
-              title: 'Success',
-              description: 'Individual product created and added to stock',
+              title: 'Saved to Stock',
+              description: `Roll ${newProduct.roll_number || newProduct.id} added to stock and available immediately`,
             });
             onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
             toast({
               title: 'Error',
-              description: 'Failed to create individual product',
+              description: error instanceof Error ? error.message : 'Failed to create individual product',
               variant: 'destructive',
             });
           }
@@ -455,7 +413,7 @@ export default function IndividualProductsTable({
       console.error('Error updating product:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update product details',
+        description: error instanceof Error ? error.message : 'Failed to update product details',
         variant: 'destructive',
       });
       // Revert local state on error
@@ -488,20 +446,36 @@ export default function IndividualProductsTable({
       } else if (productItem.id && productItem.id.startsWith('temp-')) {
         // For temp products, check if we have enough data to create it
         const tempProduct = updated[row];
-        const hasRequiredFields = tempProduct.final_weight && 
-                                  tempProduct.final_width && 
+        const hasRequiredFields = tempProduct.final_weight &&
+                                  tempProduct.final_width &&
                                   tempProduct.final_length &&
+                                  tempProduct.roll_number &&
+                                  tempProduct.location &&
                                   productId;
-        
+
         // Only create if all required fields are now filled
         if (hasRequiredFields) {
+          // Check for duplicate roll_number within this batch
+          const duplicate = localProducts.find(
+            (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
+          );
+          if (duplicate) {
+            toast({
+              title: 'Duplicate Roll Number',
+              description: `Roll number "${tempProduct.roll_number}" is already used by another product in this batch. Please use a unique roll number.`,
+              variant: 'destructive',
+            });
+            setSaving(null);
+            return;
+          }
           try {
             // Create the individual product
             const newProduct = await IndividualProductService.createIndividualProduct({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
-              status: tempProduct.status || 'available',
+              roll_number: tempProduct.roll_number || '',
+              status: 'available',
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
               final_weight: tempProduct.final_weight || '',
@@ -509,30 +483,23 @@ export default function IndividualProductsTable({
               location: tempProduct.location || 'Warehouse A - General Storage',
               notes: tempProduct.notes || '',
               production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
+              batch_number: batchId || '',
             });
-            
-            // Update the product with batch_number after creation
-            if (batchId && newProduct.id) {
-              await IndividualProductService.updateIndividualProduct(newProduct.id, {
-                batch_number: batchId,
-              });
-              newProduct.batch_number = batchId;
-            }
-            
+
             // Update local state with the real product
             updated[row] = newProduct;
             setLocalProducts(updated);
-            
+
             toast({
-              title: 'Success',
-              description: 'Individual product created and added to stock',
+              title: 'Saved to Stock',
+              description: `Roll ${newProduct.roll_number || newProduct.id} added to stock and available immediately`,
             });
             onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
             toast({
               title: 'Error',
-              description: 'Failed to create individual product',
+              description: error instanceof Error ? error.message : 'Failed to create individual product',
               variant: 'destructive',
             });
           }
@@ -542,7 +509,7 @@ export default function IndividualProductsTable({
       console.error('Error updating product:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update product details',
+        description: error instanceof Error ? error.message : 'Failed to update product details',
         variant: 'destructive',
       });
       // Revert local state on error
@@ -655,7 +622,7 @@ export default function IndividualProductsTable({
         console.error('Error updating product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to save value',
+          description: error instanceof Error ? error.message : 'Failed to save value',
           variant: 'destructive',
         });
         // Revert on error
@@ -692,7 +659,7 @@ export default function IndividualProductsTable({
         console.error('Error creating individual product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to create individual product',
+          description: error instanceof Error ? error.message : 'Failed to create individual product',
           variant: 'destructive',
         });
       }
@@ -761,7 +728,7 @@ export default function IndividualProductsTable({
         console.error('Error updating product location:', error);
         toast({
           title: 'Error',
-          description: 'Failed to save location',
+          description: error instanceof Error ? error.message : 'Failed to save location',
           variant: 'destructive',
         });
         // Revert on error
@@ -797,7 +764,7 @@ export default function IndividualProductsTable({
         console.error('Error creating individual product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to create individual product',
+          description: error instanceof Error ? error.message : 'Failed to create individual product',
           variant: 'destructive',
         });
       }
@@ -876,7 +843,7 @@ export default function IndividualProductsTable({
         console.error('Error updating product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to save values',
+          description: error instanceof Error ? error.message : 'Failed to save values',
           variant: 'destructive',
         });
       }
@@ -908,7 +875,7 @@ export default function IndividualProductsTable({
         console.error('Error creating individual product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to create individual product',
+          description: error instanceof Error ? error.message : 'Failed to create individual product',
           variant: 'destructive',
         });
       }
@@ -972,7 +939,7 @@ export default function IndividualProductsTable({
       console.error('Error applying location to all products:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save location for some rows',
+        description: error instanceof Error ? error.message : 'Failed to save location for some rows',
         variant: 'destructive',
       });
     }
@@ -1032,7 +999,7 @@ export default function IndividualProductsTable({
         console.error('Error updating product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to save pasted values',
+          description: error instanceof Error ? error.message : 'Failed to save pasted values',
           variant: 'destructive',
         });
         // Revert on error
@@ -1069,7 +1036,7 @@ export default function IndividualProductsTable({
         console.error('Error creating individual product:', error);
         toast({
           title: 'Error',
-          description: 'Failed to create individual product',
+          description: error instanceof Error ? error.message : 'Failed to create individual product',
           variant: 'destructive',
         });
       }
@@ -1152,7 +1119,7 @@ export default function IndividualProductsTable({
           console.error('Error deleting product:', error);
           toast({
             title: 'Error',
-            description: 'Failed to remove product',
+            description: error instanceof Error ? error.message : 'Failed to remove product',
             variant: 'destructive',
           });
           // Revert local state on error
@@ -1161,111 +1128,12 @@ export default function IndividualProductsTable({
     }
   };
 
-  // Calculate actual weight in KG from GSM, length, and width (product reference values)
-  const calculateWeightInKg = (): number | null => {
-    if (!product?.weight || !product?.length || !product?.width) return null;
-    
-    const gsm = parseFloat(product.weight.toString().replace(/[^\d.]/g, ''));
-    const lengthStr = product.length.toString();
-    const widthStr = product.width.toString();
-    
-    // Extract numeric values
-    let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
-    let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
-    
-    // Convert to meters if in feet (1 foot = 0.3048 meters)
-    if (product.length_unit?.toLowerCase().includes('feet') || lengthStr.toLowerCase().includes('feet')) {
-      lengthM = lengthM * 0.3048;
-    }
-    if (product.width_unit?.toLowerCase().includes('feet') || widthStr.toLowerCase().includes('feet')) {
-      widthM = widthM * 0.3048;
-    }
-    
-    // Calculate weight in KG: (GSM × Length (m) × Width (m)) / 1000
-    if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
-      return (gsm * lengthM * widthM) / 1000;
-    }
-    
-    return null;
-  };
-
-  // Parse length and width in meters from a row (for weight ↔ GSM conversion)
-  const getLengthWidthMeters = (item: IndividualProduct): { lengthM: number; widthM: number } | null => {
-    const lengthStr = (item.final_length || '').toString();
-    const widthStr = (item.final_width || '').toString();
-    let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
-    let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
-    if (product?.length_unit?.toLowerCase().includes('feet') || lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
-    if (product?.width_unit?.toLowerCase().includes('feet') || widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
-    if (!isNaN(lengthM) && !isNaN(widthM) && lengthM > 0 && widthM > 0) return { lengthM, widthM };
-    return null;
-  };
-
-  // Weight (kg) → GSM: GSM = weight_kg * 1000 / (length_m * width_m)
-  const weightKgToGsm = (weightKg: number, item: IndividualProduct): number | null => {
-    const lw = getLengthWidthMeters(item);
-    if (!lw) return null;
-    return (weightKg * 1000) / (lw.lengthM * lw.widthM);
-  };
-
-  // GSM → Weight (kg) for display when editing
-  const gsmToWeightKg = (item: IndividualProduct): number | null => {
-    const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
-    const lw = getLengthWidthMeters(item);
-    if (!lw || isNaN(gsm) || gsm <= 0) return null;
-    return (gsm * lw.lengthM * lw.widthM) / 1000;
-  };
-
-  const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>, col: string) => {
+  const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
     // Only allow numbers and decimal point
     let numericValue = value.replace(/[^\d.]/g, '');
-    // For final_weight (weight kg), allow max 4 decimal places
-    if (col === 'final_weight' && numericValue.includes('.')) {
-      const [intPart, decPart] = numericValue.split('.');
-      if (decPart && decPart.length > 4) numericValue = `${intPart}.${decPart.slice(0, 4)}`;
-    }
     setEditValue(numericValue);
-    
-    // Clear validation error when user types
     setValidationError(null);
-
-    // Real-time validation for weight, length, width
-    if (col === 'final_weight' || col === 'final_length' || col === 'final_width') {
-      if (!numericValue.trim()) {
-        return;
-      }
-
-      const enteredNumeric = parseFloat(numericValue);
-      if (isNaN(enteredNumeric)) {
-        return;
-      }
-
-      // Skip range validation for final_weight in real time (user enters weight kg; we validate GSM on save)
-      if (col === 'final_weight') {
-        setValidationError(null);
-        return;
-      }
-      let expectedNumeric: number | null = null;
-      let fieldName = '';
-      if (col === 'final_length' && product?.length) {
-        expectedNumeric = parseFloat(product.length.toString().replace(/[^\d.]/g, ''));
-        fieldName = 'Length';
-      } else if (col === 'final_width' && product?.width) {
-        expectedNumeric = parseFloat(product.width.toString().replace(/[^\d.]/g, ''));
-        fieldName = 'Width';
-      }
-      if (expectedNumeric !== null && !isNaN(expectedNumeric)) {
-        const range = 2;
-        const minValue = expectedNumeric - range;
-        const maxValue = expectedNumeric + range;
-        if (enteredNumeric < minValue || enteredNumeric > maxValue) {
-          setValidationError(`${fieldName} must be between ${minValue} and ${maxValue} (Expected: ${expectedNumeric} ± ${range})`);
-        } else {
-          setValidationError(null);
-        }
-      }
-    }
   };
 
   return (
@@ -1301,10 +1169,55 @@ export default function IndividualProductsTable({
             </Button>
             {onComplete && (
               <Button
-                onClick={onComplete}
+                onClick={() => {
+                  if (canComplete) {
+                    onComplete();
+                    return;
+                  }
+                  // Show exactly what's blocking completion
+                  const tempRows = localProducts.filter(p => p.id?.startsWith('temp-'));
+                  if (tempRows.length > 0) {
+                    toast({
+                      title: 'Unsaved rows',
+                      description: `${tempRows.length} row(s) are not saved yet. Fill in all required fields (Roll No, Weight, Width, Length, Location) to auto-save them first.`,
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+                  const requiredFields: { key: string; label: string }[] = [
+                    { key: 'roll_number', label: 'Roll Number' },
+                    { key: 'final_weight', label: 'Weight/GSM' },
+                    { key: 'final_width', label: 'Width' },
+                    { key: 'final_length', label: 'Length' },
+                    { key: 'location', label: 'Location' },
+                  ];
+                  const missingMap: Record<string, string[]> = {};
+                  localProducts.forEach((p, i) => {
+                    requiredFields.forEach(({ key, label }) => {
+                      const val = p[key as keyof IndividualProduct];
+                      if (!val || (typeof val === 'string' && val.trim() === '')) {
+                        if (!missingMap[`Row ${i + 1}`]) missingMap[`Row ${i + 1}`] = [];
+                        missingMap[`Row ${i + 1}`].push(label);
+                      }
+                    });
+                  });
+                  const missing = Object.entries(missingMap).map(([row, fields]) => `${row}: ${fields.join(', ')}`).join(' | ');
+                  if (missing) {
+                    toast({
+                      title: 'Missing required fields',
+                      description: missing,
+                      variant: 'destructive',
+                    });
+                  } else if (localProducts.length === 0) {
+                    toast({
+                      title: 'No products added',
+                      description: 'Add at least one individual product before proceeding.',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
                 size="sm"
-                disabled={!canComplete}
-                className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2 disabled:opacity-50 disabled:text-white"
+                className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
               >
                 <CheckCircle className="w-4 h-4" />
                 {actionLabel}
@@ -1340,18 +1253,6 @@ export default function IndividualProductsTable({
                   <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
                 </div>
               )}
-              {(() => {
-                const weightKg = calculateWeightInKg();
-                if (weightKg !== null) {
-                  return (
-                    <div>
-                      <p className="text-gray-600 font-medium mb-1">Actual Weight (KG)</p>
-                      <p className="text-gray-900 font-semibold">{weightKg.toFixed(3)} kg</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
               {plannedQuantity > 0 && (
                 <div>
                   <p className="text-gray-600 font-medium mb-1">Planned Quantity</p>
@@ -1360,7 +1261,7 @@ export default function IndividualProductsTable({
               )}
             </div>
             <p className="text-xs text-blue-700 mt-3 italic">
-              Fill Length and Width first, then enter <strong>weight (kg)</strong> in the Final Weight column — it is converted to GSM and saved (max 4 decimals).
+              Enter Final GSM directly in the Final GSM column.
             </p>
           </div>
         )}
@@ -1422,7 +1323,7 @@ export default function IndividualProductsTable({
                           type="text"
                           inputMode="decimal"
                           value={editValue}
-                          onChange={(e) => handleNumberInput(e, 'final_length')}
+                          onChange={handleNumberInput}
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
@@ -1467,7 +1368,7 @@ export default function IndividualProductsTable({
                           type="text"
                           inputMode="decimal"
                           value={editValue}
-                          onChange={(e) => handleNumberInput(e, 'final_width')}
+                          onChange={handleNumberInput}
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
@@ -1512,11 +1413,11 @@ export default function IndividualProductsTable({
                           type="text"
                           inputMode="decimal"
                           value={editValue}
-                          onChange={(e) => handleNumberInput(e, 'final_weight')}
+                          onChange={handleNumberInput}
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder={getLengthWidthMeters(productItem) ? 'Weight (kg, max 4 decimals)' : `e.g., 15 (${product?.weight_unit || 'GSM'})`}
+                          placeholder={`e.g., 350 (${product?.weight_unit || 'GSM'})`}
                           disabled={saving === productItem.id}
                           className={validationError && editingCell?.col === 'final_weight' ? 'border-red-500 focus:border-red-500' : ''}
                         />
@@ -1530,24 +1431,11 @@ export default function IndividualProductsTable({
                           className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-start flex-col"
                           onClick={() => handleCellClick(index, 'final_weight')}
                         >
-                          {(() => {
-                            const wKg = gsmToWeightKg(productItem);
-                            if (!productItem.final_weight) {
-                              return <span className="text-gray-400">Click to edit</span>;
-                            }
-                            return (
-                              <>
-                                <span className="text-sm text-gray-900">
-                                  {productItem.final_weight}
-                                </span>
-                                {wKg !== null && (
-                                  <span className="text-xs text-gray-500">
-                                    ({wKg.toFixed(4)} kg)
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
+                          {productItem.final_weight ? (
+                            <span className="text-sm text-gray-900">{productItem.final_weight}</span>
+                          ) : (
+                            <span className="text-gray-400">Click to edit</span>
+                          )}
                         </div>
                         {productItem.final_weight && (
                           <Button

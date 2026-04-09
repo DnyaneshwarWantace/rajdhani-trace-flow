@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Grid3x3, List, ArrowLeft } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List, ArrowLeft, UserRound, ClipboardList, Target, PackageCheck, CalendarClock } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
+import { OrderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ProductionStatsBoxes from '@/components/production/ProductionStatsBoxes';
@@ -13,9 +14,12 @@ import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
 import { canView, canDelete } from '@/utils/permissions';
+import { useAuth } from '@/contexts/AuthContext';
+import AllPendingOrdersSection from '@/components/production/create/AllPendingOrdersSection';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import ProductionDuplicateDialog from '@/components/production/ProductionDuplicateDialog';
+import { type ProductionTask } from '@/services/productionService';
 import {
   Select,
   SelectContent,
@@ -32,16 +36,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination-primitives';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 export default function ProductionList() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { productId: productIdFromPath } = useParams<{ productId?: string }>();
   const [allBatches, setAllBatches] = useState<ProductionBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductionBatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('all');
+  const [activeSection, setActiveSection] = useState<'assigned' | 'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('assigned');
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [categoryFilter, _setCategoryFilter] = useState<string[]>([]);
@@ -65,12 +71,15 @@ export default function ProductionList() {
 
 
   const [stats, setStats] = useState({
+    assigned: 0,
     all: 0,
     planned: 0,
     active: 0,
     completed: 0,
     cancelled: 0,
   });
+  const [assignedTasks, setAssignedTasks] = useState<ProductionTask[]>([]);
+  const assignedTaskCount = assignedTasks.filter((t) => t.status === 'assigned').length;
 
   // Product-scoped page: from path /production/product/:productId or query ?productId=
   const searchParams = new URLSearchParams(location.search);
@@ -81,6 +90,11 @@ export default function ProductionList() {
     loadBatches();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productIdFilter]);
+
+  useEffect(() => {
+    loadAssignedTasks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, activeSection]);
 
   // Fetch product name for product-scoped page header
   useEffect(() => {
@@ -164,12 +178,98 @@ export default function ProductionList() {
     );
   };
 
+  const getAttachedOrderNumbersFromNotes = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Orders:\s*(.+)$/i);
+    if (!match?.[1]) return [];
+    const raw = match[1].split('·')[0].trim();
+    const idMatches = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+    const parsed = (idMatches.length > 0 ? idMatches : raw.split(','))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set(parsed));
+  };
+
+  const getAttachedOrderIdsFromNotes = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+    if (!match?.[1]) return [];
+    return Array.from(
+      new Set(
+        match[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const enrichBatchesWithCustomerNames = async (batches: ProductionBatch[]): Promise<ProductionBatch[]> => {
+    try {
+      const { data: orders } = await OrderService.getOrders({
+        limit: 1000,
+        sortBy: 'order_date',
+        sortOrder: 'desc',
+      });
+      const orderCustomerMap: Record<string, string> = {};
+      const orderTargetsMap: Record<string, string[]> = {};
+      (orders || []).forEach((order) => {
+        const orderNo = (order.orderNumber || '').trim();
+        const customer = (order.customerName || '').trim();
+        if (orderNo && customer) {
+          orderCustomerMap[orderNo] = customer;
+        }
+        if (orderNo) {
+          const targets = Array.from(
+            new Set(
+              (order.items || [])
+                .map((item) => (item.productName || '').trim())
+                .filter(Boolean)
+            )
+          );
+          orderTargetsMap[orderNo] = targets;
+        }
+      });
+
+      return batches.map((batch) => {
+        const allOrderNos = Array.from(
+          new Set([
+            ...(batch.order_number ? [batch.order_number] : []),
+            ...getAttachedOrderNumbersFromNotes(batch.notes),
+          ].filter(Boolean))
+        );
+        const primaryOrder = allOrderNos[0] || '';
+        const mappedCustomer = orderCustomerMap[primaryOrder];
+
+        const finalTargets = allOrderNos.map((orderNo) => ({
+          order_number: orderNo,
+          product_names: orderTargetsMap[orderNo] || [],
+        }));
+
+        const finalTargetDisplay = finalTargets
+          .flatMap((t) => t.product_names)
+          .filter(Boolean)
+          .join(', ');
+
+        return {
+          ...batch,
+          customer_name: batch.customer_name || mappedCustomer || batch.customer_name,
+          final_targets: finalTargets,
+          final_target_display: finalTargetDisplay || batch.final_target_display || batch.product_name || 'Product',
+        };
+      });
+    } catch (error) {
+      console.error('Error enriching customer names for production batches:', error);
+      return batches;
+    }
+  };
+
   const loadBatches = async () => {
     try {
       setLoading(true);
-      const { data, error } = await ProductionService.getBatches(
-        productIdFilter ? { product_id: productIdFilter } : {}
-      );
+      const params: Record<string, string> = {};
+      if (productIdFilter) params.product_id = productIdFilter;
+      const { data, error } = await ProductionService.getBatches(params);
 
       if (error) {
         toast({ title: 'Error', description: error, variant: 'destructive' });
@@ -178,13 +278,27 @@ export default function ProductionList() {
       }
 
       if (data) {
+        // Show all batches returned by API for users with production_view permission.
+        // "Assigned" section still filters to current user separately.
+        const visibleBatches = data;
+
+        const normalizedVisibleBatches = visibleBatches.map((batch) => ({
+          ...batch,
+          assigned_to_name:
+            batch.assigned_to_name ||
+            batch.current_stage_assigned_to_name ||
+            batch.operator ||
+            '',
+        }));
+
         // Fetch product names for batches that don't have them
-        const batchesWithProductNames = await enrichBatchesWithProductNames(data);
-        setAllBatches(batchesWithProductNames);
+        const batchesWithProductNames = await enrichBatchesWithProductNames(normalizedVisibleBatches);
+        const batchesWithCustomers = await enrichBatchesWithCustomerNames(batchesWithProductNames);
+        setAllBatches(batchesWithCustomers);
         // Stats will be calculated in useEffect when allBatches updates
       } else {
         setAllBatches([]);
-        setStats({ all: 0, planned: 0, active: 0, completed: 0, cancelled: 0 });
+        setStats({ assigned: 0, all: 0, planned: 0, active: 0, completed: 0, cancelled: 0 });
       }
     } catch (error) {
       console.error('Error loading batches:', error);
@@ -200,11 +314,19 @@ export default function ProductionList() {
 
     // Filter by section (status)
     switch (activeSection) {
+      case 'assigned':
+        filtered = allBatches.filter(b =>
+          b.assigned_to === user?.id ||
+          b.current_stage_assigned_to === user?.id ||
+          (user?.full_name ? (b.assigned_to_name || '').toLowerCase().trim() === user.full_name.toLowerCase().trim() : false) ||
+          (user?.full_name ? (b.current_stage_assigned_to_name || '').toLowerCase().trim() === user.full_name.toLowerCase().trim() : false) ||
+          (user?.email ? (b.assigned_to_email || '').toLowerCase().trim() === user.email.toLowerCase().trim() : false)
+        );
+        break;
       case 'planned':
         filtered = allBatches.filter(b => b.status === 'planned');
         break;
       case 'active':
-        // Active includes both 'in_progress' and 'in_production' statuses
         filtered = allBatches.filter(b => {
           const status = b.status?.toLowerCase();
           return status === 'in_progress' || status === 'in_production';
@@ -299,20 +421,86 @@ export default function ProductionList() {
   };
 
   const calculateStats = (batchesList: ProductionBatch[]) => {
+    const currentUserName = (user?.full_name || '').toLowerCase().trim();
+    const currentUserEmail = (user?.email || '').toLowerCase().trim();
     const all = batchesList.length;
-    // Planned: only batches with status 'planned'
+    const assigned = batchesList.filter(b => {
+      const status = (b.status || '').toLowerCase();
+      // Do not count finished/cancelled work in "Assigned to Me" badge.
+      if (status === 'completed' || status === 'cancelled') return false;
+      return (
+        b.assigned_to === user?.id ||
+        b.current_stage_assigned_to === user?.id ||
+        (!!currentUserName &&
+          (
+            (b.assigned_to_name || '').toLowerCase().trim() === currentUserName ||
+            (b.current_stage_assigned_to_name || '').toLowerCase().trim() === currentUserName
+          )) ||
+        (!!currentUserEmail && (b.assigned_to_email || '').toLowerCase().trim() === currentUserEmail)
+      );
+    }).length;
     const planned = batchesList.filter(b => b.status === 'planned').length;
-    // Active includes both 'in_progress' and 'in_production' statuses
     const active = batchesList.filter(b => {
       const status = b.status?.toLowerCase();
       return status === 'in_progress' || status === 'in_production';
     }).length;
-    // Completed: only batches with status 'completed'
     const completed = batchesList.filter(b => b.status === 'completed').length;
-    // Cancelled: only batches with status 'cancelled'
     const cancelled = batchesList.filter(b => b.status === 'cancelled').length;
 
-    setStats({ all, planned, active, completed, cancelled });
+    setStats({ assigned, all, planned, active, completed, cancelled });
+  };
+
+  const loadAssignedTasks = async () => {
+    if (!user?.id) {
+      setAssignedTasks([]);
+      return;
+    }
+    try {
+      const myId = String(user.id).trim();
+      const myName = String(user.full_name || '').toLowerCase().trim();
+      const myEmail = String(user.email || '').toLowerCase().trim();
+
+      // Primary query by assignee id
+      const primary = await ProductionService.getTasks({ assigned_to: myId, limit: 200 });
+      let tasks = primary.data || [];
+
+      // Fallback query (all visible tasks), then resilient client-side match for legacy data.
+      if (tasks.length === 0) {
+        const fallback = await ProductionService.getTasks({ limit: 200 });
+        tasks = (fallback.data || []).filter((t) => {
+          const taskAssigneeId = String(t.assigned_to_id || '').trim();
+          const taskAssigneeName = String(t.assigned_to_name || '').toLowerCase().trim();
+          return (
+            (!!myId && taskAssigneeId === myId) ||
+            (!!myName && taskAssigneeName === myName) ||
+            (!!myEmail && taskAssigneeName.includes(myEmail))
+          );
+        });
+      }
+
+      const { data: batchesData } = await ProductionService.getBatches({ limit: 500 });
+      // A task is "started as batch" if ANY non-cancelled batch exists for that order-stage pair,
+      // including completed batches. Otherwise completed work appears again as "not started".
+      const linkedBatches = (batchesData || []).filter((b) => b.status !== 'cancelled');
+      const hasStartedBatchForTask = (task: ProductionTask) =>
+        linkedBatches.some((b) => {
+          const attachedOrderIds = getAttachedOrderIdsFromNotes(b.notes);
+          const attachedOrderNumbers = getAttachedOrderNumbersFromNotes(b.notes);
+          const sameOrder =
+            b.order_id === task.order_id ||
+            attachedOrderIds.includes(task.order_id || '') ||
+            (!!task.order_number && (b.order_number === task.order_number || attachedOrderNumbers.includes(task.order_number)));
+          const sameProduct = b.product_id === task.stage_product_id;
+          return sameOrder && sameProduct;
+        });
+
+      setAssignedTasks(
+        tasks.filter((t) => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'planning') && !hasStartedBatchForTask(t))
+      );
+    } catch (error) {
+      console.error('Error loading assigned production tasks:', error);
+      setAssignedTasks([]);
+    }
   };
 
   const handleCreate = () => {
@@ -456,6 +644,7 @@ export default function ProductionList() {
         <ProductionSectionTabs
           activeSection={activeSection}
           onSectionChange={setActiveSection}
+          assignedCount={stats.assigned + assignedTaskCount}
           allCount={stats.all}
           plannedCount={stats.planned}
           activeCount={stats.active}
@@ -478,11 +667,12 @@ export default function ProductionList() {
         />
 
         {loading ? (
-            <div className="flex items-center justify-center py-12">
+          <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-            </div>
+          </div>
         ) : filteredBatches.length === 0 ? (
-          <ProductionEmptyState onCreate={handleCreate} />
+          // On "Assigned" tab, hide the generic empty-batch card so assignment tasks remain primary.
+          activeSection === 'assigned' ? null : <ProductionEmptyState onCreate={handleCreate} />
         ) : viewMode === 'table' ? (
           <ProductionTable
             batches={filteredBatches}
@@ -499,6 +689,105 @@ export default function ProductionList() {
             onDuplicate={handleDuplicate}
             canDelete={canDelete('production')}
             allBatches={allBatches}
+          />
+        )}
+
+        {/* Assignment-only tasks (no batch created yet) */}
+        {activeSection === 'assigned' && assignedTasks.length > 0 && (
+          <div className="mt-6 bg-white rounded-lg border border-gray-200 p-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Assigned Tasks (Not Started as Batch)</h3>
+            <div className="space-y-2">
+              {assignedTasks.map((task) => {
+                const createdAtValue = task.createdAt || task.created_at;
+                const assignedBy = task.created_by_name?.trim();
+                const isPlanning = task.status === 'planning';
+                return (
+                  <div key={task.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+                          <ClipboardList className="w-3.5 h-3.5" />
+                          Task
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold">
+                          <Target className="w-3.5 h-3.5" />
+                          {task.stage_product_name}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-700">
+                        <div><span className="font-semibold text-gray-900">Order:</span> {task.order_number || task.order_id}</div>
+                        <div><span className="font-semibold text-gray-900">Customer:</span> {task.customer_name || '-'}</div>
+                        <div className="flex items-center gap-1.5">
+                          <PackageCheck className="w-3.5 h-3.5 text-gray-500" />
+                          <span><span className="font-semibold text-gray-900">Final Product:</span> {task.final_product_name || '-'}</span>
+                        </div>
+                        <div><span className="font-semibold text-gray-900">Qty:</span> {task.planned_quantity ?? 0}</div>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-gray-500">
+                        {assignedBy && (
+                          <span className="inline-flex items-center gap-1">
+                            <UserRound className="w-3.5 h-3.5" />
+                            Assigned by: <span className="font-medium text-gray-700">{assignedBy}</span>
+                          </span>
+                        )}
+                        {createdAtValue && (
+                          <span className="inline-flex items-center gap-1">
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            Assigned on: <span className="font-medium text-gray-700">{formatIndianDateTime(createdAtValue)}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="sm:shrink-0"
+                      disabled={isPlanning}
+                      onClick={() =>
+                        navigate('/production/create', {
+                          state: {
+                            fromTask: true,
+                            productId: task.stage_product_id,
+                            productName: task.stage_product_name,
+                            planned_quantity: task.planned_quantity,
+                            orderId: task.order_id,
+                            order_number: task.order_number,
+                            customer_name: task.customer_name,
+                            taskId: task.id,
+                            assigned_to_id: task.assigned_to_id,
+                            assigned_to_name: task.assigned_to_name,
+                          },
+                        })
+                      }
+                    >
+                      {isPlanning ? 'In Planning' : 'Start Production'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Pending orders — shown below assigned batches on the Assigned to Me tab */}
+        {activeSection === 'assigned' && !isProductScoped && (
+          <AllPendingOrdersSection
+            onSelectOrder={(order, productId) => {
+              navigate('/production/create', {
+                state: {
+                  fromOrder: true,
+                  orderId: order.order_id,
+                  productId,
+                  productName: order.product_name || '',
+                  planned_quantity: order.quantity_needed,
+                  expected_delivery: order.expected_delivery,
+                  order_number: order.order_number,
+                  customer_name: order.customer_name,
+                },
+              });
+            }}
           />
         )}
 

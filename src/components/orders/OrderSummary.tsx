@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/utils/formatHelpers';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
+import { calculatePricingUnitQuantity } from '@/utils/unitConverter';
 
 /** Minimal customer info for order summary display */
 export interface OrderSummaryCustomer {
@@ -149,7 +150,23 @@ export default function OrderSummary({
                           </span>
                         </td>
                         <td className="py-2 px-3 text-right">
-                          {item.quantity} {item.unit || ''}
+                          {(() => {
+                            const countUnitLabel = item.unit || 'units';
+                            const pricingUnitLabel = item.pricing_unit === 'unit' ? countUnitLabel : item.pricing_unit;
+                            const convertedPricingQuantity = calculatePricingUnitQuantity(
+                              Number(item.quantity || 0),
+                              item.pricing_unit || 'unit',
+                              item.product_dimensions || {},
+                              (item as any).length_unit,
+                              (item as any).width_unit
+                            );
+                            return (
+                              <div className="leading-tight">
+                                <div>{item.quantity} {countUnitLabel}</div>
+                                <div className="text-xs text-gray-500">= {convertedPricingQuantity.toFixed(2)} {pricingUnitLabel}</div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-2 px-3 text-right">{formatCurrency(item.unit_price ?? 0, { full: true })}</td>
                         <td className="py-2 px-3 text-right">{formatCurrency(item.gst_amount ?? 0, { full: true })}</td>

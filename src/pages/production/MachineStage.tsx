@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, FileText } from 'lucide-react';
+import AssignUserModal from '@/components/production/AssignUserModal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -32,6 +33,17 @@ export default function MachineStage() {
   const [isMachineCompleted, setIsMachineCompleted] = useState(false);
   const [machineStageRemark, setMachineStageRemark] = useState('');
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const actorName = (() => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return 'User';
+      const parsed = JSON.parse(raw);
+      return parsed?.full_name || parsed?.email || 'User';
+    } catch {
+      return 'User';
+    }
+  })();
 
   useEffect(() => {
     if (id) {
@@ -357,13 +369,13 @@ export default function MachineStage() {
         machine_stage: {
           status: 'completed',
           completed_at: new Date().toISOString(),
-          completed_by: 'User',
+          completed_by: actorName,
           ...(remark ? { remark } : {}),
         },
         individual_stage: {
           status: 'in_progress',
           started_at: new Date().toISOString(),
-          started_by: 'User',
+          started_by: actorName,
         },
       });
 
@@ -416,7 +428,7 @@ export default function MachineStage() {
           onBack={() => {
             // Check where we came from based on location state
             const from = location.state?.from;
-            
+
             if (from === 'production-detail' && id) {
               // If we came from production detail page, go back to production detail
               navigate(`/production/${id}`);
@@ -427,6 +439,7 @@ export default function MachineStage() {
           }}
           onWastage={handleNavigateToWastage}
           onRefresh={handleRefresh}
+          onAssign={() => setShowAssignModal(true)}
           shift={machineShift}
           wastageDisabled={!isMachineCompleted}
         />
@@ -502,6 +515,26 @@ export default function MachineStage() {
           </Button>
         </div>
       </div>
+
+      {/* Assign to Next Person Modal */}
+      <AssignUserModal
+        open={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        title="Forward Machine Stage"
+        description="Select a user to forward this machine operations stage work to."
+        confirmLabel="Forward"
+        onAssign={async (userId, userName) => {
+          const { error } = await ProductionService.assignStage(batch.id, 'machine', userId, userName);
+          if (error) throw new Error(error);
+          setBatch(prev => prev ? {
+            ...prev,
+            current_stage: 'machine',
+            current_stage_assigned_to: userId,
+            current_stage_assigned_to_name: userName,
+          } : prev);
+          toast({ title: 'Forwarded', description: `Machine stage forwarded to ${userName}` });
+        }}
+      />
     </Layout>
   );
 }

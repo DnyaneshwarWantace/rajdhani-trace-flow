@@ -239,6 +239,18 @@ button[class*="bg-primary-700"],
   }
 }
 
+/* Hide number input spinner arrows across website */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* Sidebar - ensure tooltips are visible */
 aside {
   overflow: visible !important;

@@ -220,10 +220,10 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   
   const planningStage = {
     status: planningIsCompleted ? 'completed' : 'draft',
-    started_at: planningStartDate,
-    started_by: batch.operator || batch.supervisor || 'System',
-    completed_at: planningCompletionDate,
-    completed_by: planningIsCompleted ? (batch.operator || batch.supervisor || 'System') : null
+    started_at: (batch as any).planning_stage?.started_at || planningStartDate,
+    started_by: (batch as any).planning_stage?.started_by || batch.operator || batch.supervisor || 'System',
+    completed_at: (batch as any).planning_stage?.completed_at || planningCompletionDate,
+    completed_by: (batch as any).planning_stage?.completed_by || (planningIsCompleted ? (batch.operator || batch.supervisor || 'System') : null)
   };
 
   // Machine Stage:
@@ -240,9 +240,9 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   const machineStage = {
     status: machineIsCompleted ? 'completed' : (machineIsInProgress ? 'in_progress' : 'not_started'),
     started_at: machineStartDate,
-    started_by: machineStep?.inspector_name || machineStep?.inspector || batch.operator || batch.supervisor || 'System',
+    started_by: batch.machine_stage?.started_by || machineStep?.inspector_name || machineStep?.inspector || batch.operator || batch.supervisor || 'System',
     completed_at: machineCompletionDate,
-    completed_by: machineIsCompleted ? (wastageStep?.inspector_name || wastageStep?.inspector || batch.operator || batch.supervisor || 'System') : null
+    completed_by: batch.machine_stage?.completed_by || (machineIsCompleted ? (wastageStep?.inspector_name || wastageStep?.inspector || batch.operator || batch.supervisor || 'System') : null)
   };
 
   // Individual Product Details Stage (3rd: after machine, before wastage)

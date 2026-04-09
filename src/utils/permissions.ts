@@ -48,7 +48,55 @@ export function canAccessPage(pageKey: string): boolean {
   if (isSuperAdmin()) return true;
   const p = getStoredPermissions();
   if (!p?.page_permissions) return isAdmin(); // admin with no permissions = full access
-  return p.page_permissions[pageKey] === true;
+  if (p.page_permissions[pageKey] === true) return true;
+
+  // Fallback: allow page access when related actions are granted.
+  // This prevents inconsistent config (page=false, action=true) from blocking valid users.
+  const ap = p.action_permissions ?? {};
+  if (pageKey === 'production') {
+    return (
+      ap['production_view'] === true ||
+      ap['production_create'] === true ||
+      ap['production_edit'] === true
+    );
+  }
+  if (pageKey === 'orders') {
+    return (
+      ap['order_view'] === true ||
+      ap['order_create'] === true ||
+      ap['order_edit'] === true
+    );
+  }
+  if (pageKey === 'products') {
+    return (
+      ap['product_view'] === true ||
+      ap['product_create'] === true ||
+      ap['product_edit'] === true
+    );
+  }
+  if (pageKey === 'materials') {
+    return (
+      ap['material_view'] === true ||
+      ap['material_create'] === true ||
+      ap['material_edit'] === true
+    );
+  }
+  if (pageKey === 'customers') {
+    return (
+      ap['customer_view'] === true ||
+      ap['customer_create'] === true ||
+      ap['customer_edit'] === true
+    );
+  }
+  if (pageKey === 'suppliers') {
+    return (
+      ap['supplier_view'] === true ||
+      ap['supplier_create'] === true ||
+      ap['supplier_edit'] === true
+    );
+  }
+
+  return false;
 }
 
 /** True if user can perform this action (e.g. product_create, material_edit). */

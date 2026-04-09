@@ -47,6 +47,7 @@ export interface OrderItem {
   id: string;
   orderId?: string;
   productId?: string;
+  rawMaterialId?: string;
   productName: string;
   productType: string;
   quantity: number;
@@ -65,6 +66,11 @@ export interface OrderItem {
   weight_unit?: string;
   color?: string;
   pattern?: string;
+}
+
+export interface MaterialProcurementTaskPayload {
+  assigned_to_id?: string;
+  material_id?: string;
 }
 
 export class OrderService {
@@ -166,6 +172,7 @@ export class OrderService {
         items: (order.order_items || []).map((item: any) => ({
           id: item.id,
           productId: item.product_id,
+          rawMaterialId: item.raw_material_id,
           productName: item.product_name || '',
           productType: item.product_type || 'product',
           quantity: item.quantity || 0,
@@ -353,6 +360,7 @@ export class OrderService {
         items: (order.order_items || []).map((item: any) => ({
           id: item.id,
           productId: item.product_id,
+          rawMaterialId: item.raw_material_id,
           productName: item.product_name || '',
           productType: item.product_type || 'product',
           quantity: item.quantity || 0,
@@ -414,6 +422,7 @@ export class OrderService {
         items: (order.order_items || []).map((item: any) => ({
           id: item.id,
           productId: item.product_id,
+          rawMaterialId: item.raw_material_id,
           productName: item.product_name || '',
           productType: item.product_type || 'product',
           quantity: item.quantity || 0,
@@ -536,6 +545,75 @@ export class OrderService {
     } catch (error) {
       console.error('Error in getPendingOrdersForProduct:', error);
       return { data: null, error: 'Failed to fetch pending orders' };
+    }
+  }
+
+  static async getMaterialProcurementEligibleUsers(): Promise<{ data: Array<{ id: string; full_name?: string; email?: string }>; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/material-procurement/eligible-users`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        return { data: [], error: getServiceError(response, result) };
+      }
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error fetching material procurement eligible users:', error);
+      return { data: [], error: 'Failed to fetch eligible users' };
+    }
+  }
+
+  static async createMaterialProcurementTask(
+    orderId: string,
+    payload: MaterialProcurementTaskPayload
+  ): Promise<{ success: boolean; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/${orderId}/material-procurement-task`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(payload || {}),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        return { success: false, error: getServiceError(response, result) };
+      }
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error creating material procurement task:', error);
+      return { success: false, error: 'Failed to create material procurement task' };
+    }
+  }
+
+  static async getMyMaterialProcurementTasks(): Promise<{ data: any[]; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/material-procurement/my-tasks`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        return { data: [], error: getServiceError(response, result) };
+      }
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error fetching my material procurement tasks:', error);
+      return { data: [], error: 'Failed to fetch my material tasks' };
+    }
+  }
+
+  static async getOrderRawMaterialStatus(orderId: string): Promise<{ data: any[]; error: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/orders/${orderId}/raw-material-status`, {
+        headers: this.getHeaders(),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        return { data: [], error: getServiceError(response, result) };
+      }
+      return { data: result.data || [], error: null };
+    } catch (error) {
+      console.error('Error fetching order raw material status:', error);
+      return { data: [], error: 'Failed to fetch raw material status' };
     }
   }
 }

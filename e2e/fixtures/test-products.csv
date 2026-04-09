@@ -1,0 +1,6 @@
+name,category,length,width,length_unit,width_unit,unit,weight,weight_unit,base_quantity,min_stock_level,status
+TEST CARPET ALPHA 100,Non-Woven Carpet,50,2,m,m,SQM,350,GSM,0,5,active
+TEST CARPET BETA 200,Non-Woven Carpet,40,2,m,m,SQM,400,GSM,0,5,active
+TEST CARPET GAMMA 300,Non-Woven Carpet,30,2,m,m,SQM,300,GSM,0,5,active
+TEST SPEAKER DELTA 400,Speaker Felt,20,1,m,m,SQM,200,GSM,0,3,active
+TEST SPEAKER EPSILON 500,Speaker Felt,25,1,m,m,SQM,250,GSM,0,3,active

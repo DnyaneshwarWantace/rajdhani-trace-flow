@@ -17,6 +17,63 @@ interface ProductionCardProps {
 
 export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete, allBatches = [] }: ProductionCardProps) {
   const navigate = useNavigate();
+  const getAttachedOrderNumbers = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Orders:\s*(.+)$/i);
+    if (!match?.[1]) return [];
+    const raw = match[1]
+      .split('·')[0]
+      .trim();
+    const idMatches = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+    const parsed = (idMatches.length > 0 ? idMatches : raw.split(','))
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set(parsed));
+  };
+  const getAttachedOrderCustomers = (notes?: string): string[] => {
+    if (!notes) return [];
+    const match = notes.match(/Attached Customers:\s*(.+)$/i);
+    if (match?.[1]) {
+      const parsed = match[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((entry) => entry.split(':').slice(1).join(':').trim())
+        .filter(Boolean);
+      if (parsed.length > 0) return Array.from(new Set(parsed));
+    }
+    const fallback = notes.match(/Order\s+[A-Z]{2,}-\d{6}-\d{3,}\s+For\s+(.+?)(?:\s*·|$)/i)?.[1]?.trim();
+    return fallback ? [fallback] : [];
+  };
+  const getAttachedOrderCustomerMap = (notes?: string): Record<string, string> => {
+    if (!notes) return {};
+    const map: Record<string, string> = {};
+    const orderIds = getAttachedOrderNumbers(notes);
+    const customersRawMatch = notes.match(/Attached Customers:\s*(.+)$/i);
+    const customersRaw = customersRawMatch?.[1] || '';
+    if (customersRaw) {
+      const entries = customersRaw.split(',').map((s) => s.trim()).filter(Boolean);
+      entries.forEach((entry, idx) => {
+        const [left, ...rightParts] = entry.split(':');
+        const possibleOrderId = (left || '').trim();
+        const possibleCustomer = rightParts.join(':').trim();
+        if (possibleCustomer && /[A-Z]{2,}-\d{6}-\d{3,}/.test(possibleOrderId)) {
+          map[possibleOrderId] = possibleCustomer;
+          return;
+        }
+        if (orderIds[idx] && entry) {
+          map[orderIds[idx]] = possibleCustomer || entry;
+        }
+      });
+    }
+    if (Object.keys(map).length === 0) {
+      const fallback = notes.match(/Order\s+([A-Z]{2,}-\d{6}-\d{3,})\s+For\s+(.+?)(?:\s*·|$)/i);
+      if (fallback?.[1] && fallback?.[2]) {
+        map[fallback[1].trim()] = fallback[2].trim();
+      }
+    }
+    return map;
+  };
 
   const isOverdue = (batch: ProductionBatch): boolean => {
     if (!batch.completion_date || batch.status === 'completed' || batch.status === 'cancelled') {
@@ -163,10 +220,45 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
         </div>
 
         <div className="space-y-1 text-[10px] mb-2">
+          {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) && (
+            <>
+              <div className="flex justify-between items-start gap-2 min-w-0">
+                <span className="text-gray-600 flex-shrink-0">Order:</span>
+                <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">
+                  {batch.order_number || getAttachedOrderNumbers(batch.notes)[0] || 'Linked Order'}
+                </span>
+              </div>
+              <div className="flex justify-between items-start gap-2 min-w-0">
+                <span className="text-gray-600 flex-shrink-0">Customer:</span>
+                <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">
+                  {(() => {
+                    const attachedOrders = getAttachedOrderNumbers(batch.notes);
+                    const primaryOrder = batch.order_number || attachedOrders[0] || '';
+                    const orderCustomerMap = getAttachedOrderCustomerMap(batch.notes);
+                    return batch.customer_name || orderCustomerMap[primaryOrder] || getAttachedOrderCustomers(batch.notes)[0] || 'N/A';
+                  })()}
+                </span>
+              </div>
+              {getAttachedOrderNumbers(batch.notes).length > 1 && (
+                <div className="flex justify-between items-start gap-2 min-w-0">
+                  <span className="text-gray-600 flex-shrink-0">Attached:</span>
+                  <span className="text-indigo-700 min-w-0 flex-1 text-right break-words line-clamp-1">
+                    +{getAttachedOrderNumbers(batch.notes).length - 1} more order(s)
+                  </span>
+                </div>
+              )}
+            </>
+          )}
           <div className="flex justify-between gap-2">
             <span className="text-gray-600 flex-shrink-0">Quantity:</span>
             <span className="font-medium text-gray-900">
               {batch.planned_quantity}
+            </span>
+          </div>
+          <div className="flex justify-between items-start gap-2 min-w-0">
+            <span className="text-gray-600 flex-shrink-0">Final Target:</span>
+            <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">
+              {(batch.final_target_display || batch.product_name || 'Product')} ({batch.planned_quantity})
             </span>
           </div>
 

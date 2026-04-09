@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ProductFormModal from '@/components/products/ProductFormModal';
+import BulkProductUploadDialog from '@/components/products/BulkProductUploadDialog';
 import InventoryStatsBoxes from '@/components/products/InventoryStatsBoxes';
 import ProductTabs from '@/components/products/ProductTabs';
 import InventoryTab from '@/components/products/InventoryTab';
@@ -17,7 +18,7 @@ import { canCreate, canEdit, canDelete, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers, Upload } from 'lucide-react';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
@@ -69,6 +70,7 @@ export default function ProductList() {
 
   // Modal states
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'duplicate'>('create');
 
@@ -378,6 +380,18 @@ export default function ProductList() {
 
                 {/* Add Product Button - only if user has create permission */}
                 {canCreate('products') && (
+                  <Button
+                    onClick={() => setIsBulkUploadOpen(true)}
+                    variant="outline"
+                    className="inline-flex items-center justify-center gap-2 border-gray-300"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="font-medium">Bulk Upload</span>
+                  </Button>
+                )}
+
+                {/* Add Product Button - only if user has create permission */}
+                {canCreate('products') && (
                   <button
                     onClick={handleCreate}
                     className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
@@ -459,6 +473,12 @@ export default function ProductList() {
           onSuccess={loadProducts}
           product={selectedProduct}
           mode={formMode}
+        />
+
+        <BulkProductUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          onSuccess={loadProducts}
         />
 
         {/* QR Code Dialog */}

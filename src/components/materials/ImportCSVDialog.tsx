@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, Upload, FileText, AlertCircle, CheckCircle, FileSpreadsheet, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MaterialService } from '@/services/materialService';
 import type { RawMaterial } from '@/types/material';
@@ -25,7 +26,9 @@ interface ImportProgress {
   total: number;
   success: number;
   failed: number;
+  skipped: number;
   errors: string[];
+  skippedNames: string[];
 }
 
 export default function ImportCSVDialog({
@@ -41,16 +44,63 @@ export default function ImportCSVDialog({
     total: 0,
     success: 0,
     failed: 0,
+    skipped: 0,
     errors: [],
+    skippedNames: [],
   });
+
+  const TEMPLATE_HEADERS = ['name', 'supplier', 'category', 'unit', 'costPerUnit', 'type', 'currentStock', 'minThreshold', 'maxCapacity', 'reorderPoint', 'color'];
+  const TEMPLATE_EXAMPLE = ['Polypropylene Fibre', 'ABC Supplier', 'Fibre', 'kg', '50', '', '100', '10', '1000', '50', 'NA'];
+
+  const downloadTemplateCsv = () => {
+    const csv = `${TEMPLATE_HEADERS.join(',')}\n${TEMPLATE_EXAMPLE.map(v => `"${v}"`).join(',')}\n`;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'materials_import_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+  };
+
+  const downloadTemplateExcel = () => {
+    const ws = XLSX.utils.aoa_to_sheet([TEMPLATE_HEADERS, TEMPLATE_EXAMPLE]);
+    // Style header row
+    TEMPLATE_HEADERS.forEach((_, i) => {
+      const cell = XLSX.utils.encode_cell({ r: 0, c: i });
+      if (ws[cell]) ws[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: 'E5F0FF' } } };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Materials');
+    // Guide sheet
+    const guide = XLSX.utils.aoa_to_sheet([
+      ['Column', 'Required', 'Notes'],
+      ['name', 'YES', 'Material name (also accepted: material_name)'],
+      ['supplier', 'YES', 'Supplier name (also accepted: supplier_name)'],
+      ['category', 'YES', 'e.g. Fibre, Chemical, Gas and Fuel, Packaging, Paper'],
+      ['unit', 'YES', 'e.g. kg, L, meters'],
+      ['costPerUnit', 'YES', 'Cost per unit (also: cost_per_unit, cost)'],
+      ['type', 'no', 'Optional type'],
+      ['currentStock', 'no', 'Current stock qty — defaults 0'],
+      ['minThreshold', 'no', 'Min threshold — defaults 10'],
+      ['maxCapacity', 'no', 'Max capacity — defaults 1000'],
+      ['reorderPoint', 'no', 'Reorder point — defaults 50'],
+      ['color', 'no', 'Color — defaults NA'],
+    ]);
+    XLSX.utils.book_append_sheet(wb, guide, 'Guide');
+    XLSX.writeFile(wb, 'materials_import_template.xlsx');
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
+      const isCSV  = selectedFile.type === 'text/csv' || selectedFile.name.endsWith('.csv');
+      const isXLSX = selectedFile.name.endsWith('.xlsx') || selectedFile.name.endsWith('.xls');
+      if (!isCSV && !isXLSX) {
         toast({
           title: 'Invalid File Type',
-          description: 'Please select a CSV file',
+          description: 'Please select a CSV or Excel (.xlsx/.xls) file',
           variant: 'destructive',
         });
         return;
@@ -267,31 +317,39 @@ export default function ImportCSVDialog({
     }
 
     setImporting(true);
-    setProgress({
-      current: 0,
-      total: 0,
-      success: 0,
-      failed: 0,
-      errors: [],
-    });
+    setProgress({ current: 0, total: 0, success: 0, failed: 0, skipped: 0, errors: [], skippedNames: [] });
 
     try {
-      // Read file with better error handling
-      let text: string;
+      // Read file — support both CSV and Excel
+      let rows: any[];
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
       try {
-        text = await file.text();
+        if (isExcel) {
+          const buffer = await file.arrayBuffer();
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
+          // Normalize keys (remove spaces, lowercase)
+          rows = jsonRows.map(row => {
+            const normalized: Record<string, string> = {};
+            Object.keys(row).forEach(key => {
+              normalized[key.toLowerCase().replace(/\s+/g, '')] = String(row[key] ?? '').trim();
+            });
+            return normalized;
+          });
+        } else {
+          const text = await file.text();
+          rows = parseCSV(text);
+        }
       } catch (readError) {
-        console.error('Error reading file:', readError);
         toast({
           title: 'File Read Error',
-          description: 'Cannot read the CSV file. Please make sure the file is not open in another program, close it, and try again.',
+          description: 'Cannot read the file. Make sure it is not open in another program.',
           variant: 'destructive',
         });
         setImporting(false);
         return;
       }
-      
-      const rows = parseCSV(text);
 
       if (rows.length === 0) {
         toast({
@@ -307,25 +365,23 @@ export default function ImportCSVDialog({
 
       let successCount = 0;
       let failedCount = 0;
+      let skippedCount = 0;
       const errors: string[] = [];
+      const skippedNames: string[] = [];
 
-      // Import materials one by one
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         setProgress(prev => ({ ...prev, current: i + 1 }));
 
         try {
           const materialData = mapCSVRowToMaterial(row);
-          
           const validationError = validateMaterial(materialData);
-
           if (validationError) {
             failedCount++;
             errors.push(`Row ${i + 2}: ${validationError} - ${materialData.name || 'Unknown'}`);
             continue;
           }
 
-          // Final check: Ensure reorder_point is always a valid number before sending
           const reorderPointValue = Number(materialData.reorder_point) || Number(materialData.min_threshold) || 50;
           const finalMaterialData = {
             ...materialData,
@@ -336,21 +392,16 @@ export default function ImportCSVDialog({
             cost_per_unit: Number(materialData.cost_per_unit) || 0,
           };
 
-          // Debug: Log the data being sent
-          console.log(`Row ${i + 2} - Sending material data:`, {
-            name: finalMaterialData.name,
-            reorder_point: finalMaterialData.reorder_point,
-            min_threshold: finalMaterialData.min_threshold,
-            max_capacity: finalMaterialData.max_capacity,
-          });
-
-          // Create material with guaranteed valid numbers
           await MaterialService.createMaterial(finalMaterialData as any);
           successCount++;
         } catch (error) {
-          failedCount++;
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          errors.push(`Row ${i + 2}: ${errorMessage} - ${row.name || 'Unknown'}`);
+          if ((error as any).isDuplicate) {
+            skippedCount++;
+            skippedNames.push(row.name || row.material_name || `Row ${i + 2}`);
+          } else {
+            failedCount++;
+            errors.push(`Row ${i + 2}: ${error instanceof Error ? error.message : 'Unknown error'} - ${row.name || 'Unknown'}`);
+          }
         }
       }
 
@@ -359,16 +410,21 @@ export default function ImportCSVDialog({
         total: rows.length,
         success: successCount,
         failed: failedCount,
-        errors: errors.slice(0, 10), // Show first 10 errors
+        skipped: skippedCount,
+        errors: errors.slice(0, 10),
+        skippedNames,
       });
 
-      if (successCount > 0) {
+      if (successCount > 0 || skippedCount > 0) {
         toast({
           title: 'Import Complete',
-          description: `Successfully imported ${successCount} material(s). ${failedCount > 0 ? `${failedCount} failed.` : ''}`,
+          description: [
+            successCount > 0 && `${successCount} imported`,
+            skippedCount > 0 && `${skippedCount} skipped (already exist)`,
+            failedCount > 0 && `${failedCount} failed`,
+          ].filter(Boolean).join(', ') + '.',
         });
-        onSuccess();
-        handleClose();
+        if (successCount > 0) { onSuccess(); handleClose(); }
       } else {
         toast({
           title: 'Import Failed',
@@ -391,35 +447,44 @@ export default function ImportCSVDialog({
   const handleClose = () => {
     if (!importing) {
       setFile(null);
-      setProgress({
-        current: 0,
-        total: 0,
-        success: 0,
-        failed: 0,
-        errors: [],
-      });
+      setProgress({ current: 0, total: 0, success: 0, failed: 0, skipped: 0, errors: [], skippedNames: [] });
       onOpenChange(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="w-5 h-5" />
-            Import Materials from CSV
+            Import Materials from CSV / Excel
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Template Download */}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+              <Download className="w-3.5 h-3.5" /> Download Template First
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={downloadTemplateCsv} className="gap-1.5 text-xs">
+                <FileText className="w-3.5 h-3.5" /> CSV Template
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={downloadTemplateExcel} className="gap-1.5 text-xs">
+                <FileSpreadsheet className="w-3.5 h-3.5" /> Excel Template
+              </Button>
+            </div>
+          </div>
+
           {/* File Selection */}
           <div>
-            <Label htmlFor="csv-file">Select CSV File</Label>
+            <Label htmlFor="csv-file">Select CSV or Excel File</Label>
             <Input
               id="csv-file"
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               onChange={handleFileChange}
               disabled={importing}
               className="mt-2"
@@ -475,14 +540,24 @@ export default function ImportCSVDialog({
           {/* Results */}
           {!importing && progress.total > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-green-700">Success: {progress.success}</span>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
+                  <CheckCircle className="w-3.5 h-3.5" /> Imported: {progress.success}
+                </span>
+                {progress.skipped > 0 && (
+                  <span className="flex items-center gap-1 text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-0.5">
+                    <AlertCircle className="w-3.5 h-3.5" /> Skipped (duplicate): {progress.skipped}
+                  </span>
+                )}
+                {progress.failed > 0 && (
+                  <span className="flex items-center gap-1 text-red-700 bg-red-50 border border-red-200 rounded px-2 py-0.5">
+                    <AlertCircle className="w-3.5 h-3.5" /> Failed: {progress.failed}
+                  </span>
+                )}
               </div>
-              {progress.failed > 0 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <AlertCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-red-700">Failed: {progress.failed}</span>
+              {progress.skippedNames.length > 0 && (
+                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                  Already existed — skipped: {progress.skippedNames.join(', ')}
                 </div>
               )}
               {progress.errors.length > 0 && (
@@ -492,9 +567,7 @@ export default function ImportCSVDialog({
                     <p key={index} className="text-red-700">{error}</p>
                   ))}
                   {progress.failed > 10 && (
-                    <p className="text-red-600 mt-1 italic">
-                      ... and {progress.failed - 10} more error(s)
-                    </p>
+                    <p className="text-red-600 mt-1 italic">... and {progress.failed - 10} more error(s)</p>
                   )}
                 </div>
               )}

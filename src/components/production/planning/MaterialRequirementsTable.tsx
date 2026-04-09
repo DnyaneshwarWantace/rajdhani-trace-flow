@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Truck, Plus, Trash2, AlertCircle, CheckCircle, Package } from 'lucide-react';
+import { Truck, Plus, Trash2, AlertCircle, CheckCircle, Package, Factory } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface MaterialRequirement {
@@ -26,6 +26,8 @@ interface MaterialRequirementsTableProps {
   onRemoveMaterialFromDraft?: (materialId: string) => void;
   onUpdateQuantity?: (materialId: string, quantityPerSqm: number) => void;
   onSelectIndividualProducts?: (materialId: string) => void;
+  onStartSubProduction?: (materialId: string, materialName: string) => void;
+  onOrderRawMaterial?: (materialId: string, materialName: string) => void;
   selectedIndividualProducts?: Record<string, any[]>;
   recipeBased?: boolean;
   consumedMaterialIds?: string[]; // IDs of materials that are in consumption
@@ -40,6 +42,8 @@ export default function MaterialRequirementsTable({
   onRemoveMaterialFromDraft,
   onUpdateQuantity,
   onSelectIndividualProducts,
+  onStartSubProduction,
+  onOrderRawMaterial,
   selectedIndividualProducts = {},
   recipeBased = false,
   consumedMaterialIds = [],
@@ -168,6 +172,36 @@ export default function MaterialRequirementsTable({
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Sub-production button (for product-type shortages) */}
+                        {material.material_type === 'product' &&
+                          (material.status === 'low' || material.status === 'unavailable') &&
+                          onStartSubProduction && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onStartSubProduction(material.material_id, material.material_name)}
+                            className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                            title="Start production to create this material"
+                          >
+                            <Factory className="w-4 h-4 mr-2" />
+                            Sub-Produce
+                          </Button>
+                        )}
+                        {/* Order stock button (for raw-material shortages) */}
+                        {material.material_type === 'raw_material' &&
+                          (material.status === 'low' || material.status === 'unavailable') &&
+                          onOrderRawMaterial && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onOrderRawMaterial(material.material_id, material.material_name)}
+                              className="text-blue-700 border-blue-300 hover:bg-blue-50"
+                              title="Create/track purchase order for this raw material"
+                            >
+                              <Truck className="w-4 h-4 mr-2" />
+                              Order Stock
+                            </Button>
+                          )}
                         {material.material_type === 'product' && onSelectIndividualProducts && (
                           <Button
                             variant="outline"

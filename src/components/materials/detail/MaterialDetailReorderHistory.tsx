@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { ShoppingBag, Package, Calendar, Building2, Loader2 } from 'lucide-react';
-import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
+import { ShoppingBag, Package, Calendar, Building2, Loader2, History, User } from 'lucide-react';
+import { formatCurrency, formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { StockOrder } from '@/services/manageStockService';
 import type { RawMaterial } from '@/types/material';
 
@@ -281,6 +281,35 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
                     <div className="pt-3 border-t">
                       <p className="text-xs text-gray-500">Batch Number</p>
                       <p className="text-sm font-medium text-gray-900">{order.materialBatchNumber}</p>
+                    </div>
+                  )}
+
+                  {/* Show process history as business history, not logs */}
+                  {(order as any).status_history && (order as any).status_history.length > 0 && (
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                        <History className="w-3.5 h-3.5" />
+                        Material Order History
+                      </p>
+                      <div className="space-y-1.5">
+                        {(order as any).status_history
+                          .slice()
+                          .reverse()
+                          .map((entry: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between gap-2 text-xs text-gray-700 bg-gray-50 rounded px-2 py-1">
+                              <div className="flex items-center gap-2">
+                                <Badge className="text-[10px] px-1.5 py-0">
+                                  {entry.status === 'delivered' ? 'received' : entry.status}
+                                </Badge>
+                                <span className="flex items-center gap-1 text-gray-500">
+                                  <User className="w-3 h-3" />
+                                  {entry.changed_by || 'System'}
+                                </span>
+                              </div>
+                              <span className="text-gray-500">{formatIndianDateTime(entry.changed_at)}</span>
+                            </div>
+                          ))}
+                      </div>
                     </div>
                   )}
                 </div>

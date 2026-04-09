@@ -42,6 +42,17 @@ export class UserService {
     return data.data || [];
   }
 
+  static async getAssignableUsers(): Promise<User[]> {
+    const response = await fetch(`${API_URL}/auth/users/assignable`, {
+      headers: this.getHeaders(),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(getApiError(response, data));
+    }
+    return data.data || [];
+  }
+
   static async getUserById(id: string): Promise<User> {
     const response = await fetch(`${API_URL}/auth/admin/users/${id}`, {
       headers: this.getHeaders(),

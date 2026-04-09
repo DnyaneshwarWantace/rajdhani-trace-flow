@@ -1,0 +1,6 @@
+name,category,unit,costPerUnit,currentStock,minThreshold,maxCapacity,supplier
+TEST FIBRE ALPHA,Fibre,kg,50,100,10,1000,Test Supplier
+TEST FIBRE BETA,Fibre,kg,60,200,20,2000,Test Supplier
+TEST CHEMICAL GAMMA,Chemical,L,30,50,5,500,Test Supplier
+TEST CHEMICAL DELTA,Chemical,kg,40,80,8,800,Test Supplier
+TEST GAS EPSILON,Gas and Fuel,L,20,30,3,300,Test Supplier

@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { WasteService } from '@/services/wasteService';
+import { OrderService, type Order } from '@/services/orderService';
+import { RecipeService } from '@/services/recipeService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { getApiUrl } from '@/utils/apiConfig';
@@ -35,6 +38,18 @@ export default function ProductionWastage() {
   const [noWastageMaterials, setNoWastageMaterials] = useState<Set<string>>(new Set());
   const [wasteItems, setWasteItems] = useState<any[]>([]);
   const [canNavigate, setCanNavigate] = useState(false);
+  const [nextStageTasks, setNextStageTasks] = useState<Array<{
+    orderId: string;
+    orderNumber: string;
+    customerName: string;
+    productId: string;
+    productName: string;
+    requiredQuantity: number;
+  }>>([]);
+  // Excess quantity tracking: materialId → extra qty used beyond planned
+  const [excessQty, setExcessQty] = useState<Record<string, string>>({});
+  const [savingExcess, setSavingExcess] = useState<string | null>(null);
+  const excessSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
     if (id) {
@@ -42,6 +57,182 @@ export default function ProductionWastage() {
       loadData();
     }
   }, [id, refreshKey]);
+
+  useEffect(() => {
+    if (!batch?.product_id) {
+      setNextStageTasks([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const attachedFromNotes = new Set<string>();
+        const attachedIdsFromNotes = new Set<string>();
+        const notesText = batch.notes || '';
+        const match = notesText.match(/Attached Orders:\s*(.+)$/i);
+        if (match?.[1]) {
+          const raw = match[1].split('·')[0].trim();
+          const idMatches = raw.match(/[A-Z]{2,}-\d{6}-\d{3,}/g) || [];
+          const parsed = (idMatches.length > 0 ? idMatches : raw.split(','))
+            .map((s) => s.trim())
+            .filter(Boolean);
+          parsed.forEach((orderNo) => attachedFromNotes.add(orderNo));
+        }
+        const idMatch = notesText.match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+        if (idMatch?.[1]) {
+          idMatch[1]
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .forEach((orderId) => attachedIdsFromNotes.add(orderId));
+        }
+
+        const targetOrders = new Map<string, Order>();
+        const { data: orders } = await OrderService.getOrders({ limit: 500 });
+        (orders || []).forEach((order) => {
+          if (
+            order.id === batch.order_id ||
+            attachedIdsFromNotes.has(order.id) ||
+            (!!batch.order_number && order.orderNumber === batch.order_number) ||
+            attachedFromNotes.has(order.orderNumber || '')
+          ) {
+            targetOrders.set(order.id, order);
+          }
+        });
+
+        if (targetOrders.size === 0) {
+          if (!cancelled) setNextStageTasks([]);
+          return;
+        }
+
+        const taskMap = new Map<string, {
+          orderId: string;
+          orderNumber: string;
+          customerName: string;
+          productId: string;
+          productName: string;
+          requiredQuantity: number;
+        }>();
+
+        const recipeCache: Record<string, any> = {};
+        const productNameCache: Record<string, string> = {};
+        const getProductName = async (productId: string, fallback?: string) => {
+          if (productNameCache[productId]) return productNameCache[productId];
+          if (fallback) {
+            productNameCache[productId] = fallback;
+            return fallback;
+          }
+          try {
+            const p = await ProductService.getProductById(productId);
+            const name = p?.name || productId;
+            productNameCache[productId] = name;
+            return name;
+          } catch {
+            productNameCache[productId] = productId;
+            return productId;
+          }
+        };
+
+        const ensureRecipe = async (productId: string) => {
+          if (!recipeCache[productId]) {
+            recipeCache[productId] = await RecipeService.getRecipeByProductId(productId);
+          }
+          return recipeCache[productId];
+        };
+
+        const collectImmediateNextStages = async (
+          finalProductId: string,
+          finalProductName: string,
+          demandQty: number,
+          currentProductId: string
+        ): Promise<Array<{ productId: string; productName: string; requiredQuantity: number }>> => {
+          const results: Array<{ productId: string; productName: string; requiredQuantity: number }> = [];
+          const visited = new Set<string>();
+
+          const dfs = async (productId: string, productName: string, qtyForProduct: number) => {
+            if (!productId || visited.has(`${productId}:${qtyForProduct}`)) return;
+            visited.add(`${productId}:${qtyForProduct}`);
+
+            const recipe = await ensureRecipe(productId);
+            const materials = (recipe?.materials || []).filter((m: any) => m.material_type === 'product');
+            if (materials.length === 0) return;
+
+            for (const material of materials) {
+              const childId = material.material_id;
+              const coeff = Number(material.quantity_per_sqm || 0);
+              if (!childId || coeff <= 0) continue;
+
+              // If current batch product is a direct input of this product,
+              // this product is the immediate next stage.
+              if (childId === currentProductId) {
+                const stageName = await getProductName(productId, productName);
+                results.push({
+                  productId,
+                  productName: stageName,
+                  requiredQuantity: qtyForProduct,
+                });
+                continue;
+              }
+
+              const nextQty = qtyForProduct * coeff;
+              const childName = await getProductName(childId);
+              await dfs(childId, childName, nextQty);
+            }
+          };
+
+          await dfs(finalProductId, finalProductName, demandQty);
+          return results;
+        };
+
+        for (const order of targetOrders.values()) {
+          for (const item of order.items || []) {
+            if (!item.productId || !item.productName || !item.quantity) continue;
+            const stages = await collectImmediateNextStages(
+              item.productId,
+              item.productName,
+              Number(item.quantity || 0),
+              batch.product_id
+            );
+            for (const stage of stages) {
+              if (stage.requiredQuantity <= 0) continue;
+              const key = `${order.id}::${stage.productId}`;
+              const existing = taskMap.get(key);
+              if (existing) {
+                existing.requiredQuantity += stage.requiredQuantity;
+              } else {
+                taskMap.set(key, {
+                  orderId: order.id,
+                  orderNumber: order.orderNumber || order.id,
+                  customerName: order.customerName || '-',
+                  productId: stage.productId,
+                  productName: stage.productName,
+                  requiredQuantity: stage.requiredQuantity,
+                });
+              }
+            }
+          }
+        }
+
+        if (!cancelled) {
+          const tasks = Array.from(taskMap.values()).map((t) => ({
+            ...t,
+            requiredQuantity: Math.ceil(t.requiredQuantity * 1000) / 1000,
+          }));
+          setNextStageTasks(tasks);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error building next stage tasks:', error);
+          setNextStageTasks([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batch?.product_id, batch?.order_id, batch?.notes]);
 
   const loadData = async () => {
     try {
@@ -169,6 +360,52 @@ export default function ProductionWastage() {
 
   const handleRefresh = async () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  // Save excess quantity for a material — deducts from stock immediately
+  const handleExcessQtyChange = (materialId: string, value: string) => {
+    setExcessQty(prev => ({ ...prev, [materialId]: value }));
+    if (excessSaveTimers.current[materialId]) clearTimeout(excessSaveTimers.current[materialId]);
+    excessSaveTimers.current[materialId] = setTimeout(() => saveExcessQty(materialId, value), 800);
+  };
+
+  const saveExcessQty = async (materialId: string, value: string) => {
+    const extra = parseFloat(value);
+    if (isNaN(extra) || extra <= 0) return;
+    const material = consumedMaterials.find(m => m.material_id === materialId);
+    if (!material || !id) return;
+    setSavingExcess(materialId);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL_BASE = getApiUrl();
+      const res = await fetch(`${API_URL_BASE}/material-consumption`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          production_batch_id: id,
+          material_id: materialId,
+          material_name: material.material_name,
+          material_type: material.material_type,
+          quantity_used: extra,
+          actual_consumed_quantity: extra,
+          unit: material.unit,
+          deduct_now: true,
+          notes: `Excess usage: ${extra} ${material.unit} more than planned`,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: 'Excess saved', description: `${extra} ${material.unit} extra recorded and deducted from stock for ${material.material_name}` });
+        setExcessQty(prev => ({ ...prev, [materialId]: '' }));
+        handleRefresh();
+      } else {
+        const err = await res.json();
+        toast({ title: 'Error', description: err.error || 'Failed to save excess', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to save excess quantity', variant: 'destructive' });
+    } finally {
+      setSavingExcess(null);
+    }
   };
 
   // Lightweight update: only refetch waste items (no full page reload). Use after save wastage.
@@ -622,7 +859,7 @@ export default function ProductionWastage() {
         console.log('✅ Final validation passed: All products are now "used"');
       }
 
-      // Mark wastage stage and final stage as completed, then complete the batch and go to production list
+      // Mark wastage stage and final stage as completed
       const completionDate = new Date().toISOString();
       const completedBy = user?.full_name || user?.email || 'User';
       console.log('✅ Marking wastage stage and final stage as completed...');
@@ -652,12 +889,22 @@ export default function ProductionWastage() {
           return;
         }
         console.log('✅ Production batch completed successfully');
+        setBatch((prev) => ({
+          ...prev,
+          ...updatedBatch,
+          // Preserve locally enriched name/details if update response omits them.
+          product_name:
+            updatedBatch.product_name ||
+            prev?.product_name ||
+            product?.name ||
+            updatedBatch.product_id ||
+            'N/A',
+        }) as ProductionBatch);
         toast({
           title: 'Success',
           description: 'Production batch completed successfully.',
         });
         setUpdatingStatus(false);
-        navigate('/production');
       } catch (error) {
         console.error('❌ Error completing production:', error);
         toast({
@@ -710,6 +957,53 @@ export default function ProductionWastage() {
           }}
           onCompleteProduction={handleCompleteProduction}
           onRefresh={handleRefresh}
+          onAssignAfterComplete={async (userId, userName, selectedTasks) => {
+            if (!selectedTasks || selectedTasks.length === 0) {
+              throw new Error('No next-stage order tasks found to assign');
+            }
+            const createResults = await Promise.all(
+              selectedTasks.map((task) =>
+                ProductionService.createTask({
+                  order_id: task.orderId,
+                  order_number: task.orderNumber,
+                  customer_name: task.customerName,
+                  stage_product_id: task.productId,
+                  stage_product_name: task.productName,
+                  final_product_id: task.productId,
+                  final_product_name: task.productName,
+                  planned_quantity: task.requiredQuantity,
+                  assigned_to_id: userId,
+                  assigned_to_name: userName,
+                  notes: `Next-stage task from completed batch ${batch.batch_number}`,
+                })
+              )
+            );
+            const failed = createResults.find((r) => r.error);
+            if (failed?.error) throw new Error(failed.error);
+            const effectiveUsers = Array.from(
+              new Set(
+                createResults
+                  .map((r) => r.data?.assigned_to_name)
+                  .filter((name): name is string => !!name && name.trim().length > 0)
+              )
+            );
+            toast({
+              title: 'Forwarded',
+              description:
+                effectiveUsers.length > 0
+                  ? `${selectedTasks.length} next-stage item(s) forwarded to ${effectiveUsers.join(', ')}`
+                  : `${selectedTasks.length} next-stage item(s) forwarded to ${userName}`,
+            });
+          }}
+          onDoneAfterComplete={() => navigate('/production')}
+          nextStageTasks={nextStageTasks.map((t) => ({
+            orderId: t.orderId,
+            orderNumber: t.orderNumber,
+            customerName: t.customerName,
+            productId: t.productId,
+            productName: t.productName,
+            requiredQuantity: t.requiredQuantity,
+          }))}
           completeDisabled={!canNavigate}
           isCompleting={updatingStatus}
         />
@@ -748,6 +1042,61 @@ export default function ProductionWastage() {
           product={product}
           targetQuantity={batch?.planned_quantity || 0}
         />
+
+        {/* Excess Material Usage — if more was used than planned */}
+        {consumedMaterials.length > 0 && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <Plus className="w-4 h-4 text-orange-500" />
+                <h3 className="text-base font-semibold text-gray-900">Excess Material Used</h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-4">
+                If you used more material than planned (e.g. planned 300 kg but used 320 kg), enter the extra amount here. It will be deducted from stock immediately.
+              </p>
+              <div className="space-y-3">
+                {consumedMaterials.map((m) => (
+                  <div key={m.material_id} className="flex items-center gap-4 p-3 border rounded-lg bg-orange-50 border-orange-100">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{m.material_name}</p>
+                      <p className="text-xs text-gray-500">
+                        Planned: {m.required_quantity || m.quantity_used || 0} {m.unit}
+                        {m.actual_consumed_quantity && m.actual_consumed_quantity !== m.required_quantity
+                          ? ` · Previously extra: ${Math.max(0, m.actual_consumed_quantity - (m.required_quantity || 0))} ${m.unit}`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Minus className="w-4 h-4 text-gray-400" />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={`Extra ${m.unit}`}
+                        value={excessQty[m.material_id] || ''}
+                        onChange={e => handleExcessQtyChange(m.material_id, e.target.value)}
+                        className="w-32 h-8 text-sm"
+                      />
+                      <span className="text-xs text-gray-500 w-8">{m.unit}</span>
+                      {savingExcess === m.material_id && (
+                        <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-orange-300 text-orange-700 hover:bg-orange-50"
+                        disabled={!excessQty[m.material_id] || parseFloat(excessQty[m.material_id]) <= 0 || savingExcess === m.material_id}
+                        onClick={() => saveExcessQty(m.material_id, excessQty[m.material_id] || '0')}
+                      >
+                        Save Extra
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Wastage Management */}
         <WastageManagement
@@ -835,28 +1184,8 @@ export default function ProductionWastage() {
           );
         })()}
 
-        {/* Complete Production button at bottom */}
-        <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleCompleteProduction}
-            disabled={updatingStatus || !canNavigate}
-            className="bg-green-600 hover:bg-green-700 text-white"
-            size="lg"
-          >
-            {updatingStatus ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Completing...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Complete Production
-              </>
-            )}
-          </Button>
-        </div>
       </div>
+
     </Layout>
   );
 }

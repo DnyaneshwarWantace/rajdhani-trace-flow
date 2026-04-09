@@ -94,6 +94,7 @@ export default function IndividualProductSelectionDialog({
       p.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.qr_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.serial_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.roll_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   };
@@ -156,7 +157,7 @@ export default function IndividualProductSelectionDialog({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search by ID, QR code, serial number, or batch..."
+              placeholder="Search by roll no, ID, QR code, serial number, or batch..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -217,6 +218,11 @@ export default function IndividualProductSelectionDialog({
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900 truncate">{product.id}</p>
+                            {product.roll_number && (
+                              <p className="text-sm text-gray-700">
+                                Roll No: <span className="font-mono">{product.roll_number}</span>
+                              </p>
+                            )}
                             {product.serial_number && (
                               <p className="text-sm text-gray-600">SN: {product.serial_number}</p>
                             )}
@@ -237,6 +243,12 @@ export default function IndividualProductSelectionDialog({
                             <div>
                               <span className="text-gray-500">Batch:</span>
                               <span className="ml-1 font-medium">{product.batch_number}</span>
+                            </div>
+                          )}
+                          {product.roll_number && (
+                            <div>
+                              <span className="text-gray-500">Roll No:</span>
+                              <span className="ml-1 font-medium font-mono">{product.roll_number}</span>
                             </div>
                           )}
                           {product.location && (

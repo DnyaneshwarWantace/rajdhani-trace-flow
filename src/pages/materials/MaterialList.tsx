@@ -9,6 +9,7 @@ import MaterialInventoryTab from '@/components/materials/MaterialInventoryTab';
 import WasteRecoveryTab from '@/components/materials/WasteRecoveryTab';
 import MaterialAnalyticsTab from '@/components/materials/MaterialAnalyticsTab';
 import MaterialNotificationsTab from '@/components/materials/MaterialNotificationsTab';
+import MaterialAssignedTasksTab from '@/components/materials/MaterialAssignedTasksTab';
 import AddMaterialDialog from '@/components/materials/AddMaterialDialog';
 import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
 import RecordPeriodicUsageDialog from '@/components/materials/RecordPeriodicUsageDialog';
@@ -44,7 +45,7 @@ import { TruncatedText } from '@/components/ui/TruncatedText';
 import { canDelete, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 
-type TabValue = 'inventory' | 'waste-recovery' | 'analytics' | 'notifications';
+type TabValue = 'inventory' | 'assigned-tasks' | 'waste-recovery' | 'analytics' | 'notifications';
 
 export interface MaterialListProps {
   /** When set, only materials with this category are shown (e.g. "Ink" for Ink Management). */
@@ -98,6 +99,19 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   
   // Waste recovery state
   const [wasteCount, setWasteCount] = useState(0);
+  const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
+  const activeAssignedTasks = assignedTasks.filter((task) => {
+    const taskStatus = String(task?.related_data?.task_status || '').toLowerCase();
+    const notificationStatus = String(task?.status || '').toLowerCase();
+    const hasCreatedPurchaseOrder = Boolean(task?.related_data?.purchase_order_id);
+
+    if (hasCreatedPurchaseOrder) return false;
+    if (notificationStatus === 'dismissed') return false;
+    if (taskStatus === 'completed' || taskStatus === 'cancelled') return false;
+    return taskStatus === 'assigned' || taskStatus === 'in_progress' || taskStatus === '';
+  });
+
+  const [assignedTasksLoading, setAssignedTasksLoading] = useState(false);
 
   // Dialog states
   const [isAddMaterialOpen, setIsAddMaterialOpen] = useState(false);
@@ -132,6 +146,8 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const [activeProcurementTaskId, setActiveProcurementTaskId] = useState<string | null>(null);
+  const [activeProcurementSourceOrderId, setActiveProcurementSourceOrderId] = useState<string | null>(null);
 
   // Check delete permission on mount
   useEffect(() => {
@@ -147,6 +163,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       // Load suppliers for form - non-blocking
       loadSuppliers();
       loadNotifications(true); // Initial load silent - no spinner; badge updates when ready
+      loadAssignedTasks();
       setHasLoadedInitial(true);
 
       // Auto-refresh notifications every 60 seconds (silent - no loading spinner)
@@ -663,6 +680,62 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     }
 
     setIsRestockDialogOpen(true);
+    setActiveProcurementTaskId(null);
+    setActiveProcurementSourceOrderId(null);
+  };
+
+  const loadAssignedTasks = async () => {
+    try {
+      setAssignedTasksLoading(true);
+      const { OrderService } = await import('@/services/orderService');
+      const result = await OrderService.getMyMaterialProcurementTasks();
+      setAssignedTasks(result.data || []);
+    } catch {
+      setAssignedTasks([]);
+    } finally {
+      setAssignedTasksLoading(false);
+    }
+  };
+
+  const handleCreateOrderFromAssignedTask = async (task: any) => {
+    const shortages = task?.related_data?.shortages || [];
+    const primary = shortages[0] || {
+      material_id: task?.related_data?.material_id,
+      material_name: task?.related_data?.material_name,
+      need_to_add: task?.related_data?.need_to_add,
+      order_quantity: task?.related_data?.order_quantity,
+    };
+    if (!primary?.material_id) {
+      toast({
+        title: 'Error',
+        description: 'Material information is missing in this task.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      const material = await MaterialService.getMaterialById(primary.material_id);
+      await handleOrder(material);
+      setActiveProcurementTaskId(task?.id || null);
+      setActiveProcurementSourceOrderId(task?.related_data?.order_id || null);
+      setRestockForm((prev) => ({
+        ...prev,
+        quantity: primary.need_to_add && primary.need_to_add > 0
+          ? String(primary.need_to_add)
+          : String(primary.order_quantity || ''),
+        notes: `${prev.notes || ''}${prev.notes ? ' | ' : ''}Task: ${task?.related_data?.order_number || ''} · ${primary.material_name || ''}`.trim(),
+      }));
+      toast({
+        title: 'Assigned Task Opened',
+        description: 'Use this form to create the purchase order for your assigned task.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to load material for assigned task',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleRestockSupplierChange = (supplierName: string) => {
@@ -764,6 +837,8 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           maxCapacity: selectedRestockMaterial.max_capacity || 1000,
           isRestock: !orderIsOutOfStock,
           userNotes: restockForm.notes || '',
+          source_order_id: activeProcurementSourceOrderId || null,
+          source_material_id: selectedRestockMaterial.id,
         },
         // Also include items array for backend compatibility
         items: [{
@@ -774,6 +849,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           unit_price: costPerUnit,
           total_price: totalCost,
         }],
+        procurement_task_id: activeProcurementTaskId || undefined,
       };
 
       const orderResult = await ManageStockService.createOrder(orderData);
@@ -798,6 +874,9 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         notes: '',
       });
       setSelectedRestockMaterial(null);
+      setActiveProcurementTaskId(null);
+      setActiveProcurementSourceOrderId(null);
+      loadAssignedTasks();
     } catch (error) {
       console.error('Error creating restock order:', error);
       toast({
@@ -959,6 +1038,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onTabChange={setActiveTab}
             unreadCount={notificationCount}
             wasteCount={wasteCount}
+            assignedTaskCount={activeAssignedTasks.length}
           />
         )}
 
@@ -1014,6 +1094,13 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         {/* Waste Recovery / Analytics / Notifications – only on Materials page, not Ink Management */}
         {!categoryFilter && activeTab === 'waste-recovery' && (
           <WasteRecoveryTab onRefresh={handleWasteRefresh} />
+        )}
+        {!categoryFilter && activeTab === 'assigned-tasks' && (
+          <MaterialAssignedTasksTab
+            tasks={activeAssignedTasks}
+            loading={assignedTasksLoading}
+            onCreateOrder={handleCreateOrderFromAssignedTask}
+          />
         )}
         {!categoryFilter && activeTab === 'analytics' && (
           <MaterialAnalyticsTab initialStats={fullStats} />
@@ -1396,6 +1483,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                   e.preventDefault();
                   handleRestockSubmit(e);
                 }} 
+                className="bg-primary-600 hover:bg-primary-700 text-white"
                 disabled={
                   submitting || 
                   !restockForm.quantity || 

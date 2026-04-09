@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,9 +21,32 @@ interface BatchDetailsFormProps {
   onChange: (data: CreateProductionBatchData) => void;
   selectedProduct: Product | null;
   orderDeliveryDate?: string | null;
+  orderOptions?: Array<{
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    expectedDelivery?: string;
+    status?: string;
+    productNames?: string[];
+  }>;
+  selectedOrderIds?: string[];
+  onToggleOrder?: (orderId: string) => void;
+  lockedOrderId?: string | null;
+  ordersLoading?: boolean;
 }
 
-export default function BatchDetailsForm({ formData, onChange, selectedProduct, orderDeliveryDate }: BatchDetailsFormProps) {
+export default function BatchDetailsForm({
+  formData,
+  onChange,
+  selectedProduct,
+  orderDeliveryDate,
+  orderOptions = [],
+  selectedOrderIds = [],
+  onToggleOrder,
+  lockedOrderId = null,
+  ordersLoading = false,
+}: BatchDetailsFormProps) {
+  const [showOrdersDropdown, setShowOrdersDropdown] = useState(false);
   const handleChange = (field: keyof CreateProductionBatchData, value: any) => {
     onChange({ ...formData, [field]: value });
   };
@@ -179,6 +203,57 @@ export default function BatchDetailsForm({ formData, onChange, selectedProduct, 
         )}
         {!orderDeliveryDate && (
           <p className="text-xs text-gray-500 mt-1">Target date for completing this production batch</p>
+        )}
+      </div>
+
+      <div>
+        <Label>Orders (Attach to Batch)</Label>
+        <button
+          type="button"
+          onClick={() => setShowOrdersDropdown((prev) => !prev)}
+          className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm"
+        >
+          {selectedOrderIds.length > 0 ? `${selectedOrderIds.length} order(s) selected` : 'Select order(s)'}
+        </button>
+        {showOrdersDropdown && (
+          <div className="mt-2 border border-gray-200 rounded-md max-h-56 overflow-y-auto bg-white">
+            {ordersLoading ? (
+              <p className="text-xs text-gray-500 p-3">Loading orders...</p>
+            ) : orderOptions.length === 0 ? (
+              <p className="text-xs text-gray-500 p-3">No pending/accepted orders available</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {orderOptions.map((order) => {
+                  const checked = selectedOrderIds.includes(order.id);
+                  const isLocked = !!lockedOrderId && order.id === lockedOrderId;
+                  return (
+                    <label key={order.id} className="flex items-start gap-2 p-2.5 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={isLocked}
+                        onChange={() => onToggleOrder?.(order.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-medium text-gray-900">
+                          {order.orderNumber} - {order.customerName}
+                        </div>
+                        <div className="text-xs text-gray-600 mt-0.5">
+                          Products: {(order.productNames || []).join(', ') || 'N/A'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          Expected: {order.expectedDelivery ? formatIndianDate(order.expectedDelivery) : 'N/A'}
+                          {order.status ? ` | Status: ${order.status}` : ''}
+                          {isLocked ? ' | Auto-selected from task/order' : ''}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { formatCurrency } from '@/utils/formatHelpers';
+import { calculatePricingUnitQuantity } from '@/utils/unitConverter';
 import OrderItemForm from './OrderItemForm';
 
 function CollapsedItemSummary({
@@ -29,6 +30,14 @@ function CollapsedItemSummary({
   if (p?.pattern) specs.push({ label: 'Pattern', value: p.pattern });
   if (p?.color) specs.push({ label: 'Color', value: p.color });
   const unitLabel = item.product_type === 'raw_material' ? (p?.unit || 'units') : (p?.count_unit || 'rolls');
+  const pricingUnitLabel = item.pricing_unit === 'unit' ? unitLabel : item.pricing_unit;
+  const convertedPricingQuantity = calculatePricingUnitQuantity(
+    Number(item.quantity || 0),
+    item.pricing_unit || 'unit',
+    item.product_dimensions || {},
+    (item as any).length_unit,
+    (item as any).width_unit
+  );
 
   return (
     <div
@@ -68,9 +77,14 @@ function CollapsedItemSummary({
             <span className="text-gray-600">
               Qty: <span className="font-semibold text-gray-900">{item.quantity || 0}</span> {unitLabel}
             </span>
+            {!!item.quantity && (
+              <span className="text-gray-600">
+                = <span className="font-semibold text-gray-900">{convertedPricingQuantity.toFixed(2)}</span> {pricingUnitLabel}
+              </span>
+            )}
             {item.unit_price > 0 && (
               <span className="text-gray-600">
-                @ <span className="font-medium text-gray-900">{formatCurrency(item.unit_price ?? 0, { full: true })}</span> / {item.pricing_unit && item.pricing_unit !== 'unit' ? item.pricing_unit : unitLabel}
+                @ <span className="font-medium text-gray-900">{formatCurrency(item.unit_price ?? 0, { full: true })}</span> / {pricingUnitLabel}
               </span>
             )}
           </div>

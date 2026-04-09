@@ -187,12 +187,12 @@ export default function OrderDetailsDialog({ order, isOpen, onClose, onStatusUpd
             </div>
           )}
 
-          {/* Status History */}
+          {/* Material Order History */}
           {order.status_history && order.status_history.length > 0 && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <History className="w-5 h-5" />
-                Status History
+                Material Order History
               </h3>
               <div className="space-y-3">
                 {order.status_history

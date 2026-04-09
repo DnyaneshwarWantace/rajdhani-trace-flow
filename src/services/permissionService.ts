@@ -84,6 +84,20 @@ export class PermissionService {
     return data.data;
   }
 
+  static async getUserPermissionsPublic(userId: string): Promise<RolePermissions | null> {
+    const response = await fetch(`${API_URL}/permissions/user/${encodeURIComponent(userId)}/public`, {
+      headers: this.getHeaders(),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(getApiError(response, data));
+    }
+    return data.data;
+  }
+
   static async updateUserPermissions(userId: string, payload: {
     page_permissions: Record<string, boolean>;
     action_permissions: Record<string, boolean>;
