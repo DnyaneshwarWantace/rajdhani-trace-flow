@@ -811,7 +811,14 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                   newMaterial={newMaterial}
                   onMaterialChange={setNewMaterial}
                   onAdd={addProductMaterial}
-                  onAddMaterial={addMaterialDirectly}
+                  onAddMultiple={(materials) => {
+                    // Filter out duplicates already in the recipe
+                    const existing = new Set(recipeMaterials.map(m => m.materialId));
+                    const toAdd = materials.filter(m => !existing.has(m.materialId));
+                    if (toAdd.length > 0) {
+                      setRecipeMaterials([...recipeMaterials, ...toAdd]);
+                    }
+                  }}
                   targetProduct={{
                     length: formData.length,
                     width: formData.width,

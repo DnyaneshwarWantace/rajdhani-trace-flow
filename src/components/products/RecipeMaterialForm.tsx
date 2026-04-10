@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label';
 import { Plus, Search, X } from 'lucide-react';
 import MaterialSelectorDialog from './MaterialSelectorDialog';
 // import { calculateSQM } from '@/utils/sqmCalculator';
-import { calculateProductRatio } from '@/utils/productRatioCalculator';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
@@ -22,7 +21,8 @@ interface RecipeMaterialFormProps {
   newMaterial: RecipeMaterial;
   onMaterialChange: (material: RecipeMaterial) => void;
   onAdd: () => void;
-  onAddMaterial?: (material: RecipeMaterial) => void; // Direct add function
+  /** Called when user confirms multiple selections from the dialog */
+  onAddMultiple?: (materials: RecipeMaterial[]) => void;
   targetProduct?: {
     length: string;
     width: string;
@@ -35,43 +35,15 @@ export default function RecipeMaterialForm({
   newMaterial,
   onMaterialChange,
   onAdd,
+  onAddMultiple,
   targetProduct,
 }: RecipeMaterialFormProps) {
   const [showMaterialSelector, setShowMaterialSelector] = useState(false);
-  const [selectedProductData, setSelectedProductData] = useState<any>(null);
-
-  const handleMaterialSelect = async (selected: RecipeMaterial) => {
-    // Populate the form with selected material
-    let materialToSet = { ...selected };
-    
-    // If it's a product and we have target product dimensions, calculate quantity
-    if (selected.materialType === 'product' && targetProduct && selected.materialId) {
-      try {
-        // Fetch the product details to get dimensions
-        const { ProductService } = await import('@/services/productService');
-        const product = await ProductService.getProductById(selected.materialId);
-        
-        if (product && product.length && product.width && product.length_unit && product.width_unit &&
-            targetProduct.length && targetProduct.width && targetProduct.length_unit && targetProduct.width_unit) {
-          // Calculate the ratio
-          const ratio = calculateProductRatio(product, targetProduct);
-          if (ratio > 0 && !isNaN(ratio) && isFinite(ratio)) {
-            materialToSet.quantity = ratio.toFixed(4);
-            setSelectedProductData(product);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch product details:', error);
-        setSelectedProductData(null);
-      }
-    } else {
-      setSelectedProductData(null);
+  /** Called when user confirms all selected items in the dialog */
+  const handleMultipleSelect = (selected: RecipeMaterial[]) => {
+    if (onAddMultiple && selected.length > 0) {
+      onAddMultiple(selected);
     }
-    
-    // Set the material in the form
-    onMaterialChange(materialToSet);
-    // Close the dialog so user can see the form and fill in details
-    setShowMaterialSelector(false);
   };
 
   // Check if the selected material is a product based on the unit field
@@ -128,7 +100,7 @@ export default function RecipeMaterialForm({
                 className="w-full h-12 border-dashed border-2 border-gray-300 hover:border-primary-400 hover:bg-primary-50"
               >
                 <Search className="w-4 h-4 mr-2" />
-                Click to search and select material or product
+                Click to search and select materials or products (pick multiple at once)
               </Button>
             )}
           </div>
@@ -163,22 +135,6 @@ export default function RecipeMaterialForm({
                 ? 'Quantity per 1 SQM (auto-calculated based on product dimensions, or edit manually)'
                 : 'Quantity needed for 1 SQM of this product (supports decimals like 0.5kg, 0.2 pieces)'}
             </p>
-            {isProduct && newMaterial.quantity && selectedProductData && (
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded">
-                <p className="text-xs font-medium text-blue-900 mb-1">Auto-calculated Quantity for 1 SQM:</p>
-                <p className="text-sm font-bold text-blue-900">
-                  {newMaterial.quantity} {newMaterial.unit}
-                </p>
-                {selectedProductData.length && selectedProductData.width && (
-                  <p className="text-xs text-blue-700 mt-1">
-                    Based on: {selectedProductData.length} {selectedProductData.length_unit} × {selectedProductData.width} {selectedProductData.width_unit}
-                  </p>
-                )}
-                <p className="text-xs text-blue-600 mt-1">
-                  For 1 SQM of target product, you need {newMaterial.quantity} {newMaterial.unit} of this product
-                </p>
-              </div>
-            )}
           </div>
           <div>
             <Label htmlFor="materialUnit">Unit *</Label>
@@ -217,7 +173,7 @@ export default function RecipeMaterialForm({
       <MaterialSelectorDialog
         isOpen={showMaterialSelector}
         onClose={() => setShowMaterialSelector(false)}
-        onSelect={handleMaterialSelect}
+        onSelectMultiple={handleMultipleSelect}
         targetProduct={targetProduct}
       />
     </div>
