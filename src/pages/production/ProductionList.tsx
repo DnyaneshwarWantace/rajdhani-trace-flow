@@ -13,7 +13,7 @@ import ProductionFilters from '@/components/production/ProductionFilters';
 import ProductionTable from '@/components/production/ProductionTable';
 import ProductionGrid from '@/components/production/ProductionGrid';
 import ProductionEmptyState from '@/components/production/ProductionEmptyState';
-import { canView, canDelete } from '@/utils/permissions';
+import { canView, canCreate, canDelete } from '@/utils/permissions';
 import { useAuth } from '@/contexts/AuthContext';
 import AllPendingOrdersSection from '@/components/production/create/AllPendingOrdersSection';
 import PermissionDenied from '@/components/ui/PermissionDenied';
@@ -37,6 +37,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination-primitives';
 import { formatIndianDateTime } from '@/utils/formatHelpers';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function ProductionList() {
   const { toast } = useToast();
@@ -503,6 +504,15 @@ export default function ProductionList() {
     }
   };
 
+  useLiveSyncRefresh({
+    modules: ['production', 'orders', 'products', 'materials'],
+    onRefresh: () => {
+      loadBatches();
+      loadAssignedTasks();
+    },
+    pollingMs: 6000,
+  });
+
   const handleCreate = () => {
     navigate('/production/create');
   };
@@ -620,7 +630,7 @@ export default function ProductionList() {
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
               </div>
-              {!isProductScoped && (
+              {!isProductScoped && canCreate('production') && (
                 <Button
                   onClick={handleCreate}
                   className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white"

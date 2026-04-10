@@ -13,10 +13,11 @@ import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerGrid from '@/components/customers/CustomerGrid';
 import CustomerEmptyState from '@/components/customers/CustomerEmptyState';
-import { canView } from '@/utils/permissions';
+import { canView, canCreate, canDelete } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import type { Order } from '@/services/orderService';
 import {
   Pagination,
@@ -94,6 +95,7 @@ export default function CustomerList() {
     loadCustomers();
     loadOrders();
   }, [searchTerm, typeFilter]);
+
 
   useEffect(() => {
     // Apply pagination to filtered customers
@@ -180,6 +182,15 @@ export default function CustomerList() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['customers', 'orders'],
+    onRefresh: () => {
+      loadCustomers();
+      loadOrders();
+    },
+    pollingMs: 6000,
+  });
 
   const handleCreate = () => {
     setFormData({
@@ -414,10 +425,12 @@ export default function CustomerList() {
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
               </div>
-              <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Customer
-              </Button>
+              {canCreate('customers') && (
+                <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Customer
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -452,7 +465,7 @@ export default function CustomerList() {
                   onView={handleView}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  canDelete={user?.role === 'admin' || false}
+                  canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
                 />
               ) : (
                 <CustomerGrid
@@ -460,7 +473,7 @@ export default function CustomerList() {
                   orders={orders}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  canDelete={user?.role === 'admin' || false}
+                  canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
                 />
               )}
             </div>
@@ -471,7 +484,7 @@ export default function CustomerList() {
                 orders={orders}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                canDelete={user?.role === 'admin' || false}
+                canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
               />
             </div>
           </>

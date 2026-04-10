@@ -13,10 +13,11 @@ import SupplierFilters from '@/components/suppliers/SupplierFilters';
 import SupplierTable from '@/components/suppliers/SupplierTable';
 import SupplierGrid from '@/components/suppliers/SupplierGrid';
 import SupplierEmptyState from '@/components/suppliers/SupplierEmptyState';
-import { canView } from '@/utils/permissions';
+import { canView, canCreate, canDelete } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 import SupplierDeleteDialog from '@/components/suppliers/SupplierDeleteDialog';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import {
   Pagination,
   PaginationContent,
@@ -76,6 +77,7 @@ export default function SupplierList() {
     loadOrders();
   }, []);
 
+
   useEffect(() => {
     // Apply pagination to filtered suppliers
     const filtered = allSuppliers.filter((supplier) => {
@@ -130,6 +132,15 @@ export default function SupplierList() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['suppliers', 'manage_stock', 'materials'],
+    onRefresh: () => {
+      loadSuppliers();
+      loadOrders();
+    },
+    pollingMs: 6000,
+  });
 
   const handleCreate = () => {
     setFormData({
@@ -295,10 +306,12 @@ export default function SupplierList() {
                   <Grid3x3 className="w-4 h-4" />
                 </Button>
               </div>
-              <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Supplier
-              </Button>
+              {canCreate('suppliers') && (
+                <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Supplier
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -330,7 +343,7 @@ export default function SupplierList() {
                   onView={handleView}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  canDelete={user?.role === 'admin' || false}
+                  canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
                 />
               ) : (
                 <SupplierGrid
@@ -338,7 +351,7 @@ export default function SupplierList() {
                   orders={orders}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
-                  canDelete={user?.role === 'admin' || false}
+                  canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
                 />
               )}
             </div>
@@ -349,7 +362,7 @@ export default function SupplierList() {
                 orders={orders}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                canDelete={user?.role === 'admin' || false}
+                canDelete={user?.role === 'admin' || user?.role === 'super-admin'}
               />
             </div>
           </>

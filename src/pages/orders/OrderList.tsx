@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,9 @@ import OrderCard from '@/components/orders/OrderCard';
 import OrderFilters from '@/components/orders/OrderFilters';
 import OrderStatsBoxes from '@/components/orders/OrderStatsBoxes';
 import Pagination from '@/components/ui/pagination';
-import { canView } from '@/utils/permissions';
+import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 type ViewMode = 'table' | 'grid';
 
@@ -51,7 +52,7 @@ export default function OrderList() {
     loadOrders();
   }, [filters]);
 
-  const loadOrders = async (showLoader = true) => {
+  const loadOrders = useCallback(async (showLoader = true) => {
     try {
       if (showLoader) setLoading(true);
       const searchQuery = filters.search?.trim();
@@ -88,9 +89,9 @@ export default function OrderList() {
     } finally {
       if (showLoader) setLoading(false);
     }
-  };
+  }, [filters, toast]);
 
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       setStatsLoading(true);
       const { data, error } = await OrderService.getOrderStats();
@@ -108,7 +109,16 @@ export default function OrderList() {
     } finally {
       setStatsLoading(false);
     }
-  };
+  }, []);
+
+  useLiveSyncRefresh({
+    modules: ['orders', 'materials', 'production', 'manage_stock'],
+    onRefresh: () => {
+      loadOrders(false);
+      loadStats();
+    },
+    pollingMs: 6000,
+  });
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
@@ -227,10 +237,12 @@ export default function OrderList() {
             </div>
 
             {/* New Order Button */}
-            <Button onClick={() => navigate('/orders/new')} className="bg-primary-600 hover:bg-primary-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              New Order
-            </Button>
+            {canCreate('orders') && (
+              <Button onClick={() => navigate('/orders/new')} className="bg-primary-600 hover:bg-primary-700 text-white">
+                <Plus className="w-4 h-4 mr-2" />
+                New Order
+              </Button>
+            )}
           </div>
         </div>
 
