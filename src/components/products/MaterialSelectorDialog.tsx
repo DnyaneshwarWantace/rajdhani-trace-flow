@@ -27,7 +27,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination-primitives';
-import { Search, Package, Factory, CheckCircle, X, ArrowRight } from 'lucide-react';
+import { Search, Package, Factory, CheckCircle, X, ArrowRight, Plus } from 'lucide-react';
 import type { Product } from '@/types/product';
 import type { RawMaterial, MaterialFilters } from '@/types/material';
 import type { ProductFilters } from '@/types/product';
