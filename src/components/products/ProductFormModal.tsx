@@ -287,22 +287,6 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     });
   };
 
-  const _addMaterialDirectly = (material: RecipeMaterial) => {
-    // Direct add function that bypasses newMaterial state
-    // This is used when materials are selected from the dialog
-    if (!material.materialId || !material.unit) return;
-    const quantity = parseFloat(material.quantity) || 0;
-    if (quantity <= 0 || material.quantity.trim() === '') {
-      toast({
-        title: 'Validation Error',
-        description: 'Please enter a quantity greater than 0 for the material',
-        variant: 'destructive',
-      });
-      return;
-    }
-    setRecipeMaterials([...recipeMaterials, material]);
-  };
-
   const removeProductMaterial = (index: number) => {
     setRecipeMaterials(recipeMaterials.filter((_, i) => i !== index));
   };
