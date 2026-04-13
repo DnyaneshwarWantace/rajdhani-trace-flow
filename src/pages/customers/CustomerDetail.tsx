@@ -14,6 +14,7 @@ import CustomerDetailFinancial from '@/components/customers/detail/CustomerDetai
 import CustomerDetailOrderStats from '@/components/customers/detail/CustomerDetailOrderStats';
 import CustomerDetailOrderHistory from '@/components/customers/detail/CustomerDetailOrderHistory';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
@@ -99,6 +100,16 @@ export default function CustomerDetail() {
       setOrders([]);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['customers', 'orders'],
+    onRefresh: () => {
+      if (!id) return;
+      loadCustomer();
+      loadOrders();
+    },
+    pollingMs: 8000,
+  });
 
   const handleBack = () => {
     navigate('/customers');

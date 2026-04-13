@@ -58,11 +58,6 @@ export const useActivityLogs = () => {
     // Cleanup on unmount
     return () => {
       socketService.off('new-activity', handleNewActivity);
-      // Only disconnect if socket is actually connected
-      // In React strict mode, effects run twice, so we need to be careful
-      if (socketService.isConnected()) {
-        socketService.disconnect();
-      }
     };
   }, [user?.email, user?.role, toast]);
 

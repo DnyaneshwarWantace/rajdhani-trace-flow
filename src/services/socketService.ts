@@ -24,6 +24,24 @@ export interface ActivityLog {
   ip_address?: string;
 }
 
+export interface DataChangeEvent {
+  module:
+    | 'orders'
+    | 'production'
+    | 'materials'
+    | 'manage_stock'
+    | 'products'
+    | 'individual_products'
+    | 'customers'
+    | 'suppliers'
+    | 'recipes'
+    | 'system';
+  method: string;
+  endpoint: string;
+  status_code: number;
+  at: string;
+}
+
 export class SocketService {
   private static instance: SocketService;
   private socket: Socket | null = null;
@@ -50,6 +68,7 @@ export class SocketService {
 
     this.socket.on('connect', () => {
       console.log('🔌 Connected to Socket.IO');
+      this.notifyListeners('connection-change', { connected: true });
       
       // Join admin logs room if admin
       if (userRole === 'admin') {
@@ -73,8 +92,13 @@ export class SocketService {
       this.notifyListeners('new-activity', activityLog);
     });
 
+    this.socket.on('data-changed', (event: DataChangeEvent) => {
+      this.notifyListeners('data-changed', event);
+    });
+
     this.socket.on('disconnect', () => {
       console.log('🔌 Disconnected from Socket.IO');
+      this.notifyListeners('connection-change', { connected: false });
     });
 
     this.socket.on('error', (error: Error) => {
@@ -92,6 +116,7 @@ export class SocketService {
       }
       this.socket = null;
     }
+    this.notifyListeners('connection-change', { connected: false });
   }
 
   on(event: string, callback: (data: any) => void): void {

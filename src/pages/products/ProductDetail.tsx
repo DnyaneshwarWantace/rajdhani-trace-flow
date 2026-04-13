@@ -16,6 +16,7 @@ import type { Recipe } from '@/types/recipe';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Factory, Package, Edit } from 'lucide-react';
 import ProductFormModal from '@/components/products/ProductFormModal';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +69,15 @@ export default function ProductDetail() {
       setRecipeLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['products', 'recipes', 'production', 'individual_products'],
+    onRefresh: () => {
+      if (!id) return;
+      loadProduct();
+    },
+    pollingMs: 8000,
+  });
 
   const handleEdit = () => {
     setIsEditOpen(true);

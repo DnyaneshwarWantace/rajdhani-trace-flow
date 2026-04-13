@@ -19,6 +19,7 @@ import PermissionDenied from '@/components/ui/PermissionDenied';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers, Upload } from 'lucide-react';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
 
@@ -105,6 +106,7 @@ export default function ProductList() {
     }
   }, [activeTab, filters]);
 
+
   const loadInventoryStats = async () => {
     try {
       setStatsLoading(true);
@@ -170,6 +172,16 @@ export default function ProductList() {
       console.error('Error loading notifications:', error);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['products', 'individual_products', 'production', 'orders', 'recipes'],
+    onRefresh: () => {
+      if (activeTab === 'inventory') loadProducts();
+      if (activeTab === 'notifications') loadNotifications();
+      loadInventoryStats();
+    },
+    pollingMs: 6000,
+  });
 
   // Filter handlers
   const handleSearch = (value: string) => {

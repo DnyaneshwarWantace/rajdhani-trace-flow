@@ -13,6 +13,7 @@ import SupplierDetailOrderSummary from '@/components/suppliers/detail/SupplierDe
 import SupplierDetailOrderStats from '@/components/suppliers/detail/SupplierDetailOrderStats';
 import SupplierDetailOrderHistory from '@/components/suppliers/detail/SupplierDetailOrderHistory';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function SupplierDetail() {
   const { id } = useParams<{ id: string }>();
@@ -75,6 +76,16 @@ export default function SupplierDetail() {
       setOrders([]);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['suppliers', 'manage_stock', 'materials'],
+    onRefresh: () => {
+      if (!id) return;
+      loadSupplier();
+      loadOrders();
+    },
+    pollingMs: 8000,
+  });
 
   const handleBack = () => {
     navigate('/suppliers');

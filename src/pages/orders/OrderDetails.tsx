@@ -29,6 +29,7 @@ import { ActivityLogTimeline } from '@/components/orders/ActivityLogTimeline';
 import { InvoiceBill } from '@/components/orders/InvoiceBill';
 import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 interface OrderItem {
   id: string;
@@ -137,6 +138,15 @@ export default function OrderDetails() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['orders', 'production', 'materials', 'manage_stock'],
+    onRefresh: () => {
+      if (!id) return;
+      loadOrderDetails();
+    },
+    pollingMs: 8000,
+  });
 
   const handleUpdatePayment = async (newPaidAmount: number) => {
     if (!id) return;

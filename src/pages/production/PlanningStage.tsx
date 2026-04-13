@@ -1184,7 +1184,6 @@ export default function PlanningStage() {
             }
           }}
           onEdit={handleEdit}
-          onAssign={currentBatch ? () => setShowAssignModal(true) : undefined}
           batch={currentBatch}
         />
 

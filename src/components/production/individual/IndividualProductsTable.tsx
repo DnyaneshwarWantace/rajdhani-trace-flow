@@ -332,12 +332,12 @@ export default function IndividualProductsTable({
       
       const updateData: any = {};
       updateData[col] = valueToSave;
-      
-      // Update local state first
-      const updated = [...localProducts];
+
+      // Update local state first — use ref to avoid stale state from concurrent saves
+      const updated = [...localProductsRef.current];
       updated[row] = { ...updated[row], ...updateData };
       setLocalProductsSync(updated);
-      
+
       // If product has a real ID (not temp ID), update it
       if (productItem.id && !productItem.id.startsWith('temp-')) {
         await IndividualProductService.updateIndividualProduct(productItem.id, updateData);
@@ -362,7 +362,7 @@ export default function IndividualProductsTable({
         // Only create if this is the last required field being filled
         if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'roll_number' || col === 'location')) {
           // Check for duplicate roll_number within this batch
-          const duplicate = localProducts.find(
+          const duplicate = localProductsRef.current.find(
             (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
           );
           if (duplicate) {
@@ -436,15 +436,15 @@ export default function IndividualProductsTable({
   const handleSelectChange = async (row: number, field: string, value: string) => {
     // Use ref to get latest state — cell input blur may have updated state just before this fires
     const productItem = localProductsRef.current[row];
-    
+
     try {
       setSaving(productItem.id);
-      
+
       const updateData: any = {};
       updateData[field] = value;
-      
-      // Update local state first
-      const updated = [...localProducts];
+
+      // Update local state first — use ref to avoid stale state from concurrent saves
+      const updated = [...localProductsRef.current];
       updated[row] = { ...updated[row], ...updateData };
       setLocalProductsSync(updated);
       
@@ -465,7 +465,7 @@ export default function IndividualProductsTable({
         // Only create if all required fields are now filled
         if (hasRequiredFields) {
           // Check for duplicate roll_number within this batch
-          const duplicate = localProducts.find(
+          const duplicate = localProductsRef.current.find(
             (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
           );
           if (duplicate) {

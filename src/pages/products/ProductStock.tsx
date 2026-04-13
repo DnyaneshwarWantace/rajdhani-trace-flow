@@ -21,6 +21,7 @@ import type {
   IndividualProductFormData,
   StockStats,
 } from '@/types/product';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 /** Sanitize string for use in file names */
 function sanitizeFileName(s: string): string {
@@ -177,6 +178,7 @@ export default function ProductStock() {
     }
   }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, currentPage, limit, sortBy, sortOrder]);
 
+
   const loadProduct = async () => {
     if (!productId) return;
 
@@ -235,6 +237,17 @@ export default function ProductStock() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['individual_products', 'products', 'production'],
+    onRefresh: () => {
+      if (!productId) return;
+      loadProduct();
+      loadAllIndividualProducts();
+      loadIndividualProducts();
+    },
+    pollingMs: 6000,
+  });
 
   // Calculate stats from all products (not just current page)
   const stats: StockStats = {

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
-import { IndividualProductService } from '@/services/individualProductService';
 import { WasteService } from '@/services/wasteService';
 import { OrderService, type Order } from '@/services/orderService';
 import { RecipeService } from '@/services/recipeService';
@@ -22,7 +21,6 @@ import ProductionOverviewStats from '@/components/production/planning/Production
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Product } from '@/types/product';
-import type { IndividualProduct } from '@/types/product';
 
 export default function ProductionWastage() {
   const { id } = useParams<{ id: string }>();
@@ -546,381 +544,63 @@ export default function ProductionWastage() {
 
     try {
       setUpdatingStatus(true);
-      console.log('🔄 Starting status update before navigation...');
 
-      // Get material consumption records to find which individual products are used as materials
-      const { data: consumptionData } = await ProductionService.getMaterialConsumption(id!);
-      
-      // Collect all individual product IDs that are used as materials in this batch
-      const usedProductIds = new Set<string>();
-      const materialProductIds = new Set<string>(); // Track which material products we need to query
-      
-      if (consumptionData && consumptionData.length > 0) {
-        consumptionData.forEach((m: any) => {
-          if (m.material_type === 'product' && m.individual_product_ids && Array.isArray(m.individual_product_ids)) {
-            m.individual_product_ids.forEach((id: string) => usedProductIds.add(id));
-            // Track the material product ID so we can fetch its individual products
-            if (m.material_id) {
-              materialProductIds.add(m.material_id);
-            }
-          }
-        });
-      }
-
-      // CRITICAL FIX: Fetch individual products from EACH material product, not the batch product
-      // Individual products used as materials belong to the material product, not the batch product
-      const allProducts: IndividualProduct[] = [];
-      if (materialProductIds.size > 0) {
-        console.log(`🔍 Fetching individual products from ${materialProductIds.size} material product(s):`, Array.from(materialProductIds));
-        for (const materialProductId of materialProductIds) {
-          try {
-            const { products } = await IndividualProductService.getIndividualProducts({
-              product_id: materialProductId,
-            });
-            allProducts.push(...products);
-            console.log(`✅ Found ${products.length} individual products for material product ${materialProductId}`);
-          } catch (error) {
-            console.error(`❌ Error fetching individual products for material ${materialProductId}:`, error);
-          }
-        }
-      }
-
-      // Filter products that are used as materials and still in "in_production"
-      const productsToUpdate = allProducts.filter((p: IndividualProduct) => {
-        const isUsedAsMaterial = usedProductIds.has(p.id);
-        const isInProduction = p.status === 'in_production';
-        return isUsedAsMaterial && isInProduction;
-      });
-
-      console.log(`🔍 Found ${productsToUpdate.length} individual products in "in_production" that need to be updated to "used"`);
-
-      // Update material consumption status from 'in_production' to 'used' (both raw materials and products)
-      // This will automatically update individual products via backend logic
-      console.log('🔄 Updating material consumption status to "used"...');
-      let statusUpdateSuccess = false;
-      let updatedProductCount = 0;
-      
+      // Update material consumption records to 'used' (best effort — do not block on failure)
       try {
-        if (consumptionData && consumptionData.length > 0) {
-          // First, fetch the actual consumption records to get their IDs
-          // The summary doesn't include IDs, so we need to fetch the actual records
-          const API_URL = getApiUrl();
-          const token = localStorage.getItem('auth_token');
-          
-          // Fetch actual consumption records for this batch
-          const consumptionRecordsResponse = await fetch(
-            `${API_URL}/material-consumption?production_batch_id=${id}`,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          
-          let actualConsumptionRecords: any[] = [];
-          if (consumptionRecordsResponse.ok) {
-            const recordsData = await consumptionRecordsResponse.json();
-            actualConsumptionRecords = recordsData.data || [];
-            console.log(`📦 Fetched ${actualConsumptionRecords.length} actual consumption records with IDs`);
-          }
-          
-          // Update materials that:
-          // 1. Have consumption_status === 'in_production' (raw materials), OR
-          // 2. Are product-type materials with individual products in 'in_production' status
-          const materialsToUpdate = consumptionData.filter((m: any) => {
-            // For raw materials: check consumption_status
-            if (m.material_type === 'raw_material' && m.consumption_status === 'in_production') {
-              return true;
-            }
-            // For products: ALWAYS update if they have individual_product_ids
-            // Products don't use consumption_status the same way - they track via individual product statuses
-            // The backend will check the actual individual product statuses and update them
-            if (m.material_type === 'product' && m.individual_product_ids && m.individual_product_ids.length > 0) {
-              // Always update product-type materials if they have individual_product_ids
-              // The backend will handle checking the actual status and updating accordingly
-              return true; // Always update product-type materials - backend will verify status
-            }
-            return false;
-          });
-          
-          if (materialsToUpdate.length > 0) {
-            console.log(`🔄 Updating ${materialsToUpdate.length} material consumption records to "used"...`);
-            
-            const updatePromises = materialsToUpdate.map(async (material: any) => {
-              try {
-                // Find the actual consumption record(s) for this material
-                const recordsToUpdate = actualConsumptionRecords.filter((record: any) => 
-                  record.material_id === material.material_id && 
-                  record.production_batch_id === id &&
-                  record.status === 'active'
-                );
-                
-                if (recordsToUpdate.length === 0) {
-                  console.warn(`⚠️ No consumption records found for material ${material.material_name} (${material.material_id})`);
-                  return false;
-                }
-                
-                // Update all records for this material
-                const recordUpdatePromises = recordsToUpdate.map(async (record: any) => {
-                  try {
-                    const response = await fetch(`${API_URL}/material-consumption/${record.id}`, {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
-                  },
-                  body: JSON.stringify({
-                    consumption_status: 'used'
-                  }),
-                });
-                
-                if (response.ok) {
-                      console.log(`✅ Updated consumption record ${record.id} for ${material.material_name} (${material.material_type}) to "used"`);
-                  return true;
-                } else {
-                  const error = await response.json();
-                      console.error(`❌ Error updating record ${record.id} for ${material.material_name}:`, error);
-                      return false;
-                    }
-                  } catch (error) {
-                    console.error(`❌ Error updating record for ${material.material_name}:`, error);
-                  return false;
-                }
-                });
-                
-                const recordResults = await Promise.all(recordUpdatePromises);
-                return recordResults.some(r => r === true); // Return true if at least one record was updated
-              } catch (error) {
-                console.error(`❌ Error updating ${material.material_name}:`, error);
-                return false;
-              }
-            });
-            
-            const results = await Promise.all(updatePromises);
-            const successCount = results.filter(r => r === true).length;
-            statusUpdateSuccess = successCount > 0;
-            
-            console.log(`✅ Updated ${successCount}/${materialsToUpdate.length} material consumption records to "used"`);
-            
-            if (successCount > 0) {
-              // Wait a moment for backend to process individual product updates
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              
-              // CRITICAL: Verify that individual products were actually updated from 'in_production' to 'used'
-              // Fetch from ALL material products, not just batch product
-              const updatedProducts: IndividualProduct[] = [];
-              if (materialProductIds.size > 0) {
-                for (const materialProductId of materialProductIds) {
-                  try {
-                    const { products } = await IndividualProductService.getIndividualProducts({
-                      product_id: materialProductId,
-                    });
-                    updatedProducts.push(...products);
-                  } catch (error) {
-                    console.error(`❌ Error fetching updated products for material ${materialProductId}:`, error);
-                  }
-                }
-              }
-              
-              const stillInProduction = updatedProducts.filter((p: IndividualProduct) => 
-                usedProductIds.has(p.id) && p.status === 'in_production'
-              );
-              
-              const successfullyUpdated = updatedProducts.filter((p: IndividualProduct) => 
-                usedProductIds.has(p.id) && p.status === 'used'
-              );
-              
-              updatedProductCount = successfullyUpdated.length;
-              
-              // BLOCK navigation if ANY products are still in 'in_production'
-              if (stillInProduction.length > 0) {
-                console.error(`❌ ${stillInProduction.length} individual products are still in "in_production" status`);
-                console.error(`❌ Products that failed to update:`, stillInProduction.map(p => p.id));
-                toast({
-                  title: 'Error: Status Not Updated',
-                  description: `${stillInProduction.length} product(s) are still in "in_production" status. Cannot proceed to next stage. Please try again or contact support.`,
-                  variant: 'destructive',
-                  duration: 10000,
-                });
-                setUpdatingStatus(false);
-                return; // BLOCK navigation - status was not changed
-              }
-              
-              // Only proceed if ALL products were successfully updated to 'used'
-              if (updatedProductCount === productsToUpdate.length && productsToUpdate.length > 0) {
-                console.log(`✅ All ${updatedProductCount} individual products successfully updated from "in_production" to "used"`);
-                toast({
-                  title: 'Status Updated Successfully',
-                  description: `All ${updatedProductCount} product(s) updated from "in_production" to "used"`,
-                });
-                statusUpdateSuccess = true; // Mark as successful
-              } else if (productsToUpdate.length === 0) {
-                // No products to update - this is fine
-                console.log('ℹ️ No products in "in_production" status to update');
-                statusUpdateSuccess = true;
-              } else {
-                // Some products were updated but not all - this shouldn't happen but block navigation
-                console.error(`❌ Only ${updatedProductCount}/${productsToUpdate.length} products were updated`);
-                toast({
-                  title: 'Error: Incomplete Status Update',
-                  description: `Only ${updatedProductCount}/${productsToUpdate.length} product(s) were updated. Cannot proceed.`,
-                  variant: 'destructive',
-                });
-                setUpdatingStatus(false);
-                return; // BLOCK navigation
-              }
-            } else {
-              // No materials were updated successfully
-              if (productsToUpdate.length > 0) {
-                console.error('❌ Failed to update material consumption - no materials were updated');
-                toast({
-                  title: 'Error: Status Update Failed',
-                  description: 'Failed to update material consumption status. Cannot proceed to next stage.',
-                  variant: 'destructive',
-                });
-                setUpdatingStatus(false);
-                return; // BLOCK navigation
-              }
-            }
-          } else {
-            console.log('ℹ️ No materials found to update');
-            // If there are no materials to update, check if there are any products that need updating
-            if (productsToUpdate.length > 0) {
-              console.warn(`⚠️ Found ${productsToUpdate.length} products in "in_production" but no material consumption records to update`);
-              toast({
-                title: 'Warning',
-                description: 'Some products are still in "in_production" status. Please complete wastage first.',
-                variant: 'destructive',
-              });
-              setUpdatingStatus(false);
-              return;
-            }
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error updating material consumption status:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to update material consumption status',
-          variant: 'destructive',
+        const API_URL = getApiUrl();
+        const token = localStorage.getItem('auth_token');
+        const recordsRes = await fetch(`${API_URL}/material-consumption?production_batch_id=${id}`, {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         });
-        setUpdatingStatus(false);
-        return; // Don't navigate if update fails
+        if (recordsRes.ok) {
+          const recordsData = await recordsRes.json();
+          const records: any[] = recordsData.data || [];
+          await Promise.allSettled(
+            records
+              .filter((r: any) => r.status === 'active' && r.consumption_status !== 'used')
+              .map((r: any) =>
+                fetch(`${API_URL}/material-consumption/${r.id}`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ consumption_status: 'used' }),
+                })
+              )
+          );
+        }
+      } catch (err) {
+        console.warn('Could not update consumption records (non-blocking):', err);
       }
 
-      // CRITICAL VALIDATION: Only allow navigation if status was successfully changed
-      // If there were products to update, they MUST all be updated to 'used' before proceeding
-      if (productsToUpdate.length > 0) {
-        if (!statusUpdateSuccess) {
-          console.error('❌ Status update failed - blocking navigation');
-          toast({
-            title: 'Error: Cannot Proceed',
-            description: 'Failed to update product status from "in_production" to "used". Cannot proceed to individual products stage. Please try again.',
-            variant: 'destructive',
-            duration: 10000,
-          });
-          setUpdatingStatus(false);
-          return; // BLOCK navigation
-        }
-        
-        // Double-check: Verify one more time that all products are now 'used'
-        // Fetch from ALL material products, not just batch product
-        const finalCheck: IndividualProduct[] = [];
-        if (materialProductIds.size > 0) {
-          for (const materialProductId of materialProductIds) {
-            try {
-              const { products } = await IndividualProductService.getIndividualProducts({
-                product_id: materialProductId,
-              });
-              finalCheck.push(...products);
-            } catch (error) {
-              console.error(`❌ Error fetching final check products for material ${materialProductId}:`, error);
-            }
-          }
-        }
-        
-        const stillInProductionFinal = finalCheck.filter((p: IndividualProduct) => 
-          usedProductIds.has(p.id) && p.status === 'in_production'
-        );
-        
-        if (stillInProductionFinal.length > 0) {
-          console.error(`❌ Final check failed: ${stillInProductionFinal.length} products still in "in_production"`);
-          toast({
-            title: 'Error: Status Not Changed',
-            description: `${stillInProductionFinal.length} product(s) are still in "in_production" status. Status was not changed. Cannot proceed.`,
-            variant: 'destructive',
-            duration: 10000,
-          });
-          setUpdatingStatus(false);
-          return; // BLOCK navigation - status was not changed
-        }
-        
-        console.log('✅ Final validation passed: All products are now "used"');
-      }
-
-      // Mark wastage stage and final stage as completed
+      // Mark batch as completed
       const completionDate = new Date().toISOString();
       const completedBy = user?.full_name || user?.email || 'User';
-      console.log('✅ Marking wastage stage and final stage as completed...');
-      try {
-        const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(id!, {
-          status: 'completed',
-          wastage_stage: {
-            status: 'completed',
-            completed_at: completionDate,
-            completed_by: completedBy,
-          },
-          final_stage: {
-            status: 'completed',
-            completed_at: completionDate,
-            completed_by: completedBy,
-          },
-        });
+      const { data: updatedBatch, error: updateError } = await ProductionService.updateBatch(id!, {
+        status: 'completed',
+        wastage_stage: { status: 'completed', completed_at: completionDate, completed_by: completedBy },
+        final_stage: { status: 'completed', completed_at: completionDate, completed_by: completedBy },
+      });
 
-        if (updateError || !updatedBatch) {
-          console.error('❌ Error completing production:', updateError);
-          toast({
-            title: 'Error',
-            description: 'Failed to complete production batch. Please try again.',
-            variant: 'destructive',
-          });
-          setUpdatingStatus(false);
-          return;
-        }
-        console.log('✅ Production batch completed successfully');
-        setBatch((prev) => ({
-          ...prev,
-          ...updatedBatch,
-          // Preserve locally enriched name/details if update response omits them.
-          product_name:
-            updatedBatch.product_name ||
-            prev?.product_name ||
-            product?.name ||
-            updatedBatch.product_id ||
-            'N/A',
-        }) as ProductionBatch);
-        toast({
-          title: 'Success',
-          description: 'Production batch completed successfully.',
-        });
-        setUpdatingStatus(false);
-      } catch (error) {
-        console.error('❌ Error completing production:', error);
+      if (updateError || !updatedBatch) {
         toast({
           title: 'Error',
           description: 'Failed to complete production batch. Please try again.',
           variant: 'destructive',
         });
         setUpdatingStatus(false);
+        return;
       }
+
+      setBatch((prev) => ({
+        ...prev,
+        ...updatedBatch,
+        product_name: updatedBatch.product_name || prev?.product_name || product?.name || updatedBatch.product_id || 'N/A',
+      }) as ProductionBatch);
+
+      toast({ title: 'Production Completed', description: 'Batch marked as completed successfully.' });
+      setUpdatingStatus(false);
     } catch (error) {
-      console.error('❌ Error completing production:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to complete production. Please try again.',
-        variant: 'destructive',
-      });
+      console.error('Error completing production:', error);
+      toast({ title: 'Error', description: 'Failed to complete production. Please try again.', variant: 'destructive' });
     } finally {
       setUpdatingStatus(false);
     }

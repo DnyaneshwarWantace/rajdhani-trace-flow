@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function ManageStock() {
   const { toast } = useToast();
@@ -79,6 +80,7 @@ export default function ManageStock() {
     loadOrders();
   }, [filters]);
 
+
   const loadOrders = async () => {
     try {
       setLoading(true);
@@ -114,6 +116,15 @@ export default function ManageStock() {
       setStatsLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['manage_stock', 'materials', 'suppliers', 'orders'],
+    onRefresh: () => {
+      loadOrders();
+      loadStats();
+    },
+    pollingMs: 6000,
+  });
 
   const handleSearchChange = (value: string) => {
     setFilters({ ...filters, search: value, page: 1 });

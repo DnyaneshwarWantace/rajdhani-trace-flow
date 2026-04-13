@@ -14,6 +14,7 @@ import ProductionStagesDetailed from '@/components/production/detail/ProductionS
 import ProductionIndividualProducts from '@/components/production/detail/ProductionIndividualProducts';
 import ProductionFormDialog from '@/components/production/ProductionFormDialog';
 import type { CreateProductionBatchData} from '@/services/productionService';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function ProductionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -103,6 +104,15 @@ export default function ProductionDetail() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['production', 'orders', 'products', 'individual_products', 'materials'],
+    onRefresh: () => {
+      if (!id) return;
+      loadBatch();
+    },
+    pollingMs: 8000,
+  });
 
   const handleBack = () => {
     navigate('/production');

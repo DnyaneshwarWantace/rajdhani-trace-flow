@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, AlertTriangle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Product, IndividualProduct, IndividualProductFormData } from '@/types/product';
+import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 export default function IndividualProductDetail() {
   const { productId, individualProductId } = useParams<{
@@ -62,6 +63,14 @@ export default function IndividualProductDetail() {
       setLoading(false);
     }
   };
+
+  useLiveSyncRefresh({
+    modules: ['individual_products', 'products', 'production'],
+    onRefresh: () => {
+      loadData();
+    },
+    pollingMs: 8000,
+  });
 
   const handleBack = () => {
     // Check where we came from based on location state
