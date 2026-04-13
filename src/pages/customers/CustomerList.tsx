@@ -13,7 +13,7 @@ import CustomerFilters from '@/components/customers/CustomerFilters';
 import CustomerTable from '@/components/customers/CustomerTable';
 import CustomerGrid from '@/components/customers/CustomerGrid';
 import CustomerEmptyState from '@/components/customers/CustomerEmptyState';
-import { canView, canCreate, canDelete } from '@/utils/permissions';
+import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';

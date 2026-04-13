@@ -287,7 +287,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     });
   };
 
-  const addMaterialDirectly = (material: RecipeMaterial) => {
+  const _addMaterialDirectly = (material: RecipeMaterial) => {
     // Direct add function that bypasses newMaterial state
     // This is used when materials are selected from the dialog
     if (!material.materialId || !material.unit) return;

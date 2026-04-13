@@ -36,7 +36,6 @@ import { MaterialService } from '@/services/materialService';
 import ProductCard from './ProductCard';
 import MaterialCard from '@/components/materials/MaterialCard';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
-import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface SelectedMaterial {
   materialId: string;
@@ -69,7 +68,7 @@ export default function MaterialSelectorDialog({
   isOpen,
   onClose,
   onSelectMultiple,
-  onSelect,
+  onSelect: _onSelect,
   targetProduct,
 }: MaterialSelectorDialogProps) {
   const [selectionStep, setSelectionStep] = useState<SelectionStep>('type');
