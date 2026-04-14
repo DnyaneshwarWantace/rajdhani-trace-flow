@@ -1,12 +1,11 @@
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, RefreshCw, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Trash2, User } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 
 interface IndividualProductsStageHeaderProps {
   batch: ProductionBatch;
   onBack: () => void;
   onProceedToWastage: () => void;
-  onRefresh: () => void;
   canProceed?: boolean;
 }
 
@@ -14,7 +13,6 @@ export default function IndividualProductsStageHeader({
   batch,
   onBack,
   onProceedToWastage,
-  onRefresh,
   canProceed = false,
 }: IndividualProductsStageHeaderProps) {
   const assignedName = batch.current_stage_assigned_to_name || batch.assigned_to_name;
@@ -41,15 +39,6 @@ export default function IndividualProductsStageHeader({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </Button>
         <Button
           onClick={onProceedToWastage}
           size="lg"

@@ -33,7 +33,6 @@ export default function ProductionIndividualProducts() {
   const [wasteItems, setWasteItems] = useState<WasteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [canProceedFromTable, setCanProceedFromTable] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const [, setCreatedProductsCount] = useState(0);
   const [locationFilter, setLocationFilter] = useState<string[]>([]);
   const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
@@ -42,7 +41,7 @@ export default function ProductionIndividualProducts() {
     if (id) {
       loadData();
     }
-  }, [id, refreshKey]);
+  }, [id]);
 
   useEffect(() => {
     DropdownService.getDropdownsByCategory('storage_location')
@@ -221,10 +220,6 @@ export default function ProductionIndividualProducts() {
     }
   };
 
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
-  };
-
   const refetchIndividualProducts = async (): Promise<IndividualProduct[]> => {
     if (!batch?.product_id) return individualProducts;
     try {
@@ -342,7 +337,6 @@ export default function ProductionIndividualProducts() {
             }
           }}
           onProceedToWastage={handleProceedToWastage}
-          onRefresh={handleRefresh}
           canProceed={canProceed}
         />
 

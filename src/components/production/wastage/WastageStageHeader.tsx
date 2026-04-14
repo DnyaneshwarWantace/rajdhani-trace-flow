@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, CheckCircle, RefreshCw, User, UserPlus } from 'lucide-react';
+import { ArrowLeft, CheckCircle, User, UserPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,6 @@ interface WastageStageHeaderProps {
   batch: ProductionBatch;
   onBack: () => void;
   onCompleteProduction: () => Promise<void>;
-  onRefresh: () => void;
   onAssignAfterComplete?: (
     userId: string,
     userName: string,
@@ -45,7 +44,6 @@ export default function WastageStageHeader({
   batch,
   onBack,
   onCompleteProduction,
-  onRefresh,
   onAssignAfterComplete,
   onDoneAfterComplete,
   nextStageTasks = [],
@@ -102,16 +100,6 @@ export default function WastageStageHeader({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            className="flex items-center gap-2"
-            disabled={isDisabled}
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
-          </Button>
           <Button
             onClick={handleComplete}
             size="lg"

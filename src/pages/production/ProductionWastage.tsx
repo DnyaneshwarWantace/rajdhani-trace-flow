@@ -636,7 +636,6 @@ export default function ProductionWastage() {
             else navigate('/production');
           }}
           onCompleteProduction={handleCompleteProduction}
-          onRefresh={handleRefresh}
           onAssignAfterComplete={async (userId, userName, selectedTasks) => {
             if (!selectedTasks || selectedTasks.length === 0) {
               throw new Error('No next-stage order tasks found to assign');
