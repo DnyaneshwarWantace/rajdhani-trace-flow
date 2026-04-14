@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import {
   Loader2, Search, CheckCircle2, Factory,
   AlertTriangle, CheckCircle, XCircle, Layers,
-  UserPlus, X, ArrowDown, Archive
+  UserPlus, X, ArrowDown, Archive, ShoppingCart
 } from 'lucide-react';
 import { UserService } from '@/services/userService';
 import { PermissionService } from '@/services/permissionService';
@@ -12,6 +12,7 @@ import { RecipeService } from '@/services/recipeService';
 import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { ProductionService } from '@/services/productionService';
+import { OrderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import type { User as UserType } from '@/types/auth';
 import type { Order, OrderItem } from '@/services/orderService';
@@ -160,6 +161,10 @@ export default function SendToProductionModal({
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [assignments, setAssignments] = useState<Record<string, ProductAssignment & { picking: boolean; search: string }>>({});
   const [submitting, setSubmitting] = useState(false);
+  // Raw material ordering: materialId → { ordering, pickingUser, search, assignedUser }
+  const [matOrderState, setMatOrderState] = useState<Record<string, {
+    ordering: boolean; pickingUser: boolean; search: string; assignedUser: UserType | null;
+  }>>({});
   const assignmentStorageKey = `production_task_assignments:${order.id}:${productItem.productId}`;
 
   useEffect(() => {
@@ -490,6 +495,36 @@ export default function SendToProductionModal({
     }
   };
 
+  const handleOrderRawMaterial = async (mat: MaterialWithStock) => {
+    const state = matOrderState[mat.material_id];
+    setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], ordering: true } }));
+    try {
+      const result = await OrderService.createMaterialProcurementTask(order.id, {
+        material_id: mat.material_id,
+        assigned_to_id: state?.assignedUser?.id,
+      });
+      if (!result.success) {
+        toast({ title: 'Error', description: result.error || 'Failed to create task', variant: 'destructive' });
+        return;
+      }
+      toast({
+        title: 'Raw Material Task Created',
+        description: state?.assignedUser
+          ? `${mat.material_name} ordering assigned to ${state.assignedUser.full_name}`
+          : `${mat.material_name} ordering task sent to all eligible users`,
+      });
+      setMatOrderState(prev => {
+        const n = { ...prev };
+        delete n[mat.material_id];
+        return n;
+      });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to create task', variant: 'destructive' });
+    } finally {
+      setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], ordering: false } }));
+    }
+  };
+
   const getStockChip = (mat: MaterialWithStock) => {
     const qty = mat.available_stock ?? mat.stock ?? 0;
     if (mat.stockStatus === 'available') return (
@@ -674,29 +709,107 @@ export default function SendToProductionModal({
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Materials needed</p>
                 <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
-                  {node.materials.map((mat, i) => (
-                    <div key={mat.id} className={`flex items-center justify-between gap-4 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {mat.material_type === 'product' ? (
-                          <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                            <Layers className="w-3.5 h-3.5 text-purple-600" />
-                          </div>
-                        ) : (
-                          <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                            <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">
-                            Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm} {mat.unit}/sqm</span>
-                            {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
+                  {node.materials.map((mat, i) => {
+                    const isOutRaw = mat.stockStatus === 'out' && mat.material_type === 'raw_material';
+                    const mos = matOrderState[mat.material_id];
+                    return (
+                    <div key={mat.id} className={`flex flex-col gap-2 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {mat.material_type === 'product' ? (
+                            <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                              <Layers className="w-3.5 h-3.5 text-purple-600" />
+                            </div>
+                          ) : (
+                            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                              <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm} {mat.unit}/sqm</span>
+                              {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
+                            </div>
                           </div>
                         </div>
+                        {getStockChip(mat)}
                       </div>
-                      {getStockChip(mat)}
+
+                      {/* Order raw material section */}
+                      {isOutRaw && (
+                        <div className="ml-9 rounded-lg border border-dashed border-red-200 bg-red-50 p-3">
+                          {mos?.assignedUser ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center text-xs font-bold text-white">
+                                  {mos.assignedUser.full_name?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <span className="text-xs font-medium text-red-800">{mos.assignedUser.full_name}</span>
+                                <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], assignedUser: null } }))} className="text-gray-400 hover:text-red-500">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                                <Button size="sm" variant="destructive" className="h-7 text-xs gap-1" disabled={mos?.ordering} onClick={() => handleOrderRawMaterial(mat)}>
+                                  {mos?.ordering ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShoppingCart className="w-3 h-3" />}
+                                  Order
+                                </Button>
+                              </div>
+                            </div>
+                          ) : mos?.pickingUser ? (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2 bg-white rounded border border-gray-200 px-2 py-1.5">
+                                <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                <input
+                                  className="flex-1 text-xs outline-none placeholder:text-gray-400"
+                                  placeholder="Search user..."
+                                  value={mos.search}
+                                  onChange={e => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], search: e.target.value } }))}
+                                  autoFocus
+                                />
+                                <button onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], pickingUser: false, search: '' } }))}>
+                                  <X className="w-3.5 h-3.5 text-gray-400" />
+                                </button>
+                              </div>
+                              <div className="max-h-32 overflow-y-auto space-y-0.5">
+                                {users.filter(u => {
+                                  const q = (mos.search || '').toLowerCase();
+                                  return !q || u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
+                                }).map(u => (
+                                  <button key={u.id} className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white text-left text-xs"
+                                    onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], assignedUser: u, pickingUser: false, search: '' } }))}>
+                                    <div className="w-5 h-5 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                                      {u.full_name?.charAt(0)?.toUpperCase() || '?'}
+                                    </div>
+                                    <span className="font-medium text-gray-800">{u.full_name}</span>
+                                    <span className="text-gray-400">{u.role}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-red-700">Out of stock — assign someone to order it</p>
+                              <div className="flex items-center gap-1.5">
+                                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-red-200 text-red-700 hover:bg-red-100"
+                                  onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ordering: false, pickingUser: true, search: '', assignedUser: null, ...prev[mat.material_id] } }))}>
+                                  <UserPlus className="w-3 h-3" />
+                                  Assign
+                                </Button>
+                                <Button size="sm" variant="destructive" className="h-7 text-xs gap-1" disabled={mos?.ordering} onClick={() => handleOrderRawMaterial(mat)}>
+                                  {mos?.ordering ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShoppingCart className="w-3 h-3" />}
+                                  Order (All)
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
