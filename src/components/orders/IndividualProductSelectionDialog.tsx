@@ -172,10 +172,10 @@ export function IndividualProductSelectionDialog({
   const handleToggleProduct = (product: any) => {
     const isSelected = selectedProducts.some(p => p.id === product.id);
     if (isSelected) {
-      // Always allow deselection
       setSelectedProducts(selectedProducts.filter(p => p.id !== product.id));
     } else {
-      // Allow selection even if at limit (user can swap products)
+      // Block selecting more than required quantity
+      if (selectedProducts.length >= (orderItem?.quantity || 0)) return;
       setSelectedProducts([...selectedProducts, product]);
     }
   };
@@ -409,48 +409,26 @@ export function IndividualProductSelectionDialog({
           )}
         </div>
 
-        <DialogFooter className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {selectionComplete && (
-              <Badge variant="default" className="bg-green-600 text-white">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Complete Selection
-              </Badge>
-            )}
+        <div className="border-t bg-white px-6 py-3 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-gray-500">Required: <strong>{requiredQuantity}</strong></span>
+            <span className={`font-semibold ${selectionComplete ? 'text-green-600' : selectedProducts.length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+              Selected: {selectedProducts.length}
+            </span>
+            {selectionComplete && <Badge className="bg-green-600 text-white text-xs"><CheckCircle className="w-3 h-3 mr-1" />Complete</Badge>}
             {selectedProducts.length > 0 && selectedProducts.length < requiredQuantity && (
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300">
-                Partial: {selectedProducts.length}/{requiredQuantity}
-              </Badge>
-            )}
-            {selectedProducts.length > requiredQuantity && (
-              <Badge variant="destructive">
-                <AlertTriangle className="w-3 h-3 mr-1" />
-                {selectedProducts.length - requiredQuantity} too many
-              </Badge>
-            )}
-            {selectedProducts.length < requiredQuantity && selectedProducts.length > 0 && (
-              <span className="text-sm text-gray-600">
-                ({requiredQuantity - selectedProducts.length} more needed for full order)
-              </span>
+              <span className="text-amber-600 text-xs">{requiredQuantity - selectedProducts.length} more needed</span>
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleAutoSelect} disabled={loading || saving}>
-              Auto Select
-            </Button>
-            <Button variant="outline" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={selectedProducts.length === 0 || selectedProducts.length > requiredQuantity || saving}
-              className="text-white"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Save Selection ({selectedProducts.length})
+            <Button variant="outline" size="sm" onClick={handleAutoSelect} disabled={loading || saving}>Auto Select</Button>
+            <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={selectedProducts.length === 0 || selectedProducts.length > requiredQuantity || saving} className="bg-green-600 hover:bg-green-700 text-white">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+              Confirm ({selectedProducts.length}/{requiredQuantity})
             </Button>
           </div>
-        </DialogFooter>
+        </div>
       </DialogContent>
 
       {/* QR Code Display Dialog */}

@@ -400,8 +400,8 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           );
                         } else {
                           return (
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2" title="Select Individual Products">
-                              <Edit className="w-3 h-3 mr-1" />Select
+                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 text-xs px-2 border-gray-300" title="Select Individual Products">
+                              <Edit className="w-3 h-3 mr-1" />Select Rolls
                             </Button>
                           );
                         }
