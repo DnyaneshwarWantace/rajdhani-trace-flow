@@ -341,18 +341,14 @@ export default function ProductionTable({
                     </Badge>
                   </div>
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                <td className="px-4 py-2 whitespace-nowrap text-xs">
                   {batch.completion_date ? (
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-0.5">
                       {batch.status === 'completed' ? (
                         <>
-                          <div className="text-gray-500">
-                            <span className="text-xs">Expected:</span> {formatDate(batch.completion_date)}
-                          </div>
+                          <div className="text-gray-400">Exp: {formatDate(batch.completion_date)}</div>
                           {batch.final_stage?.completed_at && (
-                            <div className="text-gray-900 font-medium">
-                              <span className="text-xs">Actual:</span> {formatDate(batch.final_stage.completed_at)}
-                            </div>
+                            <div className="text-gray-900 font-medium">Act: {formatDate(batch.final_stage.completed_at)}</div>
                           )}
                         </>
                       ) : (
