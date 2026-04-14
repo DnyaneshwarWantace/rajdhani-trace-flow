@@ -53,7 +53,7 @@ export async function uploadImageToR2(
       if (response.status === 401) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        window.location.href = '/v2/login';
+        window.location.href = '/login';
         return { url: '', key: '', error: 'Authentication expired' };
       }
 
@@ -126,7 +126,7 @@ export async function deleteImageFromR2(imageUrl: string): Promise<{ success: bo
       if (response.status === 401) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
-        window.location.href = '/v2/login';
+        window.location.href = '/login';
         return { success: false, error: 'Authentication expired' };
       }
 

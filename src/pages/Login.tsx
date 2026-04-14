@@ -83,7 +83,7 @@ const CSS = `
     content: '';
     position: absolute;
     inset: 0;
-    background: url('/v2/login-bg.jpg') center/cover;
+    background: url('/login-bg.jpg') center/cover;
     filter: brightness(0.4) saturate(1.2);
     opacity: 0.15;
   }
