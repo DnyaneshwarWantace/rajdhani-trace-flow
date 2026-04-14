@@ -257,7 +257,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[22%] min-w-[220px]">
                 Date
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[200px] min-w-[200px]">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[260px] min-w-[260px]">
                 Actions
               </th>
             </tr>
@@ -366,7 +366,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 w-[220px] min-w-[220px]">
+                  <td className="px-4 py-2 w-[260px] min-w-[260px]">
                     <div className="flex items-center justify-end gap-1 flex-nowrap">
                       {/* Slot 1: Accept — always takes space */}
                       {order.status === 'pending' ? (
@@ -376,12 +376,20 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       ) : (
                         <div className="h-7 w-[68px] shrink-0" />
                       )}
-                      {/* Slot 2: Produce / Ship / Select Rolls / Deliver — always takes space */}
+                      {/* Slot 2: Produce button */}
                       {canShowProduceButton ? (
                         <Button size="sm" onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }} disabled={!!orderResponsibleUsers[order.id]} className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2">
                           <Factory className="w-3 h-3 mr-1" />{producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
                         </Button>
-                      ) : order.status === 'accepted' ? (() => {
+                      ) : order.status === 'dispatched' ? (
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'delivered'); }} className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white px-2">
+                          <CheckCircle className="w-3 h-3 mr-1" />Deliver
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-[60px] shrink-0" />
+                      )}
+                      {/* Slot 3: Ship or Select Rolls for accepted orders */}
+                      {order.status === 'accepted' ? (() => {
                         const hasProductItems = order.items?.some(item => item.productType === 'product');
                         const allProductsHaveIndividuals = order.items?.filter(item => item.productType === 'product').every(item => item.selectedProducts && item.selectedProducts.length > 0);
                         return (!hasProductItems || allProductsHaveIndividuals) ? (
@@ -393,11 +401,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                             <Edit className="w-3 h-3 mr-1" />Select Rolls
                           </Button>
                         );
-                      })() : order.status === 'dispatched' ? (
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'delivered'); }} className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white px-2">
-                          <CheckCircle className="w-3 h-3 mr-1" />Deliver
-                        </Button>
-                      ) : (
+                      })() : (
                         <div className="h-7 w-[60px] shrink-0" />
                       )}
                       {/* Slot 3: Info — always takes space */}
