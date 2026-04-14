@@ -295,11 +295,9 @@ export default function ProductionTable({
                     {batch.batch_number}
                   </div>
                 </td>
-                <td className="px-4 py-2 max-w-[160px]">
-                  <TruncatedText text={batch.product_name || 'N/A'} maxLength={25} className="text-sm text-gray-900" />
-                  <div className="text-[11px] text-gray-500 mt-0.5 truncate">
-                    <TruncatedText text={`${batch.final_target_display || batch.product_name || 'Product'} (${batch.planned_quantity})`} maxLength={30} as="span" />
-                  </div>
+                <td className="px-4 py-2 max-w-[150px]">
+                  <div className="text-sm text-gray-900 truncate"><TruncatedText text={batch.product_name || 'N/A'} maxLength={20} as="span" /></div>
+                  <div className="text-[11px] text-gray-500 mt-0.5 truncate"><TruncatedText text={`${batch.final_target_display || batch.product_name || 'Product'} (${batch.planned_quantity})`} maxLength={25} as="span" /></div>
                 </td>
                 <td className="px-4 py-2 max-w-[130px]">
                   {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
