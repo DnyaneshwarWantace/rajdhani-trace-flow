@@ -301,7 +301,7 @@ export default function ProductionTable({
                     <TruncatedText text={`${batch.final_target_display || batch.product_name || 'Product'} (${batch.planned_quantity})`} maxLength={30} as="span" />
                   </div>
                 </td>
-                <td className="px-4 py-2 max-w-[140px]">
+                <td className="px-4 py-2 max-w-[130px]">
                   {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
                     <div className="space-y-0.5">
                       {(() => {
@@ -315,19 +315,19 @@ export default function ProductionTable({
                           'Customer not linked';
                         return (
                           <>
-                            <div className="text-xs font-medium text-gray-900">{primaryOrder}</div>
-                            <div className="text-xs text-gray-600">{primaryCustomer}</div>
+                            <div className="text-xs font-medium text-gray-900 truncate">{primaryOrder}</div>
+                            <div className="text-xs text-gray-600 truncate">{primaryCustomer}</div>
                           </>
                         );
                       })()}
                       {getAttachedOrderNumbers(batch.notes).length > 1 && (
-                        <div className="text-[11px] text-indigo-700">
-                          +{getAttachedOrderNumbers(batch.notes).length - 1} more attached order(s)
+                        <div className="text-[11px] text-indigo-700 truncate">
+                          +{getAttachedOrderNumbers(batch.notes).length - 1} more
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-400">No order linked</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">No order</span>
                   )}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900" data-quantity={batch.planned_quantity}>
