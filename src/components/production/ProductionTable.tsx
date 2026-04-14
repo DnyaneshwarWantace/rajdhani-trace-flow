@@ -202,7 +202,7 @@ export default function ProductionTable({
       return (
         <Button variant="outline" size="sm" className="text-xs py-1 h-7 bg-purple-50 border-purple-300 text-purple-700" onClick={(e) => handleStageClick(e, batch)}>
           <Package className="w-3 h-3 mr-1" />
-          Individual Products
+          Ind. Products
         </Button>
       );
     }
