@@ -794,7 +794,7 @@ export default function SendToProductionModal({
                               <p className="text-xs text-red-700">Out of stock — assign someone to order it</p>
                               <div className="flex items-center gap-1.5">
                                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-red-200 text-red-700 hover:bg-red-100"
-                                  onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ordering: false, pickingUser: true, search: '', assignedUser: null, ...prev[mat.material_id] } }))}>
+                                  onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], ordering: false, pickingUser: true, search: '', assignedUser: null } }))}>
                                   <UserPlus className="w-3 h-3" />
                                   Assign
                                 </Button>
