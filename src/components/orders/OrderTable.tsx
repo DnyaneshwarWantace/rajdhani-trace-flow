@@ -366,13 +366,17 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 w-[200px] min-w-[200px]">
+                  <td className="px-4 py-2 w-[220px] min-w-[220px]">
                     <div className="flex items-center justify-end gap-1 flex-nowrap">
-                      {/* Slot 1: Accept (pending) or invisible spacer */}
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className={`h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 ${order.status !== 'pending' ? 'invisible pointer-events-none' : ''}`}>
-                        <CheckCircle className="w-3 h-3 mr-1" />Accept
-                      </Button>
-                      {/* Slot 2: Produce / Ship / Deliver / invisible spacer */}
+                      {/* Slot 1: Accept — always takes space */}
+                      {order.status === 'pending' ? (
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
+                          <CheckCircle className="w-3 h-3 mr-1" />Accept
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-[68px] shrink-0" />
+                      )}
+                      {/* Slot 2: Produce / Ship / Select Rolls / Deliver — always takes space */}
                       {canShowProduceButton ? (
                         <Button size="sm" onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }} disabled={!!orderResponsibleUsers[order.id]} className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2">
                           <Factory className="w-3 h-3 mr-1" />{producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
@@ -394,14 +398,18 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           <CheckCircle className="w-3 h-3 mr-1" />Deliver
                         </Button>
                       ) : (
-                        <div className="h-7 w-16 invisible" />
+                        <div className="h-7 w-[60px] shrink-0" />
                       )}
-                      {/* Slot 3: Info icon or invisible spacer */}
-                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className={`h-7 w-7 p-0 ${!firstProductItem?.productId ? 'invisible pointer-events-none' : ''}`} title="Production Info">
-                        <Info className="w-3.5 h-3.5" />
-                      </Button>
-                      {/* Slot 4: View */}
-                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0" title="View details">
+                      {/* Slot 3: Info — always takes space */}
+                      {firstProductItem?.productId ? (
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0 shrink-0" title="Production Info">
+                          <Info className="w-3.5 h-3.5" />
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-7 shrink-0" />
+                      )}
+                      {/* Slot 4: View — always visible */}
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0 shrink-0" title="View details">
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
                     </div>
