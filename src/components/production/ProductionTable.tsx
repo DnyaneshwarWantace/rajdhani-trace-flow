@@ -288,7 +288,7 @@ export default function ProductionTable({
               <tr
                 key={batch.id}
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={() => onView(batch)}
+                onClick={(e) => handleStageClick(e, batch)}
               >
                 <td className="px-4 py-2">
                   <div className="text-sm font-medium text-gray-900 whitespace-nowrap">
@@ -407,11 +407,10 @@ export default function ProductionTable({
                         variant="ghost"
                         size="sm"
                         onClick={() => onDelete(batch)}
-                        className="text-red-600 hover:text-red-900 hover:bg-red-50"
+                        className="text-red-600 hover:text-red-900 hover:bg-red-50 h-7 w-7 p-0"
                         title="Cancel Production"
                       >
-                        <X className="w-4 h-4 mr-1" />
-                        Cancel
+                        <X className="w-4 h-4" />
                       </Button>
                     )}
                   </div>

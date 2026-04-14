@@ -428,20 +428,18 @@ export default function OrderItemForm({
                 }
 
                 const parsed = parseFloat(current);
-                if (isNaN(parsed) || parsed <= 0) {
+                if (isNaN(parsed) || parsed < 0) {
                   setGstInputValue('0');
                   onUpdate(item.id, 'gst_rate', 0);
                   onUpdate(item.id, 'gst_included', false);
                   return;
                 }
 
-                const clamped = Math.max(5, Math.min(18, parsed));
+                // Clamp to max 18 only, allow any value >= 0 (min 5 enforced only when > 0)
+                const clamped = Math.min(18, parsed);
                 onUpdate(item.id, 'gst_rate', clamped);
-                onUpdate(item.id, 'gst_included', true);
+                onUpdate(item.id, 'gst_included', clamped > 0);
                 setGstInputValue(String(clamped));
-                if (clamped !== parsed) {
-                  e.target.value = String(clamped);
-                }
               }}
               min="0"
               max="18"

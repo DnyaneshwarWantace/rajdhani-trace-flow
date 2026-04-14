@@ -39,14 +39,10 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
       setLoading(true);
       const { products } = await IndividualProductService.getIndividualProducts({
         product_id: batch.product_id,
+        batch_number: batch.batch_number,
+        limit: 500,
       });
-
-      // Filter by batch_number to show only products created in this batch
-      const batchProducts = products.filter((p: IndividualProduct) => 
-        p.batch_number === batch.id || p.batch_number === batch.batch_number
-      );
-
-      setIndividualProducts(batchProducts);
+      setIndividualProducts(products || []);
     } catch (error) {
       console.error('Error loading individual products:', error);
       setIndividualProducts([]);
