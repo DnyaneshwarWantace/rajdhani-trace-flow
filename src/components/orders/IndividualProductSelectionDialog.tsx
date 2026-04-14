@@ -3,7 +3,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -12,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { QrCode, Package, Loader2, CheckCircle, AlertTriangle, Search } from 'lucide-react';
+import { QrCode, Package, Loader2, CheckCircle, Search } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 
