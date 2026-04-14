@@ -368,54 +368,39 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                   </td>
                   <td className="px-4 py-2 w-[200px] min-w-[200px]">
                     <div className="flex items-center justify-end gap-1 flex-nowrap">
-                      {order.status === 'pending' && (
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
-                          <CheckCircle className="w-3 h-3 mr-1" />Accept
+                      {/* Slot 1: Accept (pending) or invisible spacer */}
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className={`h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 ${order.status !== 'pending' ? 'invisible pointer-events-none' : ''}`}>
+                        <CheckCircle className="w-3 h-3 mr-1" />Accept
+                      </Button>
+                      {/* Slot 2: Produce / Ship / Deliver / invisible spacer */}
+                      {canShowProduceButton ? (
+                        <Button size="sm" onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }} disabled={!!orderResponsibleUsers[order.id]} className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2">
+                          <Factory className="w-3 h-3 mr-1" />{producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
                         </Button>
-                      )}
-                      {canShowProduceButton && (
-                        <Button size="sm"
-                          onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }}
-                          disabled={!!orderResponsibleUsers[order.id]}
-                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2"
-                          title={orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
-                        >
-                          <Factory className="w-3 h-3 mr-1" />
-                          {producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
-                        </Button>
-                      )}
-                      {!!firstProductItem?.productId && (
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0" title="Production Info">
-                          <Info className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                      {order.status === 'accepted' && (() => {
+                      ) : order.status === 'accepted' ? (() => {
                         const hasProductItems = order.items?.some(item => item.productType === 'product');
                         const allProductsHaveIndividuals = order.items?.filter(item => item.productType === 'product').every(item => item.selectedProducts && item.selectedProducts.length > 0);
-                        if (!hasProductItems || allProductsHaveIndividuals) {
-                          return (
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'dispatched'); }} className="h-7 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">
-                              <Package className="w-3 h-3 mr-1" />Ship
-                            </Button>
-                          );
-                        } else {
-                          return (
-                            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 text-xs px-2 border-gray-300" title="Select Individual Products">
-                              <Edit className="w-3 h-3 mr-1" />Select Rolls
-                            </Button>
-                          );
-                        }
-                      })()}
-                      {order.status === 'dispatched' && (
+                        return (!hasProductItems || allProductsHaveIndividuals) ? (
+                          <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'dispatched'); }} className="h-7 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">
+                            <Package className="w-3 h-3 mr-1" />Ship
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 text-xs px-2 border-gray-300">
+                            <Edit className="w-3 h-3 mr-1" />Select Rolls
+                          </Button>
+                        );
+                      })() : order.status === 'dispatched' ? (
                         <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'delivered'); }} className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white px-2">
                           <CheckCircle className="w-3 h-3 mr-1" />Deliver
                         </Button>
+                      ) : (
+                        <div className="h-7 w-16 invisible" />
                       )}
-                      {(order.status === 'pending' || order.status === 'accepted') && order.items?.some((item) => item.productType === 'raw_material') && (
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (pendingRawItems.length > 1) { setPickRawMaterialOrder(order); } else { setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null); setMaterialTaskOrder(order); } }} disabled={!hasRawNotStarted} className="h-7 text-xs px-2" title={hasRawNotStarted ? 'Order Stock' : 'Stock Task Active'}>
-                          <ShoppingCart className="w-3 h-3" />
-                        </Button>
-                      )}
+                      {/* Slot 3: Info icon or invisible spacer */}
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className={`h-7 w-7 p-0 ${!firstProductItem?.productId ? 'invisible pointer-events-none' : ''}`} title="Production Info">
+                        <Info className="w-3.5 h-3.5" />
+                      </Button>
+                      {/* Slot 4: View */}
                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0" title="View details">
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
