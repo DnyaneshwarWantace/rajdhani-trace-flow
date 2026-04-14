@@ -369,13 +369,9 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                   <td className="px-4 py-2 w-[260px] min-w-[260px]">
                     <div className="flex items-center justify-end gap-1 flex-nowrap">
                       {/* Slot 1: Accept — always takes space */}
-                      {order.status === 'pending' ? (
-                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
-                          <CheckCircle className="w-3 h-3 mr-1" />Accept
-                        </Button>
-                      ) : (
-                        <div className="h-7 w-[68px] shrink-0" />
-                      )}
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className={`h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 ${order.status !== 'pending' ? 'invisible pointer-events-none' : ''}`}>
+                        <CheckCircle className="w-3 h-3 mr-1" />Accept
+                      </Button>
                       {/* Slot 2: Produce button */}
                       {canShowProduceButton ? (
                         <Button size="sm" onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }} disabled={!!orderResponsibleUsers[order.id]} className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2">
@@ -386,9 +382,11 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           <CheckCircle className="w-3 h-3 mr-1" />Deliver
                         </Button>
                       ) : (
-                        <div className="h-7 w-[60px] shrink-0" />
+                        <Button size="sm" className="h-7 text-xs bg-indigo-600 text-white px-2 invisible pointer-events-none">
+                          <Factory className="w-3 h-3 mr-1" />Produce
+                        </Button>
                       )}
-                      {/* Slot 3: Ship or Select Rolls for accepted orders */}
+                      {/* Slot 3: Ship or Select Rolls for accepted orders — always takes space */}
                       {order.status === 'accepted' ? (() => {
                         const hasProductItems = order.items?.some(item => item.productType === 'product');
                         const allProductsHaveIndividuals = order.items?.filter(item => item.productType === 'product').every(item => item.selectedProducts && item.selectedProducts.length > 0);
@@ -402,16 +400,14 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           </Button>
                         );
                       })() : (
-                        <div className="h-7 w-[60px] shrink-0" />
-                      )}
-                      {/* Slot 3: Info — always takes space */}
-                      {firstProductItem?.productId ? (
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0 shrink-0" title="Production Info">
-                          <Info className="w-3.5 h-3.5" />
+                        <Button size="sm" className="h-7 text-xs bg-orange-600 text-white px-2 invisible pointer-events-none">
+                          <Package className="w-3 h-3 mr-1" />Ship
                         </Button>
-                      ) : (
-                        <div className="h-7 w-7 shrink-0" />
                       )}
+                      {/* Slot 4: Info — always takes space */}
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className={`h-7 w-7 p-0 shrink-0 ${!firstProductItem?.productId ? 'invisible pointer-events-none' : ''}`} title="Production Info">
+                        <Info className="w-3.5 h-3.5" />
+                      </Button>
                       {/* Slot 4: View — always visible */}
                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0 shrink-0" title="View details">
                         <Eye className="w-3.5 h-3.5" />
