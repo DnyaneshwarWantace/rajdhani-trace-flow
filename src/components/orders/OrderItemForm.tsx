@@ -55,6 +55,7 @@ export default function OrderItemForm({
 
   // State for individual product count
   const [individualProductCount, setIndividualProductCount] = useState<number | null>(null);
+  const [gstInputValue, setGstInputValue] = useState<string>('');
   
   // State for tracking touched fields for validation
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
@@ -63,6 +64,14 @@ export default function OrderItemForm({
   useEffect(() => {
     setTouchedFields(new Set());
   }, [item.id]);
+
+  useEffect(() => {
+    if (item.gst_rate === undefined || item.gst_rate === null) {
+      setGstInputValue('');
+      return;
+    }
+    setGstInputValue(String(item.gst_rate));
+  }, [item.gst_rate, item.id]);
 
   // Load individual products count if product has individual tracking
   useEffect(() => {
@@ -391,43 +400,50 @@ export default function OrderItemForm({
             <Label>GST Rate (%)</Label>
             <Input
               type="number"
-              value={item.gst_rate !== undefined && item.gst_rate !== null ? item.gst_rate : ''}
+              value={gstInputValue}
               onChange={e => {
-                const validation = validateNumberInput(e.target.value, ValidationPresets.PERCENTAGE);
+                const rawValue = e.target.value;
+                const validation = validateNumberInput(rawValue, ValidationPresets.PERCENTAGE);
                 const inputValue = validation.value;
+                setGstInputValue(inputValue);
 
-                if (inputValue === '') {
+                if (inputValue === '' || inputValue === '.') {
                   onUpdate(item.id, 'gst_rate', undefined);
-                  onUpdate(item.id, 'gst_included', false);
                   return;
                 }
 
                 const numValue = parseFloat(inputValue);
                 if (!isNaN(numValue)) {
-                  if (numValue < 5) {
-                    onUpdate(item.id, 'gst_rate', 0);
-                    onUpdate(item.id, 'gst_included', false);
-                    return;
-                  }
-                  if (numValue > 18) {
-                    onUpdate(item.id, 'gst_rate', 18);
-                    onUpdate(item.id, 'gst_included', true);
-                    return;
-                  }
-
                   onUpdate(item.id, 'gst_rate', numValue);
-                  if (numValue >= 5 && numValue <= 18) {
-                    onUpdate(item.id, 'gst_included', true);
-                  }
+                  onUpdate(item.id, 'gst_included', numValue > 0);
                 }
               }}
               onBlur={e => {
-                if (e.target.value === '' && (item.gst_rate === undefined || item.gst_rate === null)) {
+                const current = e.target.value.trim();
+                if (current === '') {
+                  setGstInputValue('0');
                   onUpdate(item.id, 'gst_rate', 0);
                   onUpdate(item.id, 'gst_included', false);
+                  return;
+                }
+
+                const parsed = parseFloat(current);
+                if (isNaN(parsed) || parsed <= 0) {
+                  setGstInputValue('0');
+                  onUpdate(item.id, 'gst_rate', 0);
+                  onUpdate(item.id, 'gst_included', false);
+                  return;
+                }
+
+                const clamped = Math.max(5, Math.min(18, parsed));
+                onUpdate(item.id, 'gst_rate', clamped);
+                onUpdate(item.id, 'gst_included', true);
+                setGstInputValue(String(clamped));
+                if (clamped !== parsed) {
+                  e.target.value = String(clamped);
                 }
               }}
-              min="5"
+              min="0"
               max="18"
               step="0.01"
               placeholder={item.gst_included ? '5-18' : '0'}
