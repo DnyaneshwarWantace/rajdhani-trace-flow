@@ -159,13 +159,24 @@ export default function ProductionTable({
     return 'planning';
   };
 
+  const handleRowClick = (batch: ProductionBatch) => {
+    const stage = getCurrentStage(batch);
+    if (stage === 'completed' || stage === 'cancelled') {
+      onView(batch);
+    } else if (stage === 'planning') {
+      navigate(`/production/planning?batchId=${batch.id}`);
+    } else if (stage === 'machine') {
+      navigate(`/production/${batch.id}/machine`);
+    } else if (stage === 'wastage') {
+      navigate(`/production/${batch.id}/wastage`);
+    } else if (stage === 'individual_products') {
+      navigate(`/production/${batch.id}/individual-products`);
+    }
+  };
+
   const handleStageClick = (e: React.MouseEvent, batch: ProductionBatch) => {
     e.stopPropagation();
-    const stage = getCurrentStage(batch);
-    if (stage === 'planning') navigate(`/production/planning?batchId=${batch.id}`);
-    else if (stage === 'machine') navigate(`/production/${batch.id}/machine`);
-    else if (stage === 'wastage') navigate(`/production/${batch.id}/wastage`);
-    else if (stage === 'individual_products') navigate(`/production/${batch.id}/individual-products`);
+    handleRowClick(batch);
   };
 
   const getStageButton = (batch: ProductionBatch) => {
@@ -288,7 +299,7 @@ export default function ProductionTable({
               <tr
                 key={batch.id}
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
-                onClick={(e) => handleStageClick(e, batch)}
+                onClick={() => handleRowClick(batch)}
               >
                 <td className="px-4 py-2">
                   <div className="text-sm font-medium text-gray-900 whitespace-nowrap">
