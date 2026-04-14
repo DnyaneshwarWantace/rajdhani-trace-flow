@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, FileText } from 'lucide-react';
-import AssignUserModal from '@/components/production/AssignUserModal';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,7 +32,6 @@ export default function MachineStage() {
   const [isMachineCompleted, setIsMachineCompleted] = useState(false);
   const [machineStageRemark, setMachineStageRemark] = useState('');
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
   const actorName = (() => {
     try {
       const raw = localStorage.getItem('user');
@@ -439,7 +437,6 @@ export default function MachineStage() {
           }}
           onWastage={handleNavigateToWastage}
           onRefresh={handleRefresh}
-          onAssign={() => setShowAssignModal(true)}
           shift={machineShift}
           wastageDisabled={!isMachineCompleted}
         />
@@ -516,25 +513,6 @@ export default function MachineStage() {
         </div>
       </div>
 
-      {/* Assign to Next Person Modal */}
-      <AssignUserModal
-        open={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Forward Machine Stage"
-        description="Select a user to forward this machine operations stage work to."
-        confirmLabel="Forward"
-        onAssign={async (userId, userName) => {
-          const { error } = await ProductionService.assignStage(batch.id, 'machine', userId, userName);
-          if (error) throw new Error(error);
-          setBatch(prev => prev ? {
-            ...prev,
-            current_stage: 'machine',
-            current_stage_assigned_to: userId,
-            current_stage_assigned_to_name: userName,
-          } : prev);
-          toast({ title: 'Forwarded', description: `Machine stage forwarded to ${userName}` });
-        }}
-      />
     </Layout>
   );
 }
