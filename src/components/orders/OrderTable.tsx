@@ -257,7 +257,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider w-[22%] min-w-[220px]">
                 Date
               </th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[16%] min-w-[120px]">
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider w-[200px] min-w-[200px]">
                 Actions
               </th>
             </tr>
@@ -366,8 +366,8 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="px-4 py-2 w-[200px] min-w-[200px]">
+                    <div className="flex items-center justify-end gap-1 flex-nowrap">
                       {order.status === 'pending' && (
                         <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
                           <CheckCircle className="w-3 h-3 mr-1" />Accept
