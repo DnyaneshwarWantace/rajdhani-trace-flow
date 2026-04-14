@@ -308,252 +308,116 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
 
               return (
                 <tr key={order.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onViewDetails(order)}>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-gray-900">
-                          {order.orderNumber || order.id}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                        </div>
-                      </div>
-                    </div>
+                  <td className="px-4 py-2 whitespace-nowrap">
+                    <div className="font-medium text-gray-900 text-sm">{order.orderNumber || order.id}</div>
+                    <div className="text-xs text-gray-500">{order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}</div>
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-start gap-2">
-                      <User className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                      <div className="min-w-0">
-                        <div className="text-sm text-gray-900 truncate">
-                          <TruncatedText text={order.customerName} maxLength={18} as="span" showTooltip={false} />
-                        </div>
-                        <div className="text-sm font-medium text-gray-900 mt-1">
-                          {formatCurrency(order.totalAmount, { full: true })}
-                        </div>
-                        {order.outstandingAmount > 0 && (
-                          <div className="text-xs text-red-600">
-                            Due: {formatCurrency(order.outstandingAmount, { full: true })}
+                  <td className="px-4 py-2 max-w-[140px]">
+                    <div className="text-sm text-gray-900 truncate">
+                      <TruncatedText text={order.customerName} maxLength={18} as="span" showTooltip={false} />
+                    </div>
+                    <div className="text-xs font-medium text-gray-700">{formatCurrency(order.totalAmount, { full: true })}</div>
+                    {order.outstandingAmount > 0 && (
+                      <div className="text-xs text-red-600">Due: {formatCurrency(order.outstandingAmount, { full: true })}</div>
+                    )}
+                  </td>
+                  <td className="px-4 py-2 max-w-[160px]">
+                    {order.items && order.items.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {order.items.slice(0, 2).map((item, idx) => (
+                          <div key={idx} className="text-xs">
+                            <div className="font-medium text-gray-900 truncate">
+                              <TruncatedText text={item.productName} maxLength={22} as="span" showTooltip={false} />
+                            </div>
+                            <div className="text-gray-500">Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}</div>
                           </div>
-                        )}
+                        ))}
+                        {order.items.length > 2 && <div className="text-xs text-gray-400">+{order.items.length - 2} more</div>}
                       </div>
-                    </div>
+                    ) : <span className="text-xs text-gray-400">No items</span>}
                   </td>
-                  <td className="px-4 py-4 text-sm text-gray-900">
-                    <div className="max-w-[200px]">
-                      {order.items && order.items.length > 0 ? (
-                        <div className="space-y-1">
-                          {order.items.slice(0, 2).map((item, idx) => (
-                            <div key={idx} className="text-xs">
-                              <div className="font-medium text-gray-900 truncate">
-                                <TruncatedText text={item.productName} maxLength={25} as="span" showTooltip={false} />
-                              </div>
-                              <div className="text-gray-600 truncate">
-                                Qty: {Number(item.quantity).toFixed(2)} {item.count_unit || item.unit || 'units'}
-                              </div>
-                            </div>
-                          ))}
-                          {order.items.length > 2 && (
-                            <div className="text-xs text-gray-500">
-                              +{order.items.length - 2} more item{order.items.length - 2 > 1 ? 's' : ''}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">No items</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-4 py-2 whitespace-nowrap">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${status.color}`}>
                       <StatusIcon className="w-3 h-3" />
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-4 py-4 w-[22%] min-w-[220px]" onClick={(e) => e.stopPropagation()}>
-                    <div className="space-y-1 min-w-[200px]">
-                      <div className="space-y-0.5 text-sm">
-                        <div className="flex items-center gap-1 text-gray-900">
-                          <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
-                          <span className="text-xs text-gray-600">Order:</span>
-                          <span>{formatIndianDate(order.orderDate)}</span>
-                        </div>
-                        {order.expectedDelivery && (() => {
-                          const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
-                          const today = new Date();
-                          today.setHours(0, 0, 0, 0);
-                          expectedDate.setHours(0, 0, 0, 0);
-                          const notDelivered = order.status !== 'delivered';
-                          const isOverdue = notDelivered && expectedDate < today;
-                          return (
-                            <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-900'}`}>
-                              <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`} />
-                              <span className="text-xs text-gray-600">Expected:</span>
-                              <span>{formatIndianDate(order.expectedDelivery)}</span>
-                            </div>
-                          );
-                        })()}
-                        {orderStageInfo[order.id] && (
-                          <div className="text-xs text-indigo-700 mt-1">
-                            Stage: {orderStageInfo[order.id].stage}
-                            {orderStageInfo[order.id].assignedTo ? ` · ${orderStageInfo[order.id].assignedTo}` : ''}
-                          </div>
-                        )}
-                        {rawStatuses.length > 0 && (
-                          <div className="text-xs text-amber-700 mt-1 space-y-0.5">
-                            {rawStatuses.slice(0, 2).map((s, idx) => (
-                              <div key={`${order.id}-raw-${idx}`}>
-                                Raw: {s.material_name} · {String(s.procurement_status || 'not_started').replace('_', ' ')}
-                              </div>
-                            ))}
-                            {rawStatuses.length > 2 && (
-                              <div>+{rawStatuses.length - 2} more raw items</div>
-                            )}
-                          </div>
-                        )}
+                  <td className="px-4 py-2 whitespace-nowrap text-xs" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-gray-600">
+                        <Calendar className="w-3 h-3 text-gray-400 shrink-0" />
+                        <span className="text-gray-400">Order:</span> {formatIndianDate(order.orderDate)}
                       </div>
+                      {order.expectedDelivery && (() => {
+                        const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                        const today = new Date(); today.setHours(0,0,0,0); expectedDate.setHours(0,0,0,0);
+                        const isOverdue = order.status !== 'delivered' && expectedDate < today;
+                        return (
+                          <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
+                            <Calendar className={`w-3 h-3 shrink-0 ${isOverdue ? 'text-red-500' : 'text-gray-400'}`} />
+                            <span className="text-gray-400">Exp:</span> {formatIndianDate(order.expectedDelivery)}
+                          </div>
+                        );
+                      })()}
+                      {orderStageInfo[order.id] && (
+                        <div className="text-indigo-600 truncate max-w-[160px]">
+                          {orderStageInfo[order.id].stage}
+                        </div>
+                      )}
                     </div>
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center justify-end gap-1">
                       {order.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusUpdate(order.id, 'accepted');
-                          }}
-                          className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Accept
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
+                          <CheckCircle className="w-3 h-3 mr-1" />Accept
                         </Button>
                       )}
                       {canShowProduceButton && (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            if (producibleItems.length > 1) {
-                              e.stopPropagation();
-                              setPickProductionOrder(order);
-                              return;
-                            }
-                            handleSendToProduction(e, order, producibleItems[0]);
-                          }}
+                        <Button size="sm"
+                          onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }}
                           disabled={!!orderResponsibleUsers[order.id]}
-                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                          title={
-                            orderResponsibleUsers[order.id]
-                              ? `Already handled by ${orderResponsibleUsers[order.id]}`
-                              : `Send to Production (${producibleItems.length} product${producibleItems.length > 1 ? 's' : ''})`
-                          }
+                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2"
+                          title={orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
                         >
                           <Factory className="w-3 h-3 mr-1" />
-                          {orderResponsibleUsers[order.id]
-                            ? `Handled by ${orderResponsibleUsers[order.id]}`
-                            : (producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce')}
+                          {producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
                         </Button>
                       )}
                       {!!firstProductItem?.productId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProductionInfoOrder(order);
-                          }}
-                          className="text-xs"
-                          title="View production progress"
-                        >
-                          <Info className="w-3 h-3 mr-1" />
-                          Production Info
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0" title="Production Info">
+                          <Info className="w-3.5 h-3.5" />
                         </Button>
                       )}
                       {order.status === 'accepted' && (() => {
-                        // Check if order has products that need individual product selection
                         const hasProductItems = order.items?.some(item => item.productType === 'product');
-                        const allProductsHaveIndividuals = order.items
-                          ?.filter(item => item.productType === 'product')
-                          .every(item => item.selectedProducts && item.selectedProducts.length > 0);
-
-                        // Show dispatch only if no product items OR all products have individual products selected
+                        const allProductsHaveIndividuals = order.items?.filter(item => item.productType === 'product').every(item => item.selectedProducts && item.selectedProducts.length > 0);
                         if (!hasProductItems || allProductsHaveIndividuals) {
                           return (
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onStatusUpdate(order.id, 'dispatched');
-                              }}
-                              className="text-xs bg-orange-600 hover:bg-orange-700 text-white"
-                            >
-                              <Package className="w-3 h-3 mr-1" />
-                              Ship
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'dispatched'); }} className="h-7 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">
+                              <Package className="w-3 h-3 mr-1" />Ship
                             </Button>
                           );
                         } else {
-                          // Show "Select Individual Products" button instead
                           return (
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onViewDetails(order);
-                              }}
-                              className="text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              <Edit className="w-3 h-3 mr-1" />
-                              Select Individual Products
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2" title="Select Individual Products">
+                              <Edit className="w-3 h-3 mr-1" />Select
                             </Button>
                           );
                         }
                       })()}
                       {order.status === 'dispatched' && (
-                        <Button
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusUpdate(order.id, 'delivered');
-                          }}
-                          className="text-xs bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Deliver
+                        <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'delivered'); }} className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white px-2">
+                          <CheckCircle className="w-3 h-3 mr-1" />Deliver
                         </Button>
                       )}
-                      {(order.status === 'pending' || order.status === 'accepted') &&
-                        order.items?.some((item) => item.productType === 'raw_material') && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (pendingRawItems.length > 1) {
-                                setPickRawMaterialOrder(order);
-                              } else {
-                                setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null);
-                                setMaterialTaskOrder(order);
-                              }
-                            }}
-                            disabled={!hasRawNotStarted}
-                            className="text-xs"
-                          >
-                            {hasRawNotStarted
-                              ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}`
-                              : 'Stock Task Active'}
-                          </Button>
-                        )}
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onViewDetails(order);
-                        }}
-                        className="text-xs"
-                        title="View order details"
-                      >
-                        <Eye className="w-3 h-3" />
+                      {(order.status === 'pending' || order.status === 'accepted') && order.items?.some((item) => item.productType === 'raw_material') && (
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (pendingRawItems.length > 1) { setPickRawMaterialOrder(order); } else { setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null); setMaterialTaskOrder(order); } }} disabled={!hasRawNotStarted} className="h-7 text-xs px-2" title={hasRawNotStarted ? 'Order Stock' : 'Stock Task Active'}>
+                          <ShoppingCart className="w-3 h-3" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0" title="View details">
+                        <Eye className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </td>
