@@ -265,7 +265,7 @@ export function IndividualProductSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+      <DialogContent customLayout className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
         {/* Sticky Header */}
         <div className="px-6 pt-5 pb-3 border-b bg-white shrink-0">
           <DialogHeader>
