@@ -75,9 +75,7 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
               src={`${import.meta.env.BASE_URL}logo.png`}
               alt="Rajdhani Carpets Logo" 
               className="h-10 sm:h-12 md:h-14 w-auto object-contain"
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                const currentSrc = img.src;
+              onError={() => {
                 console.error('Logo not found at any path');
               }}
             />
