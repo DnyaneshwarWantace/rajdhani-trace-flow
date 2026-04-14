@@ -239,16 +239,22 @@ export function IndividualProductSelectionDialog({
   const selectionComplete = selectedProducts.length === requiredQuantity;
 
   // Filter and sort products based on search and date
+  // Parse search query into multiple tokens (split by comma or whitespace)
+  const searchTokens = searchQuery
+    .split(/[\s,]+/)
+    .map(t => t.trim().toLowerCase())
+    .filter(Boolean);
+
   const filteredProducts = availableProducts
     .filter(product => {
-      // Search filter
-      const matchesSearch = searchQuery === '' ||
-        product.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.qr_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.serial_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.roll_number?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      return matchesSearch;
+      if (searchTokens.length === 0) return true;
+      // Product matches if ANY token matches any field
+      return searchTokens.some(token =>
+        product.id?.toLowerCase().includes(token) ||
+        product.qr_code?.toLowerCase().includes(token) ||
+        product.serial_number?.toLowerCase().includes(token) ||
+        product.roll_number?.toLowerCase().includes(token)
+      );
     })
     .sort((a, b) => {
       // Sort by date
