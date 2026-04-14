@@ -18,11 +18,15 @@ export class IndividualProductService {
     product_id?: string;
     status?: string;
     search?: string;
+    batch_number?: string;
+    limit?: number;
   }): Promise<{ products: IndividualProduct[]; total: number }> {
     const queryParams = new URLSearchParams();
     if (filters?.product_id) queryParams.append('product_id', filters.product_id);
     if (filters?.status) queryParams.append('status', filters.status);
     if (filters?.search) queryParams.append('search', filters.search);
+    if (filters?.batch_number) queryParams.append('batch_number', filters.batch_number);
+    if (filters?.limit) queryParams.append('limit', filters.limit.toString());
 
     const response = await fetch(`${API_URL}/individual-products?${queryParams}`, {
       headers: this.getHeaders(),
