@@ -314,18 +314,18 @@ export default function ProductionTable({
                 className="hover:bg-gray-50 transition-colors cursor-pointer"
                 onClick={() => onView(batch)}
               >
-                <td className="px-4 py-4">
-                  <div className="text-sm font-medium text-gray-900">
+                <td className="px-4 py-2">
+                  <div className="text-sm font-medium text-gray-900 whitespace-nowrap">
                     {batch.batch_number}
                   </div>
                 </td>
-                <td className="px-4 py-4">
-                  <TruncatedText text={batch.product_name || 'N/A'} maxLength={30} className="text-sm text-gray-900" />
-                  <div className="text-[11px] text-gray-500 mt-1">
-                    Final Target: {(batch.final_target_display || batch.product_name || 'Product')} ({batch.planned_quantity})
+                <td className="px-4 py-2 max-w-[160px]">
+                  <TruncatedText text={batch.product_name || 'N/A'} maxLength={25} className="text-sm text-gray-900" />
+                  <div className="text-[11px] text-gray-500 mt-0.5 truncate">
+                    <TruncatedText text={`${batch.final_target_display || batch.product_name || 'Product'} (${batch.planned_quantity})`} maxLength={30} as="span" />
                   </div>
                 </td>
-                <td className="px-4 py-4">
+                <td className="px-4 py-2 max-w-[140px]">
                   {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
                     <div className="space-y-0.5">
                       {(() => {
@@ -354,23 +354,23 @@ export default function ProductionTable({
                     <span className="text-xs text-gray-400">No order linked</span>
                   )}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900" data-quantity={batch.planned_quantity}>
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900" data-quantity={batch.planned_quantity}>
                   {batch.planned_quantity}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-2 whitespace-nowrap">
                   <Badge className={getStatusColor(batch.status)}>
                     {getStatusLabel(batch.status)}
                   </Badge>
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-2 whitespace-nowrap">
                   <Badge className={getPriorityColor(batch.priority)}>
                     {batch.priority.toUpperCase()}
                   </Badge>
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
                   {batch.start_date ? formatDate(batch.start_date) : '-'}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                <td className="px-4 py-2 whitespace-nowrap text-sm">
                   {batch.completion_date ? (
                     <div className="flex flex-col gap-1">
                       {batch.status === 'completed' ? (
@@ -393,10 +393,10 @@ export default function ProductionTable({
                     </div>
                   ) : '-'}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-2 whitespace-nowrap">
                   {getStageButton(batch)}
                 </td>
-                <td className="px-4 py-4 whitespace-nowrap">
+                <td className="px-4 py-2 whitespace-nowrap">
                   {(() => {
                     const name = batch.current_stage_assigned_to_name || batch.assigned_to_name;
                     if (name) {
@@ -412,7 +412,7 @@ export default function ProductionTable({
                     return <span className="text-xs text-gray-400">—</span>;
                   })()}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-4 py-2 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
                       variant="ghost"
