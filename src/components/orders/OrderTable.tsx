@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShoppingCart, User, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, Info } from 'lucide-react';
+import { ShoppingCart, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { OrderService, type Order, type OrderItem } from '@/services/orderService';
