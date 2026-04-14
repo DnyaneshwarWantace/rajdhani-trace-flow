@@ -265,20 +265,23 @@ export function IndividualProductSelectionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            Select Individual Products
-          </DialogTitle>
-          <DialogDescription>
-            {orderItem.product_name} • Required: {requiredQuantity} • Selected: {selectedProducts.length}
-            {totalCount > 0 && ` • Available: ${totalCount}`}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-4xl h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+        {/* Sticky Header */}
+        <div className="px-6 pt-5 pb-3 border-b bg-white shrink-0">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              Select Individual Products
+            </DialogTitle>
+            <DialogDescription>
+              {orderItem.product_name} • Required: <strong>{requiredQuantity}</strong> • Selected: <strong>{selectedProducts.length}</strong>
+              {totalCount > 0 && <> • Available: <span className="text-green-600 font-medium">{totalCount}</span></>}
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
         {/* Search and Sort */}
-        <div className="flex gap-2 px-6">
+        <div className="flex gap-2 px-6 py-3 border-b bg-white shrink-0">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input
@@ -299,7 +302,7 @@ export function IndividualProductSelectionDialog({
           </Select>
         </div>
 
-        <div className="flex-1 overflow-auto px-6">
+        <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
@@ -348,8 +351,11 @@ export function IndividualProductSelectionDialog({
                             </Button>
                             <span className="font-semibold">{product.id}</span>
                             <Badge
-                              variant={isSelected ? 'default' : 'secondary'}
-                              className={`text-xs ${product.status === 'reserved' ? 'bg-blue-600 text-white' : ''}`}
+                              variant="secondary"
+                              className={`text-xs ${
+                                product.status === 'available' ? 'bg-green-100 text-green-700 border-green-300' :
+                                product.status === 'reserved' ? 'bg-blue-100 text-blue-700' : ''
+                              }`}
                             >
                               {product.status}
                             </Badge>
