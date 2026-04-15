@@ -1280,6 +1280,17 @@ export default function IndividualProductsTable({
                 <div>
                   <p className="text-gray-600 font-medium mb-1">Expected GSM</p>
                   <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
+                  {(() => {
+                    const gsm = parseFloat((product.weight || '').replace(/[^\d.]/g, ''));
+                    let l = parseFloat((product.length || '').replace(/[^\d.]/g, ''));
+                    let w = parseFloat((product.width || '').replace(/[^\d.]/g, ''));
+                    if ((product.length || '').toLowerCase().includes('feet')) l *= 0.3048;
+                    if ((product.width || '').toLowerCase().includes('feet')) w *= 0.3048;
+                    if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) {
+                      return <p className="text-gray-500 text-xs mt-0.5">{((gsm * l * w) / 1000).toFixed(3)} kg/roll</p>;
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
               {plannedQuantity > 0 && (
