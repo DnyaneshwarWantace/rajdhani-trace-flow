@@ -161,6 +161,7 @@ export default function SendToProductionModal({
   const [loadingRecipe, setLoadingRecipe] = useState(false);
   const [assignments, setAssignments] = useState<Record<string, ProductAssignment & { picking: boolean; search: string }>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [stepQuantities, setStepQuantities] = useState<Record<string, number>>({});
   // Raw material ordering: materialId → { ordering, pickingUser, search, assignedUser }
   const [matOrderState, setMatOrderState] = useState<Record<string, {
     ordering: boolean; pickingUser: boolean; search: string; assignedUser: UserType | null;
@@ -175,8 +176,26 @@ export default function SendToProductionModal({
     if (!open) {
       setAssignments({});
       setRecipeTree(null);
+      setStepQuantities({});
     }
   }, [open, productItem.productId]);
+
+  // Compute how many units of each step product are needed for the order quantity
+  useEffect(() => {
+    if (!recipeTree) return;
+    const qty = Number(productItem.quantity || 0);
+    const map: Record<string, number> = {};
+    const dfs = (node: RecipeNode, parentQty: number) => {
+      map[node.productId] = parentQty;
+      for (const sub of node.subProductNodes) {
+        const mat = node.materials.find(m => m.material_id === sub.productId);
+        const coeff = mat ? Number(mat.quantity_per_sqm || 0) : 0;
+        dfs(sub, coeff > 0 ? parentQty * coeff : parentQty);
+      }
+    };
+    dfs(recipeTree, qty);
+    setStepQuantities(map);
+  }, [recipeTree, productItem.quantity]);
 
   useEffect(() => {
     if (!open || users.length === 0 || !recipeTree) return;
@@ -615,6 +634,7 @@ export default function SendToProductionModal({
 
   const renderStepCard = (node: RecipeNode, stepNumber: number, totalSteps: number) => {
     const isMain = node.productId === productItem.productId;
+    const stepQty = stepQuantities[node.productId] ?? (isMain ? Number(productItem.quantity || 0) : 0);
     const assignment = assignments[node.productId];
     const isPicking = assignment?.picking ?? false;
     const assignedUser = assignment?.assignedUser ?? null;
@@ -671,7 +691,7 @@ export default function SendToProductionModal({
                 <div className="text-xs mt-0.5 opacity-80 text-white">
                   {isMain
                     ? `Main product · Qty: ${productItem.quantity} · Order ${order.orderNumber || order.id}`
-                    : `Sub-product · Step ${stepNumber} of ${totalSteps}`}
+                    : `Sub-product · Step ${stepNumber} of ${totalSteps}${stepQty > 0 ? ` · Need: ${stepQty.toFixed(3)} units` : ''}`}
                 </div>
               </div>
             </div>
@@ -728,7 +748,12 @@ export default function SendToProductionModal({
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
                             <div className="text-xs text-gray-400 mt-0.5">
-                              Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm} {mat.unit}/sqm</span>
+                              Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm} {mat.unit}/unit</span>
+                              {stepQty > 0 && (
+                                <span className="ml-1 font-semibold text-gray-800">
+                                  = {(mat.quantity_per_sqm * stepQty).toFixed(3)} {mat.unit} total
+                                </span>
+                              )}
                               {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
                             </div>
                           </div>
