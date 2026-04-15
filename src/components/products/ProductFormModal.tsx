@@ -370,21 +370,10 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         missingFields.push('GSM');
       }
       
-      // base_quantity is required for create and duplicate, check if it's a valid number (not negative)
-      if (mode === 'create' || mode === 'duplicate') {
-        const quantityValue = formData.base_quantity as any;
-        if (quantityValue === '' || quantityValue === null || quantityValue === undefined || (typeof quantityValue === 'string' && quantityValue.trim() === '')) {
-          missingFields.push('Base Quantity');
-        } else {
-          const quantity = Number(quantityValue);
-          if (quantity < 0 || isNaN(quantity)) {
-            missingFields.push('Base Quantity (must be >= 0)');
-          }
-        }
-      } else {
-        // For edit mode, allow empty but validate if provided
-        const quantity = (formData.base_quantity === null || formData.base_quantity === undefined || isNaN(Number(formData.base_quantity))) ? 0 : Number(formData.base_quantity);
-        if (quantity < 0 || isNaN(quantity)) {
+      // base_quantity defaults to 0 if blank — never required
+      {
+        const quantity = (formData.base_quantity === null || formData.base_quantity === undefined || formData.base_quantity === '' as any || isNaN(Number(formData.base_quantity))) ? 0 : Number(formData.base_quantity);
+        if (quantity < 0) {
           missingFields.push('Base Quantity (must be >= 0)');
         }
       }
