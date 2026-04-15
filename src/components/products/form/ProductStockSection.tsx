@@ -33,7 +33,7 @@ export default function ProductStockSection({
       {/* Base Quantity and Unit */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="quantity">Base Quantity *</Label>
+          <Label htmlFor="quantity">Base Quantity</Label>
           {isQuantityDisabled ? (
             <div className="flex items-center gap-2">
               <Input
@@ -62,20 +62,13 @@ export default function ProductStockSection({
                 max="99999"
                 step="1"
               />
-              {touchedFields.has('base_quantity') && (formData.base_quantity === null || formData.base_quantity === undefined || formData.base_quantity === 0 || String(formData.base_quantity).trim() === '') && (
-                <p className="text-xs text-red-500 mt-1">
-                  Base quantity is required
-                </p>
-              )}
             </>
           )}
-          {!touchedFields.has('base_quantity') || (formData.base_quantity !== null && formData.base_quantity !== undefined && formData.base_quantity !== 0 && String(formData.base_quantity).trim() !== '') ? (
-            <p className="text-xs text-gray-500 mt-1">
-              {isQuantityDisabled
-                ? 'Quantity cannot be edited. Use inventory management to update stock.'
-                : 'Initial stock quantity'}
-            </p>
-          ) : null}
+          <p className="text-xs text-gray-500 mt-1">
+            {isQuantityDisabled
+              ? 'Quantity cannot be edited. Use inventory management to update stock.'
+              : 'Initial stock quantity (defaults to 0 if blank)'}
+          </p>
         </div>
 
         <div onBlur={() => markFieldTouched('unit')}>
