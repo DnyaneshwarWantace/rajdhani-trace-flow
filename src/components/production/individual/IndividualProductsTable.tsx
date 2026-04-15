@@ -87,7 +87,7 @@ export default function IndividualProductsTable({
     setLocalProducts(products);
   };
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string; roll_number?: string} | null>(null);
+  const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string; roll_number?: string; location?: string} | null>(null);
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [newLocationValue, setNewLocationValue] = useState('');
@@ -575,10 +575,12 @@ export default function IndividualProductsTable({
     const final_width = productToCopy.final_width ? String(productToCopy.final_width).trim() : '';
     const final_weight = productToCopy.final_weight ? String(productToCopy.final_weight).trim() : '';
     
+    const location = productToCopy.location ? String(productToCopy.location).trim() : '';
     setCopiedRowData({
       final_length,
       final_width,
       final_weight,
+      location,
     });
     toast({
       title: 'Copied',
@@ -979,8 +981,8 @@ export default function IndividualProductsTable({
     }
 
     const productItem = localProducts[index];
-    const updateData: {final_length?: string; final_width?: string; final_weight?: string} = {};
-    
+    const updateData: {final_length?: string; final_width?: string; final_weight?: string; location?: string} = {};
+
     // Only include fields that have values, ensure they're clean strings
     if (copiedRowData.final_length) {
       const val = String(copiedRowData.final_length).trim();
@@ -993,6 +995,10 @@ export default function IndividualProductsTable({
     if (copiedRowData.final_weight) {
       const val = String(copiedRowData.final_weight).trim();
       if (val) updateData.final_weight = val;
+    }
+    if (copiedRowData.location) {
+      const val = String(copiedRowData.location).trim();
+      if (val) updateData.location = val;
     }
 
     const updated = [...localProducts];
@@ -1489,7 +1495,7 @@ export default function IndividualProductsTable({
                 <td className="border border-gray-200 p-2">
                   <div className="flex items-center gap-1">
                     <Select
-                      value={productItem.location || (locationOptions[0] || '')}
+                      value={productItem.location || ''}
                       onValueChange={(value) => {
                         if (value === '__add_new__') {
                           setIsAddingLocation(true);
@@ -1500,8 +1506,8 @@ export default function IndividualProductsTable({
                       disabled={saving === productItem.id}
                     >
                       <SelectTrigger
-                        className="w-40 max-w-[160px] truncate"
-                        title={productItem.location || (locationOptions[0] || '')}
+                        className={`w-40 max-w-[160px] truncate ${!productItem.location ? 'text-gray-400' : ''}`}
+                        title={productItem.location || ''}
                       >
                         <SelectValue placeholder="Select location" />
                       </SelectTrigger>
