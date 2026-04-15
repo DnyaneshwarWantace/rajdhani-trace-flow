@@ -24,6 +24,20 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { IndividualProduct } from '@/types/product';
 
+function weightKgFromRow(item: IndividualProduct): number | null {
+  const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
+  const lengthStr = (item.final_length || '').toString();
+  const widthStr = (item.final_width || '').toString();
+  let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
+  let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
+  if (lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
+  if (widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
+  if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
+    return (gsm * lengthM * widthM) / 1000;
+  }
+  return null;
+}
+
 interface IndividualProductsTableProps {
   individualProducts: IndividualProduct[];
   onUpdate: () => void;
@@ -1441,7 +1455,15 @@ export default function IndividualProductsTable({
                           onClick={() => handleCellClick(index, 'final_weight')}
                         >
                           {productItem.final_weight ? (
-                            <span className="text-sm text-gray-900">{productItem.final_weight}</span>
+                            <>
+                              <span className="text-sm text-gray-900">{productItem.final_weight}</span>
+                              {(() => {
+                                const kg = weightKgFromRow(productItem);
+                                return kg !== null ? (
+                                  <span className="text-xs text-gray-500 mt-0.5">{kg.toFixed(3)} kg</span>
+                                ) : null;
+                              })()}
+                            </>
                           ) : (
                             <span className="text-gray-400">Click to edit</span>
                           )}
