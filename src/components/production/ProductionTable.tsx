@@ -12,7 +12,8 @@ interface ProductionTableProps {
   onDelete: (batch: ProductionBatch) => void;
   onDuplicate?: (batch: ProductionBatch) => void;
   canDelete: boolean;
-  allBatches?: ProductionBatch[]; // All batches to check for duplicates
+  allBatches?: ProductionBatch[];
+  activeSection?: string;
 }
 
 export default function ProductionTable({
@@ -22,6 +23,7 @@ export default function ProductionTable({
   onDuplicate,
   canDelete,
   allBatches = [],
+  activeSection = 'assigned',
 }: ProductionTableProps) {
   const getAttachedOrderNumbers = (notes?: string): string[] => {
     if (!notes) return [];
@@ -161,16 +163,17 @@ export default function ProductionTable({
 
   const handleRowClick = (batch: ProductionBatch) => {
     const stage = getCurrentStage(batch);
+    const state = { section: activeSection };
     if (stage === 'completed' || stage === 'cancelled') {
       onView(batch);
     } else if (stage === 'planning') {
-      navigate(`/production/planning?batchId=${batch.id}`);
+      navigate(`/production/planning?batchId=${batch.id}`, { state });
     } else if (stage === 'machine') {
-      navigate(`/production/${batch.id}/machine`);
+      navigate(`/production/${batch.id}/machine`, { state });
     } else if (stage === 'wastage') {
-      navigate(`/production/${batch.id}/wastage`);
+      navigate(`/production/${batch.id}/wastage`, { state });
     } else if (stage === 'individual_products') {
-      navigate(`/production/${batch.id}/individual-products`);
+      navigate(`/production/${batch.id}/individual-products`, { state });
     }
   };
 

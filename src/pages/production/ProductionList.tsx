@@ -48,7 +48,9 @@ export default function ProductionList() {
   const [allBatches, setAllBatches] = useState<ProductionBatch[]>([]);
   const [filteredBatches, setFilteredBatches] = useState<ProductionBatch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'assigned' | 'all' | 'planned' | 'active' | 'completed' | 'cancelled'>('assigned');
+  const [activeSection, setActiveSection] = useState<'assigned' | 'all' | 'planned' | 'active' | 'completed' | 'cancelled'>(
+    (location.state?.section as 'assigned' | 'all' | 'planned' | 'active' | 'completed' | 'cancelled') || 'assigned'
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [categoryFilter, _setCategoryFilter] = useState<string[]>([]);
@@ -691,6 +693,7 @@ export default function ProductionList() {
             onDuplicate={handleDuplicate}
             canDelete={canDelete('production')}
             allBatches={allBatches}
+            activeSection={activeSection}
           />
         ) : (
           <ProductionGrid

@@ -289,7 +289,7 @@ export default function ProductionIndividualProducts() {
     } catch (e) {
       console.error('Error setting individual/wastage stage:', e);
     }
-    navigate(`/production/${id}/wastage`);
+    navigate(`/production/${id}/wastage`, { state: { section: location.state?.section || 'assigned' } });
   };
 
   // Can proceed only if all existing rows have required fields filled (from table callback)
@@ -329,12 +329,7 @@ export default function ProductionIndividualProducts() {
         <IndividualProductsStageHeader
           batch={batch}
           onBack={() => {
-            const from = location.state?.from;
-            if (from === 'production-detail' && id) {
-              navigate(`/production/${id}`);
-            } else {
-              navigate('/production');
-            }
+            navigate('/production', { state: { section: location.state?.section || 'assigned' } });
           }}
           onProceedToWastage={handleProceedToWastage}
           canProceed={canProceed}

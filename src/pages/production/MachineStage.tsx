@@ -385,7 +385,7 @@ export default function MachineStage() {
           variant: 'destructive',
         });
       }
-      navigate(`/production/${id}/individual-products`);
+      navigate(`/production/${id}/individual-products`, { state: { section: location.state?.section || 'assigned' } });
     } catch (error) {
       console.error('❌ Error updating machine stage:', error);
       toast({
@@ -424,16 +424,7 @@ export default function MachineStage() {
         <MachineStageHeader
           batch={batch}
           onBack={() => {
-            // Check where we came from based on location state
-            const from = location.state?.from;
-
-            if (from === 'production-detail' && id) {
-              // If we came from production detail page, go back to production detail
-              navigate(`/production/${id}`);
-            } else {
-              // Default: go to production list
-              navigate('/production');
-            }
+            navigate('/production', { state: { section: location.state?.section || 'assigned' } });
           }}
           onWastage={handleNavigateToWastage}
           onRefresh={handleRefresh}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, CheckCircle, XCircle, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import type { Product } from '@/types/product';
 export default function ProductionWastage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
   const [batch, setBatch] = useState<ProductionBatch | null>(null);
@@ -632,8 +633,7 @@ export default function ProductionWastage() {
         <WastageStageHeader
           batch={batch}
           onBack={() => {
-            if (id) navigate(`/production/${id}/individual-products`);
-            else navigate('/production');
+            navigate('/production', { state: { section: location.state?.section || 'assigned' } });
           }}
           onCompleteProduction={handleCompleteProduction}
           onAssignAfterComplete={async (userId, userName, selectedTasks) => {
@@ -674,7 +674,7 @@ export default function ProductionWastage() {
                   : `${selectedTasks.length} next-stage item(s) forwarded to ${userName}`,
             });
           }}
-          onDoneAfterComplete={() => navigate('/production')}
+          onDoneAfterComplete={() => navigate('/production', { state: { section: location.state?.section || 'assigned' } })}
           nextStageTasks={nextStageTasks.map((t) => ({
             orderId: t.orderId,
             orderNumber: t.orderNumber,
