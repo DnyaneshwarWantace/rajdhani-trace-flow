@@ -1263,7 +1263,7 @@ export default function IndividualProductsTable({
               <span className="text-blue-600">📋</span>
               Product Reference Details
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               {product.length && (
                 <div>
                   <p className="text-gray-600 font-medium mb-1">Expected Length</p>
@@ -1280,19 +1280,24 @@ export default function IndividualProductsTable({
                 <div>
                   <p className="text-gray-600 font-medium mb-1">Expected GSM</p>
                   <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
-                  {(() => {
-                    const gsm = parseFloat((product.weight || '').replace(/[^\d.]/g, ''));
-                    let l = parseFloat((product.length || '').replace(/[^\d.]/g, ''));
-                    let w = parseFloat((product.width || '').replace(/[^\d.]/g, ''));
-                    if ((product.length || '').toLowerCase().includes('feet')) l *= 0.3048;
-                    if ((product.width || '').toLowerCase().includes('feet')) w *= 0.3048;
-                    if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) {
-                      return <p className="text-gray-500 text-xs mt-0.5">{((gsm * l * w) / 1000).toFixed(3)} kg/roll</p>;
-                    }
-                    return null;
-                  })()}
                 </div>
               )}
+              {(() => {
+                const gsm = parseFloat((product.weight || '').replace(/[^\d.]/g, ''));
+                let l = parseFloat((product.length || '').replace(/[^\d.]/g, ''));
+                let w = parseFloat((product.width || '').replace(/[^\d.]/g, ''));
+                if ((product.length || '').toLowerCase().includes('feet')) l *= 0.3048;
+                if ((product.width || '').toLowerCase().includes('feet')) w *= 0.3048;
+                if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) {
+                  return (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Expected Weight</p>
+                      <p className="text-gray-900 font-semibold">{((gsm * l * w) / 1000).toFixed(3)} kg/roll</p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               {plannedQuantity > 0 && (
                 <div>
                   <p className="text-gray-600 font-medium mb-1">Planned Quantity</p>
