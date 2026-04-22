@@ -97,6 +97,8 @@ interface RecipeNode {
   subProductNodes: RecipeNode[];
   // stock of this product itself (for sub-products)
   productStock?: number;
+  // SQM per roll of this product (length × width)
+  productSqm?: number;
 }
 
 interface MaterialWithStock extends RecipeMaterial {
@@ -180,17 +182,22 @@ export default function SendToProductionModal({
     }
   }, [open, productItem.productId]);
 
-  // Compute how many units of each step product are needed for the order quantity
+  // Compute how many rolls of each step product are needed for the order quantity.
+  // quantity_per_sqm is in rolls-per-sqm, so: child_rolls = parent_rolls × parent_sqm × quantity_per_sqm
   useEffect(() => {
     if (!recipeTree) return;
     const qty = Number(productItem.quantity || 0);
     const map: Record<string, number> = {};
-    const dfs = (node: RecipeNode, parentQty: number) => {
-      map[node.productId] = parentQty;
+    const dfs = (node: RecipeNode, parentQtyRolls: number) => {
+      map[node.productId] = parentQtyRolls;
+      const parentSqm = node.productSqm ?? 0;
       for (const sub of node.subProductNodes) {
         const mat = node.materials.find(m => m.material_id === sub.productId);
-        const coeff = mat ? Number(mat.quantity_per_sqm || 0) : 0;
-        dfs(sub, coeff > 0 ? parentQty * coeff : parentQty);
+        const qtyPerSqm = mat ? Number(mat.quantity_per_sqm || 0) : 0;
+        const childRolls = parentSqm > 0 && qtyPerSqm > 0
+          ? parentQtyRolls * parentSqm * qtyPerSqm
+          : parentQtyRolls;
+        dfs(sub, childRolls);
       }
     };
     dfs(recipeTree, qty);
@@ -272,16 +279,18 @@ export default function SendToProductionModal({
       );
     }
 
-    // For sub-products, also fetch the product's own stock
+    // Fetch product data once: stock (for sub-products) + SQM for roll→roll calculations
     let productStock: number | undefined;
-    if (depth > 0) {
-      try {
-        const prod = await ProductService.getProductById(productId);
-        productStock = resolveProductAvailableStock(prod);
-      } catch { /* ignore */ }
-    }
+    let productSqm: number | undefined;
+    try {
+      const prod = await ProductService.getProductById(productId);
+      if (depth > 0) productStock = resolveProductAvailableStock(prod);
+      const l = parseFloat(prod.length || '0');
+      const w = parseFloat(prod.width || '0');
+      if (l > 0 && w > 0) productSqm = l * w;
+    } catch { /* ignore */ }
 
-    return { productId, productName, recipe, materials, subProductNodes, productStock };
+    return { productId, productName, recipe, materials, subProductNodes, productStock, productSqm };
   };
 
   const loadRecipeTree = async (productId: string, productName: string) => {
@@ -691,7 +700,7 @@ export default function SendToProductionModal({
                 <div className="text-xs mt-0.5 opacity-80 text-white">
                   {isMain
                     ? `Main product · Qty: ${productItem.quantity} · Order ${order.orderNumber || order.id}`
-                    : `Sub-product · Step ${stepNumber} of ${totalSteps}${stepQty > 0 ? ` · Need: ${stepQty.toFixed(3)} units` : ''}`}
+                    : `Sub-product · Step ${stepNumber} of ${totalSteps}${stepQty > 0 ? ` · Need: ${Math.round(stepQty * 1000) / 1000} rolls` : ''}`}
                 </div>
               </div>
             </div>
@@ -748,11 +757,24 @@ export default function SendToProductionModal({
                           <div className="min-w-0">
                             <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
                             <div className="text-xs text-gray-400 mt-0.5">
-                              Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm} {mat.unit}/unit</span>
-                              {stepQty > 0 && (
-                                <span className="ml-1 font-semibold text-gray-800">
-                                  = {(mat.quantity_per_sqm * stepQty).toFixed(3)} {mat.unit} total
-                                </span>
+                              {mat.material_type === 'product' && stepQty > 0 && node.productSqm ? (() => {
+                                const totalSqm = stepQty * node.productSqm;
+                                const rollsNeeded = totalSqm * mat.quantity_per_sqm;
+                                return (
+                                  <span className="font-semibold text-purple-700">
+                                    Need: <span className="text-gray-900">{rollsNeeded % 1 === 0 ? rollsNeeded.toFixed(0) : rollsNeeded.toFixed(3)} {mat.unit}</span>
+                                    <span className="ml-1 text-gray-400 font-normal">({stepQty} rolls × {node.productSqm.toFixed(2)} sqm = {totalSqm.toFixed(2)} sqm total)</span>
+                                  </span>
+                                );
+                              })() : (
+                                <>
+                                  Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm.toFixed(6)} {mat.unit}/sqm</span>
+                                  {stepQty > 0 && node.productSqm && (
+                                    <span className="ml-1 font-semibold text-gray-800">
+                                      = {(mat.quantity_per_sqm * stepQty * node.productSqm).toFixed(3)} {mat.unit} total
+                                    </span>
+                                  )}
+                                </>
                               )}
                               {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
                             </div>
