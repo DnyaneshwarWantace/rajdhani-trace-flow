@@ -29,10 +29,6 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadOrders();
-  }, [material.id]);
-
   const loadOrders = async () => {
     try {
       setLoading(true);
@@ -57,6 +53,10 @@ export default function MaterialDetailOrders({ material }: MaterialDetailOrdersP
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadOrders();
+  }, [material.id]);
 
   const reservedOrders = orders.filter(o => o.status === 'pending' || o.status === 'accepted');
   const soldOrders = orders.filter(o => o.status === 'dispatched' || o.status === 'delivered');

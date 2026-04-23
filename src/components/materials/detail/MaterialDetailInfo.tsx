@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { Hash, Palette, Calendar, Package, User, Building2 } from 'lucide-react';
+import { Hash, Palette, Calendar, Package, User, Building2, IndianRupee } from 'lucide-react';
 import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { RawMaterial } from '@/types/material';
 
@@ -40,8 +40,17 @@ export default function MaterialDetailInfo({ material }: MaterialDetailInfoProps
       maxLength: 40,
     },
     {
+      label: 'Price per Unit',
+      value: material.cost_per_unit != null && material.cost_per_unit > 0
+        ? `₹${material.cost_per_unit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${material.unit}`
+        : 'N/A',
+      icon: IndianRupee,
+      color: 'text-emerald-600',
+      truncate: false,
+    },
+    {
       label: 'Last Restocked',
-      value: material.last_restocked 
+      value: material.last_restocked
         ? formatIndianDate(material.last_restocked)
         : 'Never',
       icon: Calendar,

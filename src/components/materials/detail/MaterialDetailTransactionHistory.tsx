@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package, Factory, ShoppingCart, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, Package, Factory, ShoppingCart, CheckCircle, Clock, ArrowDownCircle } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import { MaterialService } from '@/services/materialService';
 import { getApiUrl } from '@/utils/apiConfig';
@@ -40,6 +40,20 @@ interface ConsumptionRecord {
   product_pattern?: string;
 }
 
+interface PurchaseRecord {
+  id: string;
+  quantity: number;
+  unit: string;
+  previous_stock: number;
+  new_stock: number;
+  cost_per_unit?: number;
+  total_cost?: number;
+  supplier_name?: string;
+  invoice_number?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export default function MaterialDetailTransactionHistory({
   material,
 }: MaterialDetailTransactionHistoryProps) {
@@ -47,10 +61,35 @@ export default function MaterialDetailTransactionHistory({
   const [records, setRecords] = useState<ConsumptionRecord[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'consumption' | 'purchases'>('purchases');
+  const [purchaseRecords, setPurchaseRecords] = useState<PurchaseRecord[]>([]);
+  const [purchaseLoading, setPurchaseLoading] = useState(true);
 
   useEffect(() => {
     loadHistory();
+    loadPurchaseHistory();
   }, [material.id, statusFilter]);
+
+  const loadPurchaseHistory = async () => {
+    try {
+      setPurchaseLoading(true);
+      const token = localStorage.getItem('auth_token');
+      const apiUrl = getApiUrl();
+      const res = await fetch(
+        `${apiUrl}/raw-materials/${encodeURIComponent(material.id)}/history?limit=100`,
+        { headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const purchases = (data.data || []).filter((m: any) => m.reason === 'purchase' && m.movement_type === 'in');
+      purchases.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setPurchaseRecords(purchases);
+    } catch {
+      setPurchaseRecords([]);
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -236,11 +275,11 @@ export default function MaterialDetailTransactionHistory({
     }
   };
 
-  if (loading) {
+  if (loading && purchaseLoading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <CardTitle>History</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12">
@@ -254,26 +293,98 @@ export default function MaterialDetailTransactionHistory({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Transaction History</CardTitle>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="reserved">Reserved</SelectItem>
-              {((material.category || '').toString().toLowerCase().trim() !== 'ink') && (
-                <SelectItem value="in_production">In Production</SelectItem>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('purchases')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'purchases' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <ArrowDownCircle className="w-4 h-4 text-green-600" />
+              Purchase History
+              {purchaseRecords.length > 0 && (
+                <span className="bg-green-100 text-green-700 text-xs rounded-full px-1.5 py-0.5">{purchaseRecords.length}</span>
               )}
-              <SelectItem value="used">Used</SelectItem>
-              <SelectItem value="sold">Sold</SelectItem>
-            </SelectContent>
-          </Select>
+            </button>
+            <button
+              onClick={() => setActiveTab('consumption')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'consumption' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Factory className="w-4 h-4 text-blue-600" />
+              Consumption History
+            </button>
+          </div>
+          {activeTab === 'consumption' && (
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="reserved">Reserved</SelectItem>
+                {((material.category || '').toString().toLowerCase().trim() !== 'ink') && (
+                  <SelectItem value="in_production">In Production</SelectItem>
+                )}
+                <SelectItem value="used">Used</SelectItem>
+                <SelectItem value="sold">Sold</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {summary && (
+
+        {/* Purchase History Tab */}
+        {activeTab === 'purchases' && (
+          purchaseLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : purchaseRecords.length === 0 ? (
+            <div className="text-center py-12">
+              <ArrowDownCircle className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 font-medium">No purchase records yet</p>
+              <p className="text-gray-400 text-sm mt-1">Use Restock on the Materials page to add stock</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="w-full border-collapse bg-white text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No.</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Qty Added</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Price/Unit</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Total Cost</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Stock After</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {purchaseRecords.map((r, i) => (
+                    <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{r.supplier_name || <span className="text-gray-400 italic">—</span>}</td>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-700">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-green-700">+{r.quantity} {r.unit}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{r.new_stock} {r.unit}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{r.notes || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* Consumption History Tab */}
+        {activeTab === 'consumption' && summary && (
           <div className={`grid grid-cols-2 gap-4 mb-6 ${(material.category || '').toString().toLowerCase().trim() === 'ink' ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}>
             <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-600 font-medium">Total Used</p>
@@ -320,7 +431,7 @@ export default function MaterialDetailTransactionHistory({
           </div>
         )}
 
-        {records.length === 0 ? (
+        {activeTab === 'consumption' && (records.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-12 h-12 mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600">No transaction history found for this material</p>
@@ -443,7 +554,7 @@ export default function MaterialDetailTransactionHistory({
               </tbody>
             </table>
           </div>
-        )}
+        ))}
       </CardContent>
     </Card>
   );
