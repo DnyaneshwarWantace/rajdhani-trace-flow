@@ -42,16 +42,6 @@ export default function OrderList() {
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Load stats only on mount
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  // Load orders when filters change
-  useEffect(() => {
-    loadOrders();
-  }, [filters]);
-
   const loadOrders = useCallback(async (showLoader = true) => {
     try {
       if (showLoader) setLoading(true);
@@ -110,6 +100,27 @@ export default function OrderList() {
       setStatsLoading(false);
     }
   }, []);
+
+  // Load stats only on mount
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  // Load orders when filters change
+  useEffect(() => {
+    loadOrders();
+  }, [filters]);
+
+  useEffect(() => {
+    const handleOrderUpdated = () => {
+      loadOrders(false);
+      loadStats();
+    };
+    window.addEventListener('order-updated', handleOrderUpdated);
+    return () => {
+      window.removeEventListener('order-updated', handleOrderUpdated);
+    };
+  }, [loadOrders, loadStats]);
 
   useLiveSyncRefresh({
     modules: ['orders', 'materials', 'production', 'manage_stock'],
