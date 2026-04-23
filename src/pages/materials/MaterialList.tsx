@@ -26,18 +26,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Package, Plus, Loader2, X, Bell } from 'lucide-react';
+import { Package, Loader2, X, Bell } from 'lucide-react';
 import type { RawMaterial, MaterialFilters as MaterialFiltersType, PeriodicDueMaterial } from '@/types/material';
 import { toPeriodicDueMaterial } from '@/types/material';
 import { MaterialService } from '@/services/materialService';
-import { ManageStockService } from '@/services/manageStockService';
 import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
@@ -140,15 +132,12 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [restockForm, setRestockForm] = useState({
     supplier: '',
-    type: '',
     quantity: '',
     costPerUnit: '',
-    expectedDelivery: '',
+    invoiceNumber: '',
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
-  const [activeProcurementTaskId, setActiveProcurementTaskId] = useState<string | null>(null);
-  const [activeProcurementSourceOrderId, setActiveProcurementSourceOrderId] = useState<string | null>(null);
 
   // Check delete permission on mount
   useEffect(() => {
@@ -596,93 +585,18 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     setIsRecordPeriodicOpen(true);
   };
 
-  const handleOrder = async (material: RawMaterial) => {
+  const handleOrder = (material: RawMaterial) => {
     setSelectedRestockMaterial(material);
-
-    // Fetch last purchase order for this material to get previous supplier
-    let previousSupplier = '';
-    try {
-      const { getApiUrl } = await import('@/utils/apiConfig');
-      const API_URL = getApiUrl();
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_URL}/purchase-orders?limit=1000`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        const orders = result.data || [];
-        
-        // Find orders containing this material
-        const matchingOrders = orders.filter((order: any) => {
-          if (order.items && order.items.length > 0) {
-            return order.items.some((item: any) => 
-              item.material_id === material.id || 
-              (item.material_name && item.material_name.toLowerCase().trim() === material.name.toLowerCase().trim())
-            );
-          }
-          const materialDetails = order.material_details || {};
-          return materialDetails.materialName && 
-                 materialDetails.materialName.toLowerCase().trim() === material.name.toLowerCase().trim();
-        });
-        
-        // Get the most recent order (sorted by order_date descending)
-        if (matchingOrders.length > 0) {
-          const sortedOrders = matchingOrders.sort((a: any, b: any) => {
-            const dateA = new Date(a.order_date || a.created_at || 0).getTime();
-            const dateB = new Date(b.order_date || b.created_at || 0).getTime();
-            return dateB - dateA;
-          });
-          previousSupplier = sortedOrders[0].supplier_name || '';
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching previous supplier:', error);
-    }
-
-    // Get suppliers for this material's category
-    const categorySuppliers = getSuppliersForCategory(material.category);
-
-    // Pre-fill with previous supplier if available, otherwise use first available supplier from category
-    let selectedSupplier = previousSupplier || (categorySuppliers.length > 0 ? categorySuppliers[0].supplier.name : '');
-    
-    if (selectedSupplier) {
-      const supplierDetails = getSupplierDetails(
-        selectedSupplier,
-        material.category,
-        material.name
-      );
-      const materialIsOutOfStock = material.status === 'out-of-stock';
-      setRestockForm({
-        supplier: selectedSupplier,
-        type: supplierDetails.type || (categorySuppliers.find(s => s.supplier.name === selectedSupplier)?.type || ''),
-        quantity: '',
-        costPerUnit: supplierDetails.costPerUnit > 0 
-          ? supplierDetails.costPerUnit.toString() 
-          : (categorySuppliers.find(s => s.supplier.name === selectedSupplier)?.costPerUnit?.toString() || ''),
-        expectedDelivery: '',
-        notes: `${materialIsOutOfStock ? 'Order' : 'Restock'} for ${material.name}`,
-      });
-    } else {
-      // Reset form if no suppliers available
-      const materialIsOutOfStock = material.status === 'out-of-stock';
-      setRestockForm({
-        supplier: '',
-        type: '',
-        quantity: '',
-        costPerUnit: '',
-        expectedDelivery: '',
-        notes: `${materialIsOutOfStock ? 'Order' : 'Restock'} for ${material.name}`,
-      });
-    }
-
+    setRestockForm({
+      supplier: material.supplier_name || '',
+      quantity: '',
+      costPerUnit: material.cost_per_unit != null && material.cost_per_unit > 0
+        ? material.cost_per_unit.toString()
+        : '',
+      invoiceNumber: '',
+      notes: '',
+    });
     setIsRestockDialogOpen(true);
-    setActiveProcurementTaskId(null);
-    setActiveProcurementSourceOrderId(null);
   };
 
   const loadAssignedTasks = async () => {
@@ -731,15 +645,13 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     }
     try {
       const material = await MaterialService.getMaterialById(primary.material_id);
-      await handleOrder(material);
-      setActiveProcurementTaskId(task?.id || null);
-      setActiveProcurementSourceOrderId(task?.related_data?.order_id || null);
+      handleOrder(material);
       setRestockForm((prev) => ({
         ...prev,
         quantity: primary.need_to_add && primary.need_to_add > 0
           ? String(primary.need_to_add)
           : String(primary.order_quantity || ''),
-        notes: `${prev.notes || ''}${prev.notes ? ' | ' : ''}Task: ${task?.related_data?.order_number || ''} · ${primary.material_name || ''}`.trim(),
+        notes: `Task: ${task?.related_data?.order_number || ''} · ${primary.material_name || ''}`.trim(),
       }));
       toast({
         title: 'Assigned Task Opened',
@@ -754,71 +666,29 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     }
   };
 
-  const handleRestockSupplierChange = (supplierName: string) => {
-    if (supplierName === 'new_supplier') {
-      setRestockForm((prev) => ({
-        ...prev,
-        supplier: 'new_supplier',
-        type: '',
-        costPerUnit: '',
-      }));
-      return;
-    }
-
-    if (!selectedRestockMaterial) return;
-
-    // Get supplier details for this material
-    const supplierDetails = getSupplierDetails(
-      supplierName,
-      selectedRestockMaterial.category,
-      selectedRestockMaterial.name
-    );
-
-    setRestockForm((prev) => ({
-      ...prev,
-      supplier: supplierName,
-      type: supplierDetails.type || prev.type,
-      costPerUnit: supplierDetails.costPerUnit > 0 
-        ? supplierDetails.costPerUnit.toString() 
-        : prev.costPerUnit,
-    }));
-  };
 
   const handleRestockSubmit = async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
+    if (e) e.preventDefault();
 
-    // STRICT VALIDATION - Check all required fields first
-    if (!selectedRestockMaterial || !restockForm.supplier || !restockForm.quantity || !restockForm.costPerUnit) {
+    if (!selectedRestockMaterial || !restockForm.quantity || !restockForm.costPerUnit || !restockForm.invoiceNumber) {
       toast({
         title: 'Missing Required Fields',
-        description: 'Please fill in all required fields before submitting.',
+        description: 'Please fill in quantity, price, and invoice number.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Parse and validate quantity - MUST BE > 0
     const quantity = parseFloat(restockForm.quantity);
-    if (isNaN(quantity) || quantity <= 0 || quantity === 0) {
-      toast({
-        title: 'Invalid Quantity',
-        description: 'Quantity must be greater than 0. Minimum value is 0.01.',
-        variant: 'destructive',
-      });
+    if (isNaN(quantity) || quantity <= 0) {
+      toast({ title: 'Invalid Quantity', description: 'Quantity must be greater than 0.', variant: 'destructive' });
       setRestockForm({ ...restockForm, quantity: '' });
       return;
     }
 
-    // Parse and validate cost per unit - MUST BE > 0
     const costPerUnit = parseFloat(restockForm.costPerUnit);
-    if (isNaN(costPerUnit) || costPerUnit <= 0 || costPerUnit === 0) {
-      toast({
-        title: 'Invalid Price',
-        description: 'Cost per unit must be greater than 0. Minimum value is 0.01.',
-        variant: 'destructive',
-      });
+    if (isNaN(costPerUnit) || costPerUnit <= 0) {
+      toast({ title: 'Invalid Price', description: 'Cost per unit must be greater than 0.', variant: 'destructive' });
       setRestockForm({ ...restockForm, costPerUnit: '' });
       return;
     }
@@ -826,78 +696,55 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     try {
       setSubmitting(true);
 
-      // Create order (restock or new order based on material status)
-      const orderIsOutOfStock = selectedRestockMaterial.status === 'out-of-stock';
-      const totalCost = quantity * costPerUnit;
+      const { getApiUrl } = await import('@/utils/apiConfig');
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
 
-      // Get supplier ID if exists
-      const supplierData = suppliers.find((s) => s.name === restockForm.supplier);
-      const supplierId = supplierData?.id;
+      const response = await fetch(
+        `${API_URL}/raw-materials/${encodeURIComponent(selectedRestockMaterial.id)}/adjust-stock`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify({
+            quantity,
+            reason: 'purchase',
+            operator: 'user',
+            notes: restockForm.notes || undefined,
+            supplier_name: restockForm.supplier || undefined,
+            cost_per_unit: costPerUnit,
+            invoice_number: restockForm.invoiceNumber,
+          }),
+        }
+      );
 
-      const orderData = {
-        supplier_name: restockForm.supplier === 'new_supplier' ? restockForm.supplier : restockForm.supplier,
-        supplier_id: supplierId,
-        order_date: new Date().toISOString().split('T')[0],
-        expected_delivery: restockForm.expectedDelivery || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        total_amount: totalCost,
-        status: 'pending' as const,
-        material_details: {
-          materialName: selectedRestockMaterial.name,
-          materialType: restockForm.type,
-          materialCategory: selectedRestockMaterial.category,
-          materialBatchNumber: `BATCH-${Date.now()}`,
-          quantity: quantity,
-          unit: selectedRestockMaterial.unit,
-          costPerUnit: costPerUnit,
-          minThreshold: selectedRestockMaterial.min_threshold || 100,
-          maxCapacity: selectedRestockMaterial.max_capacity || 1000,
-          isRestock: !orderIsOutOfStock,
-          userNotes: restockForm.notes || '',
-          source_order_id: activeProcurementSourceOrderId || null,
-          source_material_id: selectedRestockMaterial.id,
-        },
-        // Also include items array for backend compatibility
-        items: [{
-          material_id: selectedRestockMaterial.id,
-          material_name: selectedRestockMaterial.name,
-          quantity: quantity,
-          unit: selectedRestockMaterial.unit,
-          unit_price: costPerUnit,
-          total_price: totalCost,
-        }],
-        procurement_task_id: activeProcurementTaskId || undefined,
-      };
-
-      const orderResult = await ManageStockService.createOrder(orderData);
-
-      if (!orderResult.success) {
-        throw new Error(orderResult.error || 'Failed to create order');
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to restock material');
       }
 
       toast({
-        title: orderIsOutOfStock ? 'Material Order Created!' : 'Restock Order Created!',
-        description: `${selectedRestockMaterial.name} ${orderIsOutOfStock ? 'order' : 'restock order'} has been created.`,
+        title: 'Restocked!',
+        description: `${selectedRestockMaterial.name} stock updated by +${quantity} ${selectedRestockMaterial.unit}.`,
       });
 
-      // Close dialog and reset form
       setIsRestockDialogOpen(false);
-      setRestockForm({
-        supplier: '',
-        type: '',
-        quantity: '',
-        costPerUnit: '',
-        expectedDelivery: '',
-        notes: '',
-      });
+      setRestockForm({ supplier: '', quantity: '', costPerUnit: '', invoiceNumber: '', notes: '' });
       setSelectedRestockMaterial(null);
-      setActiveProcurementTaskId(null);
-      setActiveProcurementSourceOrderId(null);
       loadAssignedTasks();
+
+      // Refresh materials list
+      const { materials: data, total } = await MaterialService.getMaterials(filters);
+      setMaterials(data);
+      setTotalMaterials(total || data.length);
+      loadStats();
     } catch (error) {
-      console.error('Error creating restock order:', error);
+      console.error('Error restocking material:', error);
       toast({
-        title: 'Error Creating Restock Order',
-        description: error instanceof Error ? error.message : 'There was an error creating the restock order. Please try again.',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to restock. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -1225,157 +1072,77 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       {/* Restock Dialog */}
       {isRestockDialogOpen && selectedRestockMaterial && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] flex flex-col">
-            {/* Fixed Header */}
+          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-                        <div>
+              <div>
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  {selectedRestockMaterial.status === 'out-of-stock' ? 'Order' : 'Restock'}{' '}
+                  Restock{' '}
                   <TruncatedText text={selectedRestockMaterial.name} maxLength={40} as="span" />
                 </h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedRestockMaterial.status === 'out-of-stock'
-                    ? 'Order this material from available suppliers'
-                    : 'Restock this material from available suppliers'}
-                </p>
-                        </div>
-                          <button
+                <p className="text-sm text-gray-500 mt-1">Stock will be updated immediately</p>
+              </div>
+              <button
                 onClick={() => setIsRestockDialogOpen(false)}
                 type="button"
                 className="text-gray-400 hover:text-gray-600 transition-colors"
-                          >
+              >
                 <X className="w-5 h-5" />
-                          </button>
+              </button>
             </div>
 
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Material Info Card */}
-              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                <div className="flex items-center gap-3">
-                  {selectedRestockMaterial.image_url && (
-                    <img
-                      src={selectedRestockMaterial.image_url}
-                      alt={selectedRestockMaterial.name}
-                      className="w-16 h-16 rounded-lg object-cover border border-gray-200"
-                    />
-                  )}
-                    <div className="flex-1">
-                    <div className="font-semibold text-gray-900">
-                      <TruncatedText text={selectedRestockMaterial.name} maxLength={50} as="span" />
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Current stock: <span className="font-medium">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Category: <span className="font-medium">{selectedRestockMaterial.category}</span>
-                    </div>
-                  </div>
-                </div>
-                    </div>
-
-              {/* Available Suppliers */}
-              {/* Available Suppliers by Category */}
-              {(() => {
-                const categorySuppliers = getSuppliersForCategory(selectedRestockMaterial.category);
-                return categorySuppliers.length > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700 mb-2">
-                      Available Suppliers from {selectedRestockMaterial.category} Category
-                    </Label>
-                    <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
-                      {categorySuppliers.map((item, index) => (
-                        <div key={index} className="p-2 border border-gray-200 rounded-md text-sm bg-white">
-                          <div className="font-medium text-gray-900">{item.supplier.name}</div>
-                          {item.type && item.costPerUnit && item.unit && (
-                            <div className="text-xs text-gray-600 mt-0.5">
-                              Type: {item.type} | Cost: ₹{item.costPerUnit} | Unit: {item.unit}
-                            </div>
-                          )}
-                    </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Supplier Selection */}
-              <div>
-                <Label htmlFor="restockSupplier" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Select Supplier * {restockForm.supplier && <span className="text-xs text-gray-500 font-normal">(Previous supplier - cannot be changed)</span>}
-                </Label>
-                <Select
-                  value={restockForm.supplier}
-                  onValueChange={handleRestockSupplierChange}
-                  disabled={!!restockForm.supplier}
-                >
-                  <SelectTrigger className="bg-white [&>span]:text-left [&>span]:justify-start" disabled={!!restockForm.supplier}>
-                    <SelectValue placeholder="Select supplier" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white max-h-[300px]">
-                    {suppliers.map((supplier) => {
-                      const supplierDetails = getSupplierDetails(
-                        supplier.name,
-                        selectedRestockMaterial.category,
-                        selectedRestockMaterial.name
-                      );
-                      return (
-                        <SelectItem 
-                          key={supplier.id} 
-                          value={supplier.name}
-                          className="bg-white hover:bg-gray-100"
-                        >
-                          <div className="flex flex-col text-left">
-                            <span className="font-medium text-left">{supplier.name}</span>
-                            {supplierDetails.type && supplierDetails.costPerUnit > 0 && (
-                              <span className="text-xs text-gray-500 text-left">
-                                {supplierDetails.type} • ₹{supplierDetails.costPerUnit} • {supplierDetails.unit || 'unit'}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                    <div className="border-t border-gray-200 my-1" />
-                    <SelectItem value="new_supplier" className="bg-white hover:bg-gray-100">
-                      <div className="flex items-center gap-2 text-blue-600">
-                        <Plus className="w-4 h-4" />
-                        Add New Supplier
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                {restockForm.supplier === 'new_supplier' && (
-                  <Input
-                    placeholder="Enter new supplier name"
-                    className="mt-2"
-                    onChange={(e) => setRestockForm({ ...restockForm, supplier: e.target.value })}
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {/* Material Info */}
+              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex items-center gap-3">
+                {selectedRestockMaterial.image_url && (
+                  <img
+                    src={selectedRestockMaterial.image_url}
+                    alt={selectedRestockMaterial.name}
+                    className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
                   />
                 )}
+                <div>
+                  <div className="font-medium text-gray-900">
+                    <TruncatedText text={selectedRestockMaterial.name} maxLength={50} as="span" />
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Current stock: <span className="font-medium text-gray-700">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>
+                    {selectedRestockMaterial.cost_per_unit != null && selectedRestockMaterial.cost_per_unit > 0 && (
+                      <span className="ml-3">Last price: <span className="font-medium text-gray-700">₹{selectedRestockMaterial.cost_per_unit}</span></span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Type and Quantity */}
+              {/* Supplier */}
+              <div>
+                <Label htmlFor="restockSupplier" className="text-sm font-medium text-gray-700 mb-1 block">
+                  Supplier Name
+                  {selectedRestockMaterial.supplier_name && (
+                    <span className="text-xs text-gray-400 font-normal ml-1">(pre-filled from material, editable)</span>
+                  )}
+                </Label>
+                <Input
+                  id="restockSupplier"
+                  value={restockForm.supplier}
+                  onChange={(e) => setRestockForm({ ...restockForm, supplier: e.target.value })}
+                  placeholder="Enter supplier name"
+                  list="restock-suppliers-list"
+                />
+                <datalist id="restock-suppliers-list">
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.name} />
+                  ))}
+                </datalist>
+              </div>
+
+              {/* Quantity + Price */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="restockType" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Material Type *
-                  </Label>
-                  <Input
-                    id="restockType"
-                    value={restockForm.type}
-                    readOnly
-                    disabled
-                    className="bg-gray-100 cursor-not-allowed"
-                    placeholder="Auto-filled from supplier"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Cannot be changed
-                  </p>
-                </div>
-                <div>
                   <Label htmlFor="restockQuantity" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Quantity to Order *
+                    Quantity *
                   </Label>
                   <Input
                     id="restockQuantity"
@@ -1384,35 +1151,23 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                     step="0.01"
                     value={restockForm.quantity}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      // Allow empty string for typing, but validate on blur/submit
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        // Prevent setting to exactly "0" - require at least 0.01
-                        if (value !== '0') {
-                          setRestockForm({ ...restockForm, quantity: value });
-                        }
+                      const v = e.target.value;
+                      if (v === '' || (/^\d*\.?\d*$/.test(v) && v !== '0')) {
+                        setRestockForm({ ...restockForm, quantity: v });
                       }
                     }}
                     onBlur={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (isNaN(value) || value <= 0) {
+                      if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
                         setRestockForm({ ...restockForm, quantity: '' });
-                      }
                     }}
-                    placeholder="Enter quantity (min: 0.01)"
+                    placeholder={`Min 0.01 ${selectedRestockMaterial.unit}`}
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Unit: {selectedRestockMaterial.unit}
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Unit: {selectedRestockMaterial.unit}</p>
                 </div>
-              </div>
-
-              {/* Cost per Unit and Expected Delivery */}
-              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="restockCostPerUnit" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Cost per Unit (₹) *
+                    Price per {selectedRestockMaterial.unit} (₹) *
                   </Label>
                   <Input
                     id="restockCostPerUnit"
@@ -1421,109 +1176,91 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                     step="0.01"
                     value={restockForm.costPerUnit}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      // Allow empty string for typing, but validate on blur/submit
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        // Prevent setting to exactly "0" - require at least 0.01
-                        if (value !== '0') {
-                          setRestockForm({ ...restockForm, costPerUnit: value });
-                        }
+                      const v = e.target.value;
+                      if (v === '' || (/^\d*\.?\d*$/.test(v) && v !== '0')) {
+                        setRestockForm({ ...restockForm, costPerUnit: v });
                       }
                     }}
                     onBlur={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (isNaN(value) || value <= 0) {
+                      if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
                         setRestockForm({ ...restockForm, costPerUnit: '' });
-                      }
                     }}
-                    placeholder="Enter cost per unit (min: 0.01)"
+                    placeholder="Enter price"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Editable
-                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Becomes new current price</p>
                 </div>
-                <div>
-                  <Label htmlFor="restockExpectedDelivery" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Expected Delivery Date
-                  </Label>
-                  <Input
-                    id="restockExpectedDelivery"
-                    type="date"
-                    value={restockForm.expectedDelivery}
-                    onChange={(e) => setRestockForm({ ...restockForm, expectedDelivery: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
+              </div>
+
+              {/* Invoice Number */}
+              <div>
+                <Label htmlFor="restockInvoice" className="text-sm font-medium text-gray-700 mb-1 block">
+                  Invoice Number *
+                </Label>
+                <Input
+                  id="restockInvoice"
+                  value={restockForm.invoiceNumber}
+                  onChange={(e) => setRestockForm({ ...restockForm, invoiceNumber: e.target.value })}
+                  placeholder="Enter invoice / bill number"
+                  required
+                />
               </div>
 
               {/* Notes */}
               <div>
                 <Label htmlFor="restockNotes" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Notes
+                  Notes <span className="text-gray-400 font-normal">(optional)</span>
                 </Label>
                 <Textarea
                   id="restockNotes"
                   value={restockForm.notes}
                   onChange={(e) => setRestockForm({ ...restockForm, notes: e.target.value })}
-                  placeholder="Additional notes for this restock order"
-                  rows={3}
+                  placeholder="Any additional notes"
+                  rows={2}
                   className="resize-none"
                 />
               </div>
 
-              {/* Total Cost Calculation */}
-              {restockForm.quantity && restockForm.costPerUnit && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="text-sm font-semibold text-blue-900">
-                    Total Cost: ₹{(parseFloat(restockForm.quantity) * parseFloat(restockForm.costPerUnit)).toFixed(2)}
+              {/* Total Cost */}
+              {restockForm.quantity && restockForm.costPerUnit &&
+                parseFloat(restockForm.quantity) > 0 && parseFloat(restockForm.costPerUnit) > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-sm font-semibold text-green-900">
+                    Total: ₹{(parseFloat(restockForm.quantity) * parseFloat(restockForm.costPerUnit)).toFixed(2)}
                   </div>
-                  <div className="text-xs text-blue-700 mt-1">
-                    {restockForm.quantity} {selectedRestockMaterial.unit} × ₹{restockForm.costPerUnit} per {selectedRestockMaterial.unit}
+                  <div className="text-xs text-green-700 mt-0.5">
+                    {restockForm.quantity} {selectedRestockMaterial.unit} × ₹{restockForm.costPerUnit}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Fixed Footer */}
+            {/* Footer */}
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => setIsRestockDialogOpen(false)}
-                disabled={submitting}
-              >
+              <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleRestockSubmit(e);
-                }} 
+              <Button
+                onClick={(e) => { e.preventDefault(); handleRestockSubmit(e); }}
                 className="bg-primary-600 hover:bg-primary-700 text-white"
                 disabled={
-                  submitting || 
-                  !restockForm.quantity || 
-                  !restockForm.costPerUnit || 
-                  restockForm.quantity === '0' ||
-                  restockForm.costPerUnit === '0' ||
-                  parseFloat(restockForm.quantity || '0') <= 0 || 
-                  parseFloat(restockForm.costPerUnit || '0') <= 0 ||
-                  isNaN(parseFloat(restockForm.quantity || '0')) ||
-                  isNaN(parseFloat(restockForm.costPerUnit || '0'))
+                  submitting ||
+                  !restockForm.quantity ||
+                  !restockForm.costPerUnit ||
+                  !restockForm.invoiceNumber ||
+                  parseFloat(restockForm.quantity || '0') <= 0 ||
+                  parseFloat(restockForm.costPerUnit || '0') <= 0
                 }
               >
                 {submitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Restocking...</>
                 ) : (
-                  'Create Order'
+                  'Restock Now'
                 )}
               </Button>
             </div>
           </div>
-      </div>
+        </div>
       )}
     </Layout>
   );
