@@ -38,6 +38,28 @@ function weightKgFromRow(item: IndividualProduct): number | null {
   return null;
 }
 
+function getRollNumberDatePrefix(dateInput?: string): string {
+  const source = dateInput ? new Date(dateInput) : new Date();
+  if (Number.isNaN(source.getTime())) {
+    const fallback = new Date();
+    const yy = String(fallback.getFullYear()).slice(-2);
+    const mm = String(fallback.getMonth() + 1).padStart(2, '0');
+    return `${yy}-${mm}-`;
+  }
+  const yy = String(source.getFullYear()).slice(-2);
+  const mm = String(source.getMonth() + 1).padStart(2, '0');
+  return `${yy}-${mm}-`;
+}
+
+function normalizeRollNumberInput(rawValue: string, productionDate?: string): string {
+  const trimmed = String(rawValue || '').trim();
+  if (!trimmed) return '';
+  const prefix = getRollNumberDatePrefix(productionDate);
+  if (trimmed.startsWith(prefix)) return trimmed;
+  if (/^\d+$/.test(trimmed)) return `${prefix}${trimmed}`;
+  return trimmed;
+}
+
 interface IndividualProductsTableProps {
   individualProducts: IndividualProduct[];
   onUpdate: () => void;
@@ -258,7 +280,7 @@ export default function IndividualProductsTable({
         value = productItem.location || 'Warehouse A - General Storage';
         break;
       case 'roll_number':
-        value = productItem.roll_number || '';
+        value = productItem.roll_number || getRollNumberDatePrefix(productItem.production_date);
         break;
       case 'notes':
         value = productItem.notes || '';
@@ -312,6 +334,20 @@ export default function IndividualProductsTable({
           toast({
             title: 'Location required',
             description: 'Please select a storage location.',
+            variant: 'destructive',
+          });
+          setSaving(null);
+          return;
+        }
+      }
+
+      if (col === 'roll_number') {
+        valueToSave = normalizeRollNumberInput(valueToSave, productItem.production_date);
+        const expectedPrefix = getRollNumberDatePrefix(productItem.production_date);
+        if (!valueToSave || valueToSave === expectedPrefix) {
+          toast({
+            title: 'Roll number required',
+            description: `Enter serial after prefix ${expectedPrefix} (example: ${expectedPrefix}101).`,
             variant: 'destructive',
           });
           setSaving(null);
@@ -1108,6 +1144,62 @@ export default function IndividualProductsTable({
     });
   };
 
+  const handleGenerateRollNumbers = () => {
+    const sourceIndex = localProducts.findIndex(
+      (row) => row.roll_number && String(row.roll_number).trim() !== ''
+    );
+    if (sourceIndex < 0) {
+      toast({
+        title: 'Starting roll number required',
+        description: 'Enter one roll number first (example: 101), then click Generate Roll Nos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const sourceRow = localProducts[sourceIndex];
+    const normalizedSource = normalizeRollNumberInput(
+      String(sourceRow.roll_number || ''),
+      sourceRow.production_date
+    );
+    const match = normalizedSource.match(/^(.*?)(\d+)$/);
+    if (!match) {
+      toast({
+        title: 'Invalid starting roll number',
+        description: 'Use numeric ending (example: 24-03-101 or just 101).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const prefix = match[1];
+    const startSerial = Number(match[2]);
+    if (!Number.isFinite(startSerial)) {
+      toast({
+        title: 'Invalid starting serial',
+        description: 'Starting serial must be a valid number.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const updated = [...localProducts];
+    let serial = startSerial;
+    for (let i = sourceIndex; i < updated.length; i += 1) {
+      updated[i] = {
+        ...updated[i],
+        roll_number: `${prefix}${serial}`,
+      };
+      serial += 1;
+    }
+
+    setLocalProductsSync(updated);
+    toast({
+      title: 'Roll numbers generated',
+      description: `Generated sequential roll numbers from ${prefix}${startSerial} onward.`,
+    });
+  };
+
   const hasOneRowFilled = localProducts.some(p =>
     p.final_weight && p.final_width && p.final_length && p.location &&
     String(p.final_weight).trim() !== '' &&
@@ -1188,6 +1280,14 @@ export default function IndividualProductsTable({
                 Apply same details to all
               </Button>
             )}
+            <Button
+              onClick={handleGenerateRollNumbers}
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50"
+            >
+              Generate Roll Nos
+            </Button>
             <Button
               onClick={handleAddRow}
               size="sm"
@@ -1348,9 +1448,12 @@ export default function IndividualProductsTable({
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder="Enter roll no"
+                          placeholder={`${getRollNumberDatePrefix(productItem.production_date)}101`}
                           disabled={saving === productItem.id}
                         />
+                        <p className="mt-1 text-[11px] text-gray-500">
+                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (year-month + serial)
+                        </p>
                       </div>
                     ) : (
                       <div
