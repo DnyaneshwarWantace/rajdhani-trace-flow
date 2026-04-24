@@ -26,6 +26,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Package, Loader2, X, Bell } from 'lucide-react';
 import type { RawMaterial, MaterialFilters as MaterialFiltersType, PeriodicDueMaterial } from '@/types/material';
 import { toPeriodicDueMaterial } from '@/types/material';
@@ -1017,24 +1024,27 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
 
               {/* Supplier */}
               <div>
-                <Label htmlFor="restockSupplier" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Supplier Name
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">
+                  Supplier
                   {selectedRestockMaterial.supplier_name && (
-                    <span className="text-xs text-gray-400 font-normal ml-1">(pre-filled from material, editable)</span>
+                    <span className="text-xs text-gray-400 font-normal ml-1">(auto-selected, change if needed)</span>
                   )}
                 </Label>
-                <Input
-                  id="restockSupplier"
+                <Select
                   value={restockForm.supplier}
-                  onChange={(e) => setRestockForm({ ...restockForm, supplier: e.target.value })}
-                  placeholder="Enter supplier name"
-                  list="restock-suppliers-list"
-                />
-                <datalist id="restock-suppliers-list">
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.name} />
-                  ))}
-                </datalist>
+                  onValueChange={(val) => setRestockForm({ ...restockForm, supplier: val })}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white max-h-[260px]">
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.name} className="hover:bg-gray-100">
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Quantity + Price */}
