@@ -37,10 +37,10 @@ export async function downloadQRsAsPdf(
   const marginX = 10;
   const marginY = 14;
   const cols = 3;
-  const qrSize = 50; // mm
+  const qrSize = 44; // mm
   const labelHeight = 10; // mm for roll + qr text below QR
   const cellW = (pageW - marginX * 2) / cols;
-  const cellH = qrSize + labelHeight + 6;
+  const cellH = qrSize + labelHeight + 8;
 
   // Title on first page
   doc.setFontSize(13);
@@ -76,6 +76,10 @@ export async function downloadQRsAsPdf(
 
       // QR image centered in cell
       const imgX = x + (cellW - qrSize) / 2;
+      // Black border around every QR label for cleaner print
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.4);
+      doc.rect(imgX - 1.5, y - 1.5, qrSize + 3, qrSize + 3);
       doc.addImage(dataUrl, 'PNG', imgX, y, qrSize, qrSize);
 
       // Roll No below QR
@@ -98,6 +102,28 @@ export async function downloadQRsAsPdf(
     }
 
     onProgress?.(i + 1, validItems.length);
+  }
+
+  // Cutting guides across the full page
+  const pageCount = doc.getNumberOfPages();
+  for (let pageIndex = 1; pageIndex <= pageCount; pageIndex++) {
+    doc.setPage(pageIndex);
+    doc.setDrawColor(170, 170, 170);
+    doc.setLineWidth(0.2);
+
+    // Vertical guide lines
+    for (let c = 1; c < cols; c++) {
+      const xGuide = marginX + c * cellW;
+      doc.line(xGuide, marginY + 1, xGuide, pageH - marginY + 1);
+    }
+
+    // Horizontal guide lines
+    for (let r = 1; r <= rowsPerPage; r++) {
+      const yGuide = marginY + 4 + r * cellH;
+      if (yGuide < pageH - marginY + 2) {
+        doc.line(marginX, yGuide, pageW - marginX, yGuide);
+      }
+    }
   }
 
   doc.save(fileName);

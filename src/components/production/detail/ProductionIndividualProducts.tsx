@@ -124,7 +124,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
             disabled={downloadingPdf || individualProducts.filter(p => p.qr_code).length === 0}
           >
             {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
-            Download QR PDF
+            PDF (All)
           </Button>
         </div>
         <p className="text-sm text-gray-600 mt-1">
