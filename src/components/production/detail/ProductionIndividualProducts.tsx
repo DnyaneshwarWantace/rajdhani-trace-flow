@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Package, Loader2, FileDown } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
+import { downloadQRsAsPdf } from '@/utils/qrPdfExport';
+import { useToast } from '@/hooks/use-toast';
 import type { IndividualProduct } from '@/types/product';
 import type { ProductionBatch } from '@/services/productionService';
 
@@ -27,6 +30,31 @@ interface ProductionIndividualProductsProps {
 export default function ProductionIndividualProducts({ batch }: ProductionIndividualProductsProps) {
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const { toast } = useToast();
+
+  const handleDownloadQrPdf = async () => {
+    const withQr = individualProducts.filter((p) => p.qr_code);
+    if (withQr.length === 0) {
+      toast({ title: 'No QR codes', description: 'No QR codes available to download.', variant: 'destructive' });
+      return;
+    }
+    setDownloadingPdf(true);
+    toast({ title: 'Generating PDF…', description: `Preparing ${withQr.length} QR codes, please wait.` });
+    try {
+      const productName = batch.product_name || batch.product_id || 'batch';
+      await downloadQRsAsPdf(
+        withQr,
+        `QR Codes — ${productName} (Batch ${batch.batch_number || ''})`,
+        `${productName}-${batch.batch_number || 'batch'}-qr-codes.pdf`
+      );
+      toast({ title: 'PDF Downloaded', description: `${withQr.length} QR codes saved as PDF.` });
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to generate PDF.', variant: 'destructive' });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     if (batch?.product_id && batch?.batch_number) {
@@ -84,10 +112,21 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Package className="w-5 h-5 text-primary-600" />
-          Individual Products Created ({individualProducts.length})
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-primary-600" />
+            Individual Products Created ({individualProducts.length})
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownloadQrPdf}
+            disabled={downloadingPdf || individualProducts.filter(p => p.qr_code).length === 0}
+          >
+            {downloadingPdf ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileDown className="w-4 h-4 mr-2" />}
+            Download QR PDF
+          </Button>
+        </div>
         <p className="text-sm text-gray-600 mt-1">
           These are the individual products created in this production batch
         </p>
