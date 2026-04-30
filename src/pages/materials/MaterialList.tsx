@@ -15,7 +15,6 @@ import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
 import RecordPeriodicUsageDialog from '@/components/materials/RecordPeriodicUsageDialog';
 import ImportCSVDialog from '@/components/materials/ImportCSVDialog';
 import ExportMaterialsDialog from '@/components/materials/ExportMaterialsDialog';
-import BulkRestockDialog from '@/components/materials/BulkRestockDialog';
 import {
   Dialog,
   DialogContent,
@@ -134,8 +133,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   const [selectedPeriodicMaterial, setSelectedPeriodicMaterial] = useState<PeriodicDueMaterial | null>(null);
   const periodicReminderShownRef = useRef(false);
 
-  // Bulk restock dialog
-  const [isBulkRestockOpen, setIsBulkRestockOpen] = useState(false);
 
   // Restock dialog states
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false);
@@ -787,7 +784,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           subtitle={pageSubtitle}
           onImportCSV={activeTab === 'inventory' && canCreate('materials') ? handleImportCSV : undefined}
           onExport={activeTab === 'inventory' ? handleExport : undefined}
-          onBulkRestock={activeTab === 'inventory' && canCreate('materials') ? () => setIsBulkRestockOpen(true) : undefined}
           onAddToInventory={activeTab === 'inventory' ? handleAddToInventory : undefined}
           onAddMaterial={canCreate('materials') ? handleCreate : undefined}
           viewMode={viewMode}
@@ -979,22 +975,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Bulk Restock Dialog */}
-      {isBulkRestockOpen && (
-        <BulkRestockDialog
-          materials={materials}
-          suppliers={suppliers}
-          onClose={() => setIsBulkRestockOpen(false)}
-          onSuccess={async () => {
-            setIsBulkRestockOpen(false);
-            const { materials: data, total } = await MaterialService.getMaterials(filters);
-            setMaterials(data);
-            setTotalMaterials(total || data.length);
-            loadStats();
-          }}
-        />
-      )}
 
       {/* Restock Dialog */}
       {isRestockDialogOpen && selectedRestockMaterial && (

@@ -14,6 +14,7 @@ import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
 import { uploadImageToR2 } from '@/services/imageService';
 import { HexColorInput, HexColorPicker } from 'react-colorful';
+import ColorSwatch from '@/components/ui/ColorSwatch';
 
 interface ProductDropdownFieldProps {
   label: string;
@@ -258,10 +259,7 @@ export default function ProductDropdownField({
                   <HexColorPicker color={newColorCode} onChange={setNewColorCode} className="!w-full" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <span
-                    className="w-5 h-5 rounded-full border border-gray-300 inline-block"
-                    style={{ backgroundColor: newColorCode }}
-                  />
+                  <ColorSwatch colorCode={newColorCode} className="w-5 h-5 rounded-full" />
                   <HexColorInput
                     color={newColorCode}
                     onChange={setNewColorCode}
@@ -355,10 +353,7 @@ export default function ProductDropdownField({
                       />
                     )}
                     {category.toLowerCase() === 'color' && optionColors[option] && (
-                      <span
-                        className="w-8 h-8 rounded-md border border-gray-300 inline-block shrink-0"
-                        style={{ backgroundColor: optionColors[option] }}
-                      />
+                      <ColorSwatch colorCode={optionColors[option]} />
                     )}
                     <span className="truncate block max-w-[200px] text-sm">{option}</span>
                   </div>

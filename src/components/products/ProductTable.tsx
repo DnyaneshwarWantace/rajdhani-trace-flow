@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import ColorSwatch from '@/components/ui/ColorSwatch';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface ProductTableProps {
@@ -150,7 +151,7 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                         <p className="text-xs text-gray-500 break-words flex items-center gap-1">
                           <span>Color:</span>
                           {colorCodeMap[product.color] && (
-                            <span className="w-8 h-8 rounded-md border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                            <ColorSwatch colorCode={colorCodeMap[product.color]} />
                           )}
                           <span className="truncate">{product.color}</span>
                         </p>
@@ -161,15 +162,19 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                       product.pattern.toLowerCase() !== 'n/a' && (
                         <p className="text-xs text-gray-500 break-words flex items-center gap-1">
                           <span>Pattern:</span>
-                          {patternImageMap[product.pattern] && (
+                          {(() => {
+                            const patternImageUrl = patternImageMap[product.pattern];
+                            if (!patternImageUrl) return null;
+                            return (
                             <img
-                              src={patternImageMap[product.pattern]}
-                              alt={product.pattern}
-                              onClick={() => setSelectedImage({ url: patternImageMap[product.pattern], alt: product.pattern })}
+                              src={patternImageUrl}
+                              alt={product.pattern || 'Pattern'}
+                              onClick={() => setSelectedImage({ url: patternImageUrl, alt: product.pattern || 'Pattern' })}
                               className="w-8 h-8 rounded-md object-cover border border-gray-300 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                              title={`View ${product.pattern}`}
+                              title={`View ${product.pattern || 'Pattern'}`}
                             />
-                          )}
+                            );
+                          })()}
                           <span className="truncate">{product.pattern}</span>
                         </p>
                       )}
