@@ -154,7 +154,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
 
   // Load materials FIRST, then stats in background
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
-  const notificationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const notificationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!hasLoadedInitial) {
