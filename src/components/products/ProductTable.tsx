@@ -162,15 +162,20 @@ export default function ProductTable({ products, onEdit, onDuplicate, onView, on
                       product.pattern.toLowerCase() !== 'n/a' && (
                         <p className="text-xs text-gray-500 break-words flex items-center gap-1">
                           <span>Pattern:</span>
-                          {patternImageMap[product.pattern] && (
-                            <img
-                              src={patternImageMap[product.pattern]}
-                              alt={product.pattern || 'Pattern'}
-                              onClick={() => setSelectedImage({ url: patternImageMap[product.pattern]!, alt: product.pattern || 'Pattern' })}
-                              className="w-8 h-8 rounded-md object-cover border border-gray-300 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                              title={`View ${product.pattern || 'Pattern'}`}
-                            />
-                          )}
+                          {(() => {
+                            const pat = product.pattern;
+                            const img = pat ? patternImageMap[pat] : undefined;
+                            if (!img) return null;
+                            return (
+                              <img
+                                src={img}
+                                alt={pat}
+                                onClick={() => setSelectedImage({ url: img, alt: pat })}
+                                className="w-8 h-8 rounded-md object-cover border border-gray-300 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                                title={`View ${pat}`}
+                              />
+                            );
+                          })()}
                           <span className="truncate">{product.pattern}</span>
                         </p>
                       )}
