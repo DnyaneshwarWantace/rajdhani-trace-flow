@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Search, Package, Loader2, Check, Filter } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import {
   Select,
   SelectContent,
@@ -59,6 +60,7 @@ export default function RecipeMaterialSelectionDialog({
   // Sorting states
   const [sortBy, setSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
 
   useEffect(() => {
     if (isOpen) {
@@ -428,7 +430,7 @@ export default function RecipeMaterialSelectionDialog({
                                 }}
                               />
                               <label htmlFor={`color-${color}`} className="text-sm cursor-pointer flex-1">
-                                {color}
+                                <span className="inline-flex items-center gap-1">{colorCodeMap[color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: colorCodeMap[color] }} />}{color}</span>
                               </label>
                             </div>
                           ))}
@@ -465,7 +467,7 @@ export default function RecipeMaterialSelectionDialog({
                                 }}
                               />
                               <label htmlFor={`pattern-${pattern}`} className="text-sm cursor-pointer flex-1">
-                                {pattern}
+                                <span className="inline-flex items-center gap-1">{patternImageMap[pattern] && <img src={patternImageMap[pattern]} alt={pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />}{pattern}</span>
                               </label>
                             </div>
                           ))}
@@ -668,13 +670,13 @@ export default function RecipeMaterialSelectionDialog({
                             {materialType === 'product' && (
                               <>
                                 {material.color && material.color !== 'N/A' && (
-                                  <div className="truncate">
-                                    <span className="font-medium">Color:</span> {material.color}
+                                  <div className="truncate inline-flex items-center gap-1">
+                                    <span className="font-medium">Color:</span> {colorCodeMap[material.color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: colorCodeMap[material.color] }} />} {material.color}
                                   </div>
                                 )}
                                 {material.pattern && material.pattern !== 'N/A' && (
-                                  <div className="truncate">
-                                    <span className="font-medium">Pattern:</span> {material.pattern}
+                                  <div className="truncate inline-flex items-center gap-1">
+                                    <span className="font-medium">Pattern:</span> {patternImageMap[material.pattern] && <img src={patternImageMap[material.pattern]} alt={material.pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />} {material.pattern}
                                   </div>
                                 )}
                                 {material.length && material.width && (

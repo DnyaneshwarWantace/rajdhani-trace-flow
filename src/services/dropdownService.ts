@@ -188,7 +188,13 @@ export class DropdownService {
   /**
    * Add a new dropdown option
    */
-  static async addOption(category: string, value: string, displayOrder?: number): Promise<{ success: boolean; error?: string }> {
+  static async addOption(
+    category: string,
+    value: string,
+    displayOrder?: number,
+    imageUrl?: string | null,
+    colorCode?: string | null
+  ): Promise<{ success: boolean; error?: string; data?: DropdownOption }> {
     try {
       const response = await fetch(`${API_URL}/dropdowns`, {
         method: 'POST',
@@ -197,6 +203,8 @@ export class DropdownService {
           category,
           value,
           display_order: displayOrder,
+          ...(imageUrl !== undefined && { image_url: imageUrl }),
+          ...(colorCode !== undefined && { color_code: colorCode }),
         }),
       });
 
@@ -206,7 +214,7 @@ export class DropdownService {
         return { success: false, error: result.error || 'Failed to add option' };
       }
 
-      return { success: true };
+      return { success: true, data: result.data };
     } catch (error) {
       console.error('Error adding dropdown option:', error);
       return { success: false, error: 'Failed to add option' };

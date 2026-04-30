@@ -89,6 +89,8 @@ export default function MaterialSelectorDialog({
   const [selectedLength, setSelectedLength] = useState<string[]>([]);
   const [selectedWidth, setSelectedWidth] = useState<string[]>([]);
   const [selectedWeight, setSelectedWeight] = useState<string[]>([]);
+  const [productColorCodeMap, setProductColorCodeMap] = useState<Record<string, string>>({});
+  const [productPatternImageMap, setProductPatternImageMap] = useState<Record<string, string>>({});
   const [selectedItems, setSelectedItems] = useState<Array<{
     materialId: string;
     materialName: string;
@@ -220,9 +222,23 @@ export default function MaterialSelectorDialog({
         sortBy: productSortBy,
         sortOrder: productSortOrder,
       };
-      const { products: data, total } = await ProductService.getProducts(filters);
+      const [{ products: data, total }, dropdownData] = await Promise.all([
+        ProductService.getProducts(filters),
+        ProductService.getDropdownData().catch(() => null),
+      ]);
       setAllProducts(data || []);
       setProductsTotal(total);
+      const nextColorCodeMap: Record<string, string> = {};
+      (dropdownData?.colors || []).forEach((item: any) => {
+        if (item?.value && item?.color_code) nextColorCodeMap[item.value] = item.color_code;
+      });
+      setProductColorCodeMap(nextColorCodeMap);
+
+      const nextPatternImageMap: Record<string, string> = {};
+      (dropdownData?.patterns || []).forEach((item: any) => {
+        if (item?.value && item?.image_url) nextPatternImageMap[item.value] = item.image_url;
+      });
+      setProductPatternImageMap(nextPatternImageMap);
     } catch (err) {
       console.error('Failed to load products:', err);
     } finally {
@@ -702,7 +718,7 @@ export default function MaterialSelectorDialog({
                     <MultiSelect
                       options={getUniqueProductColors()
                         .filter((color) => color && color.trim() !== '')
-                        .map((color) => ({ label: color, value: color }))}
+                        .map((color) => ({ label: color, value: color, colorCode: productColorCodeMap[color] }))}
                       selected={selectedColor}
                       onChange={(values) => {
                         setSelectedColor(values);
@@ -717,7 +733,7 @@ export default function MaterialSelectorDialog({
                     <MultiSelect
                       options={getUniqueProductPatterns()
                         .filter((pattern) => pattern && pattern.trim() !== '')
-                        .map((pattern) => ({ label: pattern, value: pattern }))}
+                        .map((pattern) => ({ label: pattern, value: pattern, imageUrl: productPatternImageMap[pattern] }))}
                       selected={selectedPattern}
                       onChange={(values) => {
                         setSelectedPattern(values);

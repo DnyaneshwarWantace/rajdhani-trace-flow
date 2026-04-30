@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils"
 export interface MultiSelectOption {
   label: string
   value: string
+  colorCode?: string
+  imageUrl?: string
 }
 
 interface MultiSelectProps {
@@ -135,6 +137,19 @@ export function MultiSelect({
                     >
                       {isSelected && <Check className="h-3 w-3" />}
                     </div>
+                    {option.imageUrl && (
+                      <img
+                        src={option.imageUrl}
+                        alt={option.label}
+                        className="h-8 w-8 rounded-md object-cover border border-gray-300"
+                      />
+                    )}
+                    {option.colorCode && (
+                      <span
+                        className="h-8 w-8 rounded-md border border-gray-300 inline-block shrink-0"
+                        style={{ backgroundColor: option.colorCode }}
+                      />
+                    )}
                     <span className="text-sm">{option.label}</span>
                   </div>
                 )

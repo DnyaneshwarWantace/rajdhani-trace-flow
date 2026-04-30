@@ -101,39 +101,6 @@ export default function ProductStockSection({
         </div>
       </div>
 
-      {/* Individual Stock Tracking */}
-      <div>
-        <Label className="text-sm font-medium mb-2 block">Individual Stock Tracking</Label>
-        <div className="flex gap-4">
-          <label className="flex items-center space-x-2">
-            <input
-              type="radio"
-              name="individualStockTracking"
-              value="yes"
-              checked={formData.individual_stock_tracking === true}
-              onChange={() => onFormDataChange({ individual_stock_tracking: true })}
-              className="text-primary-600"
-            />
-            <span className="text-sm">Yes, track individual pieces (with QR codes)</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="radio"
-              name="individualStockTracking"
-              value="no"
-              checked={formData.individual_stock_tracking === false}
-              onChange={() => onFormDataChange({ individual_stock_tracking: false })}
-              className="text-primary-600"
-            />
-            <span className="text-sm">No, bulk tracking only (no QR codes)</span>
-          </label>
-        </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          {formData.individual_stock_tracking
-            ? 'Each piece will have a unique QR code for individual tracking'
-            : 'Product will be tracked as bulk quantity without individual QR codes'}
-        </div>
-      </div>
     </>
   );
 }

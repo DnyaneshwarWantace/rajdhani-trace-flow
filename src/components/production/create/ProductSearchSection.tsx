@@ -38,6 +38,8 @@ export default function ProductSearchSection({
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [patterns, setPatterns] = useState<string[]>([]);
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
   const [lengths, setLengths] = useState<string[]>([]);
   const [widths, setWidths] = useState<string[]>([]);
   const [weights, setWeights] = useState<string[]>([]);
@@ -127,6 +129,23 @@ export default function ProductSearchSection({
       setLengths(uniqueLengths);
       setWidths(uniqueWidths);
       setWeights(uniqueWeights);
+
+      try {
+        const dropdownData = await ProductService.getDropdownData();
+        const nextColorCodeMap: Record<string, string> = {};
+        (dropdownData?.colors || []).forEach((item: any) => {
+          if (item?.value && item?.color_code) nextColorCodeMap[item.value] = item.color_code;
+        });
+        setColorCodeMap(nextColorCodeMap);
+
+        const nextPatternImageMap: Record<string, string> = {};
+        (dropdownData?.patterns || []).forEach((item: any) => {
+          if (item?.value && item?.image_url) nextPatternImageMap[item.value] = item.image_url;
+        });
+        setPatternImageMap(nextPatternImageMap);
+      } catch (dropdownError) {
+        console.error('Error loading dropdown color/pattern metadata:', dropdownError);
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
     }
@@ -308,6 +327,8 @@ export default function ProductSearchSection({
           subcategories={subcategories}
           colors={colors}
           patterns={patterns}
+          colorCodeMap={colorCodeMap}
+          patternImageMap={patternImageMap}
           lengths={lengths}
           widths={widths}
           weights={weights}

@@ -4,9 +4,10 @@
 export type AreaUnit = 'sqft' | 'sqm';
 export type WeightUnit = 'kg';
 export type CountUnit = 'unit'; // Per product unit
+export type LengthUnit = 'running_meter';
 export type TextileUnit = 'gsm';
 
-export type PricingUnit = AreaUnit | WeightUnit | CountUnit | TextileUnit;
+export type PricingUnit = AreaUnit | WeightUnit | CountUnit | LengthUnit | TextileUnit;
 
 export interface ProductDimensions {
   // Area/Dimension properties
@@ -68,6 +69,14 @@ export const PRICING_UNITS: PricingUnitInfo[] = [
     requiresDimensions: true,
     applicableTo: ['raw_material', 'bulk_product', 'carpet', 'finished_good']
   },
+  {
+    unit: 'running_meter',
+    label: 'Per Running Meter',
+    description: 'Price per meter length',
+    category: 'length',
+    requiresDimensions: true,
+    applicableTo: ['carpet', 'finished_good', 'raw_material']
+  },
   
   // Textile-based pricing
   {
@@ -88,6 +97,7 @@ const CONVERSION_FACTORS: Record<string, number> = {
   
   // Weight conversions (relative to kg)
   kg: 1,
+  running_meter: 1,
   
   // Textile conversions
   gsm: 1 // grams per square meter (base unit)
@@ -262,6 +272,15 @@ export function calculateTotalPrice(
     // If no dimensions, use GSM value directly
     return unitPrice * gsm * quantity;
   }
+
+  // For running meter pricing: length in meters * quantity
+  if (pricingUnit === 'running_meter') {
+    if (!productDimensions.length) {
+      return unitPrice * quantity;
+    }
+    const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
+    return unitPrice * lengthInM * quantity;
+  }
   
   // For KG pricing: calculate weight from GSM and area, then price per kg * total weight
   if (pricingUnit === 'kg') {
@@ -275,6 +294,14 @@ export function calculateTotalPrice(
       return unitPrice * totalWeight;
     }
     return unitPrice * quantity;
+  }
+
+  if (pricingUnit === 'running_meter') {
+    if (!productDimensions.length) {
+      return safeQuantity;
+    }
+    const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
+    return lengthInM * safeQuantity;
   }
   
   // Fallback: simple calculation
@@ -426,7 +453,7 @@ export function validateDimensionsForUnit(dimensions: ProductDimensions, unit: P
     case 'weight':
       return !!(dimensions.width && dimensions.length && dimensions.weight);
     case 'length':
-      return !!(dimensions.width);
+      return !!(dimensions.length);
     case 'count':
       return true;
     case 'textile':

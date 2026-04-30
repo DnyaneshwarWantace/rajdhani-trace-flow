@@ -36,6 +36,8 @@ export default function InventoryFilters({
   const [lengths, setLengths] = useState<string[]>([]);
   const [widths, setWidths] = useState<string[]>([]);
   const [weights, setWeights] = useState<string[]>([]);
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
   const [loadingOptions, setLoadingOptions] = useState<boolean>(false);
 
   useEffect(() => {
@@ -58,6 +60,22 @@ export default function InventoryFilters({
       setCategories(mapOptions(data.categories));
       setColors(mapOptions(data.colors));
       setPatterns(mapOptions(data.patterns));
+
+      const nextColorCodeMap: Record<string, string> = {};
+      (data.colors || []).forEach((item: any) => {
+        if (item?.value && item?.color_code) {
+          nextColorCodeMap[item.value] = item.color_code;
+        }
+      });
+      setColorCodeMap(nextColorCodeMap);
+
+      const nextPatternImageMap: Record<string, string> = {};
+      (data.patterns || []).forEach((item: any) => {
+        if (item?.value && item?.image_url) {
+          nextPatternImageMap[item.value] = item.image_url;
+        }
+      });
+      setPatternImageMap(nextPatternImageMap);
 
       // Length / width / weight: prefer dropdown API, but if missing, fallback to scanning products
       let lengthValues = mapOptions(data.lengths);
@@ -163,7 +181,7 @@ export default function InventoryFilters({
           {/* Color Filter - Multi-select */}
           {onColorChange && (
             <MultiSelect
-              options={colors.map(color => ({ label: color, value: color }))}
+              options={colors.map(color => ({ label: color, value: color, colorCode: colorCodeMap[color] }))}
               selected={Array.isArray(filters.color) ? filters.color : (filters.color ? [filters.color] : [])}
               onChange={onColorChange}
               placeholder="All Colors"
@@ -174,7 +192,7 @@ export default function InventoryFilters({
           {/* Pattern Filter - Multi-select */}
           {onPatternChange && (
             <MultiSelect
-              options={patterns.map(pattern => ({ label: pattern, value: pattern }))}
+              options={patterns.map(pattern => ({ label: pattern, value: pattern, imageUrl: patternImageMap[pattern] }))}
               selected={Array.isArray(filters.pattern) ? filters.pattern : (filters.pattern ? [filters.pattern] : [])}
               onChange={onPatternChange}
               placeholder="All Patterns"

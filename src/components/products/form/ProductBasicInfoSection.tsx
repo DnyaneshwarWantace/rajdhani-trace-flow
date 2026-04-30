@@ -8,7 +8,9 @@ interface ProductBasicInfoSectionProps {
   categories: string[];
   subcategories: string[];
   colors: string[];
+  colorCodeMap?: Record<string, string>;
   patterns: string[];
+  patternImageMap?: Record<string, string>;
   onFormDataChange: (data: Partial<ProductFormData>) => void;
   onDeleteCategory: (value: string) => Promise<void>;
   onDeleteSubcategory: (value: string) => Promise<void>;
@@ -24,7 +26,9 @@ export default function ProductBasicInfoSection({
   categories,
   subcategories,
   colors,
+  colorCodeMap = {},
   patterns,
+  patternImageMap = {},
   onFormDataChange,
   onDeleteCategory,
   onDeleteSubcategory,
@@ -163,7 +167,7 @@ export default function ProductBasicInfoSection({
           value={formData.color || ''}
           placeholder="Select color"
           options={colors}
-          searchable
+          optionColors={colorCodeMap}
           allowNA
           category="color"
           onValueChange={(value) => onFormDataChange({ color: value })}
@@ -176,6 +180,7 @@ export default function ProductBasicInfoSection({
           value={formData.pattern || ''}
           placeholder="Select pattern"
           options={patterns}
+          optionImages={patternImageMap}
           allowNA
           category="pattern"
           onValueChange={(value) => onFormDataChange({ pattern: value })}

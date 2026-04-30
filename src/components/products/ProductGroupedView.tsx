@@ -7,6 +7,7 @@ import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface ProductGroupedViewProps {
   products: Product[];
@@ -38,6 +39,7 @@ export default function ProductGroupedView({
 }: ProductGroupedViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
 
   // Group products by name - products are already sorted by backend
   const groupedProducts: GroupedProducts = products.reduce((acc, product) => {
@@ -194,14 +196,14 @@ export default function ProductGroupedView({
                           product.color.trim() !== '' &&
                           product.color.toLowerCase() !== 'n/a' && (
                             <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                              Color: {product.color}
+                              Color: {colorCodeMap[product.color] && <span className="inline-block w-8 h-8 rounded-md border border-gray-300 mx-1 align-middle" style={{ backgroundColor: colorCodeMap[product.color] }} />}{product.color}
                             </p>
                           )}
                         {product.pattern &&
                           product.pattern.trim() !== '' &&
                           product.pattern.toLowerCase() !== 'n/a' && (
                             <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                              Pattern: {product.pattern}
+                              Pattern: {patternImageMap[product.pattern || ''] && <img src={patternImageMap[product.pattern || '']} alt={product.pattern || ''} onClick={() => setSelectedImage({ url: patternImageMap[product.pattern || ''], alt: product.pattern || '' })} className="inline-block w-8 h-8 rounded-md object-cover border border-gray-300 mx-1 align-middle cursor-pointer hover:opacity-80 transition-opacity" title={`View ${product.pattern || ''}`} />}{product.pattern}
                             </p>
                           )}
                       </div>
@@ -385,14 +387,14 @@ export default function ProductGroupedView({
                               product.color.trim() !== '' &&
                               product.color.toLowerCase() !== 'n/a' && (
                                 <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                                  Color: {product.color}
+                                  Color: {colorCodeMap[product.color] && <span className="inline-block w-8 h-8 rounded-md border border-gray-300 mx-1 align-middle" style={{ backgroundColor: colorCodeMap[product.color] }} />}{product.color}
                                 </p>
                               )}
                             {product.pattern &&
                               product.pattern.trim() !== '' &&
                               product.pattern.toLowerCase() !== 'n/a' && (
                                 <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                                  Pattern: {product.pattern}
+                                  Pattern: {patternImageMap[product.pattern || ''] && <img src={patternImageMap[product.pattern || '']} alt={product.pattern || ''} onClick={() => setSelectedImage({ url: patternImageMap[product.pattern || ''], alt: product.pattern || '' })} className="inline-block w-8 h-8 rounded-md object-cover border border-gray-300 mx-1 align-middle cursor-pointer hover:opacity-80 transition-opacity" title={`View ${product.pattern || ''}`} />}{product.pattern}
                                 </p>
                               )}
                           </div>

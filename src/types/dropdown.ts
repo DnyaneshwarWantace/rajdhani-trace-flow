@@ -11,6 +11,8 @@ export interface DropdownOption {
   id: string;
   category: DropdownCategory;
   value: string;
+  image_url?: string | null;
+  color_code?: string | null;
   display_order: number;
   is_active: boolean;
   created_at: string;
@@ -20,6 +22,8 @@ export interface DropdownOption {
 export interface DropdownFormData {
   category: DropdownCategory;
   value: string;
+  image_url?: string | null;
+  color_code?: string | null;
   display_order?: number;
   is_active?: boolean;
 }

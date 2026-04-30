@@ -14,10 +14,21 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, Package, User, Calendar, FileText, MapPin,
-  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail, Printer
+  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail, Printer, Plus, Truck
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
+import { ProductService } from '@/services/productService';
+import { MaterialService } from '@/services/materialService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import { getApiUrl } from '@/utils/apiConfig';
 import { OrderStatusCard } from '@/components/orders/OrderStatusCard';
@@ -30,6 +41,7 @@ import { InvoiceBill } from '@/components/orders/InvoiceBill';
 import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
+import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 
 interface OrderItem {
   id: string;
@@ -96,7 +108,17 @@ export default function OrderDetails() {
     onConfirm: () => void;
     variant: 'danger' | 'warning' | 'info';
   } | null>(null);
+  // Transport dialog
+  const [showTransportDialog, setShowTransportDialog] = useState(false);
+  const [transportType, setTransportType] = useState<'own' | 'outside'>('own');
+  const [transportVehicleNo, setTransportVehicleNo] = useState('');
+  const [transportRemark, setTransportRemark] = useState('');
+  const [dispatchingOrder, setDispatchingOrder] = useState(false);
+  // Add item inline
+  const [showAddItemPanel, setShowAddItemPanel] = useState(false);
+  const [emptyOrderPendingItems, setEmptyOrderPendingItems] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
+  const latestOrderRef = useRef<{ id: string; orderNumber: string; status: string } | null>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
@@ -107,6 +129,46 @@ export default function OrderDetails() {
     if (id) {
       loadOrderDetails();
     }
+  }, [id]);
+
+  useEffect(() => {
+    return () => {
+      // If user leaves this page with an empty pending/accepted order,
+      // auto-cancel it as requested.
+      if (!emptyOrderPendingItems) return;
+      const latest = latestOrderRef.current;
+      if (!latest) return;
+      if (!(latest.status === 'pending' || latest.status === 'accepted')) return;
+
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+      const payload = JSON.stringify({ status: 'cancelled' });
+      fetch(`${API_URL}/orders/${latest.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {
+        // ignore cleanup errors
+      });
+    };
+  }, [emptyOrderPendingItems]);
+
+  useEffect(() => {
+    const handleOrderUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ orderId?: string }>;
+      if (!id) return;
+      if (customEvent.detail?.orderId && customEvent.detail.orderId !== id) return;
+      loadOrderDetails();
+    };
+
+    window.addEventListener('order-updated', handleOrderUpdated as EventListener);
+    return () => {
+      window.removeEventListener('order-updated', handleOrderUpdated as EventListener);
+    };
   }, [id]);
 
   const loadOrderDetails = async () => {
@@ -126,6 +188,13 @@ export default function OrderDetails() {
 
       setOrder(data.order);
       setOrderItems(data.items || []);
+      latestOrderRef.current = {
+        id: data.order.id,
+        orderNumber: data.order.orderNumber,
+        status: String(data.order.status || '').toLowerCase(),
+      };
+      const canAutoCancel = ['pending', 'accepted'].includes(String(data.order.status || '').toLowerCase());
+      setEmptyOrderPendingItems(canAutoCancel && (data.items || []).length === 0);
     } catch (error) {
       console.error('Error loading order details:', error);
       toast({
@@ -243,12 +312,13 @@ export default function OrderDetails() {
     const isLastItem = orderItems.length === 1;
 
     if (isLastItem) {
-      // Single confirmation: removing last item = cancel order
+      // Allow removing last item without immediate cancellation.
+      // If user leaves with empty order, it will auto-cancel.
       setConfirmDialogConfig({
-        title: 'Cancel Order',
-        description: `This is the last item in the order. Removing "${productName}" will cancel the entire order (${order.orderNumber}). Do you want to cancel this order?`,
-        variant: 'danger',
-        onConfirm: () => performOrderCancellation(order.id, order.orderNumber),
+        title: 'Remove Last Item',
+        description: `This is the last item in the order.\n\nYou can remove it and still add new items on this page.\n\nIf you leave the page without adding any item, the order will be cancelled automatically.`,
+        variant: 'warning',
+        onConfirm: () => performDeleteItem(itemId, productName, true),
       });
     } else {
       // Multiple items: confirm remove item only
@@ -262,14 +332,14 @@ export default function OrderDetails() {
     setShowConfirmDialog(true);
   };
 
-  const performDeleteItem = async (itemId: string, productName: string) => {
+  const performDeleteItem = async (itemId: string, productName: string, allowEmptyOrder = false) => {
     setShowConfirmDialog(false);
 
     try {
       const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
 
-      const response = await fetch(`${API_URL}/orders/items/${itemId}`, {
+      const response = await fetch(`${API_URL}/orders/items/${itemId}${allowEmptyOrder ? '?allow_empty_order=true' : ''}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -283,12 +353,12 @@ export default function OrderDetails() {
       if (!response.ok && result.error === 'LAST_ITEM') {
         if (!order) return;
 
-        // Show confirmation dialog for order cancellation
+        // Show confirmation dialog to remove last item while keeping page active.
         setConfirmDialogConfig({
-          title: 'Cancel Order',
-          description: `${result.message}\n\nThis will cancel order ${order.orderNumber}. Are you sure?`,
-          variant: 'danger',
-          onConfirm: () => performOrderCancellation(order.id, order.orderNumber),
+          title: 'Remove Last Item',
+          description: `This is the last item in order ${order.orderNumber}.\n\nYou can remove it and add new items on this page.\n\nIf you leave without adding anything, the order will be cancelled automatically.`,
+          variant: 'warning',
+          onConfirm: () => performDeleteItem(itemId, productName, true),
         });
         setShowConfirmDialog(true);
         return;
@@ -309,55 +379,20 @@ export default function OrderDetails() {
       });
 
       await loadOrderDetails();
+      if (result?.data?.order_is_empty) {
+        setEmptyOrderPendingItems(true);
+        setShowAddItemPanel(true);
+        toast({
+          title: 'Order is Empty',
+          description: 'Add at least one item before leaving this page, otherwise order will be cancelled.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('Error deleting item:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove item',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const performOrderCancellation = async (orderId: string, orderNumber: string) => {
-    setShowConfirmDialog(false);
-
-    try {
-      const API_URL = getApiUrl();
-      const token = localStorage.getItem('auth_token');
-
-      const cancelResponse = await fetch(`${API_URL}/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-        body: JSON.stringify({ status: 'cancelled' }),
-      });
-
-      const cancelResult = await cancelResponse.json();
-
-      if (!cancelResponse.ok || !cancelResult.success) {
-        toast({
-          title: 'Error',
-          description: cancelResult.error || 'Failed to cancel order',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'Order Cancelled',
-        description: `Order ${orderNumber} has been cancelled`,
-      });
-
-      // Redirect to orders list
-      navigate('/orders');
-    } catch (error) {
-      console.error('Error cancelling order:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to cancel order',
         variant: 'destructive',
       });
     }
@@ -459,9 +494,16 @@ export default function OrderDetails() {
     }
   };
 
-  const handleDispatchOrder = async () => {
-    if (!id) return;
+  const handleDispatchOrder = () => {
+    setTransportType('own');
+    setTransportVehicleNo('');
+    setTransportRemark('');
+    setShowTransportDialog(true);
+  };
 
+  const handleConfirmDispatch = async () => {
+    if (!id) return;
+    setDispatchingOrder(true);
     try {
       const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
@@ -472,33 +514,53 @@ export default function OrderDetails() {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
         },
-        body: JSON.stringify({ status: 'dispatched' }),
+        body: JSON.stringify({
+          status: 'dispatched',
+          transport_type: transportType,
+          transport_vehicle_no: transportVehicleNo.trim() || undefined,
+          transport_remark: transportRemark.trim() || undefined,
+        }),
       });
 
       const data = await result.json();
 
       if (!result.ok || !data.success) {
-        toast({
-          title: 'Error',
-          description: data.error || 'Failed to ship order',
-          variant: 'destructive',
-        });
+        toast({ title: 'Error', description: data.error || 'Failed to ship order', variant: 'destructive' });
         return;
       }
 
-      toast({
-        title: 'Success',
-        description: 'Order shipped! Individual products marked as sold.',
-      });
-
+      toast({ title: 'Order Shipped', description: 'Individual products marked as sold.' });
+      setShowTransportDialog(false);
       await loadOrderDetails();
     } catch (error) {
       console.error('Error dispatching order:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to ship order',
-        variant: 'destructive',
+      toast({ title: 'Error', description: 'Failed to ship order', variant: 'destructive' });
+    } finally {
+      setDispatchingOrder(false);
+    }
+  };
+
+  const handleAddItemToOrder = async (itemData: any) => {
+    if (!id) return;
+    try {
+      const API_URL = getApiUrl();
+      const token = localStorage.getItem('auth_token');
+      const result = await fetch(`${API_URL}/orders/${id}/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+        body: JSON.stringify(itemData),
       });
+      const data = await result.json();
+      if (!result.ok || !data.success) {
+        toast({ title: 'Error', description: data.error || 'Failed to add item', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Item Added', description: 'New item added to order.' });
+      setEmptyOrderPendingItems(false);
+      setShowAddItemPanel(false);
+      await loadOrderDetails();
+    } catch {
+      toast({ title: 'Error', description: 'Failed to add item', variant: 'destructive' });
     }
   };
 
@@ -585,15 +647,34 @@ export default function OrderDetails() {
               </Button>
             )}
             {order.status === 'accepted' && (() => {
-              // Check if all product items have individual products selected
-              const allProductsSelected = orderItems.every(item => {
-                if (item.product_type !== 'product') return true; // Skip raw materials
-                const selectedCount = (item as any).selected_individual_products?.length || 0;
-                return selectedCount >= item.quantity;
+              const productItems = orderItems.filter((item: any) => item.product_type === 'product');
+              const incompleteItems = productItems.filter((item: any) => {
+                const requiredQty = Number(item.quantity || 0);
+                const selectedCount = Array.isArray((item as any).selected_individual_products)
+                  ? (item as any).selected_individual_products.length
+                  : Array.isArray((item as any).selectedProducts)
+                    ? (item as any).selectedProducts.length
+                    : 0;
+                return requiredQty > 0 && selectedCount < requiredQty;
               });
+              const allProductsSelected = incompleteItems.length === 0;
 
               return (
                 <>
+                  {!allProductsSelected && incompleteItems.length > 0 && (
+                    <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs">
+                      Complete roll selection before shipping. Remaining: {incompleteItems.map((item: any) => {
+                        const requiredQty = Number(item.quantity || 0);
+                        const selectedCount = Array.isArray((item as any).selected_individual_products)
+                          ? (item as any).selected_individual_products.length
+                          : Array.isArray((item as any).selectedProducts)
+                            ? (item as any).selectedProducts.length
+                            : 0;
+                        const remaining = Math.max(requiredQty - selectedCount, 0);
+                        return `${item.product_name} (${remaining})`;
+                      }).join(', ')}
+                    </div>
+                  )}
                   {allProductsSelected && (
                     <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
                       <Package className="w-4 h-4 mr-2" />
@@ -644,10 +725,18 @@ export default function OrderDetails() {
             {/* Order Items */}
             <Card className="w-full">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Order Items ({orderItems.length})
-                </CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Order Items ({orderItems.length})
+                  </CardTitle>
+                  {(order.status === 'pending' || order.status === 'accepted') && !isCancelled && (
+                    <Button size="sm" variant="outline" onClick={() => setShowAddItemPanel(v => !v)} className="gap-1">
+                      <Plus className="w-4 h-4" />
+                      Add Item
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="w-full">
                 <div className="space-y-4">
@@ -662,6 +751,12 @@ export default function OrderDetails() {
                       onDeleteItem={isCancelled ? undefined : handleDeleteItem}
                     />
                   ))}
+                  {showAddItemPanel && (order.status === 'pending' || order.status === 'accepted') && (
+                    <AddItemInlineForm
+                      onSave={handleAddItemToOrder}
+                      onCancel={() => setShowAddItemPanel(false)}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -683,11 +778,24 @@ export default function OrderDetails() {
                         <div className="text-orange-700">
                           <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? new Date(order.dispatchedAt).toLocaleString() : 'N/A'}
                         </div>
+                        {(order as any).transport_type && (
+                          <div className="text-orange-700">
+                            <span className="font-medium">Transport:</span>{' '}
+                            {(order as any).transport_type === 'own' ? 'Own Transport' : 'Outside Transport'}
+                          </div>
+                        )}
+                        {(order as any).transport_vehicle_no && (
+                          <div className="text-orange-700">
+                            <span className="font-medium">Vehicle No:</span> {(order as any).transport_vehicle_no}
+                          </div>
+                        )}
+                        {(order as any).transport_remark && (
+                          <div className="text-orange-700">
+                            <span className="font-medium">Remark:</span> {(order as any).transport_remark}
+                          </div>
+                        )}
                         <div className="text-orange-700">
                           <span className="font-medium">Status:</span> Ready for Delivery
-                        </div>
-                        <div className="text-orange-700">
-                          <span className="font-medium">Stock:</span> Deducted from inventory
                         </div>
                       </>
                     )}
@@ -959,11 +1067,328 @@ export default function OrderDetails() {
             title={confirmDialogConfig.title}
             description={confirmDialogConfig.description}
             variant={confirmDialogConfig.variant}
-            confirmText="Yes, Remove"
+            confirmText={
+              confirmDialogConfig.title === 'Remove Last Item'
+                ? 'Remove & Keep Open'
+                : confirmDialogConfig.title === 'Cancel Order'
+                  ? 'Cancel Order'
+                  : 'Yes, Remove'
+            }
             cancelText="Cancel"
           />
         )}
+
+        {/* Transport Dialog */}
+        <Dialog open={showTransportDialog} onOpenChange={setShowTransportDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-orange-600" />
+                Transport Details
+              </DialogTitle>
+              <DialogDescription>Add transport info before shipping this order.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-1">
+                <Label>Transport Type</Label>
+                <Select value={transportType} onValueChange={(v) => setTransportType(v as 'own' | 'outside')}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="own">Own Transport</SelectItem>
+                    <SelectItem value="outside">Outside Transport</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Vehicle No <span className="text-gray-400 text-xs">(optional)</span></Label>
+                <Input
+                  placeholder="e.g. MH12AB1234"
+                  value={transportVehicleNo}
+                  onChange={e => setTransportVehicleNo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Remark <span className="text-gray-400 text-xs">(optional)</span></Label>
+                <Input
+                  placeholder="Any notes about the shipment"
+                  value={transportRemark}
+                  onChange={e => setTransportRemark(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowTransportDialog(false)} disabled={dispatchingOrder}>Cancel</Button>
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleConfirmDispatch} disabled={dispatchingOrder}>
+                {dispatchingOrder ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Shipping…</> : <><Package className="w-4 h-4 mr-2" />Ship Order</>}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
+  );
+}
+
+// Simple inline add-item form
+function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promise<void>; onCancel: () => void }) {
+  const [productType, setProductType] = useState<'product' | 'raw_material'>('product');
+  const [productId, setProductId] = useState('');
+  const [rawMaterialId, setRawMaterialId] = useState('');
+  const [productName, setProductName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('rolls');
+  const [pricingUnit, setPricingUnit] = useState<'unit' | 'sqm' | 'sqft' | 'running_meter' | 'gsm' | 'kg'>('unit');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [gstRate, setGstRate] = useState('18');
+  const [gstIncluded, setGstIncluded] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showSelector, setShowSelector] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [productPage, setProductPage] = useState(1);
+  const [materialPage, setMaterialPage] = useState(1);
+  const { toast } = useToast();
+  const currentItem: any = {
+    id: 'inline-add-item',
+    product_type: productType,
+    product_id: productType === 'product' ? productId : rawMaterialId,
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { products: productData } = await ProductService.getProducts({
+          page: 1,
+          limit: 1000,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        });
+        setProducts(
+          (productData || []).map((p: any) => ({
+            id: p.id || p._id,
+            name: p.name,
+            price: p.price || 0,
+            current_stock: p.current_stock || 0,
+            stock: p.current_stock || 0,
+            category: p.category,
+            subcategory: p.subcategory || '',
+            color: p.color,
+            pattern: p.pattern,
+            width: p.width,
+            length: p.length,
+            weight: p.weight,
+            width_unit: p.width_unit,
+            length_unit: p.length_unit,
+            weight_unit: p.weight_unit,
+            unit: p.unit || 'SQM',
+            count_unit: p.count_unit || 'rolls',
+          }))
+        );
+      } catch (err) {
+        console.error('Failed to load products:', err);
+      }
+
+      try {
+        const result = await MaterialService.getMaterials({
+          page: 1,
+          limit: 1000,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        });
+        setMaterials(
+          (result.materials || []).map((m: any) => ({
+            id: m.id || m._id,
+            name: m.name,
+            price: m.cost_per_unit || 0,
+            current_stock: m.current_stock || 0,
+            stock: m.current_stock || 0,
+            available_stock: m.available_stock,
+            category: m.category,
+            type: m.type,
+            color: m.color,
+            unit: m.unit || 'units',
+            supplier: m.supplier_name || '',
+          }))
+        );
+      } catch (err) {
+        console.error('Failed to load materials:', err);
+      }
+    };
+    loadData();
+  }, []);
+
+  const selectedEntry =
+    productType === 'product'
+      ? products.find((p) => p.id === productId)
+      : materials.find((m) => m.id === rawMaterialId);
+
+  useEffect(() => {
+    if (!selectedEntry) return;
+    setProductName(selectedEntry.name || '');
+    setUnit(productType === 'product' ? selectedEntry.count_unit || 'rolls' : selectedEntry.unit || 'units');
+    setUnitPrice(String(selectedEntry.price || ''));
+  }, [selectedEntry, productType]);
+
+  const handleSave = async () => {
+    if (!productName.trim() || !unitPrice || !selectedEntry) {
+      toast({
+        title: 'Required',
+        description: 'Select item, quantity and pricing details.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const qty = parseFloat(quantity) || 1;
+      const price = parseFloat(unitPrice) || 0;
+      const gst = gstIncluded ? Math.max(0, parseFloat(gstRate) || 0) : 0;
+      const subtotal = qty * price;
+      const gstAmount = (subtotal * gst) / 100;
+      const total = subtotal + gstAmount;
+      await onSave({
+        product_id: productType === 'product' ? productId : undefined,
+        raw_material_id: productType === 'raw_material' ? rawMaterialId : undefined,
+        product_name: productName.trim(),
+        product_type: productType,
+        quantity: qty,
+        unit,
+        pricing_unit: pricingUnit,
+        unit_price: price,
+        subtotal,
+        total_price: total,
+        gst_rate: gst,
+        gst_amount: gstAmount,
+        gst_included: gstIncluded,
+        category: selectedEntry?.category || '',
+        subcategory: selectedEntry?.subcategory || '',
+        color: selectedEntry?.color || '',
+        pattern: selectedEntry?.pattern || '',
+        length: selectedEntry?.length || '',
+        width: selectedEntry?.width || '',
+        length_unit: selectedEntry?.length_unit || '',
+        width_unit: selectedEntry?.width_unit || '',
+        weight: selectedEntry?.weight || '',
+        weight_unit: selectedEntry?.weight_unit || '',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border border-dashed border-blue-300 rounded-lg p-4 bg-blue-50 space-y-3 mt-2">
+      <p className="text-sm font-medium text-blue-800">Add New Item</p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-1 space-y-1">
+          <Label className="text-xs">Item Type</Label>
+          <Select
+            value={productType}
+            onValueChange={(v: 'product' | 'raw_material') => {
+              setProductType(v);
+              setProductId('');
+              setRawMaterialId('');
+              setProductName('');
+            }}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="product">Product</SelectItem>
+              <SelectItem value="raw_material">Raw Material</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="col-span-1 space-y-1">
+          <Label className="text-xs">Select Item</Label>
+          <Button variant="outline" className="w-full h-8 justify-start text-sm" onClick={() => setShowSelector(true)}>
+            <Plus className="w-3 h-3 mr-1" />
+            {productName || `Select ${productType === 'product' ? 'Product' : 'Raw Material'}`}
+          </Button>
+        </div>
+        <div className="col-span-2 space-y-1">
+          <Label className="text-xs">Item Name</Label>
+          <Input placeholder="Selected item name" value={productName} readOnly className="h-8 text-sm bg-gray-50" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Quantity</Label>
+          <Input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Unit</Label>
+          <Input value={unit} onChange={e => setUnit(e.target.value)} className="h-8 text-sm" placeholder="rolls, sqm…" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Pricing Unit</Label>
+          <Select value={pricingUnit} onValueChange={(v: 'unit' | 'sqm' | 'sqft' | 'running_meter' | 'gsm' | 'kg') => setPricingUnit(v)}>
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unit">Per Unit</SelectItem>
+              <SelectItem value="sqm">Per SQM</SelectItem>
+              <SelectItem value="sqft">Per SQFT</SelectItem>
+              <SelectItem value="running_meter">Per Running Meter</SelectItem>
+              <SelectItem value="gsm">Per GSM</SelectItem>
+              <SelectItem value="kg">Per KG</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">GST %</Label>
+          <Input type="number" min="0" max="28" value={gstRate} onChange={e => setGstRate(e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="col-span-2 flex items-center gap-2">
+          <input
+            id="inline-gst-included"
+            type="checkbox"
+            checked={gstIncluded}
+            onChange={e => setGstIncluded(e.target.checked)}
+          />
+          <Label htmlFor="inline-gst-included" className="text-xs">GST Included</Label>
+        </div>
+        <div className="col-span-2 space-y-1">
+          <Label className="text-xs">Unit Price (₹)</Label>
+          <Input type="number" min="0" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} className="h-8 text-sm" placeholder="0" />
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <Button size="sm" variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
+        <Button size="sm" onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
+          Add
+        </Button>
+      </div>
+
+      <ProductMaterialSelectionDialog
+        isOpen={showSelector}
+        onClose={() => setShowSelector(false)}
+        currentItem={currentItem}
+        products={products}
+        materials={materials}
+        productSearchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        onSelectProduct={(selectedId) => {
+          if (productType === 'product') {
+            setProductId(selectedId);
+            setRawMaterialId('');
+          } else {
+            setRawMaterialId(selectedId);
+            setProductId('');
+          }
+          setShowSelector(false);
+        }}
+        productPage={productPage}
+        materialPage={materialPage}
+        productItemsPerPage={500}
+        materialItemsPerPage={500}
+        onProductPageChange={setProductPage}
+        onMaterialPageChange={setMaterialPage}
+      />
+    </div>
   );
 }

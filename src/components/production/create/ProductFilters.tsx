@@ -20,6 +20,8 @@ interface ProductFiltersProps {
   subcategories: string[];
   colors: string[];
   patterns: string[];
+  colorCodeMap?: Record<string, string>;
+  patternImageMap?: Record<string, string>;
   lengths: string[];
   widths: string[];
   weights: string[];
@@ -44,6 +46,8 @@ export default function ProductFilters({
   subcategories,
   colors,
   patterns,
+  colorCodeMap = {},
+  patternImageMap = {},
   lengths,
   widths,
   weights,
@@ -90,7 +94,7 @@ export default function ProductFilters({
         </Label>
         <div className="mt-1">
           <MultiSelect
-            options={colors.map((color) => ({ label: color, value: color }))}
+            options={colors.map((color) => ({ label: color, value: color, colorCode: colorCodeMap[color] }))}
             selected={colorsSelected}
             onChange={onColorsChange}
             placeholder="All"
@@ -105,7 +109,7 @@ export default function ProductFilters({
         </Label>
         <div className="mt-1">
           <MultiSelect
-            options={patterns.map((pattern) => ({ label: pattern, value: pattern }))}
+            options={patterns.map((pattern) => ({ label: pattern, value: pattern, imageUrl: patternImageMap[pattern] }))}
             selected={patternsSelected}
             onChange={onPatternsChange}
             placeholder="All"

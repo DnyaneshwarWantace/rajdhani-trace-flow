@@ -7,7 +7,9 @@ export function useProductFormDropdowns() {
   const [categories, setCategories] = useState<string[]>([]);
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
   const [patterns, setPatterns] = useState<string[]>([]);
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
   const [units, setUnits] = useState<string[]>([]);
   const [lengthUnits, setLengthUnits] = useState<string[]>([]);
   const [widthUnits, setWidthUnits] = useState<string[]>([]);
@@ -35,7 +37,25 @@ export function useProductFormDropdowns() {
       setCategories(extractValues(dropdownData.categories));
       setSubcategories(extractValues(dropdownData.subcategories));
       setColors(extractValues(dropdownData.colors));
+      const colorMap: Record<string, string> = {};
+      (dropdownData.colors || []).forEach((color: any) => {
+        const value = typeof color === 'string' ? color : color?.value;
+        const colorCode = typeof color === 'string' ? null : color?.color_code;
+        if (value && colorCode) {
+          colorMap[value] = colorCode;
+        }
+      });
+      setColorCodeMap(colorMap);
       setPatterns(extractValues(dropdownData.patterns));
+      const patternMap: Record<string, string> = {};
+      (dropdownData.patterns || []).forEach((pattern: any) => {
+        const value = typeof pattern === 'string' ? pattern : pattern?.value;
+        const imageUrl = typeof pattern === 'string' ? null : pattern?.image_url;
+        if (value && imageUrl) {
+          patternMap[value] = imageUrl;
+        }
+      });
+      setPatternImageMap(patternMap);
       
       // Filter out "roll" and "rolls" from units - roll is for counting, not a unit
       const unitValues = extractValues(dropdownData.units);
@@ -74,7 +94,9 @@ export function useProductFormDropdowns() {
       setCategories([]);
       setSubcategories([]);
       setColors([]);
+      setColorCodeMap({});
       setPatterns([]);
+      setPatternImageMap({});
       setUnits([]);
       setLengthUnits([]);
       setWidthUnits([]);
@@ -154,7 +176,9 @@ export function useProductFormDropdowns() {
     categories,
     subcategories,
     colors,
+    colorCodeMap,
     patterns,
+    patternImageMap,
     units,
     lengthUnits,
     widthUnits,

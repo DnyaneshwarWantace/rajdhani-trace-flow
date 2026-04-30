@@ -136,6 +136,12 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       } else {
         unitValue = product_dimensions.weight || 0;
       }
+    } else if (pricing_unit === 'running_meter') {
+      if (product_dimensions.length) {
+        unitValue = convertToMeters(product_dimensions.length, lengthUnit || 'm');
+      } else {
+        unitValue = 0;
+      }
     }
     
     // Calculate base price with unit conversion support

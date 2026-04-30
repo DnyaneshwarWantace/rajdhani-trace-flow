@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Package, ChevronDown, Trash2 } from 'lucide-react';
+import { Plus, ChevronDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { formatCurrency } from '@/utils/formatHelpers';
-import { calculatePricingUnitQuantity } from '@/utils/unitConverter';
 import OrderItemForm from './OrderItemForm';
+
+// Carpet/roll icon for empty state
+const CarpetRollIcon = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300">
+    <rect x="3" y="6" width="14" height="12" rx="2" />
+    <path d="M7 6v12M11 6v12" opacity=".5" />
+    <ellipse cx="17" cy="12" rx="4" ry="6" />
+  </svg>
+);
+
+const ITEM_GRID = '28px minmax(0,1fr) 72px 72px 56px 72px 96px 80px 88px 56px';
 
 function CollapsedItemSummary({
   item,
@@ -13,103 +22,65 @@ function CollapsedItemSummary({
   selectedProduct,
   onExpand,
   onRemove,
+  showLength,
+  showWidth,
+  showGSM,
+  showColor,
+  showRate,
 }: {
   item: ExtendedOrderItem;
   index: number;
   selectedProduct: any;
   onExpand: () => void;
   onRemove: () => void;
+  showLength: boolean;
+  showWidth: boolean;
+  showGSM: boolean;
+  showColor: boolean;
+  showRate: boolean;
 }) {
   const p = selectedProduct;
-  const specs: { label: string; value: string }[] = [];
-  if (p?.length && (p.length_unit || p.length)) specs.push({ label: 'Length', value: `${p.length} ${p.length_unit || ''}`.trim() });
-  if (p?.width && (p.width_unit || p.width)) specs.push({ label: 'Width', value: `${p.width} ${p.width_unit || ''}`.trim() });
-  if (p?.height && (p.height_unit || p.height)) specs.push({ label: 'Height', value: `${p.height} ${p.height_unit || ''}`.trim() });
-  if (p?.weight && (p.weight_unit || p.weight)) specs.push({ label: 'GSM', value: `${p.weight} ${p.weight_unit || ''}`.trim() });
-  if (p?.gsm) specs.push({ label: 'GSM', value: String(p.gsm) });
-  if (p?.pattern) specs.push({ label: 'Pattern', value: p.pattern });
-  if (p?.color) specs.push({ label: 'Color', value: p.color });
   const unitLabel = item.product_type === 'raw_material' ? (p?.unit || 'units') : (p?.count_unit || 'rolls');
-  const pricingUnitLabel = item.pricing_unit === 'unit' ? unitLabel : item.pricing_unit;
-  const convertedPricingQuantity = calculatePricingUnitQuantity(
-    Number(item.quantity || 0),
-    item.pricing_unit || 'unit',
-    item.product_dimensions || {},
-    (item as any).length_unit,
-    (item as any).width_unit
-  );
+  const pricingUnitLabel = item.pricing_unit === 'unit' ? unitLabel : (item.pricing_unit || unitLabel);
+
+  const specMap: Record<string, string> = {};
+  if (p?.length) specMap['Length'] = `${p.length}${p.length_unit ? ' ' + p.length_unit : ''}`;
+  if (p?.width)  specMap['Width']  = `${p.width}${p.width_unit ? ' ' + p.width_unit : ''}`;
+  if (p?.weight) specMap['GSM']    = `${p.weight}`;
+  if (p?.color)  specMap['Color']  = p.color;
+  if (item.unit_price > 0) specMap['Rate'] = `${formatCurrency(item.unit_price, { full: true })}/${pricingUnitLabel}`;
 
   return (
     <div
-      className="p-3 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+      className="grid items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors"
+      style={{ gridTemplateColumns: ITEM_GRID }}
       onClick={onExpand}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onExpand();
-        }
-      }}
-      aria-expanded={false}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-gray-500 font-medium text-sm">Item #{index + 1}</span>
-            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-700 capitalize">
-              {item.product_type === 'raw_material' ? 'Material' : 'Product'}
-            </span>
-          </div>
-          <p className="text-gray-900 font-medium truncate" title={item.product_name || ''}>
-            {item.product_name || 'Select product / material'}
-          </p>
-          {specs.length > 0 && (
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600">
-              {specs.map((s) => (
-                <span key={s.label}>
-                  <span className="text-gray-500">{s.label}:</span> <span className="text-gray-800">{s.value}</span>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="text-gray-600">
-              Qty: <span className="font-semibold text-gray-900">{item.quantity || 0}</span> {unitLabel}
-            </span>
-            {!!item.quantity && (
-              <span className="text-gray-600">
-                = <span className="font-semibold text-gray-900">{convertedPricingQuantity.toFixed(2)}</span> {pricingUnitLabel}
-              </span>
-            )}
-            {item.unit_price > 0 && (
-              <span className="text-gray-600">
-                @ <span className="font-medium text-gray-900">{formatCurrency(item.unit_price ?? 0, { full: true })}</span> / {pricingUnitLabel}
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 text-xs text-gray-600 pt-0.5 border-t border-gray-100 mt-1.5">
-            <span><span className="text-gray-500">Subtotal:</span> <span className="font-medium text-gray-800">{formatCurrency(item.subtotal ?? 0, { full: true })}</span></span>
-            {(item.gst_amount ?? 0) > 0 && (
-              <span><span className="text-gray-500">GST:</span> <span className="font-medium text-gray-800">{formatCurrency(item.gst_amount ?? 0, { full: true })}</span></span>
-            )}
-            <span><span className="text-gray-500">Total:</span> <span className="font-semibold text-primary-600">{formatCurrency(item.total_price ?? 0, { full: true })}</span></span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="sm" onClick={onExpand} className="text-gray-600" title="Expand">
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRemove}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-            title="Remove"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
+      <span className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 text-sm font-bold flex items-center justify-center">
+        {index + 1}
+      </span>
+      <p className="text-sm font-medium text-slate-900 truncate">
+        {item.product_name || <span className="text-slate-400 font-normal">Select product</span>}
+      </p>
+      <span className="text-sm text-slate-700 tabular-nums text-right">{showLength ? (specMap['Length'] || '—') : ''}</span>
+      <span className="text-sm text-slate-700 tabular-nums text-right">{showWidth  ? (specMap['Width']  || '—') : ''}</span>
+      <span className="text-sm text-slate-700 tabular-nums text-right">{showGSM    ? (specMap['GSM']    || '—') : ''}</span>
+      <span className="text-sm text-slate-700 truncate text-right">{showColor ? (specMap['Color'] || '—') : ''}</span>
+      <span className="text-sm text-slate-800 tabular-nums text-right">{showRate ? (specMap['Rate'] || '—') : ''}</span>
+      <span className="text-sm text-slate-800 text-right tabular-nums">{item.quantity || 0} {unitLabel}</span>
+      <span className="text-sm font-semibold text-right tabular-nums text-primary-600">
+        {formatCurrency(item.total_price ?? 0, { full: true })}
+      </span>
+      <div className="flex items-center justify-end gap-0.5" onClick={e => e.stopPropagation()}>
+        <Button variant="ghost" size="sm" onClick={onExpand} className="w-7 h-7 p-0 text-slate-400 hover:text-slate-600">
+          <ChevronDown className="w-4 h-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onRemove} className="w-7 h-7 p-0 text-red-400 hover:text-red-600 hover:bg-red-50">
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
       </div>
     </div>
   );
@@ -134,17 +105,11 @@ export default function OrderItemsList({
   products = [],
   rawMaterials = [],
 }: OrderItemsListProps) {
-  // Track which item ids are expanded (full form visible). Collapsed = only summary row.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-
   const prevLengthRef = useRef(items.length);
+
   useEffect(() => {
-    if (items.length === 0) {
-      setExpandedIds(new Set());
-      prevLengthRef.current = 0;
-      return;
-    }
-    // When user adds a new item, expand only the new (last) item
+    if (items.length === 0) { setExpandedIds(new Set()); prevLengthRef.current = 0; return; }
     if (items.length > prevLengthRef.current) {
       const lastId = items[items.length - 1].id;
       setExpandedIds(new Set([lastId]));
@@ -153,12 +118,7 @@ export default function OrderItemsList({
   }, [items.length]);
 
   const toggleExpanded = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExpandedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   };
 
   const isExpanded = (id: string) => expandedIds.has(id);
@@ -170,61 +130,135 @@ export default function OrderItemsList({
       : products.find((p: any) => p.id === item.product_id);
   };
 
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Order Items</CardTitle>
-        <Button
-          onClick={onAddItem}
-          className="bg-primary-600 hover:bg-primary-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {items.map((item, index) => {
-            const expanded = isExpanded(item.id);
-            return (
-              <div
-                key={item.id}
-                className="border rounded-lg overflow-hidden bg-white"
-              >
-                {expanded ? (
-                  <OrderItemForm
-                    item={item}
-                    index={index}
-                    onUpdate={onUpdateItem}
-                    onRemove={onRemoveItem}
-                    onSelectProduct={onSelectProduct}
-                    products={products}
-                    rawMaterials={rawMaterials}
-                    onCollapse={() => toggleExpanded(item.id)}
-                    isCollapsible
-                  />
-                ) : (
-                  <CollapsedItemSummary
-                    item={item}
-                    index={index}
-                    selectedProduct={getSelectedProduct(item)}
-                    onExpand={() => toggleExpanded(item.id)}
-                    onRemove={() => onRemoveItem(item.id)}
-                  />
-                )}
-              </div>
-            );
-          })}
+  const collapsedItems = items.filter(i => !isExpanded(i.id) && i.product_id);
+  const hasCollapsed = collapsedItems.length > 0;
+  const hasProducts  = collapsedItems.some(i => i.product_type !== 'raw_material');
+  const hasMaterials = collapsedItems.some(i => i.product_type === 'raw_material');
+  const nameLabel = hasProducts && hasMaterials ? 'Product / Material' : hasMaterials ? 'Material' : 'Product';
 
-          {items.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
-              <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No items added yet</p>
-              <p className="text-sm mt-2">Click "Add Item" to start adding products or materials</p>
+  const collapsedProducts = collapsedItems.map(i =>
+    i.product_type === 'raw_material' ? rawMaterials.find(p => p.id === i.product_id) : products.find(p => p.id === i.product_id)
+  );
+  const showLength = collapsedProducts.some(p => p?.length);
+  const showWidth  = collapsedProducts.some(p => p?.width);
+  const showGSM    = collapsedProducts.some(p => p?.weight);
+  const showColor  = collapsedProducts.some(p => p?.color);
+  const showRate   = collapsedItems.some(i => (i.unit_price || 0) > 0);
+
+  const subtotal = items.reduce((s, i) => s + (i.subtotal || 0), 0);
+  const gstSum   = items.reduce((s, i) => s + (i.gst_amount || 0), 0);
+  const total    = items.reduce((s, i) => s + (i.total_price || 0), 0);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 flex-shrink-0">
+        <div>
+          <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">Order items</h2>
+          <p className="text-[11.5px] text-slate-500 mt-0.5">Add products or raw materials. Click a row to edit.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {items.length > 0 && (
+            <div className="flex items-center gap-2 px-3 h-8 bg-slate-50 border border-slate-200 rounded-md text-[12px]">
+              <span className="text-slate-500">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+              <span className="text-slate-300">·</span>
+              <span className="font-bold tabular-nums text-primary-600">{formatCurrency(total, { full: true })}</span>
             </div>
           )}
+          <Button
+            onClick={onAddItem}
+            className="h-8 px-3 text-[12.5px] font-semibold bg-primary-600 hover:bg-primary-700 text-white"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Add item
+          </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Column header — only when at least one item is collapsed */}
+      {hasCollapsed && (
+        <div
+          className="grid items-center gap-3 px-4 h-8 bg-slate-50 border-b border-slate-200 flex-shrink-0"
+          style={{ gridTemplateColumns: ITEM_GRID }}
+        >
+          <span />
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{nameLabel}</span>
+          {showLength && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Length</span>}
+          {!showLength && <span />}
+          {showWidth  && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Width</span>}
+          {!showWidth  && <span />}
+          {showGSM    && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">GSM</span>}
+          {!showGSM    && <span />}
+          {showColor  && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Color</span>}
+          {!showColor  && <span />}
+          {showRate   && <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Rate</span>}
+          {!showRate   && <span />}
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Qty</span>
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide text-right">Total</span>
+          <span />
+        </div>
+      )}
+
+      {/* Item rows */}
+      <div className="flex-1 overflow-y-auto">
+        {items.map((item, index) => {
+          const expanded = isExpanded(item.id);
+          return (
+            <div
+              key={item.id}
+              className={`border-b border-slate-100 last:border-0 ${expanded ? 'border-l-[3px] border-l-primary-600 bg-slate-50/60' : ''}`}
+            >
+              {expanded ? (
+                <OrderItemForm
+                  item={item}
+                  index={index}
+                  onUpdate={onUpdateItem}
+                  onRemove={onRemoveItem}
+                  onSelectProduct={onSelectProduct}
+                  products={products}
+                  rawMaterials={rawMaterials}
+                  onCollapse={() => toggleExpanded(item.id)}
+                  isCollapsible
+                />
+              ) : (
+                <CollapsedItemSummary
+                  item={item}
+                  index={index}
+                  selectedProduct={getSelectedProduct(item)}
+                  onExpand={() => toggleExpanded(item.id)}
+                  onRemove={() => onRemoveItem(item.id)}
+                  showLength={showLength}
+                  showWidth={showWidth}
+                  showGSM={showGSM}
+                  showColor={showColor}
+                  showRate={showRate}
+                />
+              )}
+            </div>
+          );
+        })}
+
+        {items.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center mb-3">
+              <CarpetRollIcon />
+            </div>
+            <p className="text-[13px] font-medium text-slate-600">No items yet</p>
+            <p className="text-[11.5px] text-slate-400 mt-1">Click "Add item" above to get started</p>
+          </div>
+        )}
+      </div>
+
+      {/* Footer totals bar */}
+      {items.length > 0 && (
+        <div className="border-t border-slate-200 bg-slate-50/60 px-4 h-10 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-5 text-sm">
+            <span className="text-slate-500">Subtotal <span className="font-semibold text-slate-800 tabular-nums">{formatCurrency(subtotal, { full: true })}</span></span>
+            <span className="text-slate-500">GST <span className="font-semibold text-slate-800 tabular-nums">{formatCurrency(gstSum, { full: true })}</span></span>
+          </div>
+          <span className="text-base font-bold tabular-nums text-primary-600">Total {formatCurrency(total, { full: true })}</span>
+        </div>
+      )}
+    </div>
   );
 }

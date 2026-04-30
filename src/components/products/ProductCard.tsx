@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
 
 interface ProductCardProps {
   product: Product;
@@ -38,6 +41,8 @@ export default function ProductCard({
   isSelected = false,
   onClick,
 }: ProductCardProps) {
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
+  const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'in-stock':
@@ -57,6 +62,7 @@ export default function ProductCard({
   };
 
   return (
+    <>
     <div
       onClick={onClick}
       className={`bg-white rounded-xl border transition-all duration-200 overflow-hidden group ${
@@ -134,7 +140,12 @@ export default function ProductCard({
           {product.color && product.color.trim() !== '' && product.color.toLowerCase() !== 'n/a' && (
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Color</span>
-              <span className="font-medium text-gray-900 text-right truncate min-w-0" title={product.color}>{product.color}</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0 flex items-center gap-1 justify-end" title={product.color}>
+                {colorCodeMap[product.color] && (
+                  <span className="w-8 h-8 rounded-md border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                )}
+                {product.color}
+              </span>
             </div>
           )}
 
@@ -142,7 +153,22 @@ export default function ProductCard({
           {product.pattern && product.pattern.trim() !== '' && product.pattern.toLowerCase() !== 'n/a' && (
             <div className="flex items-center justify-between text-[10px] gap-1">
               <span className="text-gray-500 flex-shrink-0">Pattern</span>
-              <span className="font-medium text-gray-900 text-right truncate min-w-0" title={product.pattern}>{product.pattern}</span>
+              <span className="font-medium text-gray-900 text-right truncate min-w-0 flex items-center gap-1 justify-end" title={product.pattern}>
+                {patternImageMap[product.pattern] && (
+                  <img
+                    src={patternImageMap[product.pattern]}
+                    alt={product.pattern}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const patternName = product.pattern || '';
+                      setSelectedImage({ url: patternImageMap[patternName], alt: patternName });
+                    }}
+                    className="w-8 h-8 rounded-md object-cover border border-gray-300 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    title={`View ${product.pattern}`}
+                  />
+                )}
+                {product.pattern}
+              </span>
             </div>
           )}
 
@@ -258,5 +284,15 @@ export default function ProductCard({
         )}
       </div>
     </div>
+    {selectedImage && (
+      <ImageViewDialog
+        isOpen={!!selectedImage}
+        onClose={() => setSelectedImage(null)}
+        imageUrl={selectedImage.url}
+        alt={selectedImage.alt}
+        caption={selectedImage.alt}
+      />
+    )}
+    </>
   );
 }

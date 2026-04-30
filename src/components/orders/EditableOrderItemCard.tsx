@@ -170,9 +170,20 @@ export function EditableOrderItemCard({
             </div>
           )}
         </div>
-        <div className="text-right ml-4">
-          <p className="text-xl font-bold">{formatCurrency(parseFloat(item.total_price), { full: true })}</p>
-          <p className="text-xs text-gray-500">@ {formatCurrency(parseFloat(item.unit_price), { full: true })} / {getPriceUnitLabel(item.pricing_unit, item.unit)}</p>
+        <div className="text-right ml-4 min-w-[190px]">
+          <p className="text-xs text-gray-500">Unit Price</p>
+          <p className="text-sm font-semibold text-gray-900">
+            {formatCurrency(parseFloat(item.unit_price || '0'), { full: true })} / {getPriceUnitLabel(item.pricing_unit, item.unit)}
+          </p>
+          <div className="mt-1 flex items-center justify-end gap-3 text-xs">
+            <span className="text-gray-600">
+              GST: <span className="font-semibold text-gray-900">{formatCurrency(parseFloat(item.gst_amount || '0'), { full: true })}</span>
+            </span>
+            <span className="text-gray-600">
+              Subtotal: <span className="font-semibold text-gray-900">{formatCurrency(parseFloat(item.subtotal || '0'), { full: true })}</span>
+            </span>
+          </div>
+          <p className="mt-1 text-lg font-bold text-primary-700">{formatCurrency(parseFloat(item.total_price || '0'), { full: true })}</p>
         </div>
       </div>
 

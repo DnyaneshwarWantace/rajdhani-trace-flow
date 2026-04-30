@@ -29,6 +29,7 @@ import { Card } from '@/components/ui/card';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface ProductMaterialSelectionDialogProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ export default function ProductMaterialSelectionDialog({
   onMaterialSortChange,
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
 
   // Filter states
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -275,10 +277,10 @@ export default function ProductMaterialSelectionDialog({
                   </p>
                 )}
                 {isProduct && item.color && item.color !== 'N/A' && (
-                  <p><span className="font-medium">Color:</span> {item.color}</p>
+                  <p className="flex items-center gap-1"><span className="font-medium">Color:</span> {colorCodeMap[item.color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: colorCodeMap[item.color] }} />} {item.color}</p>
                 )}
                 {isProduct && item.pattern && item.pattern !== 'N/A' && (
-                  <p><span className="font-medium">Pattern:</span> {item.pattern}</p>
+                  <p className="flex items-center gap-1"><span className="font-medium">Pattern:</span> {patternImageMap[item.pattern] && <img src={patternImageMap[item.pattern]} alt={item.pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />} {item.pattern}</p>
                 )}
                 {!isProduct && item.brand && (
                   <p><span className="font-medium">Brand:</span> {item.brand}</p>
@@ -459,10 +461,10 @@ export default function ProductMaterialSelectionDialog({
                         </p>
                       )}
                       {isProduct && item.color && item.color !== 'N/A' && (
-                        <p><span className="font-medium">Color:</span> {item.color}</p>
+                        <p className="flex items-center gap-1"><span className="font-medium">Color:</span> {colorCodeMap[item.color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: colorCodeMap[item.color] }} />} {item.color}</p>
                       )}
                       {isProduct && item.pattern && item.pattern !== 'N/A' && (
-                        <p><span className="font-medium">Pattern:</span> {item.pattern}</p>
+                        <p className="flex items-center gap-1"><span className="font-medium">Pattern:</span> {patternImageMap[item.pattern] && <img src={patternImageMap[item.pattern]} alt={item.pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />} {item.pattern}</p>
                       )}
                       {!isProduct && item.brand && (
                         <p><span className="font-medium">Brand:</span> {item.brand}</p>
@@ -776,7 +778,7 @@ export default function ProductMaterialSelectionDialog({
                             }}
                           />
                           <label htmlFor={`color-${color}`} className="text-xs cursor-pointer flex-1">
-                            {color}
+                            <span className="inline-flex items-center gap-1">{colorCodeMap[color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: colorCodeMap[color] }} />}{color}</span>
                           </label>
                         </div>
                       ))}
@@ -813,7 +815,7 @@ export default function ProductMaterialSelectionDialog({
                             }}
                           />
                           <label htmlFor={`pattern-${pattern}`} className="text-xs cursor-pointer flex-1">
-                            {pattern}
+                            <span className="inline-flex items-center gap-1">{patternImageMap[pattern] && <img src={patternImageMap[pattern]} alt={pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />}{pattern}</span>
                           </label>
                         </div>
                       ))}

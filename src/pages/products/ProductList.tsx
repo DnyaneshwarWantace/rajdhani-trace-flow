@@ -12,6 +12,7 @@ import ProductWastageTab from '@/components/products/ProductWastageTab';
 import ProductQRCodeDialog from '@/components/products/ProductQRCodeDialog';
 import type { Product, ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
+import { calculateStockStatus } from '@/utils/stockStatus';
 import { exportProductsToCSV, exportProductsToExcel } from '@/utils/exportProductUtils';
 import { useToast } from '@/hooks/use-toast';
 import { canCreate, canEdit, canDelete, canView } from '@/utils/permissions';
@@ -136,8 +137,21 @@ export default function ProductList() {
         sortOrder: filters.sortOrder || 'asc',
       });
 
-      // Backend handles sorting - no need to sort on frontend
-      setProducts(data);
+      // Safety filter: keep stock-status filtering aligned with displayed status badges.
+      // This prevents "In Stock" filter from showing items with 0 available individual stock.
+      const selectedStatuses = Array.isArray(filters.status)
+        ? filters.status
+        : (filters.status ? [filters.status] : []);
+      const selectedStockStatuses = selectedStatuses.filter((s): s is 'in-stock' | 'low-stock' | 'out-of-stock' =>
+        s === 'in-stock' || s === 'low-stock' || s === 'out-of-stock'
+      );
+
+      const filteredData = selectedStockStatuses.length > 0
+        ? data.filter((product) => selectedStockStatuses.includes(calculateStockStatus(product)))
+        : data;
+
+      // Backend handles sorting; frontend only applies stock-status safety filtering.
+      setProducts(filteredData);
       setTotalProducts(total);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load products');

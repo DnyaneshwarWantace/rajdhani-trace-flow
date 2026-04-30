@@ -59,6 +59,8 @@ export default function ProductSelectorDialog({
   const [subcategories, setSubcategories] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
   const [patterns, setPatterns] = useState<string[]>([]);
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
   const [lengths, setLengths] = useState<string[]>([]);
   const [widths, setWidths] = useState<string[]>([]);
   const [weights, setWeights] = useState<string[]>([]);
@@ -113,12 +115,15 @@ export default function ProductSelectorDialog({
       setLoading(true);
       // Load products that have recipes from backend (server-side filter)
       // so we don't fetch unnecessary items.
-      const result = await ProductService.getProducts({
-        limit: 10000,
-        has_recipe: true,
-        sortBy: 'name',
-        sortOrder: 'asc',
-      });
+      const [result, dropdownData] = await Promise.all([
+        ProductService.getProducts({
+          limit: 10000,
+          has_recipe: true,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        }),
+        ProductService.getDropdownData().catch(() => null),
+      ]);
       const loadedProducts = result.products || [];
       const productsWithRecipes = loadedProducts.filter((p) => p.has_recipe);
 
@@ -159,6 +164,17 @@ export default function ProductSelectorDialog({
       setSubcategories(uniqueSubcategories);
       setColors(uniqueColors);
       setPatterns(uniquePatterns);
+      const nextColorCodeMap: Record<string, string> = {};
+      (dropdownData?.colors || []).forEach((item: any) => {
+        if (item?.value && item?.color_code) nextColorCodeMap[item.value] = item.color_code;
+      });
+      setColorCodeMap(nextColorCodeMap);
+
+      const nextPatternImageMap: Record<string, string> = {};
+      (dropdownData?.patterns || []).forEach((item: any) => {
+        if (item?.value && item?.image_url) nextPatternImageMap[item.value] = item.image_url;
+      });
+      setPatternImageMap(nextPatternImageMap);
       setLengths(uniqueLengths);
       setWidths(uniqueWidths);
       setWeights(uniqueWeights);
@@ -404,7 +420,7 @@ export default function ProductSelectorDialog({
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Color</label>
                 <MultiSelect
-                  options={colors.map((color) => ({ label: color, value: color }))}
+                  options={colors.map((color) => ({ label: color, value: color, colorCode: colorCodeMap[color] }))}
                   selected={selectedColors}
                   onChange={setSelectedColors}
                   placeholder="All Colors"
@@ -414,7 +430,7 @@ export default function ProductSelectorDialog({
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-2 block">Pattern</label>
                 <MultiSelect
-                  options={patterns.map((pattern) => ({ label: pattern, value: pattern }))}
+                  options={patterns.map((pattern) => ({ label: pattern, value: pattern, imageUrl: patternImageMap[pattern] }))}
                   selected={selectedPatterns}
                   onChange={setSelectedPatterns}
                   placeholder="All Patterns"

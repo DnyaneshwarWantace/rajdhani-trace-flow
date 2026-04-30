@@ -105,6 +105,8 @@ export default function MaterialSelectionDialog({
   const [productSubcategories, setProductSubcategories] = useState<string[]>([]);
   const [productColors, setProductColors] = useState<string[]>([]);
   const [productPatterns, setProductPatterns] = useState<string[]>([]);
+  const [productColorCodeMap, setProductColorCodeMap] = useState<Record<string, string>>({});
+  const [productPatternImageMap, setProductPatternImageMap] = useState<Record<string, string>>({});
   const [productLengths, setProductLengths] = useState<string[]>([]);
   const [productWidths, setProductWidths] = useState<string[]>([]);
   const [productWeights, setProductWeights] = useState<string[]>([]);
@@ -249,11 +251,14 @@ export default function MaterialSelectionDialog({
 
   const loadProductsOnly = async (): Promise<void> => {
     try {
-      const response = await ProductService.getProducts({
-        search: searchQuery || undefined,
-        page: 1,
-        limit: 1000,
-      });
+      const [response, dropdownData] = await Promise.all([
+        ProductService.getProducts({
+          search: searchQuery || undefined,
+          page: 1,
+          limit: 1000,
+        }),
+        ProductService.getDropdownData().catch(() => null),
+      ]);
       const all = response.products || [];
       let productsData = [...all];
       if (categoryFilter.length > 0) {
@@ -309,6 +314,17 @@ export default function MaterialSelectionDialog({
       setProductSubcategories(Array.from(new Set(all.map((p: any) => p.subcategory).filter(Boolean))).sort());
       setProductColors(Array.from(new Set(all.map((p: any) => p.color).filter((c: any) => c && c !== 'N/A'))).sort());
       setProductPatterns(Array.from(new Set(all.map((p: any) => p.pattern).filter((p: any) => p && p !== 'N/A'))).sort());
+      const nextColorCodeMap: Record<string, string> = {};
+      (dropdownData?.colors || []).forEach((item: any) => {
+        if (item?.value && item?.color_code) nextColorCodeMap[item.value] = item.color_code;
+      });
+      setProductColorCodeMap(nextColorCodeMap);
+
+      const nextPatternImageMap: Record<string, string> = {};
+      (dropdownData?.patterns || []).forEach((item: any) => {
+        if (item?.value && item?.image_url) nextPatternImageMap[item.value] = item.image_url;
+      });
+      setProductPatternImageMap(nextPatternImageMap);
       setProductLengths(Array.from(new Set(all.map((p: any) => p.length).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
       setProductWidths(Array.from(new Set(all.map((p: any) => p.width).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
       setProductWeights(Array.from(new Set(all.map((p: any) => p.weight).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
@@ -479,13 +495,23 @@ export default function MaterialSelectionDialog({
                 {material.color && material.color !== 'N/A' && (
                   <div className="min-w-0">
                     <p className="text-gray-500">Color</p>
-                    <p className="font-medium text-gray-900 truncate">{material.color}</p>
+                    <p className="font-medium text-gray-900 truncate inline-flex items-center gap-1">
+                      {productColorCodeMap[material.color] && (
+                        <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: productColorCodeMap[material.color] }} />
+                      )}
+                      {material.color}
+                    </p>
                   </div>
                 )}
                 {material.pattern && material.pattern !== 'N/A' && (
                   <div className="col-span-2 min-w-0">
                     <p className="text-gray-500">Pattern</p>
-                    <p className="font-medium text-gray-900 truncate">{material.pattern}</p>
+                    <p className="font-medium text-gray-900 truncate inline-flex items-center gap-1">
+                      {productPatternImageMap[material.pattern] && (
+                        <img src={productPatternImageMap[material.pattern]} alt={material.pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />
+                      )}
+                      {material.pattern}
+                    </p>
                   </div>
                 )}
               </div>
@@ -732,7 +758,7 @@ export default function MaterialSelectionDialog({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 {/* Color Filter - Multi-select */}
                 <MultiSelect
-                  options={productColors.map(color => ({ label: color, value: color }))}
+                  options={productColors.map(color => ({ label: color, value: color, colorCode: productColorCodeMap[color] }))}
                   selected={colorFilter}
                   onChange={(values) => { setColorFilter(values); setCurrentPage(1); }}
                   placeholder="All Colors"
@@ -740,7 +766,7 @@ export default function MaterialSelectionDialog({
 
                 {/* Pattern Filter - Multi-select */}
                 <MultiSelect
-                  options={productPatterns.map(pattern => ({ label: pattern, value: pattern }))}
+                  options={productPatterns.map(pattern => ({ label: pattern, value: pattern, imageUrl: productPatternImageMap[pattern] }))}
                   selected={patternFilter}
                   onChange={(values) => { setPatternFilter(values); setCurrentPage(1); }}
                   placeholder="All Patterns"
@@ -898,8 +924,11 @@ export default function MaterialSelectionDialog({
                                 })()}
                               </td>
                               <td className="px-3 py-3">
-                                <p className="text-gray-700 truncate max-w-[120px]" title={material.color || '-'}>{material.color || '-'}</p>
-                                {material.pattern && <p className="text-xs text-gray-500 truncate max-w-[120px]" title={material.pattern}>{material.pattern}</p>}
+                                <p className="text-gray-700 truncate max-w-[120px] inline-flex items-center gap-1" title={material.color || '-'}>
+                                  {material.color && productColorCodeMap[material.color] && <span className="w-3 h-3 rounded-full border border-gray-300 inline-block" style={{ backgroundColor: productColorCodeMap[material.color] }} />}
+                                  {material.color || '-'}
+                                </p>
+                                {material.pattern && <p className="text-xs text-gray-500 truncate max-w-[120px] inline-flex items-center gap-1" title={material.pattern}>{productPatternImageMap[material.pattern] && <img src={productPatternImageMap[material.pattern]} alt={material.pattern} className="w-3 h-3 rounded object-cover border border-gray-200" />}{material.pattern}</p>}
                               </td>
                               <td className="px-3 py-3">
                                 <p className="text-gray-700">{material.weight ? `${material.weight} ${material.weight_unit || ''}`.trim() : '-'}</p>

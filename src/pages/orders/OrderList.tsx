@@ -16,9 +16,32 @@ import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 type ViewMode = 'table' | 'grid';
 
+const DRAFT_KEY = 'newOrderDraft';
+
+function useDraft() {
+  const [draft, setDraft] = useState<{ customerName?: string; itemCount?: number; step?: number } | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.selectedCustomer || d.orderItems?.length) {
+        setDraft({
+          customerName: d.selectedCustomer?.name,
+          itemCount: d.orderItems?.length || 0,
+          step: d.step || 0,
+        });
+      }
+    } catch { }
+  }, []);
+  const discard = () => { sessionStorage.removeItem(DRAFT_KEY); setDraft(null); };
+  return { draft, discard };
+}
+
 export default function OrderList() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { draft, discard } = useDraft();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
@@ -256,6 +279,38 @@ export default function OrderList() {
             )}
           </div>
         </div>
+
+        {/* Draft resume banner */}
+        {draft && (
+          <div className="flex items-center justify-between gap-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-amber-900">You have an unfinished order</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  {draft.customerName ? <><span className="font-medium">{draft.customerName}</span> · </> : ''}
+                  {draft.itemCount ? `${draft.itemCount} item${draft.itemCount !== 1 ? 's' : ''} added` : 'No items yet'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={discard}
+                className="text-xs text-amber-600 hover:text-amber-800 font-medium px-3 py-1.5 rounded-md hover:bg-amber-100 transition-colors"
+              >
+                Discard
+              </button>
+              <Button
+                onClick={() => navigate('/orders/new')}
+                className="h-8 px-4 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                Resume draft →
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Stats Boxes */}
         <OrderStatsBoxes stats={stats} loading={statsLoading} />
