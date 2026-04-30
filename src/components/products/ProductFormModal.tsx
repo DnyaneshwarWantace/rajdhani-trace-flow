@@ -24,7 +24,7 @@ const WIZARD_STEPS = [
   { label: 'Recipe' },
 ];
 
-function WizardStepper({ current, total }: { current: number; total: number }) {
+function WizardStepper({ current }: { current: number }) {
   return (
     <div className="flex items-center gap-1">
       {WIZARD_STEPS.map((s, idx) => {
@@ -700,7 +700,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           <div className="flex items-center gap-3">
             <h2 className="text-base font-bold text-slate-900">{title}</h2>
           </div>
-          <WizardStepper current={wizardStep} total={WIZARD_STEPS.length} />
+          <WizardStepper current={wizardStep} />
           <button onClick={onClose} type="button" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
             <X className="w-4 h-4 text-slate-500" />
           </button>

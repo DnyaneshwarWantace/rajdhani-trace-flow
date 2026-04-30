@@ -10,10 +10,10 @@ export interface ProductStockHeaderProps {
   productId: string;
   onExportCSV?: () => void;
   onExportExcel?: () => void;
-  onDownloadAllQRCodes?: () => void;
-  onDownloadSelectedQRCodes?: () => void;
+  onDownloadQrPdf?: () => void;
+  onDownloadAllQrPdf?: () => void;
   onClearSelection?: () => void;
-  downloadingAllQR?: boolean;
+  downloadingQrPdf?: boolean;
   individualProductCount?: number;
   selectedCount?: number;
 }
@@ -23,10 +23,10 @@ export default function ProductStockHeader({
   productId,
   onExportCSV,
   onExportExcel,
-  onDownloadAllQRCodes,
-  onDownloadSelectedQRCodes,
+  onDownloadQrPdf,
+  onDownloadAllQrPdf,
   onClearSelection,
-  downloadingAllQR = false,
+  downloadingQrPdf = false,
   individualProductCount = 0,
   selectedCount = 0,
 }: ProductStockHeaderProps) {
@@ -64,12 +64,12 @@ export default function ProductStockHeader({
   };
 
   const handleDownloadAll = () => {
-    onDownloadAllQRCodes?.();
+    onDownloadAllQrPdf?.();
     setDownloadQROpen(false);
   };
 
   const handleDownloadSelected = () => {
-    onDownloadSelectedQRCodes?.();
+    onDownloadQrPdf?.();
     setDownloadQROpen(false);
   };
 
@@ -144,7 +144,7 @@ export default function ProductStockHeader({
               </PopoverContent>
             </Popover>
           )}
-          {onDownloadAllQRCodes && (
+          {(onDownloadQrPdf || onDownloadAllQrPdf) && (
             <Popover open={downloadQROpen} onOpenChange={setDownloadQROpen}>
               <PopoverTrigger asChild>
                 <div ref={downloadQRTriggerRef} className="inline-flex flex-1 sm:flex-initial">
@@ -152,10 +152,10 @@ export default function ProductStockHeader({
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={downloadingAllQR || individualProductCount === 0}
+                    disabled={downloadingQrPdf || individualProductCount === 0}
                     className="gap-2 w-full"
                   >
-                    {downloadingAllQR ? (
+                    {downloadingQrPdf ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <QrCode className="w-4 h-4" />
@@ -173,20 +173,22 @@ export default function ProductStockHeader({
                 <div className="flex flex-col gap-0.5">
                   <button
                     type="button"
-                    onClick={handleDownloadAll}
-                    disabled={downloadingAllQR || individualProductCount === 0}
-                    className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none"
+                    onClick={handleDownloadSelected}
+                    disabled={downloadingQrPdf || selectedCount === 0}
+                    className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
                   >
-                    Download all
+                    <FileDown className="w-4 h-4 text-red-500" />
+                    PDF
                   </button>
-                  {onDownloadSelectedQRCodes && (
+                  {onDownloadAllQrPdf && (
                     <button
                       type="button"
-                      onClick={handleDownloadSelected}
-                      disabled={downloadingAllQR || selectedCount === 0}
-                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none"
+                      onClick={handleDownloadAll}
+                      disabled={downloadingQrPdf || individualProductCount === 0}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
                     >
-                      Download selected {selectedCount > 0 ? `(${selectedCount})` : ''}
+                      <FileDown className="w-4 h-4 text-red-500" />
+                      All
                     </button>
                   )}
                   {onClearSelection && selectedCount > 0 && (

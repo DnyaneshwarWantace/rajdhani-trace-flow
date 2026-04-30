@@ -7,6 +7,7 @@ import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from '
 import { Badge } from '@/components/ui/badge';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import ColorSwatch from '@/components/ui/ColorSwatch';
 
 interface ProductCardProps {
   product: Product;
@@ -142,7 +143,7 @@ export default function ProductCard({
               <span className="text-gray-500 flex-shrink-0">Color</span>
               <span className="font-medium text-gray-900 text-right truncate min-w-0 flex items-center gap-1 justify-end" title={product.color}>
                 {colorCodeMap[product.color] && (
-                  <span className="w-8 h-8 rounded-md border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                  <ColorSwatch colorCode={colorCodeMap[product.color]} />
                 )}
                 {product.color}
               </span>

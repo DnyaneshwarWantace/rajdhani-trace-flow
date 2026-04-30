@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +20,6 @@ import CustomerForm from '@/components/orders/CustomerForm';
 import OrderItemsList from '@/components/orders/OrderItemsList';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import DeliveryAddressDialog from '@/components/orders/DeliveryAddressDialog';
-import OrderSummary from '@/components/orders/OrderSummary';
 
 const DRAFT_KEY = 'newOrderDraft';
 
@@ -501,7 +499,6 @@ export default function NewOrder() {
                   onCustomerCreated={handleCustomerCreated}
                   onCancel={() => setShowNewCustomerForm(false)}
                   showCard={false}
-                  autoSave
                 />
               )}
             </div>

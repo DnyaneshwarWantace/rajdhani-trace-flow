@@ -12,9 +12,8 @@ import EditIndividualProductDialog from '@/components/products/stock/EditIndivid
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { useToast } from '@/hooks/use-toast';
-import { getAppBaseUrl } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
+import { downloadQRsAsPdf } from '@/utils/qrPdfExport';
 import type {
   Product,
   IndividualProduct,
@@ -111,17 +110,6 @@ function buildIndividualProductsExcel(products: IndividualProduct[], productName
   return wb;
 }
 
-/** Get QR code image URL for an individual product (same as QRCodeDialog) */
-function getQRCodeImageURL(individualProduct: IndividualProduct): string {
-  const qrCodeData = JSON.stringify({
-    type: 'individual',
-    individualProductId: individualProduct.id,
-    productId: individualProduct.product_id,
-  });
-  const dataUrl = `${getAppBaseUrl()}/qr-result?data=${encodeURIComponent(qrCodeData)}`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(dataUrl)}`;
-}
-
 export default function ProductStock() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
@@ -158,8 +146,8 @@ export default function ProductStock() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<IndividualProduct | null>(null);
 
-  // Export / Download all QR
-  const [downloadingAllQR, setDownloadingAllQR] = useState(false);
+  // Export / Download QR PDF
+  const [downloadingQrPdf, setDownloadingQrPdf] = useState(false);
   const { toast } = useToast();
 
   // Selection for "Download selected QR codes"
@@ -363,55 +351,28 @@ export default function ProductStock() {
     toast({ title: 'Exported', description: `${allIndividualProducts.length} individual products exported to Excel` });
   };
 
-  const downloadQRCodesForProducts = async (list: IndividualProduct[]) => {
-    if (list.length === 0) return;
-    const productName = product?.name || 'Product';
-    const baseName = sanitizeFileName(productName);
-    setDownloadingAllQR(true);
-    toast({ title: 'Preparing ZIP…', description: `Adding ${list.length} QR code(s) to zip. Please wait.` });
+  const handleDownloadQrPdf = async (list?: IndividualProduct[]) => {
+    const items = list ?? allIndividualProducts;
+    const withQr = items.filter((p) => p.qr_code);
+    if (withQr.length === 0) {
+      toast({ title: 'No QR codes', description: 'No QR codes available.', variant: 'destructive' });
+      return;
+    }
+    setDownloadingQrPdf(true);
+    toast({ title: 'Generating PDF…', description: `Preparing ${withQr.length} QR codes, please wait.` });
     try {
-      const zip = new JSZip();
-      for (let i = 0; i < list.length; i++) {
-        const ip = list[i];
-        const url = getQRCodeImageURL(ip);
-        const res = await fetch(url);
-        const blob = await res.blob();
-        zip.file(`${baseName}-${ip.id}.png`, blob);
-      }
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const objectUrl = window.URL.createObjectURL(zipBlob);
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = `${baseName}-qr-codes.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(objectUrl);
-      toast({ title: 'Done', description: `Downloaded ${list.length} QR code(s) in ${baseName}-qr-codes.zip` });
-    } catch (err) {
-      console.error('Error downloading QR codes:', err);
-      toast({ title: 'Error', description: 'Failed to create zip. Try again.', variant: 'destructive' });
+      const productName = product?.name || 'Product';
+      await downloadQRsAsPdf(
+        withQr,
+        `QR Codes — ${productName}`,
+        `${sanitizeFileName(productName)}-qr-codes.pdf`
+      );
+      toast({ title: 'PDF Downloaded', description: `${withQr.length} QR codes saved as PDF.` });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to generate PDF.', variant: 'destructive' });
     } finally {
-      setDownloadingAllQR(false);
+      setDownloadingQrPdf(false);
     }
-  };
-
-  const handleDownloadAllQRCodes = async () => {
-    if (allIndividualProducts.length === 0) {
-      toast({ title: 'No data', description: 'No individual products to download QR codes for', variant: 'destructive' });
-      return;
-    }
-    await downloadQRCodesForProducts(allIndividualProducts);
-  };
-
-  const handleDownloadSelectedQRCodes = async () => {
-    if (selectedIds.size === 0) return;
-    const list = allIndividualProducts.filter((p) => selectedIds.has(p.id));
-    if (list.length === 0) {
-      toast({ title: 'No data', description: 'Selected items could not be found. Try refreshing.', variant: 'destructive' });
-      return;
-    }
-    await downloadQRCodesForProducts(list);
   };
 
   const handleToggleSelect = (id: string) => {
@@ -472,10 +433,10 @@ export default function ProductStock() {
           productId={productId}
           onExportCSV={handleExportCSV}
           onExportExcel={handleExportExcel}
-          onDownloadAllQRCodes={handleDownloadAllQRCodes}
-          onDownloadSelectedQRCodes={handleDownloadSelectedQRCodes}
+          onDownloadQrPdf={selectedIds.size > 0 ? () => handleDownloadQrPdf(allIndividualProducts.filter((p) => selectedIds.has(p.id))) : undefined}
+          onDownloadAllQrPdf={() => handleDownloadQrPdf()}
           onClearSelection={handleClearSelection}
-          downloadingAllQR={downloadingAllQR}
+          downloadingQrPdf={downloadingQrPdf}
           individualProductCount={allIndividualProducts.length}
           selectedCount={selectedIds.size}
         />

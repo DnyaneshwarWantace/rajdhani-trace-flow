@@ -147,7 +147,14 @@ export default function ProductList() {
       );
 
       const filteredData = selectedStockStatuses.length > 0
-        ? data.filter((product) => selectedStockStatuses.includes(calculateStockStatus(product)))
+        ? data.filter((product) => {
+            const computedStockStatus = calculateStockStatus(product);
+            return (
+              computedStockStatus === 'in-stock' ||
+              computedStockStatus === 'low-stock' ||
+              computedStockStatus === 'out-of-stock'
+            ) && selectedStockStatuses.includes(computedStockStatus);
+          })
         : data;
 
       // Backend handles sorting; frontend only applies stock-status safety filtering.

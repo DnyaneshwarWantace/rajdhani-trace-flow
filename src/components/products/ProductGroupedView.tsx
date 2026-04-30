@@ -7,6 +7,7 @@ import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import ColorSwatch from '@/components/ui/ColorSwatch';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface ProductGroupedViewProps {
@@ -196,7 +197,7 @@ export default function ProductGroupedView({
                           product.color.trim() !== '' &&
                           product.color.toLowerCase() !== 'n/a' && (
                             <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                              Color: {colorCodeMap[product.color] && <span className="inline-block w-8 h-8 rounded-md border border-gray-300 mx-1 align-middle" style={{ backgroundColor: colorCodeMap[product.color] }} />}{product.color}
+                              Color: {colorCodeMap[product.color] && <ColorSwatch colorCode={colorCodeMap[product.color]} className="w-8 h-8 rounded-md mx-1 align-middle" />}{product.color}
                             </p>
                           )}
                         {product.pattern &&
@@ -387,7 +388,7 @@ export default function ProductGroupedView({
                               product.color.trim() !== '' &&
                               product.color.toLowerCase() !== 'n/a' && (
                                 <p className="text-xs text-gray-500 line-clamp-1 break-words">
-                                  Color: {colorCodeMap[product.color] && <span className="inline-block w-8 h-8 rounded-md border border-gray-300 mx-1 align-middle" style={{ backgroundColor: colorCodeMap[product.color] }} />}{product.color}
+                                  Color: {colorCodeMap[product.color] && <ColorSwatch colorCode={colorCodeMap[product.color]} className="w-8 h-8 rounded-md mx-1 align-middle" />}{product.color}
                                 </p>
                               )}
                             {product.pattern &&

@@ -296,14 +296,6 @@ export function calculateTotalPrice(
     return unitPrice * quantity;
   }
 
-  if (pricingUnit === 'running_meter') {
-    if (!productDimensions.length) {
-      return safeQuantity;
-    }
-    const lengthInM = convertToMeters(productDimensions.length, lengthUnit || 'm');
-    return lengthInM * safeQuantity;
-  }
-  
   // Fallback: simple calculation
   return unitPrice * quantity;
 }
