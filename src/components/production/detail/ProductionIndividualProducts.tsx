@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Package, Loader2, FileDown, Download } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
-import { invalidateDropdownVisualMaps, useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { useToast } from '@/hooks/use-toast';
 import type { IndividualProduct } from '@/types/product';
 import type { ProductionBatch } from '@/services/productionService';
