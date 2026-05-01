@@ -4,7 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, Loader2, FileDown } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
-import { downloadQRsAsPdf } from '@/utils/qrPdfExport';
+import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
+import { invalidateDropdownVisualMaps, useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { useToast } from '@/hooks/use-toast';
 import type { IndividualProduct } from '@/types/product';
 import type { ProductionBatch } from '@/services/productionService';
@@ -32,6 +33,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
   const [loading, setLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const { toast } = useToast();
+  const { patternImageMap } = useDropdownVisualMaps();
 
   const handleDownloadQrPdf = async () => {
     const withQr = individualProducts.filter((p) => p.qr_code);
@@ -43,10 +45,25 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
     toast({ title: 'Generating PDF…', description: `Preparing ${withQr.length} QR codes, please wait.` });
     try {
       const productName = batch.product_name || batch.product_id || 'batch';
+      const productInfo: ProductInfo = {
+        name: productName,
+        color: batch.color,
+        pattern: batch.pattern,
+        patternImageUrl: batch.pattern ? patternImageMap[batch.pattern] : undefined,
+        length: batch.length,
+        length_unit: batch.length_unit,
+        width: batch.width,
+        width_unit: batch.width_unit,
+        weight: batch.weight,
+        weight_unit: batch.weight_unit,
+      };
+      const title = `${productName} (Batch ${batch.batch_number || ''})`;
       await downloadQRsAsPdf(
         withQr,
-        `QR Codes — ${productName} (Batch ${batch.batch_number || ''})`,
-        `${productName}-${batch.batch_number || 'batch'}-qr-codes.pdf`
+        title,
+        `${productName}-${batch.batch_number || 'batch'}-qr-codes.pdf`,
+        undefined,
+        productInfo
       );
       toast({ title: 'PDF Downloaded', description: `${withQr.length} QR codes saved as PDF.` });
     } catch (err) {
