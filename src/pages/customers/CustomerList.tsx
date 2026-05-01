@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List, Upload } from 'lucide-react';
 import { CustomerService, type Customer, type CreateCustomerData } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog';
 import CustomerDeleteDialog from '@/components/customers/CustomerDeleteDialog';
+import BulkCustomerUploadDialog from '@/components/customers/BulkCustomerUploadDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import type { Order } from '@/services/orderService';
 import {
@@ -52,6 +53,7 @@ export default function CustomerList() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -426,10 +428,20 @@ export default function CustomerList() {
                 </Button>
               </div>
               {canCreate('customers') && (
-                <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Customer
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsBulkUploadOpen(true)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import
+                  </Button>
+                  <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Customer
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -614,6 +626,12 @@ export default function CustomerList() {
           onConfirm={handleConfirmDelete}
           customer={selectedCustomer}
           isDeleting={isDeleting}
+        />
+
+        <BulkCustomerUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          onSuccess={loadCustomers}
         />
       </div>
     </Layout>

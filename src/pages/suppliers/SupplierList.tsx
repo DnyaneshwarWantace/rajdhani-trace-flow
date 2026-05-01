@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Grid3x3, List } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List, Upload } from 'lucide-react';
 import { SupplierService, type Supplier, type CreateSupplierData } from '@/services/supplierService';
 import { ManageStockService, type StockOrder } from '@/services/manageStockService';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import SupplierFormDialog from '@/components/suppliers/SupplierFormDialog';
 import SupplierDeleteDialog from '@/components/suppliers/SupplierDeleteDialog';
+import BulkSupplierUploadDialog from '@/components/suppliers/BulkSupplierUploadDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import {
   Pagination,
@@ -50,6 +51,7 @@ export default function SupplierList() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -307,10 +309,20 @@ export default function SupplierList() {
                 </Button>
               </div>
               {canCreate('suppliers') && (
-                <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Supplier
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsBulkUploadOpen(true)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Import
+                  </Button>
+                  <Button onClick={handleCreate} className="w-full sm:w-auto bg-primary-600 hover:bg-primary-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Supplier
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -491,6 +503,12 @@ export default function SupplierList() {
           onConfirm={handleConfirmDelete}
           supplier={selectedSupplier}
           isDeleting={isDeleting}
+        />
+
+        <BulkSupplierUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          onSuccess={loadSuppliers}
         />
       </div>
     </Layout>
