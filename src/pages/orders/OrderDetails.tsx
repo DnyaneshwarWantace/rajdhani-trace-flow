@@ -641,10 +641,16 @@ export default function OrderDetails() {
           </div>
           <div className="flex gap-2">
             {order.status === 'pending' && (
-              <Button onClick={handleAcceptOrder} className="bg-blue-600 hover:bg-blue-700">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Accept
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
+                  <Download className="w-4 h-4 mr-2" />
+                  Generate Bill
+                </Button>
+                <Button onClick={handleAcceptOrder} className="bg-blue-600 hover:bg-blue-700">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Accept
+                </Button>
+              </>
             )}
             {order.status === 'accepted' && (() => {
               const productItems = orderItems.filter((item: any) => item.product_type === 'product');
