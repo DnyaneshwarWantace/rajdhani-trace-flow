@@ -17,9 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus, CheckCircle, Copy, ArrowDown, Layers } from 'lucide-react';
+import { Trash2, Plus, CheckCircle, Copy, ArrowDown, Layers, FileDown } from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { DropdownService } from '@/services/dropdownService';
+import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { IndividualProduct } from '@/types/product';
@@ -64,6 +66,9 @@ interface IndividualProductsTableProps {
   individualProducts: IndividualProduct[];
   onUpdate: () => void;
   product?: {
+    name?: string;
+    color?: string;
+    pattern?: string;
     weight_unit?: string;
     width_unit?: string;
     length_unit?: string;
@@ -97,6 +102,7 @@ export default function IndividualProductsTable({
 }: IndividualProductsTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { patternImageMap } = useDropdownVisualMaps();
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
@@ -113,6 +119,8 @@ export default function IndividualProductsTable({
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [newLocationValue, setNewLocationValue] = useState('');
+  const [creatingTempRowId, setCreatingTempRowId] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Load storage locations from dropdown service
   useEffect(() => {
@@ -255,6 +263,123 @@ export default function IndividualProductsTable({
     onCreatedProductsCountChange(createdCount);
   }, [localProducts, onCreatedProductsCountChange]);
 
+  const isTempRowReady = (row: IndividualProduct): boolean => {
+    if (!row?.id?.startsWith('temp-')) return false;
+    return Boolean(
+      row.final_weight &&
+      row.final_width &&
+      row.final_length &&
+      row.location &&
+      row.roll_number &&
+      productId
+    );
+  };
+
+  const createTempRowIfReady = async (rowIndex: number) => {
+    const tempProduct = localProductsRef.current[rowIndex];
+    if (!tempProduct || !isTempRowReady(tempProduct)) return;
+
+    const candidateRoll = normalizeRollNumberInput(tempProduct.roll_number || '', tempProduct.production_date);
+    const duplicate = localProductsRef.current.find((p, i) => {
+      if (i === rowIndex || p.id.startsWith('temp-')) return false;
+      const existingRoll = normalizeRollNumberInput(p.roll_number || '', p.production_date);
+      return existingRoll === candidateRoll;
+    });
+    if (duplicate) {
+      toast({
+        title: 'Duplicate Roll Number',
+        description: `Roll number "${candidateRoll}" is already used in this product. Please use a unique roll number.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreatingTempRowId(tempProduct.id);
+    try {
+      const newProduct = await IndividualProductService.createIndividualProduct({
+        product_id: productId || '',
+        qr_code: tempProduct.qr_code || '',
+        serial_number: tempProduct.serial_number || '',
+        roll_number: candidateRoll,
+        status: 'available',
+        final_length: tempProduct.final_length || '',
+        final_width: tempProduct.final_width || '',
+        final_weight: tempProduct.final_weight || '',
+        inspector: user?.full_name || user?.email || 'System',
+        location: tempProduct.location || 'Warehouse A - General Storage',
+        notes: tempProduct.notes || '',
+        production_date: tempProduct.production_date || new Date().toISOString().split('T')[0],
+        batch_number: batchId || '',
+      });
+
+      const updated = [...localProductsRef.current];
+      updated[rowIndex] = newProduct;
+      setLocalProductsSync(updated);
+
+      toast({
+        title: 'Saved to Stock',
+        description: `Roll ${newProduct.roll_number || newProduct.id} added and QR generated.`,
+      });
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error creating individual product:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create individual product',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingTempRowId(null);
+    }
+  };
+
+  // Auto-create temp row as soon as all required fields are filled.
+  useEffect(() => {
+    if (creatingTempRowId || saving || editingCell) return;
+    const readyIndex = localProducts.findIndex((row) => isTempRowReady(row));
+    if (readyIndex >= 0) {
+      void createTempRowIfReady(readyIndex);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localProducts, creatingTempRowId, saving, editingCell]);
+
+  const handleBulkDownloadQrs = async () => {
+    const rowsWithQr = localProducts.filter((item) => !item.id.startsWith('temp-') && item.qr_code);
+    if (rowsWithQr.length === 0) {
+      toast({ title: 'No QR codes', description: 'No generated rows available for QR PDF download.', variant: 'destructive' });
+      return;
+    }
+    setDownloadingPdf(true);
+    toast({ title: 'Generating PDF…', description: `Preparing ${rowsWithQr.length} QR codes, please wait.` });
+    try {
+      const productName = product?.name || rowsWithQr[0]?.product_name || 'Production Batch';
+      const productInfo: ProductInfo = {
+        name: productName,
+        color: product?.color,
+        pattern: product?.pattern,
+        patternImageUrl: product?.pattern ? patternImageMap[product.pattern] : undefined,
+        length: product?.length,
+        length_unit: product?.length_unit,
+        width: product?.width,
+        width_unit: product?.width_unit,
+        weight: product?.weight,
+        weight_unit: product?.weight_unit,
+      };
+      await downloadQRsAsPdf(
+        rowsWithQr,
+        `QR Codes — ${productName}`,
+        `production-qr-codes.pdf`,
+        undefined,
+        productInfo
+      );
+      toast({ title: 'PDF Downloaded', description: `${rowsWithQr.length} QR codes saved as PDF.` });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to generate PDF.', variant: 'destructive' });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   const handleCellClick = (row: number, col: string) => {
     const productItem = localProducts[row];
     let value = '';
@@ -347,7 +472,7 @@ export default function IndividualProductsTable({
         if (!valueToSave || valueToSave === expectedPrefix) {
           toast({
             title: 'Roll number required',
-            description: `Enter serial after prefix ${expectedPrefix} (example: ${expectedPrefix}101).`,
+            description: `Enter serial after prefix ${expectedPrefix} (example: ${expectedPrefix}1).`,
             variant: 'destructive',
           });
           setSaving(null);
@@ -412,9 +537,12 @@ export default function IndividualProductsTable({
         // Only create if this is the last required field being filled
         if (hasRequiredFields && (col === 'final_weight' || col === 'final_width' || col === 'final_length' || col === 'roll_number' || col === 'location')) {
           // Check for duplicate roll_number within this batch
-          const duplicate = localProductsRef.current.find(
-            (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
-          );
+          const candidateRoll = normalizeRollNumberInput(tempProduct.roll_number || '', tempProduct.production_date);
+          const duplicate = localProductsRef.current.find((p, i) => {
+            if (i === row || p.id.startsWith('temp-')) return false;
+            const existingRoll = normalizeRollNumberInput(p.roll_number || '', p.production_date);
+            return existingRoll === candidateRoll;
+          });
           if (duplicate) {
             toast({
               title: 'Duplicate Roll Number',
@@ -432,7 +560,7 @@ export default function IndividualProductsTable({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
-              roll_number: tempProduct.roll_number || '',
+              roll_number: candidateRoll,
               status: 'available',
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
@@ -515,9 +643,12 @@ export default function IndividualProductsTable({
         // Only create if all required fields are now filled
         if (hasRequiredFields) {
           // Check for duplicate roll_number within this batch
-          const duplicate = localProductsRef.current.find(
-            (p, i) => i !== row && !p.id.startsWith('temp-') && p.roll_number === tempProduct.roll_number
-          );
+          const candidateRoll = normalizeRollNumberInput(tempProduct.roll_number || '', tempProduct.production_date);
+          const duplicate = localProductsRef.current.find((p, i) => {
+            if (i === row || p.id.startsWith('temp-')) return false;
+            const existingRoll = normalizeRollNumberInput(p.roll_number || '', p.production_date);
+            return existingRoll === candidateRoll;
+          });
           if (duplicate) {
             toast({
               title: 'Duplicate Roll Number',
@@ -533,7 +664,7 @@ export default function IndividualProductsTable({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
-              roll_number: tempProduct.roll_number || '',
+              roll_number: candidateRoll,
               status: 'available',
               final_length: tempProduct.final_length || '',
               final_width: tempProduct.final_width || '',
@@ -1296,6 +1427,18 @@ export default function IndividualProductsTable({
               <Plus className="w-4 h-4" />
               Add Row
             </Button>
+            <Button
+              onClick={handleBulkDownloadQrs}
+              size="sm"
+              variant="outline"
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 border-blue-600 text-blue-700 hover:bg-blue-50"
+            >
+              {downloadingPdf
+                ? <><span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />Generating…</>
+                : <><FileDown className="w-4 h-4" />Download QR PDF</>
+              }
+            </Button>
             {onComplete && (
               <Button
                 onClick={() => {
@@ -1448,11 +1591,11 @@ export default function IndividualProductsTable({
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder={`${getRollNumberDatePrefix(productItem.production_date)}101`}
+                          placeholder={`${getRollNumberDatePrefix(productItem.production_date)}1`}
                           disabled={saving === productItem.id}
                         />
                         <p className="mt-1 text-[11px] text-gray-500">
-                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (year-month + serial)
+                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (year-month + serial, enter serial like 101)
                         </p>
                       </div>
                     ) : (

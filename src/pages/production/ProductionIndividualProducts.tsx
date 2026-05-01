@@ -390,6 +390,9 @@ export default function ProductionIndividualProducts() {
           individualProducts={filteredIndividualProducts}
           onUpdate={handleTableUpdate}
           product={product ? {
+            name: product.name,
+            color: product.color,
+            pattern: product.pattern,
             weight_unit: product.weight_unit,
             width_unit: product.width_unit,
             length_unit: product.length_unit,

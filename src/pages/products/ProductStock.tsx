@@ -13,7 +13,8 @@ import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { useToast } from '@/hooks/use-toast';
 import * as XLSX from 'xlsx';
-import { downloadQRsAsPdf } from '@/utils/qrPdfExport';
+import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import type {
   Product,
   IndividualProduct,
@@ -149,6 +150,7 @@ export default function ProductStock() {
   // Export / Download QR PDF
   const [downloadingQrPdf, setDownloadingQrPdf] = useState(false);
   const { toast } = useToast();
+  const { patternImageMap } = useDropdownVisualMaps();
 
   // Selection for "Download selected QR codes"
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -204,8 +206,9 @@ export default function ProductStock() {
       setError(null);
 
       const offset = (currentPage - 1) * limit;
+      const statusParam = statusFilter.length > 0 ? statusFilter : undefined;
       const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
-        status: statusFilter,
+        status: statusParam,
         location: locationFilter.length > 0 ? locationFilter : undefined,
         search: searchTerm || undefined,
         start_date: startDate || undefined,
@@ -362,10 +365,24 @@ export default function ProductStock() {
     toast({ title: 'Generating PDF…', description: `Preparing ${withQr.length} QR codes, please wait.` });
     try {
       const productName = product?.name || 'Product';
+      const productInfo: ProductInfo = {
+        name: productName,
+        color: product?.color,
+        pattern: product?.pattern,
+        patternImageUrl: product?.pattern ? patternImageMap[product.pattern] : undefined,
+        length: product?.length,
+        length_unit: product?.length_unit,
+        width: product?.width,
+        width_unit: product?.width_unit,
+        weight: product?.weight,
+        weight_unit: product?.weight_unit,
+      };
       await downloadQRsAsPdf(
         withQr,
         `QR Codes — ${productName}`,
-        `${sanitizeFileName(productName)}-qr-codes.pdf`
+        `${sanitizeFileName(productName)}-qr-codes.pdf`,
+        undefined,
+        productInfo
       );
       toast({ title: 'PDF Downloaded', description: `${withQr.length} QR codes saved as PDF.` });
     } catch {
