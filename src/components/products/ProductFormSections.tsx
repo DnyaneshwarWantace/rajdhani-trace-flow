@@ -242,22 +242,6 @@ export default function ProductFormSections({
             />
           </div>
 
-          <div className="md:col-span-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.individual_stock_tracking}
-                onChange={(e) => onChange({ individual_stock_tracking: e.target.checked })}
-                className="w-4 h-4 text-[#1e40af] border-gray-300 rounded focus:ring-[#1e40af]"
-              />
-              <span className="text-sm font-medium text-gray-700">Enable Individual Stock Tracking</span>
-            </label>
-            <p className="text-xs text-gray-500 mt-1 ml-6">
-              {formData.individual_stock_tracking
-                ? 'Each piece will have a unique QR code for individual tracking'
-                : 'Product will be tracked as bulk quantity without individual QR codes'}
-            </p>
-          </div>
         </div>
       </div>
 
