@@ -6,6 +6,8 @@ import { Package, Edit, Check, X, QrCode, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
+import ColorSwatch from '@/components/ui/ColorSwatch';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface ProductDetails {
   color?: string;
@@ -61,6 +63,7 @@ export function EditableOrderItemCard({
   onSelectIndividualProducts,
   onDeleteItem,
 }: EditableOrderItemCardProps) {
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [editedQuantity, setEditedQuantity] = useState<number | string>(item.quantity);
   const [isSaving, setIsSaving] = useState(false);
@@ -153,13 +156,21 @@ export function EditableOrderItemCard({
                 </div>
               )}
               {color && (
-                <div>
-                  <span className="font-medium">Color:</span> {color}
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Color:</span>
+                  {colorCodeMap[color] && (
+                    <ColorSwatch colorCode={colorCodeMap[color]} className="w-3.5 h-3.5 rounded-sm" />
+                  )}
+                  {color}
                 </div>
               )}
               {pattern && (
-                <div>
-                  <span className="font-medium">Pattern:</span> {pattern}
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Pattern:</span>
+                  {patternImageMap[pattern] && (
+                    <img src={patternImageMap[pattern]} alt={pattern} className="w-5 h-5 rounded object-cover border border-gray-300" />
+                  )}
+                  {pattern}
                 </div>
               )}
               {category && (

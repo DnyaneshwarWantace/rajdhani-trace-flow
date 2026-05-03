@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { Order } from '@/services/orderService';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface InvoiceItem {
   id: string;
