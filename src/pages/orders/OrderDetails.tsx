@@ -841,6 +841,21 @@ export default function OrderDetails() {
             {/* Production Information - moved to main flow below timeline */}
             <OrderProductionInfo order={order} />
 
+            {/* PI Number */}
+            {(order as any).pi_number && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    PI Number
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-lg font-semibold text-gray-900">{(order as any).pi_number}</p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Special Instructions */}
             {order.special_instructions && (
               <Card>

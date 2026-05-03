@@ -187,7 +187,7 @@ export default function NewOrder() {
   const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
   const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const [orderDetails, setOrderDetails] = useState({ expectedDelivery: '', notes: '', remarks: '', paidAmount: 0 });
+  const [orderDetails, setOrderDetails] = useState({ expectedDelivery: '', notes: '', remarks: '', paidAmount: 0, piNumber: '' });
   const [transportType, setTransportType] = useState<'own' | 'outside' | ''>('');
   const [transportVehicleNo, setTransportVehicleNo] = useState('');
   const [transportRemark, setTransportRemark] = useState('');
@@ -370,6 +370,7 @@ export default function NewOrder() {
         })),
         discount_amount: 0, paid_amount: orderDetails.paidAmount || 0,
         priority: 'medium' as const,
+        pi_number: orderDetails.piNumber || undefined,
         special_instructions: orderDetails.notes || undefined,
         delivery_address: orderDeliveryAddress || undefined,
         transport_type: transportType || undefined,
@@ -580,6 +581,15 @@ export default function NewOrder() {
                       </div>
                     </div>
                     <div className="space-y-1.5">
+                      <Label className="text-sm font-medium text-gray-700">PI Number</Label>
+                      <Input
+                        value={orderDetails.piNumber}
+                        onChange={e => setOrderDetails(p => ({ ...p, piNumber: e.target.value }))}
+                        placeholder="Proforma Invoice number (e.g. PI-2024-001)"
+                        className="h-10 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <Label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                         <StickyNote className="w-3.5 h-3.5 text-gray-400" /> Notes
                       </Label>
@@ -750,8 +760,8 @@ export default function NewOrder() {
                     <p className="text-sm text-slate-800 font-medium truncate">{orderDeliveryAddress?.city ? `${orderDeliveryAddress.city}, ${orderDeliveryAddress.state}` : '—'}</p>
                   </div>
                   <div className="px-4 py-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Notes</p>
-                    <p className="text-sm text-slate-800 font-medium truncate">{orderDetails.notes || '—'}</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">PI Number</p>
+                    <p className="text-sm text-slate-800 font-medium truncate">{orderDetails.piNumber || '—'}</p>
                   </div>
                 </div>
               </div>

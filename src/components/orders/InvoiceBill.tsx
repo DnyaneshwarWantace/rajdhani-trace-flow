@@ -58,6 +58,12 @@ export const InvoiceBill = forwardRef<HTMLDivElement, InvoiceBillProps>(
                 <p className="text-xs text-gray-600 font-semibold">Invoice Number</p>
                 <p className="text-xl font-bold text-blue-900">{order.orderNumber}</p>
               </div>
+              {(order as any).pi_number && (
+                <div className="mt-2 bg-gray-50 border border-gray-300 px-4 py-1.5 rounded-lg">
+                  <p className="text-xs text-gray-500 font-semibold">PI Number</p>
+                  <p className="text-base font-bold text-gray-800">{(order as any).pi_number}</p>
+                </div>
+              )}
               <p className="text-sm text-gray-600 mt-2">Date: {formatDate(order.createdAt || order.orderDate)}</p>
             </div>
           </div>

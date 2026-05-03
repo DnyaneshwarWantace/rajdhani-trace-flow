@@ -24,6 +24,7 @@ export interface Order {
   acceptedAt?: string;
   dispatchedAt?: string;
   deliveredAt?: string;
+  pi_number?: string;
   delivery_address?: any;
   special_instructions?: string;
   remarks?: string;
