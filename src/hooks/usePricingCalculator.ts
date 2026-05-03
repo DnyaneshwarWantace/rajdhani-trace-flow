@@ -33,7 +33,7 @@ export interface ExtendedOrderItem {
   unit_price: number;
 
   // Per-item GST fields
-  gst_rate?: number; // GST rate for this item (default 18%)
+  gst_rate?: number; // GST rate for this item (default 5%)
   gst_included?: boolean; // Whether GST is included (default true)
   subtotal?: number; // quantity * unit_price
   gst_amount?: number; // Calculated GST amount
@@ -64,7 +64,7 @@ export interface UsePricingCalculatorReturn {
 export function usePricingCalculator(): UsePricingCalculatorReturn {
   
   const calculateItemPrice = useCallback((item: ExtendedOrderItem): PricingCalculation => {
-    const { unit_price, quantity, pricing_unit, product_dimensions, gst_rate = 18, gst_included = true } = item;
+    const { unit_price, quantity, pricing_unit, product_dimensions, gst_rate = 5, gst_included = true } = item;
 
     // For count_unit (unit): simple price * quantity
     if (pricing_unit === 'unit' || !pricing_unit) {

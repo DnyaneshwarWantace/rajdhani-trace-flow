@@ -287,7 +287,7 @@ export default function NewOrder() {
   const addOrderItem = () => {
     setOrderItems(prev => [...prev, {
       id: generateUniqueId('ORDITEM'), product_id: '', product_name: '', product_type: 'product',
-      quantity: 1, unit: '', unit_price: 0, gst_rate: 18, gst_included: true,
+      quantity: 1, unit: '', unit_price: 0, gst_rate: 5, gst_included: true,
       subtotal: 0, gst_amount: 0, total_price: 0, pricing_unit: 'sqm',
       product_dimensions: { productType: 'carpet' }, isEditing: true, isValid: false,
     }]);
@@ -319,7 +319,7 @@ export default function NewOrder() {
       }
       if (['quantity', 'unit_price', 'pricing_unit', 'product_dimensions', 'gst_rate', 'gst_included'].includes(field)) {
         if (field === 'gst_included' && value === false) updated.gst_rate = 0;
-        else if (field === 'gst_included' && value === true && (!updated.gst_rate || updated.gst_rate === 0)) updated.gst_rate = 18;
+        else if (field === 'gst_included' && value === true && (!updated.gst_rate || updated.gst_rate === 0)) updated.gst_rate = 5;
         else if (field === 'gst_rate') { if (value === 0) updated.gst_included = false; else if (value > 0 && !updated.gst_included) updated.gst_included = true; }
         const calc = pricingCalculator.calculateItemPrice(updated);
         updated.subtotal = calc.subtotal; updated.gst_amount = calc.gstAmount; updated.total_price = calc.totalPrice; updated.unit_value = calc.unitValue; updated.isValid = calc.isValid; updated.errorMessage = calc.errorMessage;
@@ -359,7 +359,7 @@ export default function NewOrder() {
           product_id: item.product_id, raw_material_id: item.raw_material_id,
           product_name: item.product_name, product_type: item.product_type,
           quantity: item.quantity, unit: item.unit, unit_price: item.unit_price,
-          gst_rate: (item.gst_included === false || item.gst_rate === 0) ? 0 : (item.gst_rate || 18),
+          gst_rate: (item.gst_included === false || item.gst_rate === 0) ? 0 : (item.gst_rate || 5),
           gst_included: item.gst_included === true,
           subtotal: typeof item.subtotal === 'string' ? parseFloat(item.subtotal) : (item.subtotal || 0),
           gst_amount: typeof item.gst_amount === 'string' ? parseFloat(item.gst_amount) : (item.gst_amount || 0),
@@ -499,6 +499,7 @@ export default function NewOrder() {
                   onCustomerCreated={handleCustomerCreated}
                   onCancel={() => setShowNewCustomerForm(false)}
                   showCard={false}
+                  autoSave
                 />
               )}
             </div>
