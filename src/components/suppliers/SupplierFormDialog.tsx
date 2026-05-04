@@ -57,9 +57,6 @@ export default function SupplierFormDialog({
   const handleNameChange = (value: string, field: 'name' | 'contact_person') => {
     let inputValue = value;
 
-    // For both supplier name and contact person, only allow alphabets and spaces (reject numbers and special characters)
-    inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
-
     // Different limits for different fields
     const limits = {
       name: { maxWords: 8, maxCharsPerWord: 20 },

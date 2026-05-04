@@ -182,9 +182,6 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const handleNameChange = (value: string) => {
     let inputValue = value;
 
-    // Only allow alphabets and spaces (reject numbers and special characters)
-    inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
-
     // Split by spaces to get words
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);
 
@@ -224,7 +221,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   };
 
   const handleCompanyNameChange = (value: string) => {
-    let inputValue = value.replace(/[^a-zA-Z\s]/g, '');
+    let inputValue = value;
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);
     if (words.length > 8) {
       let wordCount = 0;

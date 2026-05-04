@@ -92,9 +92,6 @@ export default function CustomerFormDialog({
   const handleNameChange = (value: string, field: 'name' | 'company_name') => {
     let inputValue = value;
 
-    // Only allow alphabets and spaces (reject numbers and special characters)
-    inputValue = inputValue.replace(/[^a-zA-Z\s]/g, '');
-
     // Split by spaces to get words (preserve all spaces)
     const words = inputValue.split(/\s+/).filter(w => w.length > 0);
 
