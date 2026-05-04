@@ -29,6 +29,8 @@ export type ProductAttributePreviewProps = {
   size?: ProductAttributePreviewSize;
   /** When true (default), clicking the pattern thumbnail opens a full-size dialog. */
   patternLightbox?: boolean;
+  /** `below`: swatch on top, color name underneath (e.g. order table Color column). */
+  colorLabelPosition?: 'inline' | 'below';
 };
 
 export default function ProductAttributePreview({
@@ -43,6 +45,7 @@ export default function ProductAttributePreview({
   compact = false,
   size: sizeProp,
   patternLightbox = true,
+  colorLabelPosition = 'inline',
 }: ProductAttributePreviewProps) {
   const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null);
@@ -104,9 +107,36 @@ export default function ProductAttributePreview({
           </span>
         )}
         {hasColor && (
-          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={colorKey}>
-            {colorCodeMap[colorKey] && <ColorSwatch colorCode={colorCodeMap[colorKey]} className={styles.swatch} />}
-            {showColorLabel && <span className={styles.text}>{colorKey}</span>}
+          <span
+            className={cn(
+              colorLabelPosition === 'below'
+                ? 'inline-flex flex-col items-end gap-1.5 min-w-0 max-w-[7.5rem]'
+                : 'inline-flex items-center gap-1.5 min-w-0 max-w-full',
+            )}
+            title={colorKey}
+          >
+            {colorCodeMap[colorKey] ? (
+              <ColorSwatch colorCode={colorCodeMap[colorKey]} className={styles.swatch} />
+            ) : colorLabelPosition === 'below' ? (
+              <span
+                className={cn(styles.swatch, 'border-2 border-dashed border-slate-300 bg-slate-50/80')}
+                aria-hidden
+              />
+            ) : null}
+            {colorLabelPosition === 'below' ? (
+              <span
+                className={cn(
+                  'text-right leading-tight text-slate-700 font-medium break-words',
+                  resolvedSize === 'large' && 'text-[11px]',
+                  resolvedSize === 'default' && 'text-xs',
+                  resolvedSize === 'compact' && 'text-[10px]',
+                )}
+              >
+                {colorKey}
+              </span>
+            ) : (
+              showColorLabel && <span className={styles.text}>{colorKey}</span>
+            )}
           </span>
         )}
         {hasPattern && (

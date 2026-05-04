@@ -15,7 +15,7 @@ const CarpetRollIcon = () => (
   </svg>
 );
 
-const ITEM_GRID = '28px minmax(0,1fr) 72px 72px 56px 72px 128px 80px 88px 56px';
+const ITEM_GRID = '28px minmax(0,1fr) 72px 72px 56px minmax(112px,1fr) 128px 80px 88px 56px';
 
 function CollapsedItemSummary({
   item,
@@ -67,22 +67,36 @@ function CollapsedItemSummary({
         <p className="text-sm font-medium text-slate-900 truncate">
           {item.product_name || <span className="text-slate-400 font-normal">Select product</span>}
         </p>
-        {p && (p.color || (item.product_type === 'product' && p.pattern)) && (
-          <div className="mt-1 min-h-[2rem] flex items-center" onClick={(e) => e.stopPropagation()}>
-            <ProductAttributePreview
-              color={p.color}
-              pattern={p.pattern}
-              showPattern={item.product_type === 'product'}
-            />
-          </div>
-        )}
+        {p && (() => {
+          const patternUnderName = item.product_type === 'product' && p.pattern;
+          const colorUnderName = Boolean(p.color) && !showColor;
+          if (!patternUnderName && !colorUnderName) return null;
+          return (
+            <div className="mt-1 min-h-[2rem] flex items-center" onClick={(e) => e.stopPropagation()}>
+              <ProductAttributePreview
+                color={colorUnderName ? p.color : undefined}
+                pattern={p.pattern}
+                showPattern={item.product_type === 'product'}
+              />
+            </div>
+          );
+        })()}
       </div>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showLength ? (specMap['Length'] || '—') : ''}</span>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showWidth  ? (specMap['Width']  || '—') : ''}</span>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showGSM    ? (specMap['GSM']    || '—') : ''}</span>
-      <span className="text-sm text-slate-700 truncate text-right flex items-center justify-end gap-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+      <span
+        className="text-sm text-slate-700 min-w-0 max-w-full overflow-hidden flex items-center justify-end pl-1"
+        onClick={(e) => e.stopPropagation()}
+      >
         {showColor && p?.color ? (
-          <ProductAttributePreview color={p.color} showPattern={false} />
+          <ProductAttributePreview
+            color={p.color}
+            showPattern={false}
+            size="large"
+            colorLabelPosition="below"
+            className="justify-end flex-nowrap"
+          />
         ) : (
           showColor ? '—' : ''
         )}
