@@ -53,6 +53,8 @@ export default function PlanningStage() {
   const [draftSaveTimeout, setDraftSaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null); // Track current batch ID
   const [currentBatch, setCurrentBatch] = useState<ProductionBatch | null>(null); // Track current batch object
+  const [orderQuantityMismatch, setOrderQuantityMismatch] = useState<{ currentOrderQty: number; batchQty: number; orderItemId: string } | null>(null);
+  const [syncingQuantity, setSyncingQuantity] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showRemoveMaterialDialog, setShowRemoveMaterialDialog] = useState(false);
@@ -306,6 +308,26 @@ export default function PlanningStage() {
         notes: batch.notes || '',
       });
 
+      // Check if order quantity changed since this batch was created
+      if (batch.order_id && batch.order_item_id) {
+        try {
+          const { OrderService } = await import('@/services/orderService');
+          const { data: orderData } = await OrderService.getOrderById(batch.order_id);
+          if (orderData) {
+            const linkedItem = orderData.items?.find((it: any) => it.id === batch.order_item_id);
+            if (linkedItem) {
+              const currentOrderQty = Number(linkedItem.quantity || 0);
+              const referenceQty = batch.status === 'planned'
+                ? batch.planned_quantity
+                : (batch.order_quantity_at_creation ?? batch.planned_quantity);
+              if (currentOrderQty !== referenceQty) {
+                setOrderQuantityMismatch({ currentOrderQty, batchQty: referenceQty, orderItemId: batch.order_item_id });
+              }
+            }
+          }
+        } catch { /* ignore */ }
+      }
+
       // If batch is already in production, load consumed materials instead of recipe
       if (batch.status === 'in_production' || batch.status === 'in_progress') {
         // Load consumed materials from MaterialConsumption
@@ -438,6 +460,22 @@ export default function PlanningStage() {
       setMaterials([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncOrderQuantity = async () => {
+    if (!orderQuantityMismatch || !currentBatchId) return;
+    setSyncingQuantity(true);
+    try {
+      await ProductionService.updateBatch(currentBatchId, { planned_quantity: orderQuantityMismatch.currentOrderQty });
+      setFormData(p => ({ ...p, planned_quantity: orderQuantityMismatch.currentOrderQty }));
+      setCurrentBatch(b => b ? { ...b, planned_quantity: orderQuantityMismatch.currentOrderQty } : b);
+      setOrderQuantityMismatch(null);
+      toast({ title: 'Quantity updated', description: `Planned quantity synced to ${orderQuantityMismatch.currentOrderQty}.` });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to sync quantity.', variant: 'destructive' });
+    } finally {
+      setSyncingQuantity(false);
     }
   };
 
@@ -1190,6 +1228,40 @@ export default function PlanningStage() {
         <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
           {/* Stage Progress */}
           <ProductionStageProgress currentStage="planning" />
+
+          {/* Order quantity mismatch banner */}
+          {orderQuantityMismatch && (() => {
+            const productionStarted = currentBatch?.status !== 'planned';
+            return (
+              <div className={`border rounded-lg p-4 flex items-start justify-between gap-4 ${productionStarted ? 'bg-orange-50 border-orange-300' : 'bg-amber-50 border-amber-300'}`}>
+                <div className="flex items-start gap-3">
+                  <AlertCircle className={`w-5 h-5 mt-0.5 shrink-0 ${productionStarted ? 'text-orange-600' : 'text-amber-600'}`} />
+                  <div>
+                    <p className={`font-semibold text-sm ${productionStarted ? 'text-orange-800' : 'text-amber-800'}`}>
+                      {productionStarted ? 'Order quantity changed — production already started' : 'Order quantity was updated'}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${productionStarted ? 'text-orange-700' : 'text-amber-700'}`}>
+                      {productionStarted
+                        ? <>The linked order quantity is now <strong>{orderQuantityMismatch.currentOrderQty}</strong> (was <strong>{orderQuantityMismatch.batchQty}</strong> when production started). Production cannot be auto-adjusted — update manually if needed.</>
+                        : <>The linked order now shows <strong>{orderQuantityMismatch.currentOrderQty}</strong> rolls, but this batch is planned for <strong>{orderQuantityMismatch.batchQty}</strong> rolls. Do you want to update the planned quantity?</>
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm" onClick={() => setOrderQuantityMismatch(null)} className="text-xs">
+                    Dismiss
+                  </Button>
+                  {!productionStarted && (
+                    <Button size="sm" onClick={handleSyncOrderQuantity} disabled={syncingQuantity} className="text-xs bg-amber-600 hover:bg-amber-700 text-white">
+                      {syncingQuantity && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                      Update to {orderQuantityMismatch.currentOrderQty}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Production Overview Stats */}
           <ProductionOverviewStats

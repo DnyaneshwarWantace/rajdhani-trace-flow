@@ -13,11 +13,13 @@ import { MaterialService } from '@/services/materialService';
 import { ProductService } from '@/services/productService';
 import { ProductionService } from '@/services/productionService';
 import { OrderService } from '@/services/orderService';
+import { IndividualProductSelectionDialog } from '@/components/orders/IndividualProductSelectionDialog';
 import { useToast } from '@/hooks/use-toast';
 import type { User as UserType } from '@/types/auth';
 import type { Order, OrderItem } from '@/services/orderService';
 import type { Recipe, RecipeMaterial } from '@/types/recipe';
 import type { RawMaterial } from '@/types/material';
+import { getApiUrl } from '@/utils/apiConfig';
 
 // Cache role permission results to avoid re-fetching the same role multiple times
 const rolePermCache: Record<string, Record<string, boolean>> = {};
@@ -121,21 +123,31 @@ interface SendToProductionModalProps {
 }
 
 function resolveProductAvailableStock(product: any): number {
-  const currentStock = Number(product?.current_stock ?? 0);
-  const availableStock = Number(product?.available_stock ?? currentStock);
-  const stockCount = Number(product?.stock_count ?? 0);
-  const individualCount = Number(product?.individual_products_count ?? 0);
-  const usesIndividual = product?.individual_stock_tracking === true;
+  if (!product) return 0;
 
-  if (usesIndividual) {
-    // For individual-tracked products, prefer explicit available/count fields.
-    const individualAvailable = Math.max(availableStock, stockCount, individualCount);
-    return Number.isFinite(individualAvailable) ? individualAvailable : 0;
+  const toFiniteNonNegative = (value: unknown): number | null => {
+    const num = Number(value);
+    return Number.isFinite(num) ? Math.max(num, 0) : null;
+  };
+
+  const currentStock = toFiniteNonNegative(product.current_stock);
+  const availableStock = toFiniteNonNegative(product.available_stock);
+  const stockCount = toFiniteNonNegative(product.stock_count);
+  const individualCount = toFiniteNonNegative(product.individual_products_count);
+
+  if (product.individual_stock_tracking === true) {
+    // Only trust individualCount if > 0 — a 0 may mean records simply weren't created,
+    // not that stock is genuinely empty. Fall back to current_stock in that case.
+    if (individualCount !== null && individualCount > 0) return individualCount;
+    if (currentStock !== null && currentStock > 0) return currentStock;
+    if (availableStock !== null) return availableStock;
+    if (stockCount !== null) return stockCount;
+    return 0;
   }
 
-  // For normal products, current_stock is the source of truth.
-  const fallback = Math.max(currentStock, availableStock, stockCount);
-  return Number.isFinite(fallback) ? fallback : 0;
+  if (availableStock !== null) return availableStock;
+  if (currentStock !== null) return currentStock;
+  return stockCount ?? 0;
 }
 
 // Flatten tree into ordered steps: deepest sub-products first, main product last
@@ -161,6 +173,9 @@ export default function SendToProductionModal({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [recipeTree, setRecipeTree] = useState<RecipeNode | null>(null);
   const [loadingRecipe, setLoadingRecipe] = useState(false);
+  const [orderStatus, setOrderStatus] = useState(order.status || 'pending');
+  const [acceptingOrder, setAcceptingOrder] = useState(false);
+  const [showRollSelectionDialog, setShowRollSelectionDialog] = useState(false);
   const [assignments, setAssignments] = useState<Record<string, ProductAssignment & { picking: boolean; search: string }>>({});
   const [submitting, setSubmitting] = useState(false);
   const [stepQuantities, setStepQuantities] = useState<Record<string, number>>({});
@@ -168,6 +183,7 @@ export default function SendToProductionModal({
   const [matOrderState, setMatOrderState] = useState<Record<string, {
     ordering: boolean; pickingUser: boolean; search: string; assignedUser: UserType | null;
   }>>({});
+  const [reservedSelections, setReservedSelections] = useState<any[]>([]);
   const assignmentStorageKey = `production_task_assignments:${order.id}:${productItem.productId}`;
 
   useEffect(() => {
@@ -175,10 +191,18 @@ export default function SendToProductionModal({
       loadUsers();
       loadRecipeTree(productItem.productId, productItem.productName);
     }
+    const initialSelected = Array.isArray((productItem as any).selectedProducts)
+      ? (productItem as any).selectedProducts
+      : Array.isArray((productItem as any).selected_individual_products)
+        ? (productItem as any).selected_individual_products
+        : [];
+    setReservedSelections(initialSelected);
+    setOrderStatus(order.status || 'pending');
     if (!open) {
       setAssignments({});
       setRecipeTree(null);
       setStepQuantities({});
+      setShowRollSelectionDialog(false);
     }
   }, [open, productItem.productId]);
 
@@ -186,7 +210,8 @@ export default function SendToProductionModal({
   // quantity_per_sqm is in rolls-per-sqm, so: child_rolls = parent_rolls × parent_sqm × quantity_per_sqm
   useEffect(() => {
     if (!recipeTree) return;
-    const qty = Number(productItem.quantity || 0);
+    const reservedForOrder = orderStatus === 'accepted' ? reservedSelections.length : 0;
+    const qty = Math.max(Number(productItem.quantity || 0) - reservedForOrder, 0);
     const map: Record<string, number> = {};
     const dfs = (node: RecipeNode, parentQtyRolls: number) => {
       map[node.productId] = parentQtyRolls;
@@ -194,6 +219,7 @@ export default function SendToProductionModal({
       for (const sub of node.subProductNodes) {
         const mat = node.materials.find(m => m.material_id === sub.productId);
         const qtyPerSqm = mat ? Number(mat.quantity_per_sqm || 0) : 0;
+        // rolls needed = parent_rolls × sqm_per_parent_roll × qty_per_sqm
         const childRolls = parentSqm > 0 && qtyPerSqm > 0
           ? parentQtyRolls * parentSqm * qtyPerSqm
           : parentQtyRolls;
@@ -202,7 +228,7 @@ export default function SendToProductionModal({
     };
     dfs(recipeTree, qty);
     setStepQuantities(map);
-  }, [recipeTree, productItem.quantity]);
+  }, [recipeTree, orderStatus, productItem.quantity, reservedSelections.length]);
 
   useEffect(() => {
     if (!open || users.length === 0 || !recipeTree) return;
@@ -279,12 +305,12 @@ export default function SendToProductionModal({
       );
     }
 
-    // Fetch product data once: stock (for sub-products) + SQM for roll→roll calculations
+    // Fetch product data once: stock (for every step) + SQM for roll→roll calculations
     let productStock: number | undefined;
     let productSqm: number | undefined;
     try {
       const prod = await ProductService.getProductById(productId);
-      if (depth > 0) productStock = resolveProductAvailableStock(prod);
+      productStock = resolveProductAvailableStock(prod);
       const l = parseFloat(prod.length || '0');
       const w = parseFloat(prod.width || '0');
       if (l > 0 && w > 0) productSqm = l * w;
@@ -334,10 +360,82 @@ export default function SendToProductionModal({
     setAssignments(prev => ({ ...prev, [productId]: { ...prev[productId], search } }));
   };
 
+  const handleSaveReservedRolls = async (selectedProducts: any[]) => {
+    const API_URL = getApiUrl();
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(`${API_URL}/orders/items/save-individual-products`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: JSON.stringify({
+        orderItemId: (productItem as any).id,
+        individualProductIds: selectedProducts.map((p: any) => p.id),
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || 'Failed to save reserved rolls');
+    }
+
+    setReservedSelections(selectedProducts);
+    window.dispatchEvent(
+      new CustomEvent('order-updated', {
+        detail: {
+          orderId: order.id,
+          reason: 'rolls_reserved',
+          selectedCount: selectedProducts.length,
+        },
+      })
+    );
+    toast({
+      title: 'Rolls reserved',
+      description: `${selectedProducts.length} roll(s) selected for this order item.`,
+    });
+  };
+
+  const handleAcceptOrderAndReserve = async () => {
+    if (orderStatus === 'accepted') return;
+    setAcceptingOrder(true);
+    try {
+      const { data, error } = await OrderService.updateOrderStatus(order.id, 'accepted');
+      if (error) {
+        throw new Error(error);
+      }
+      setOrderStatus(data?.status || 'accepted');
+      window.dispatchEvent(
+        new CustomEvent('order-updated', {
+          detail: {
+            orderId: order.id,
+            reason: 'status_accepted',
+          },
+        })
+      );
+      toast({
+        title: 'Order accepted',
+        description: 'Reserved individual products for this order are now considered in production planning.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Failed to accept order',
+        description: err?.message || 'Could not accept order right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAcceptingOrder(false);
+    }
+  };
+
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const mainProductId = productItem.productId || '';
   const mainAssignment = mainProductId ? assignments[mainProductId] : undefined;
+  const orderQuantity = Number(productItem.quantity || 0);
+  const reservedRollsForOrder = orderStatus === 'accepted' ? reservedSelections.length : 0;
+  const globalAvailableRolls = recipeTree?.productStock ?? 0;
+  const netProductionQuantity = Math.max(orderQuantity - reservedRollsForOrder, 0);
 
   const stepNeedsProduction = (node: RecipeNode): boolean => {
     // If no recipe exists for this step, user may still need to produce manually.
@@ -436,9 +534,17 @@ export default function SendToProductionModal({
       const requiredStageQuantityRaw = await getStageRequiredQuantity(
         productItem.productId || '',
         targetStep.productId,
-        Number(productItem.quantity || 0)
+        netProductionQuantity
       );
       const requiredStageQuantity = Math.ceil(requiredStageQuantityRaw * 1000) / 1000;
+      if (requiredStageQuantity <= 0) {
+        toast({
+          title: 'No production required',
+          description: `Order quantity is already covered by reserved rolls (${reservedRollsForOrder} rolls).`,
+        });
+        onClose();
+        return;
+      }
 
       // If already in active production, don't create duplicate task.
       const { data: existingBatches } = await ProductionService.getBatches({
@@ -467,13 +573,14 @@ export default function SendToProductionModal({
       // Assignment-only flow: create real backend production task (no batch).
       const { error: taskError } = await ProductionService.createTask({
         order_id: order.id,
+        order_item_id: (productItem as any).id || undefined,
         order_number: order.orderNumber || order.id,
         customer_name: order.customerName || '',
         stage_product_id: targetStep.productId,
         stage_product_name: targetStep.productName,
         final_product_id: productItem.productId || '',
         final_product_name: productItem.productName,
-        planned_quantity: requiredStageQuantity > 0 ? requiredStageQuantity : (productItem.quantity ?? 0),
+        planned_quantity: requiredStageQuantity,
         assigned_to_id: targetAssignment.id,
         assigned_to_name: targetAssignment.full_name,
         notes: `Assigned from order ${order.orderNumber || order.id}`,
@@ -501,7 +608,7 @@ export default function SendToProductionModal({
 
       toast({
         title: 'Task assigned',
-        description: `Assigned "${targetStep.productName}" (${requiredStageQuantity || productItem.quantity}) to ${targetAssignment.full_name}. No batch created.`,
+        description: `Assigned "${targetStep.productName}" (${requiredStageQuantity}) to ${targetAssignment.full_name}. No batch created.`,
       });
       onClose();
     } catch (err: any) {
@@ -643,7 +750,7 @@ export default function SendToProductionModal({
 
   const renderStepCard = (node: RecipeNode, stepNumber: number, totalSteps: number) => {
     const isMain = node.productId === productItem.productId;
-    const stepQty = stepQuantities[node.productId] ?? (isMain ? Number(productItem.quantity || 0) : 0);
+    const stepQty = stepQuantities[node.productId] ?? 0;
     const assignment = assignments[node.productId];
     const isPicking = assignment?.picking ?? false;
     const assignedUser = assignment?.assignedUser ?? null;
@@ -699,14 +806,14 @@ export default function SendToProductionModal({
                 <div className="text-white font-bold text-base leading-tight">{node.productName}</div>
                 <div className="text-xs mt-0.5 opacity-80 text-white">
                   {isMain
-                    ? `Main product · Qty: ${productItem.quantity} · Order ${order.orderNumber || order.id}`
+                    ? `Main product · Order: ${orderQuantity} rolls · Available: ${globalAvailableRolls} · Reserved: ${reservedRollsForOrder} · Need: ${Math.round(stepQty * 1000) / 1000} rolls`
                     : `Sub-product · Step ${stepNumber} of ${totalSteps}${stepQty > 0 ? ` · Need: ${Math.round(stepQty * 1000) / 1000} rolls` : ''}`}
                 </div>
               </div>
             </div>
 
-            {/* Product stock for sub-products */}
-            {!isMain && node.productStock !== undefined && (
+            {/* Current stock for every step (main and sub-products) */}
+            {node.productStock !== undefined && (
               <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
                 node.productStock > 0 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
               }`}>
@@ -744,39 +851,39 @@ export default function SendToProductionModal({
                     return (
                     <div key={mat.id} className={`flex flex-col gap-2 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                       <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {mat.material_type === 'product' ? (
-                            <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                              <Layers className="w-3.5 h-3.5 text-purple-600" />
-                            </div>
-                          ) : (
-                            <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                              <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {mat.material_type === 'product' && stepQty > 0 && node.productSqm ? (() => {
-                                const totalSqm = stepQty * node.productSqm;
-                                const rollsNeeded = totalSqm * mat.quantity_per_sqm;
-                                return (
-                                  <span className="font-semibold text-purple-700">
-                                    Need: <span className="text-gray-900">{rollsNeeded % 1 === 0 ? rollsNeeded.toFixed(0) : rollsNeeded.toFixed(3)} {mat.unit}</span>
-                                    <span className="ml-1 text-gray-400 font-normal">({stepQty} rolls × {node.productSqm.toFixed(2)} sqm = {totalSqm.toFixed(2)} sqm total)</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {mat.material_type === 'product' ? (
+                          <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
+                            <Layers className="w-3.5 h-3.5 text-purple-600" />
+                          </div>
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                            <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {mat.material_type === 'product' && stepQty > 0 && node.productSqm ? (() => {
+                              const totalSqm = stepQty * node.productSqm;
+                              const rollsNeeded = totalSqm * mat.quantity_per_sqm;
+                              return (
+                                <span className="font-semibold text-purple-700">
+                                  Need: <span className="text-gray-900">{rollsNeeded % 1 === 0 ? rollsNeeded.toFixed(0) : rollsNeeded.toFixed(3)} {mat.unit}</span>
+                                  <span className="ml-1 text-gray-400 font-normal">({stepQty} rolls × {node.productSqm.toFixed(2)} sqm = {totalSqm.toFixed(2)} sqm total)</span>
+                                </span>
+                              );
+                            })() : (
+                              <>
+                                Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm.toFixed(6)} {mat.unit}/sqm</span>
+                                {stepQty > 0 && node.productSqm && (
+                                  <span className="ml-1 font-semibold text-gray-800">
+                                    = {(mat.quantity_per_sqm * stepQty * node.productSqm).toFixed(3)} {mat.unit} total
                                   </span>
-                                );
-                              })() : (
-                                <>
-                                  Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm.toFixed(6)} {mat.unit}/sqm</span>
-                                  {stepQty > 0 && node.productSqm && (
-                                    <span className="ml-1 font-semibold text-gray-800">
-                                      = {(mat.quantity_per_sqm * stepQty * node.productSqm).toFixed(3)} {mat.unit} total
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
+                                )}
+                              </>
+                            )}
+                            {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
                             </div>
                           </div>
                         </div>
@@ -929,6 +1036,33 @@ export default function SendToProductionModal({
             Start from <strong>Step 1</strong> (deepest sub-product) and work up to the main product.
             Assign a worker to each step you want to schedule now.
           </p>
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Reserved stock rule: if this order is accepted and has reserved individual rolls, planning uses remaining quantity only. Otherwise, produce the full order quantity.
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="text-xs text-gray-600">
+              Order status: <span className="font-semibold uppercase">{orderStatus}</span> · Available: <span className="font-semibold">{globalAvailableRolls}</span> · Reserved for this order: <span className="font-semibold">{reservedRollsForOrder}</span> · Need to make: <span className="font-semibold">{Math.round(netProductionQuantity * 1000) / 1000}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setShowRollSelectionDialog(true)}>
+                Select Rolls
+              </Button>
+              {orderStatus !== 'accepted' && (
+                <Button
+                  size="sm"
+                  onClick={handleAcceptOrderAndReserve}
+                  disabled={acceptingOrder}
+                  className="gap-2"
+                >
+                  {acceptingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Accept Order
+                </Button>
+              )}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            After accepting, click <strong>Select Rolls</strong> and reserve individual rolls for this order item. Only reserved rolls reduce the required production quantity.
+          </p>
         </div>
 
         {/* Scrollable content */}
@@ -952,7 +1086,9 @@ export default function SendToProductionModal({
                 <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-sm font-bold text-blue-600">1</div>
                 <div>
                   <div className="text-white font-bold text-base">{productItem.productName}</div>
-                  <div className="text-xs text-blue-100 mt-0.5">Main product · Qty: {productItem.quantity} · Order {order.orderNumber || order.id}</div>
+                  <div className="text-xs text-blue-100 mt-0.5">
+                    Main product · Order: {orderQuantity} rolls · Available: {globalAvailableRolls} · Reserved: {reservedRollsForOrder} · Need: {Math.round(netProductionQuantity * 1000) / 1000} rolls
+                  </div>
                 </div>
               </div>
               <div className="px-5 py-4 space-y-3">
@@ -1022,6 +1158,18 @@ export default function SendToProductionModal({
           </div>
         </div>
       </DialogContent>
+      <IndividualProductSelectionDialog
+        isOpen={showRollSelectionDialog}
+        onClose={() => setShowRollSelectionDialog(false)}
+        orderItem={{
+          id: (productItem as any).id,
+          product_id: productItem.productId,
+          product_name: productItem.productName,
+          quantity: Number(productItem.quantity || 0),
+          selected_individual_products: reservedSelections,
+        }}
+        onSave={handleSaveReservedRolls}
+      />
     </Dialog>
   );
 }

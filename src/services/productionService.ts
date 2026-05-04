@@ -10,6 +10,8 @@ export interface ProductionBatch {
   product_name?: string;
   duplicated_from?: string; // ID of the batch this was duplicated from
   order_id?: string;
+  order_item_id?: string;
+  order_quantity_at_creation?: number;
   planned_quantity: number;
   actual_quantity?: number;
   start_date?: string;
@@ -761,6 +763,7 @@ export class ProductionService {
   // Production Task methods (assignment-first workflow)
   static async createTask(taskData: {
     order_id: string;
+    order_item_id?: string;
     order_number?: string;
     customer_name?: string;
     stage_product_id: string;
