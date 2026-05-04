@@ -102,9 +102,9 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       };
     }
     
-    // Get length_unit and width_unit from product_dimensions or item
-    const lengthUnit = (item as any).length_unit || (product_dimensions as any).length_unit;
-    const widthUnit = (item as any).width_unit || (product_dimensions as any).width_unit;
+    // Get length_unit and width_unit — prefer product_dimensions (persisted with item), fall back to item top-level
+    const lengthUnit = (product_dimensions as any).length_unit || (item as any).length_unit || 'm';
+    const widthUnit = (product_dimensions as any).width_unit || (item as any).width_unit || 'm';
     
     // Calculate unit value based on pricing unit
     let unitValue = 0;

@@ -93,8 +93,8 @@ export default function OrderItemForm({
     Number(item.quantity || 0),
     item.pricing_unit || 'unit',
     item.product_dimensions || {},
-    (item as any).length_unit,
-    (item as any).width_unit
+    (item.product_dimensions as any)?.length_unit || (item as any).length_unit,
+    (item.product_dimensions as any)?.width_unit || (item as any).width_unit
   );
 
   return (

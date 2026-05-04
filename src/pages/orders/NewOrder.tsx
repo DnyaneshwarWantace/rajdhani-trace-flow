@@ -310,7 +310,7 @@ export default function NewOrder() {
         if (product) {
           updated.product_name = product.name; updated.unit_price = product.price || 0;
           updated.unit = updated.product_type === 'raw_material' ? (product.unit || 'units') : (product.count_unit || 'rolls');
-          const productDimensions: ProductDimensions = { productType: updated.product_type === 'raw_material' ? 'raw_material' : 'carpet', width: product.width, length: product.length, weight: product.weight, gsm: product.gsm };
+          const productDimensions: ProductDimensions = { productType: updated.product_type === 'raw_material' ? 'raw_material' : 'carpet', width: product.width, length: product.length, weight: product.weight, gsm: product.gsm, length_unit: product.length_unit, width_unit: product.width_unit } as any;
           (updated as any).length_unit = product.length_unit; (updated as any).width_unit = product.width_unit; (updated as any).weight_unit = product.weight_unit;
           updated.product_dimensions = productDimensions; updated.pricing_unit = 'unit';
           const calc = pricingCalculator.calculateItemPrice(updated);
@@ -500,6 +500,7 @@ export default function NewOrder() {
                   onCustomerCreated={handleCustomerCreated}
                   onCancel={() => setShowNewCustomerForm(false)}
                   showCard={false}
+                  autoSave
                 />
               )}
             </div>
