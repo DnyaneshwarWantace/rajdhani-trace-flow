@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, User, ArrowRight, Calendar } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatHelpers';
 import type { Order } from '@/services/orderService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface RecentOrdersProps {
   orders: Order[];
@@ -79,6 +80,40 @@ export default function RecentOrders({ orders, loading }: RecentOrdersProps) {
                         <span>{formatDate(order.orderDate)}</span>
                       </div>
                     )}
+                    {order.items && order.items.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
+                        {order.items.slice(0, 3).map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-700"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <span className="font-medium text-gray-800 shrink-0">
+                              {item.quantity}
+                              {(item.count_unit || item.unit) ? ` ${item.count_unit || item.unit}` : ''}
+                              {' × '}
+                            </span>
+                            <span className="truncate min-w-0 flex-1" title={item.productName}>
+                              {item.productName}
+                            </span>
+                            <ProductAttributePreview
+                              color={item.color}
+                              pattern={item.pattern}
+                              showPattern={item.productType === 'product'}
+                              length={item.length}
+                              width={item.width}
+                              lengthUnit={item.length_unit}
+                              widthUnit={item.width_unit}
+                              compact
+                              className="shrink-0"
+                            />
+                          </div>
+                        ))}
+                        {order.items.length > 3 && (
+                          <p className="text-[10px] text-gray-400">+{order.items.length - 3} more line items</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -86,7 +121,7 @@ export default function RecentOrders({ orders, loading }: RecentOrdersProps) {
                 <div className="flex items-center gap-3 ml-3">
                   <div className="text-right">
                     <span className="text-base font-bold text-gray-900 whitespace-nowrap block">
-                      {formatCurrency(order.totalAmount)}
+                      {formatCurrency(order.totalAmount, { full: true })}
                     </span>
                     {order.gstAmount && parseFloat(order.gstAmount.toString()) > 0 && (
                       <span className="text-xs text-gray-500 whitespace-nowrap">

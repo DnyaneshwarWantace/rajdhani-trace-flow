@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Package, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { Product } from '@/types/product';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductListProps {
   products: Product[];
@@ -11,6 +12,21 @@ interface ProductListProps {
 
 interface GroupedProducts {
   [key: string]: Product[];
+}
+
+function isMeaningfulAttr(s?: string | null): boolean {
+  if (s == null) return false;
+  const t = String(s).trim();
+  if (!t) return false;
+  const low = t.toLowerCase();
+  return low !== 'n/a' && low !== 'na';
+}
+
+function productHasAttributePreview(product: Product): boolean {
+  const hasSize = isMeaningfulAttr(product.length) && isMeaningfulAttr(product.width);
+  const hasColor = isMeaningfulAttr(product.color);
+  const hasPattern = isMeaningfulAttr(product.pattern);
+  return hasSize || hasColor || hasPattern;
 }
 
 export default function ProductList({
@@ -174,19 +190,19 @@ export default function ProductList({
                             {(product.weight && product.weight !== 'NA' && product.weight !== 'N/A') ? `${product.weight} ${product.weight_unit || ''}`.trim() : '-'}
                           </span>
                         </div>
-                        <div className="w-[25%]">
-                          {product.color && product.color !== 'NA' && product.color !== 'N/A' && (
-                            <span className="text-xs text-gray-700 block">
-                              {product.color}
-                            </span>
-                          )}
-                          {product.pattern && product.pattern !== 'NA' && product.pattern !== 'N/A' && (
-                            <span className="text-xs text-gray-700 block">
-                              {product.pattern}
-                            </span>
-                          )}
-                          {(!product.color || product.color === 'NA' || product.color === 'N/A') &&
-                           (!product.pattern || product.pattern === 'NA' || product.pattern === 'N/A') && (
+                        <div className="w-[25%] min-w-0">
+                          {productHasAttributePreview(product) ? (
+                            <ProductAttributePreview
+                              color={product.color}
+                              pattern={product.pattern}
+                              length={product.length}
+                              width={product.width}
+                              lengthUnit={product.length_unit}
+                              widthUnit={product.width_unit}
+                              compact
+                              className="max-w-full"
+                            />
+                          ) : (
                             <span className="text-xs text-gray-400">-</span>
                           )}
                         </div>

@@ -189,7 +189,9 @@ export class OrderService {
           length_unit: item.length_unit,
           width_unit: item.width_unit,
           weight: item.weight,
-          weight_unit: item.weight_unit
+          weight_unit: item.weight_unit,
+          color: item.color,
+          pattern: item.pattern,
         }))
       }));
 

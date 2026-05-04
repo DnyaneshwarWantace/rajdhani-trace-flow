@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Package, CheckCircle, X } from 'lucide-react';
 import type { Product } from '@/types/product';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface SelectedProductCardProps {
   product: Product;
@@ -30,6 +31,15 @@ export default function SelectedProductCard({ product, onClear }: SelectedProduc
                   {product.subcategory && ` / ${product.subcategory}`}
                 </p>
               )}
+              <ProductAttributePreview
+                color={product.color}
+                pattern={product.pattern}
+                length={product.length}
+                width={product.width}
+                lengthUnit={product.length_unit}
+                widthUnit={product.width_unit}
+                className="mt-2"
+              />
             </div>
           </div>
           <button
