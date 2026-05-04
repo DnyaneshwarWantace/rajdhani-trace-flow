@@ -787,23 +787,29 @@ export default function ProductionList() {
 
         {/* Pending orders — shown below assigned batches on the Assigned to Me tab */}
         {activeSection === 'assigned' && !isProductScoped && (
-          <AllPendingOrdersSection
-            onSelectOrder={(order, productId) => {
-              navigate('/production/create', {
-                state: {
-                  fromOrder: true,
-                  orderId: order.order_id,
-                  orderItemId: order.order_item_id,
-                  productId,
-                  productName: order.product_name || '',
-                  planned_quantity: order.quantity_needed,
-                  expected_delivery: order.expected_delivery,
-                  order_number: order.order_number,
-                  customer_name: order.customer_name,
-                },
-              });
-            }}
-          />
+          <div className="mt-10 pt-6 border-t border-gray-200"> 
+            <div className="mb-4"> 
+              <h3 className="text-base font-semibold text-gray-900">Pending Orders</h3>
+              <p className="text-xs text-gray-500 mt-1">Create production batches for items waiting to be scheduled.</p>
+            </div>
+            <AllPendingOrdersSection
+              onSelectOrder={(order, productId) => {
+                navigate('/production/create', {
+                  state: {
+                    fromOrder: true,
+                    orderId: order.order_id,
+                    orderItemId: order.order_item_id,
+                    productId,
+                    productName: order.product_name || '',
+                    planned_quantity: order.quantity_needed,
+                    expected_delivery: order.expected_delivery,
+                    order_number: order.order_number,
+                    customer_name: order.customer_name,
+                  },
+                });
+              }}
+            />
+          </div>
         )}
 
         {/* Pagination */}
