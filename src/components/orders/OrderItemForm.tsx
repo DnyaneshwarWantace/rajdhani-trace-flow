@@ -286,7 +286,7 @@ export default function OrderItemForm({
             onCheckedChange={checked => {
               onUpdate(item.id, 'gst_included', checked);
               if (!checked) { onUpdate(item.id, 'gst_rate', 0); }
-              else if (!item.gst_rate || item.gst_rate === 0) { onUpdate(item.id, 'gst_rate', 18); }
+              else if (!item.gst_rate || item.gst_rate === 0) { onUpdate(item.id, 'gst_rate', 5); }
             }}
             className="h-3.5 w-3.5"
           />

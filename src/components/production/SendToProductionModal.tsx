@@ -481,7 +481,7 @@ export default function SendToProductionModal({
       if (!targetAssignment) {
         toast({
           title: 'Assignment required',
-          description: `Please assign a worker for "${targetStep.productName}" before sending to production.`,
+          description: `Please assign personnel for "${targetStep.productName}" before sending to production.`,
           variant: 'destructive',
         });
         return;
@@ -977,7 +977,7 @@ export default function SendToProductionModal({
                     {isMain ? 'Assign production to' : 'Assign this sub-production to'}
                   </p>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {assignedUser ? `Will be handled by ${assignedUser.full_name}` : 'Pick a worker who will handle this step'}
+                    {assignedUser ? `Will be handled by ${assignedUser.full_name}` : 'Pick assigned personnel who will handle this step'}
                   </p>
                 </div>
                 {assignedUser ? (
@@ -1001,7 +1001,7 @@ export default function SendToProductionModal({
                     className="gap-2 border-gray-300 hover:border-blue-400 hover:text-blue-600"
                   >
                     <UserPlus className="w-4 h-4" />
-                    Assign Worker
+                    Assign Personnel
                   </Button>
                 )}
               </div>
@@ -1035,7 +1035,7 @@ export default function SendToProductionModal({
           <p className="text-sm text-gray-500 mt-2 leading-relaxed">
             Each step below shows what needs to be produced and in what order.
             Start from <strong>Step 1</strong> (deepest sub-product) and work up to the main product.
-            Assign a worker to each step you want to schedule now.
+            Assign personnel to each step you want to schedule now.
           </p>
           <ProductAttributePreview
             color={productItem.color}
@@ -1111,7 +1111,7 @@ export default function SendToProductionModal({
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-semibold text-gray-800">Assign production to</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Pick a worker for this batch</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Pick assigned personnel for this batch</p>
                     </div>
                     {mainProductId && assignments[mainProductId]?.assignedUser ? (
                       <div className="flex items-center gap-2">
@@ -1135,7 +1135,7 @@ export default function SendToProductionModal({
                         className="gap-2"
                       >
                         <UserPlus className="w-4 h-4" />
-                        Assign Worker
+                        Assign Personnel
                       </Button>
                     )}
                   </div>
