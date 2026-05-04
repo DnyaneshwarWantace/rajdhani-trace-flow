@@ -231,6 +231,8 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  const visibleOrders = orders.filter((o) => !batchedItemIds.has(o.order_item_id));
+
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-3 py-10 text-gray-500">
@@ -249,9 +251,6 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
       </div>
     );
   }
-
-  // Only show orders that don't have an active batch yet
-  const visibleOrders = orders.filter((o) => !batchedItemIds.has(o.order_item_id));
 
   const urgentCount = visibleOrders.filter((o) => getDaysUntil(o.expected_delivery) <= 3).length;
   const shortageCount = visibleOrders.filter((o) => (o.shortage ?? 0) > 0).length;

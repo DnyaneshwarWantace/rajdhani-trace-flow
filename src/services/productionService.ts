@@ -71,6 +71,7 @@ export interface ProductionBatch {
     completed_at?: string;
     completed_by?: string;
     remark?: string;
+    schedule_date?: string;
   };
   individual_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';
@@ -151,6 +152,7 @@ export interface UpdateProductionBatchData extends Partial<CreateProductionBatch
     completed_at?: string;
     completed_by?: string;
     remark?: string;
+    schedule_date?: string;
   };
   individual_stage?: {
     status?: 'not_started' | 'in_progress' | 'completed';

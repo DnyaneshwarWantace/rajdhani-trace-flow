@@ -447,7 +447,6 @@ export default function MachineStage() {
           });
           const isOverdue = diffDays > 0 && batch.machine_stage.status !== 'completed';
           const isToday = diffDays === 0 && batch.machine_stage.status !== 'completed';
-          const isUpcoming = diffDays < 0 && batch.machine_stage.status !== 'completed';
           if (batch.machine_stage.status === 'completed') return null;
           return (
             <div className={`flex items-start gap-3 p-4 rounded-lg border ${
