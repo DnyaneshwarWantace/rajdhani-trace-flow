@@ -15,6 +15,7 @@ import AddToInventoryDialog from '@/components/materials/AddToInventoryDialog';
 import RecordPeriodicUsageDialog from '@/components/materials/RecordPeriodicUsageDialog';
 import ImportCSVDialog from '@/components/materials/ImportCSVDialog';
 import ExportMaterialsDialog from '@/components/materials/ExportMaterialsDialog';
+import BulkRestockDialog from '@/components/materials/BulkRestockDialog';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ import { TruncatedText } from '@/components/ui/TruncatedText';
 import { canCreate, canDelete, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 type TabValue = 'inventory' | 'assigned-tasks' | 'waste-recovery' | 'analytics' | 'notifications';
 
@@ -133,6 +135,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   const [selectedPeriodicMaterial, setSelectedPeriodicMaterial] = useState<PeriodicDueMaterial | null>(null);
   const periodicReminderShownRef = useRef(false);
 
+  const [isBulkRestockOpen, setIsBulkRestockOpen] = useState(false);
 
   // Restock dialog states
   const [isRestockDialogOpen, setIsRestockDialogOpen] = useState(false);
@@ -784,6 +787,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           subtitle={pageSubtitle}
           onImportCSV={activeTab === 'inventory' && canCreate('materials') ? handleImportCSV : undefined}
           onExport={activeTab === 'inventory' ? handleExport : undefined}
+          onBulkRestock={activeTab === 'inventory' && canCreate('materials') ? () => setIsBulkRestockOpen(true) : undefined}
           onAddToInventory={activeTab === 'inventory' ? handleAddToInventory : undefined}
           onAddMaterial={canCreate('materials') ? handleCreate : undefined}
           viewMode={viewMode}
@@ -976,6 +980,22 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         </DialogContent>
       </Dialog>
 
+      {isBulkRestockOpen && (
+        <BulkRestockDialog
+          materials={materials}
+          suppliers={suppliers}
+          onClose={() => setIsBulkRestockOpen(false)}
+          onSuccess={async () => {
+            setIsBulkRestockOpen(false);
+            const { materials: data, total } = await MaterialService.getMaterials(filters);
+            setMaterials(data);
+            setTotalMaterials(total || data.length);
+            loadStats();
+            loadAssignedTasks();
+          }}
+        />
+      )}
+
       {/* Restock Dialog */}
       {isRestockDialogOpen && selectedRestockMaterial && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1020,6 +1040,12 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                       <span className="ml-3">Last price: <span className="font-medium text-gray-700">₹{selectedRestockMaterial.cost_per_unit}</span></span>
                     )}
                   </div>
+                  <ProductAttributePreview
+                    color={selectedRestockMaterial.color}
+                    showPattern={false}
+                    compact
+                    className="mt-1.5"
+                  />
                 </div>
               </div>
 

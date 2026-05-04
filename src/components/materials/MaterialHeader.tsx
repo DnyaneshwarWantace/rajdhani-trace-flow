@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Upload, Plus, Download, List, Grid3x3 } from 'lucide-react';
+import { Upload, Plus, Download, List, Grid3x3, PackagePlus } from 'lucide-react';
 
 interface MaterialHeaderProps {
   title?: string;
@@ -8,6 +8,7 @@ interface MaterialHeaderProps {
   onExport?: () => void;
   onAddToInventory?: () => void;
   onAddMaterial?: () => void;
+  onBulkRestock?: () => void;
   viewMode?: 'grid' | 'table';
   onViewModeChange?: (mode: 'grid' | 'table') => void;
 }
@@ -19,6 +20,7 @@ export default function MaterialHeader({
   onExport,
   onAddToInventory,
   onAddMaterial,
+  onBulkRestock,
   viewMode = 'table',
   onViewModeChange,
 }: MaterialHeaderProps) {
@@ -71,6 +73,13 @@ export default function MaterialHeader({
                 <Grid3x3 className="w-4 h-4" />
               </Button>
             </div>
+          )}
+          {onBulkRestock && (
+            <Button variant="outline" onClick={onBulkRestock} className="gap-2">
+              <PackagePlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Bulk Restock</span>
+              <span className="sm:hidden">Bulk</span>
+            </Button>
           )}
           {onAddToInventory && (
             <Button
