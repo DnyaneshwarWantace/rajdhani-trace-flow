@@ -10,6 +10,7 @@ import AddWasteDialog from './AddWasteDialog';
 import ProductWastageAutoDialog from './ProductWastageAutoDialog';
 import EditWasteDialog from './EditWasteDialog';
 import EditProductWastageDialog from './EditProductWastageDialog';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface WastageManagementProps {
   batchId: string;
@@ -370,8 +371,7 @@ export default function WastageManagement({
                                         <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900">Serial Number</th>
                                         <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900">Size (L × W)</th>
                                         <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900">GSM</th>
-                                        <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900">Color</th>
-                                        <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900">Pattern</th>
+                                        <th className="border border-gray-300 px-2 py-2 text-left font-semibold text-gray-900 min-w-[140px]">Color & pattern</th>
                                       </tr>
                                     </thead>
                                     <tbody className="bg-white">
@@ -393,8 +393,13 @@ export default function WastageManagement({
                                               product.weight.includes(' ') ? product.weight : `${product.weight} ${product.weight_unit || ''}`
                                             ) : '—'}
                                           </td>
-                                          <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.color || '—'}</td>
-                                          <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.pattern || '—'}</td>
+                                          <td className="border border-gray-200 px-2 py-2 text-gray-900 align-middle">
+                                            {product.color || product.pattern ? (
+                                              <ProductAttributePreview color={product.color} pattern={product.pattern} />
+                                            ) : (
+                                              <span className="text-gray-400">—</span>
+                                            )}
+                                          </td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -574,8 +579,7 @@ export default function WastageManagement({
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Serial Number</th>
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Dimensions</th>
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">GSM</th>
-                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Color</th>
-                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Pattern</th>
+                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900 min-w-[140px]">Color & pattern</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white">
@@ -589,8 +593,13 @@ export default function WastageManagement({
                                 {product.length && product.width ? `${product.length} × ${product.width}` : '—'}
                               </td>
                               <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.weight || '—'}</td>
-                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.color || '—'}</td>
-                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.pattern || '—'}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900 align-middle">
+                                {product.color || product.pattern ? (
+                                  <ProductAttributePreview color={product.color} pattern={product.pattern} />
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -697,8 +706,7 @@ export default function WastageManagement({
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Serial Number</th>
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Dimensions</th>
                             <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">GSM</th>
-                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Color</th>
-                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Pattern</th>
+                            <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900 min-w-[140px]">Color & pattern</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white">
@@ -720,8 +728,13 @@ export default function WastageManagement({
                                   product.weight.includes(' ') ? product.weight : `${product.weight} ${product.weight_unit || ''}`
                                 ) : '—'}
                               </td>
-                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.color || '—'}</td>
-                              <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.pattern || '—'}</td>
+                              <td className="border border-gray-200 px-2 py-2 text-gray-900 align-middle">
+                                {product.color || product.pattern ? (
+                                  <ProductAttributePreview color={product.color} pattern={product.pattern} />
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

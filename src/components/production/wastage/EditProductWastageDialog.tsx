@@ -16,6 +16,7 @@ import { IndividualProductService } from '@/services/individualProductService';
 import { ProductService } from '@/services/productService';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import type { IndividualProduct } from '@/types/product';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface EditProductWastageDialogProps {
   isOpen: boolean;
@@ -277,6 +278,14 @@ export default function EditProductWastageDialog({
                           </p>
                           {product.serial_number && (
                             <p className="text-xs text-gray-600">SN: {product.serial_number}</p>
+                          )}
+                          {((product as any).color || (product as any).pattern) && (
+                            <div className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                              <ProductAttributePreview
+                                color={(product as any).color}
+                                pattern={(product as any).pattern}
+                              />
+                            </div>
                           )}
                           {product.created_at && (
                             <p className="text-xs text-gray-500">
