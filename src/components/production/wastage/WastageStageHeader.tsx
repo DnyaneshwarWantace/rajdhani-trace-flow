@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import AssignUserModal from '@/components/production/AssignUserModal';
 import type { ProductionBatch } from '@/services/productionService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface WastageStageHeaderProps {
   batch: ProductionBatch;
@@ -97,6 +98,16 @@ export default function WastageStageHeader({
             <p className="text-sm text-gray-600 mt-1">
               Batch: {batch.batch_number} • Product: {batch.product_name || 'N/A'}
             </p>
+            <ProductAttributePreview
+              color={batch.color}
+              pattern={batch.pattern}
+              length={batch.length}
+              width={batch.width}
+              lengthUnit={batch.length_unit}
+              widthUnit={batch.width_unit}
+              compact
+              className="mt-1"
+            />
           </div>
         </div>
         <div className="flex items-center gap-2">

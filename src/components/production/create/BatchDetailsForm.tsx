@@ -15,6 +15,7 @@ import type { Product } from '@/types/product';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 import { formatIndianDate } from '@/utils/formatHelpers';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface BatchDetailsFormProps {
   formData: CreateProductionBatchData;
@@ -128,15 +129,14 @@ export default function BatchDetailsForm({
               </div>
             )}
             {(selectedProduct.color || selectedProduct.pattern) && (
-              <div className="flex items-start gap-1.5">
+              <div className="flex items-start gap-1.5 flex-wrap">
                 <Tag className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span className="text-gray-600 flex-shrink-0">Details:</span>
-                <span className="font-medium text-gray-900 min-w-0 flex-1">
-                  <TruncatedText
-                    text={`${selectedProduct.color && selectedProduct.color !== 'NA' && selectedProduct.color !== 'N/A' ? selectedProduct.color : ''}${selectedProduct.color && selectedProduct.color !== 'NA' && selectedProduct.color !== 'N/A' && selectedProduct.pattern && selectedProduct.pattern !== 'NA' && selectedProduct.pattern !== 'N/A' ? ' • ' : ''}${selectedProduct.pattern && selectedProduct.pattern !== 'NA' && selectedProduct.pattern !== 'N/A' ? selectedProduct.pattern : ''}`}
-                    maxLength={40}
-                  />
-                </span>
+                <span className="text-gray-600 flex-shrink-0">Color & pattern:</span>
+                <ProductAttributePreview
+                  color={selectedProduct.color}
+                  pattern={selectedProduct.pattern}
+                  className="min-w-0 flex-1"
+                />
               </div>
             )}
           </div>

@@ -26,7 +26,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
   const [gstAutoFilled, setGstAutoFilled] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
-  
+
   // Track which fields have been touched for validation messages
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   
@@ -58,6 +58,7 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     deliveryState: '',
     deliveryPincode: '',
   });
+
 
   // Handler for address fields with different limits based on field type
   const handleAddressChange = (value: string, field: 'address' | 'city' | 'state') => {
@@ -705,15 +706,14 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           <Button
             onClick={handleSubmit}
             disabled={Boolean(
-              !newCustomer.name.trim() || 
-              !newCustomer.phone.trim() || 
-              newCustomer.phone.trim() === '+91' || 
+              !newCustomer.name.trim() ||
+              !newCustomer.phone.trim() ||
+              newCustomer.phone.trim() === '+91' ||
               (newCustomer.phone.trim() && !isValidPhoneNumber(newCustomer.phone))
             )}
             className="flex-1"
           >
-            <Save className="w-4 h-4 mr-2" />
-            Add Customer
+            <Save className="w-4 h-4 mr-2" />Save &amp; Continue
           </Button>
         </div>
     </div>

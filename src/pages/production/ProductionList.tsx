@@ -766,6 +766,7 @@ export default function ProductionList() {
                             productName: task.stage_product_name,
                             planned_quantity: task.planned_quantity,
                             orderId: task.order_id,
+                            orderItemId: task.order_item_id,
                             order_number: task.order_number,
                             customer_name: task.customer_name,
                             taskId: task.id,
@@ -792,6 +793,7 @@ export default function ProductionList() {
                 state: {
                   fromOrder: true,
                   orderId: order.order_id,
+                  orderItemId: order.order_item_id,
                   productId,
                   productName: order.product_name || '',
                   planned_quantity: order.quantity_needed,

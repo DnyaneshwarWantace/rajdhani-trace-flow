@@ -42,6 +42,8 @@ import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
+import ColorSwatch from '@/components/ui/ColorSwatch';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface OrderItem {
   id: string;
@@ -1172,6 +1174,7 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
   const [productPage, setProductPage] = useState(1);
   const [materialPage, setMaterialPage] = useState(1);
   const { toast } = useToast();
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const currentItem: any = {
     id: 'inline-add-item',
     product_type: productType,
@@ -1335,6 +1338,59 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
           <Label className="text-xs">Item Name</Label>
           <Input placeholder="Selected item name" value={productName} readOnly className="h-8 text-sm bg-gray-50" />
         </div>
+        {selectedEntry &&
+          (selectedEntry.color ||
+            selectedEntry.pattern ||
+            selectedEntry.length ||
+            selectedEntry.width ||
+            selectedEntry.weight ||
+            selectedEntry.category) && (
+            <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-md border border-blue-200 bg-white/90 px-2 py-2 text-xs text-gray-700">
+              {selectedEntry.length && selectedEntry.width && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5">
+                  <span className="font-medium text-gray-500">Size</span>
+                  {selectedEntry.length}
+                  {selectedEntry.length_unit || ''} × {selectedEntry.width}
+                  {selectedEntry.width_unit || ''}
+                </span>
+              )}
+              {selectedEntry.weight && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5">
+                  <span className="font-medium text-gray-500">GSM</span>
+                  {selectedEntry.weight}
+                  {selectedEntry.weight_unit || ''}
+                </span>
+              )}
+              {selectedEntry.color && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 max-w-full">
+                  <span className="font-medium text-gray-500 shrink-0">Color</span>
+                  {colorCodeMap[selectedEntry.color] && (
+                    <ColorSwatch colorCode={colorCodeMap[selectedEntry.color]} className="w-3.5 h-3.5 rounded-sm shrink-0" />
+                  )}
+                  <span className="truncate">{selectedEntry.color}</span>
+                </span>
+              )}
+              {productType === 'product' && selectedEntry.pattern && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 max-w-full">
+                  <span className="font-medium text-gray-500 shrink-0">Pattern</span>
+                  {patternImageMap[selectedEntry.pattern] && (
+                    <img
+                      src={patternImageMap[selectedEntry.pattern]}
+                      alt={selectedEntry.pattern || 'Pattern'}
+                      className="w-5 h-5 rounded object-cover border border-gray-300 shrink-0"
+                    />
+                  )}
+                  <span className="truncate max-w-[160px]">{selectedEntry.pattern}</span>
+                </span>
+              )}
+              {selectedEntry.category && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5">
+                  <span className="font-medium text-gray-500">Category</span>
+                  <span className="truncate max-w-[120px]">{selectedEntry.category}</span>
+                </span>
+              )}
+            </div>
+          )}
         <div className="space-y-1">
           <Label className="text-xs">Quantity</Label>
           <Input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="h-8 text-sm" />

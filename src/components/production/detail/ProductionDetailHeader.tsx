@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductionDetailHeaderProps {
   batch: ProductionBatch;
@@ -84,6 +85,16 @@ export default function ProductionDetailHeader({
                 </Badge>
               )}
             </div>
+            <ProductAttributePreview
+              color={batch.color}
+              pattern={batch.pattern}
+              length={batch.length}
+              width={batch.width}
+              lengthUnit={batch.length_unit}
+              widthUnit={batch.width_unit}
+              compact
+              className="mt-2"
+            />
           </div>
         </div>
       </div>

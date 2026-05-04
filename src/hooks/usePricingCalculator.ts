@@ -5,7 +5,9 @@ import type { PricingUnit, ProductDimensions } from '@/utils/unitConverter';
 import {
   calculateTotalPrice,
   formatUnitLabel,
-  getAvailablePricingUnits
+  getAvailablePricingUnits,
+  convertToMeters,
+  convertToFeet
 } from '@/utils/unitConverter';
 
 export interface PricingCalculation {
@@ -170,33 +172,6 @@ export function usePricingCalculator(): UsePricingCalculatorReturn {
       isValid: unit_price > 0 && quantity > 0
     };
   }, []);
-  
-  // Helper functions for unit conversion
-  function convertToMeters(value: number, unit: string): number {
-    const unitLower = unit.toLowerCase();
-    switch (unitLower) {
-      case 'mm': return value / 1000;
-      case 'cm': case 'centimeters': return value / 100;
-      case 'feet': case 'ft': return value * 0.3048;
-      case 'inches': case 'in': return value * 0.0254;
-      case 'yards': case 'yd': return value * 0.9144;
-      case 'm': case 'meter': case 'meters': return value;
-      default: return value;
-    }
-  }
-  
-  function convertToFeet(value: number, unit: string): number {
-    const unitLower = unit.toLowerCase();
-    switch (unitLower) {
-      case 'mm': return value / 304.8;
-      case 'cm': case 'centimeters': return value / 30.48;
-      case 'm': case 'meter': case 'meters': return value * 3.28084;
-      case 'inches': case 'in': return value / 12;
-      case 'yards': case 'yd': return value * 3;
-      case 'feet': case 'ft': return value;
-      default: return value;
-    }
-  }
   
   const calculateOrderTotal = useCallback((items: ExtendedOrderItem[]): number => {
     return items.reduce((total, item) => {

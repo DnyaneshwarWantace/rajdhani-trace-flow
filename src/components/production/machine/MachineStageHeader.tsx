@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, FileText, RefreshCw, UserPlus, User } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface MachineStageHeaderProps {
   batch: ProductionBatch;
@@ -52,6 +53,16 @@ export default function MachineStageHeader({
           <p className="text-sm text-gray-600 mt-1">
             Batch: {batch.batch_number} • Product: {batch.product_name || 'N/A'}
           </p>
+          <ProductAttributePreview
+            color={batch.color}
+            pattern={batch.pattern}
+            length={batch.length}
+            width={batch.width}
+            lengthUnit={batch.length_unit}
+            widthUnit={batch.width_unit}
+            compact
+            className="mt-1"
+          />
         </div>
       </div>
       <div className="flex items-center gap-2">

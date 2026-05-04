@@ -2,6 +2,7 @@ import { ArrowLeft, Edit, UserPlus, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ClipboardList } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface PlanningStageHeaderProps {
   onBack: () => void;
@@ -38,7 +39,7 @@ export default function PlanningStageHeader({ onBack, onEdit, onAssign, batch, p
                 <h1 className="text-xl font-semibold text-gray-900">
                   {batchNumber ? `${batchNumber} - ${displayProductName}` : displayProductName}
                 </h1>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <p className="text-sm text-gray-600">Planning Stage - Prepare and plan your production batch</p>
                   {assignedName && (
                     <span className="flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full">
@@ -47,6 +48,18 @@ export default function PlanningStageHeader({ onBack, onEdit, onAssign, batch, p
                     </span>
                   )}
                 </div>
+                {batch && (
+                  <ProductAttributePreview
+                    color={batch.color}
+                    pattern={batch.pattern}
+                    length={batch.length}
+                    width={batch.width}
+                    lengthUnit={batch.length_unit}
+                    widthUnit={batch.width_unit}
+                    compact
+                    className="mt-1"
+                  />
+                )}
               </div>
             </div>
           </div>

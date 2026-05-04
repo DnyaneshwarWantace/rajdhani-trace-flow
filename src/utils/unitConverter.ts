@@ -367,7 +367,7 @@ export function calculatePricingUnitQuantity(
 /**
  * Convert value to meters
  */
-function convertToMeters(value: number, unit: string): number {
+export function convertToMeters(value: number, unit: string): number {
   const unitLower = unit.toLowerCase();
   switch (unitLower) {
     case 'mm': return value / 1000;
@@ -383,7 +383,7 @@ function convertToMeters(value: number, unit: string): number {
 /**
  * Convert value to feet
  */
-function convertToFeet(value: number, unit: string): number {
+export function convertToFeet(value: number, unit: string): number {
   const unitLower = unit.toLowerCase();
   switch (unitLower) {
     case 'mm': return value / 304.8;

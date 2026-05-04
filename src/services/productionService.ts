@@ -112,6 +112,7 @@ export interface CreateProductionBatchData {
 export interface ProductionTask {
   id: string;
   order_id: string;
+  order_item_id?: string;
   order_number?: string;
   customer_name?: string;
   stage_product_id: string;

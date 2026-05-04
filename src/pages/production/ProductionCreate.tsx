@@ -86,6 +86,7 @@ export default function ProductionCreate() {
     const expectedDelivery = state.expected_delivery || state.expectedDelivery;
     const orderNumber = state.order_number || state.orderNumber || '';
     const customerName = state.customer_name || state.customerName || '';
+    const orderItemId = state.orderItemId || state.order_item_id || '';
 
     let cancelled = false;
     (async () => {
@@ -104,6 +105,9 @@ export default function ProductionCreate() {
 
         setSelectedOrderDeliveryDate(expectedDelivery || null);
         setSelectedOrderIds(state.orderId ? [state.orderId] : []);
+        if (orderItemId) {
+          setFormData((prev) => ({ ...prev, order_item_id: orderItemId } as any));
+        }
         setFormData((prev) => ({
           ...prev,
           product_id: productId,
@@ -501,13 +505,15 @@ export default function ProductionCreate() {
       ]
         .join(', ');
 
+      const orderItemIdFromState = (state?.orderItemId || state?.order_item_id || (formData as any).order_item_id) || undefined;
       const payload: CreateProductionBatchData = {
         ...formData,
         order_id: primaryOrderId,
+        ...(orderItemIdFromState ? { order_item_id: orderItemIdFromState } : {}),
         notes: attachedOrderNumbers
           ? `${formData.notes ? `${formData.notes} · ` : ''}Attached Orders: ${attachedOrderNumbers}${attachedOrderIds ? ` · Attached Order IDs: ${attachedOrderIds}` : ''}${attachedOrderCustomers ? ` · Attached Customers: ${attachedOrderCustomers}` : ''}`
           : formData.notes,
-      };
+      } as any;
 
       const { data, error } = await ProductionService.createBatch(payload);
       if (error) {

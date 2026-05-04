@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, FileText } from 'lucide-react';
+import { Loader2, FileText, Calendar, AlertTriangle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -434,6 +434,51 @@ export default function MachineStage() {
 
         {/* Production Progress Tracker */}
         <ProductionStageProgress currentStage="machine" />
+
+        {/* Machine Schedule Date Banner */}
+        {batch.machine_stage?.schedule_date && (() => {
+          const scheduleDate = new Date(batch.machine_stage.schedule_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          scheduleDate.setHours(0, 0, 0, 0);
+          const diffDays = Math.floor((today.getTime() - scheduleDate.getTime()) / (1000 * 60 * 60 * 24));
+          const formattedDate = new Date(batch.machine_stage.schedule_date).toLocaleDateString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
+          });
+          const isOverdue = diffDays > 0 && batch.machine_stage.status !== 'completed';
+          const isToday = diffDays === 0 && batch.machine_stage.status !== 'completed';
+          const isUpcoming = diffDays < 0 && batch.machine_stage.status !== 'completed';
+          if (batch.machine_stage.status === 'completed') return null;
+          return (
+            <div className={`flex items-start gap-3 p-4 rounded-lg border ${
+              isOverdue ? 'bg-red-50 border-red-200' : isToday ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-100'
+            }`}>
+              {isOverdue ? (
+                <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              ) : isToday ? (
+                <Clock className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              ) : (
+                <Calendar className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div>
+                <p className={`text-sm font-semibold ${isOverdue ? 'text-red-700' : isToday ? 'text-amber-700' : 'text-blue-700'}`}>
+                  {isOverdue
+                    ? `Machine stage overdue by ${diffDays} day${diffDays !== 1 ? 's' : ''}!`
+                    : isToday
+                    ? 'Machine production scheduled for today!'
+                    : `Machine production scheduled for ${formattedDate}`}
+                </p>
+                <p className={`text-xs mt-0.5 ${isOverdue ? 'text-red-600' : isToday ? 'text-amber-600' : 'text-blue-600'}`}>
+                  {isOverdue
+                    ? `Was scheduled for ${formattedDate}. Please start immediately.`
+                    : isToday
+                    ? 'Start the machine stage now.'
+                    : `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} remaining.`}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Product Details */}
         {product && (

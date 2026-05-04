@@ -500,7 +500,6 @@ export default function NewOrder() {
                   onCustomerCreated={handleCustomerCreated}
                   onCancel={() => setShowNewCustomerForm(false)}
                   showCard={false}
-                  autoSave
                 />
               )}
             </div>

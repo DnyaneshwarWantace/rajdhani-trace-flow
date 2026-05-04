@@ -4,6 +4,7 @@ import type { Product } from '@/types/product';
 import { ArrowLeft, FileDown, FileSpreadsheet, QrCode, Loader2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 export interface ProductStockHeaderProps {
   product: Product;
@@ -94,6 +95,16 @@ export default function ProductStockHeader({
               <p className="text-xs sm:text-sm text-gray-600 break-words line-clamp-2">
                 {product.name}
               </p>
+              <ProductAttributePreview
+                color={product.color}
+                pattern={product.pattern}
+                length={product.length}
+                width={product.width}
+                lengthUnit={product.length_unit}
+                widthUnit={product.width_unit}
+                compact
+                className="mt-1.5"
+              />
             </div>
           </div>
         </div>

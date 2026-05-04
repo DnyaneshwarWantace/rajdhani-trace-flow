@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Factory, Settings, User, Clock, Plus } from 'lucide-react';
+import { Factory, Settings, User, Clock, Plus, Calendar, AlertTriangle } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import { AuthService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,7 @@ interface Machine {
 interface MachineSelectionDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (machine: Machine | null, shift?: 'day' | 'night') => void;
+  onSelect: (machine: Machine | null, shift?: 'day' | 'night', scheduleDate?: string) => void;
   selectedMachineId?: string | null;
 }
 
@@ -59,6 +59,7 @@ export default function MachineSelectionDialog({
   const [newMachineName, setNewMachineName] = useState('');
   const [newMachineType, setNewMachineType] = useState('');
   const [newMachineModel, setNewMachineModel] = useState('');
+  const [scheduleDate, setScheduleDate] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -73,6 +74,7 @@ export default function MachineSelectionDialog({
       setSelectedMachineIdState('');
       setInspectorName('');
       setSelectedShift('day');
+      setScheduleDate('');
       setShowAddMachine(false);
       setNewMachineName('');
       setNewMachineType('');
@@ -133,7 +135,7 @@ export default function MachineSelectionDialog({
 
     // Add shift to machine object
     const machineWithShift = { ...selectedMachine, shift: selectedShift };
-    onSelect(machineWithShift, selectedShift);
+    onSelect(machineWithShift, selectedShift, scheduleDate || undefined);
     onClose();
   };
 
@@ -312,8 +314,8 @@ export default function MachineSelectionDialog({
               <Clock className="w-4 h-4" />
               Select Shift *
             </Label>
-            <Select 
-              value={selectedShift} 
+            <Select
+              value={selectedShift}
               onValueChange={(value) => setSelectedShift(value as 'day' | 'night')}
             >
               <SelectTrigger className="w-full">
@@ -325,6 +327,26 @@ export default function MachineSelectionDialog({
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500">Select the shift for this machine operation</p>
+          </div>
+
+          {/* Schedule Date */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Machine Start Schedule Date
+              <span className="text-xs font-normal text-gray-500">(optional)</span>
+            </Label>
+            <Input
+              type="date"
+              value={scheduleDate}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-500" />
+              Set a future date when machine production should start. A reminder will be sent the day before, and daily overdue alerts if not started on time.
+            </p>
           </div>
         </div>
         

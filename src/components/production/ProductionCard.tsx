@@ -6,6 +6,7 @@ import { X, Eye, ClipboardList, Factory, Copy, AlertTriangle } from 'lucide-reac
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductionCardProps {
   batch: ProductionBatch;
@@ -208,6 +209,16 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
           <div className="flex-1">
             <h3 className="font-semibold text-sm mb-1">{batch.batch_number}</h3>
             <TruncatedText text={batch.product_name || 'N/A'} maxLength={40} className="text-xs text-gray-600 mb-1" />
+            <ProductAttributePreview
+              color={batch.color}
+              pattern={batch.pattern}
+              length={batch.length}
+              width={batch.width}
+              lengthUnit={batch.length_unit}
+              widthUnit={batch.width_unit}
+              compact
+              className="mb-1"
+            />
             <div className="flex items-center gap-1 flex-wrap">
               <Badge className={`${getStatusColor(batch.status)} text-[10px] px-1.5 py-0.5`}>
                 {getStatusLabel(batch.status)}

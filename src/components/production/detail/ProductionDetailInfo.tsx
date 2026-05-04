@@ -5,6 +5,7 @@ import { Hash, Package, Calendar, User, Building2, Tag, Ruler, Weight } from 'lu
 import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { ProductionBatch } from '@/services/productionService';
 import { OrderService } from '@/services/orderService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductionDetailInfoProps {
   batch: ProductionBatch;
@@ -146,22 +147,6 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       show: batch.weight && batch.weight !== 'N/A',
     },
     {
-      label: 'Color',
-      value: batch.color && batch.color !== 'NA' && batch.color !== 'N/A' ? batch.color : 'N/A',
-      icon: Tag,
-      color: 'text-purple-600',
-      truncate: false,
-      show: !!(batch.color && batch.color !== 'NA' && batch.color !== 'N/A' && String(batch.color).trim() !== ''),
-    },
-    {
-      label: 'Pattern',
-      value: batch.pattern && batch.pattern !== 'NA' && batch.pattern !== 'N/A' ? batch.pattern : 'N/A',
-      icon: Tag,
-      color: 'text-purple-600',
-      truncate: false,
-      show: !!(batch.pattern && batch.pattern !== 'NA' && batch.pattern !== 'N/A' && String(batch.pattern).trim() !== ''),
-    },
-    {
       label: 'Operator',
       value: batch.operator || 'N/A',
       icon: User,
@@ -234,6 +219,11 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
             );
           })}
         </div>
+        <ProductAttributePreview
+          color={batch.color}
+          pattern={batch.pattern}
+          className="mt-4 p-3 rounded-lg border border-gray-200 bg-gray-50"
+        />
         {batch.notes && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-xs font-medium text-blue-900 mb-1">Notes</p>

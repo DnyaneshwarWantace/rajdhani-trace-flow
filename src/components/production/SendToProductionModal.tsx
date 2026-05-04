@@ -20,6 +20,7 @@ import type { Order, OrderItem } from '@/services/orderService';
 import type { Recipe, RecipeMaterial } from '@/types/recipe';
 import type { RawMaterial } from '@/types/material';
 import { getApiUrl } from '@/utils/apiConfig';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 // Cache role permission results to avoid re-fetching the same role multiple times
 const rolePermCache: Record<string, Record<string, boolean>> = {};
@@ -1036,6 +1037,16 @@ export default function SendToProductionModal({
             Start from <strong>Step 1</strong> (deepest sub-product) and work up to the main product.
             Assign a worker to each step you want to schedule now.
           </p>
+          <ProductAttributePreview
+            color={productItem.color}
+            pattern={productItem.pattern}
+            length={productItem.length}
+            width={productItem.width}
+            lengthUnit={productItem.length_unit}
+            widthUnit={productItem.width_unit}
+            compact
+            className="mt-2"
+          />
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Reserved stock rule: if this order is accepted and has reserved individual rolls, planning uses remaining quantity only. Otherwise, produce the full order quantity.
           </div>

@@ -1556,7 +1556,7 @@ export default function PlanningStage() {
           // Allow closing the dialog (cancel/X button)
           setShowMachineDialog(false);
         }}
-        onSelect={async (machine, shift) => {
+        onSelect={async (machine, shift, scheduleDate) => {
           if (!machine) {
             toast({
               title: 'Machine Required',
@@ -2015,6 +2015,7 @@ export default function PlanningStage() {
                 status: 'in_progress',
                 started_at: new Date().toISOString(),
                 started_by: actorName,
+                ...(scheduleDate ? { schedule_date: scheduleDate } : {}),
               },
             });
 

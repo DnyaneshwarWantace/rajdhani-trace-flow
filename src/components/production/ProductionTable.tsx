@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 import { formatDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
 
@@ -312,6 +313,16 @@ export default function ProductionTable({
                 <td className="px-4 py-2 max-w-[150px]">
                   <div className="text-sm text-gray-900 truncate"><TruncatedText text={batch.product_name || 'N/A'} maxLength={20} as="span" /></div>
                   <div className="text-[11px] text-gray-500 mt-0.5 truncate"><TruncatedText text={`${batch.final_target_display || batch.product_name || 'Product'} (${batch.planned_quantity})`} maxLength={25} as="span" /></div>
+                  <ProductAttributePreview
+                    color={batch.color}
+                    pattern={batch.pattern}
+                    length={batch.length}
+                    width={batch.width}
+                    lengthUnit={batch.length_unit}
+                    widthUnit={batch.width_unit}
+                    compact
+                    className="mt-1"
+                  />
                 </td>
                 <td className="px-4 py-2 max-w-[130px]">
                   {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (

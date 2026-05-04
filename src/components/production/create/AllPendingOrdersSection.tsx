@@ -11,13 +11,17 @@ import {
   CheckCircle2,
   ArrowRight,
   Clock,
+  Lock,
 } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { OrderService } from '@/services/orderService';
+import { ProductionService } from '@/services/productionService';
 import { formatIndianDate } from '@/utils/formatHelpers';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PendingOrder {
   order_id: string;
+  order_item_id: string;
   order_number: string;
   customer_name: string;
   order_date: string;
@@ -99,8 +103,13 @@ function DeliveryBadge({ dateStr }: { dateStr: string }) {
 }
 
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
+  const { user } = useAuth();
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  // Map of order_item_id → { assigned_to_id, assigned_to_name } for active tasks
+  const [taskAssignments, setTaskAssignments] = useState<Record<string, { assigned_to_id: string; assigned_to_name: string }>>({});
+  // Set of order_item_ids that already have an active production batch — hide these cards
+  const [batchedItemIds, setBatchedItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -117,12 +126,13 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
         if (cancelled || error || !data) return;
 
         // Flatten to one row per product item
-        const productRows: Array<Omit<PendingOrder, 'current_stock' | 'shortage'> & { product_id?: string }> = [];
+        const productRows: PendingOrder[] = [];
         for (const order of data) {
           const productItems = order.items.filter((item) => item.productType === 'product');
           for (const item of productItems) {
             productRows.push({
               order_id: order.id,
+              order_item_id: item.id,
               order_number: order.orderNumber,
               customer_name: order.customerName,
               order_date: order.orderDate,
@@ -164,6 +174,55 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
         });
 
         setOrders(enriched);
+
+        // Fetch active tasks (assignments) and active batches in parallel for all orders
+        const orderIds = [...new Set(enriched.map((r) => r.order_id))];
+        const assignments: Record<string, { assigned_to_id: string; assigned_to_name: string }> = {};
+        const batched = new Set<string>();
+
+        await Promise.all(
+          orderIds.map(async (orderId) => {
+            try {
+              const [tasksResult, batchesResult] = await Promise.all([
+                ProductionService.getTasks({ order_id: orderId, limit: 50 }),
+                ProductionService.getBatches({ order_id: orderId }),
+              ]);
+
+              // Track task assignments per order_item_id
+              for (const task of tasksResult.data || []) {
+                if (task.order_item_id && ['assigned', 'in_progress', 'planning'].includes(task.status)) {
+                  assignments[task.order_item_id] = {
+                    assigned_to_id: task.assigned_to_id,
+                    assigned_to_name: task.assigned_to_name,
+                  };
+                }
+              }
+
+              // Track which order_item_ids already have an active batch
+              for (const batch of batchesResult.data || []) {
+                if (batch.status !== 'cancelled' && batch.order_item_id) {
+                  batched.add(batch.order_item_id);
+                }
+                // Also match by order_id + product_id if order_item_id not stored on batch
+                if (batch.status !== 'cancelled' && !batch.order_item_id && batch.order_id === orderId) {
+                  // Mark all items for this order+product combo as batched
+                  enriched.forEach((row) => {
+                    if (row.order_id === orderId && row.product_id === batch.product_id) {
+                      batched.add(row.order_item_id);
+                    }
+                  });
+                }
+              }
+            } catch {
+              // ignore per-order failures
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setTaskAssignments(assignments);
+          setBatchedItemIds(batched);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -181,7 +240,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     );
   }
 
-  if (orders.length === 0) {
+  if (visibleOrders.length === 0) {
     return (
       <div className="flex flex-col items-center gap-2 py-10 text-center">
         <CheckCircle2 className="h-10 w-10 text-green-400" />
@@ -191,8 +250,11 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     );
   }
 
-  const urgentCount = orders.filter((o) => getDaysUntil(o.expected_delivery) <= 3).length;
-  const shortageCount = orders.filter((o) => (o.shortage ?? 0) > 0).length;
+  // Only show orders that don't have an active batch yet
+  const visibleOrders = orders.filter((o) => !batchedItemIds.has(o.order_item_id));
+
+  const urgentCount = visibleOrders.filter((o) => getDaysUntil(o.expected_delivery) <= 3).length;
+  const shortageCount = visibleOrders.filter((o) => (o.shortage ?? 0) > 0).length;
 
   return (
     <div className="space-y-4">
@@ -202,7 +264,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
           <ShoppingCart className="h-5 w-5 text-gray-600" />
           <h3 className="text-base font-semibold text-gray-800">Pending Orders</h3>
           <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-            {orders.length}
+            {visibleOrders.length}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -223,7 +285,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
       {/* Order cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {orders.map((order, index) => {
+        {visibleOrders.map((order, index) => {
           const days = getDaysUntil(order.expected_delivery);
           const isOverdue = days < 0;
           const isVeryUrgent = days >= 0 && days <= 3;
@@ -231,22 +293,29 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
           const priorityConf = PRIORITY_CONFIG[order.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium;
           const statusConf = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
 
+          const assignment = taskAssignments[order.order_item_id];
+          const isAssignedToMe = assignment && assignment.assigned_to_id === user?.id;
+          const isAssignedToOther = assignment && assignment.assigned_to_id !== user?.id;
+          const blocked = isAssignedToOther;
+
           return (
             <div
               key={`${order.order_id}-${index}`}
-              className={`group relative bg-white rounded-xl border transition-all duration-150 hover:shadow-md cursor-pointer overflow-hidden ${
-                isOverdue
-                  ? 'border-red-300 hover:border-red-400'
+              className={`group relative bg-white rounded-xl border transition-all duration-150 overflow-hidden ${
+                blocked
+                  ? 'border-gray-300 opacity-70 cursor-not-allowed'
+                  : isOverdue
+                  ? 'border-red-300 hover:border-red-400 hover:shadow-md cursor-pointer'
                   : isVeryUrgent
-                  ? 'border-orange-300 hover:border-orange-400'
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-orange-300 hover:border-orange-400 hover:shadow-md cursor-pointer'
+                  : 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
               }`}
-              onClick={() => onSelectOrder(order, order.product_id ?? '')}
+              onClick={() => { if (!blocked) onSelectOrder(order, order.product_id ?? ''); }}
             >
               {/* Top accent bar */}
               <div
                 className={`h-1 w-full ${
-                  isOverdue ? 'bg-red-500' : isVeryUrgent ? 'bg-orange-400' : 'bg-blue-400'
+                  blocked ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : isVeryUrgent ? 'bg-orange-400' : 'bg-blue-400'
                 }`}
               />
 
@@ -302,6 +371,20 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
                   </div>
                 </div>
 
+                {/* Assignment banner */}
+                {isAssignedToOther && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                    <Lock className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Assigned to <span className="font-semibold">{assignment.assigned_to_name}</span> — only they can create the batch</span>
+                  </div>
+                )}
+                {isAssignedToMe && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                    <User className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>Assigned to you</span>
+                  </div>
+                )}
+
                 {/* Delivery + CTA */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-1.5">
@@ -309,17 +392,24 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
                     <span className="text-xs text-gray-600">{formatIndianDate(order.expected_delivery)}</span>
                     <DeliveryBadge dateStr={order.expected_delivery} />
                   </div>
-                  <Button
-                    size="sm"
-                    className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 group-hover:translate-x-0.5 transition-transform"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectOrder(order, order.product_id ?? '');
-                    }}
-                  >
-                    Create Batch
-                    <ArrowRight className="h-3 w-3" />
-                  </Button>
+                  {blocked ? (
+                    <Button size="sm" disabled className="h-7 px-3 text-xs gap-1 cursor-not-allowed">
+                      <Lock className="h-3 w-3" />
+                      Locked
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 group-hover:translate-x-0.5 transition-transform"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectOrder(order, order.product_id ?? '');
+                      }}
+                    >
+                      Create Batch
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
