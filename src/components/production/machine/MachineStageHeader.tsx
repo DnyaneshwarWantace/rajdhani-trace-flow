@@ -60,7 +60,7 @@ export default function MachineStageHeader({
             width={batch.width}
             lengthUnit={batch.length_unit}
             widthUnit={batch.width_unit}
-            compact
+            size="large"
             className="mt-1"
           />
         </div>

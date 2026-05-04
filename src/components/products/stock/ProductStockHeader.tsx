@@ -11,8 +11,9 @@ export interface ProductStockHeaderProps {
   productId: string;
   onExportCSV?: () => void;
   onExportExcel?: () => void;
-  onDownloadQrPdf?: () => void;
   onDownloadAllQrPdf?: () => void;
+  onDownloadSelectedQrPdf?: () => void;
+  onDownloadQrPdf?: () => void;
   onClearSelection?: () => void;
   downloadingQrPdf?: boolean;
   individualProductCount?: number;
@@ -24,8 +25,9 @@ export default function ProductStockHeader({
   productId,
   onExportCSV,
   onExportExcel,
-  onDownloadQrPdf,
   onDownloadAllQrPdf,
+  onDownloadSelectedQrPdf,
+  onDownloadQrPdf,
   onClearSelection,
   downloadingQrPdf = false,
   individualProductCount = 0,
@@ -64,13 +66,13 @@ export default function ProductStockHeader({
     }
   };
 
-  const handleDownloadAll = () => {
+  const handleDownloadAllPdf = () => {
     onDownloadAllQrPdf?.();
     setDownloadQROpen(false);
   };
 
-  const handleDownloadSelected = () => {
-    onDownloadQrPdf?.();
+  const handleDownloadSelectedPdf = () => {
+    onDownloadSelectedQrPdf?.();
     setDownloadQROpen(false);
   };
 
@@ -102,7 +104,7 @@ export default function ProductStockHeader({
                 width={product.width}
                 lengthUnit={product.length_unit}
                 widthUnit={product.width_unit}
-                compact
+                size="large"
                 className="mt-1.5"
               />
             </div>
@@ -182,19 +184,32 @@ export default function ProductStockHeader({
                 style={downloadQRTriggerWidth != null ? { width: downloadQRTriggerWidth } : undefined}
               >
                 <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={handleDownloadSelected}
-                    disabled={downloadingQrPdf || selectedCount === 0}
-                    className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
-                  >
-                    <FileDown className="w-4 h-4 text-red-500" />
-                    PDF
-                  </button>
+                  {onDownloadQrPdf && (
+                    <button
+                      type="button"
+                      onClick={() => { onDownloadQrPdf(); setDownloadQROpen(false); }}
+                      disabled={downloadingQrPdf || individualProductCount === 0}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+                    >
+                      <FileDown className="w-4 h-4 text-red-500" />
+                      {downloadingQrPdf ? 'Generating…' : 'PDF'}
+                    </button>
+                  )}
+                  {onDownloadSelectedQrPdf && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadSelectedPdf}
+                      disabled={downloadingQrPdf || selectedCount === 0}
+                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
+                    >
+                      <FileDown className="w-4 h-4 text-red-500" />
+                      PDF
+                    </button>
+                  )}
                   {onDownloadAllQrPdf && (
                     <button
                       type="button"
-                      onClick={handleDownloadAll}
+                      onClick={handleDownloadAllPdf}
                       disabled={downloadingQrPdf || individualProductCount === 0}
                       className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2"
                     >

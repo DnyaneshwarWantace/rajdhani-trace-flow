@@ -216,7 +216,6 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
               width={batch.width}
               lengthUnit={batch.length_unit}
               widthUnit={batch.width_unit}
-              compact
               className="mb-1"
             />
             <div className="flex items-center gap-1 flex-wrap">

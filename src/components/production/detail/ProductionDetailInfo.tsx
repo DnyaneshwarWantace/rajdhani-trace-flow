@@ -222,6 +222,7 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
         <ProductAttributePreview
           color={batch.color}
           pattern={batch.pattern}
+          size="large"
           className="mt-4 p-3 rounded-lg border border-gray-200 bg-gray-50"
         />
         {batch.notes && (

@@ -12,8 +12,7 @@ import { useState, useEffect } from 'react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { validateNumberInput, ValidationPresets } from '@/utils/numberValidation';
 import { formatCurrency } from '@/utils/formatHelpers';
-import ColorSwatch from '@/components/ui/ColorSwatch';
-import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface OrderItemFormProps {
   item: ExtendedOrderItem;
@@ -38,7 +37,6 @@ export default function OrderItemForm({
   onCollapse,
   isCollapsible = false,
 }: OrderItemFormProps) {
-  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const selectedProduct = item.product_id
     ? item.product_type === 'raw_material'
       ? rawMaterials.find(p => p.id === item.product_id)
@@ -140,24 +138,14 @@ export default function OrderItemForm({
               {productWithUnits.weight} GSM
             </span>
           )}
-          {productWithUnits.color && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium max-w-[160px]">
-              {colorCodeMap[productWithUnits.color] && (
-                <ColorSwatch colorCode={colorCodeMap[productWithUnits.color]} className="w-3.5 h-3.5 rounded-sm shrink-0" />
-              )}
-              <span className="truncate">{productWithUnits.color}</span>
-            </span>
-          )}
-          {item.product_type === 'product' && productWithUnits.pattern && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px] font-medium max-w-[180px]">
-              {patternImageMap[productWithUnits.pattern] && (
-                <img
-                  src={patternImageMap[productWithUnits.pattern]}
-                  alt={productWithUnits.pattern || 'Pattern'}
-                  className="w-4 h-4 rounded object-cover border border-slate-300 shrink-0"
-                />
-              )}
-              <span className="truncate">{productWithUnits.pattern}</span>
+          {(productWithUnits.color || (item.product_type === 'product' && productWithUnits.pattern)) && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 max-w-full min-w-0">
+              <ProductAttributePreview
+                color={productWithUnits.color}
+                pattern={productWithUnits.pattern}
+                showPattern={item.product_type === 'product'}
+                size="default"
+              />
             </span>
           )}
           <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-600 text-[11px] font-medium">

@@ -43,6 +43,7 @@ export default function ProductDetailInfo({ product }: ProductDetailInfoProps) {
               width={product.width}
               lengthUnit={product.length_unit}
               widthUnit={product.width_unit}
+              size="large"
             />
           </div>
         )}

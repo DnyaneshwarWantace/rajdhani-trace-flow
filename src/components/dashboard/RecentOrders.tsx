@@ -104,7 +104,6 @@ export default function RecentOrders({ orders, loading }: RecentOrdersProps) {
                               width={item.width}
                               lengthUnit={item.length_unit}
                               widthUnit={item.width_unit}
-                              compact
                               className="shrink-0"
                             />
                           </div>

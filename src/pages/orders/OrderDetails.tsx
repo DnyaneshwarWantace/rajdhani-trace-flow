@@ -42,8 +42,7 @@ import OrderProductionInfo from '@/components/orders/OrderProductionInfo';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
-import ColorSwatch from '@/components/ui/ColorSwatch';
-import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface OrderItem {
   id: string;
@@ -1174,7 +1173,6 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
   const [productPage, setProductPage] = useState(1);
   const [materialPage, setMaterialPage] = useState(1);
   const { toast } = useToast();
-  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const currentItem: any = {
     id: 'inline-add-item',
     product_type: productType,
@@ -1361,26 +1359,15 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
                   {selectedEntry.weight_unit || ''}
                 </span>
               )}
-              {selectedEntry.color && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 max-w-full">
-                  <span className="font-medium text-gray-500 shrink-0">Color</span>
-                  {colorCodeMap[selectedEntry.color] && (
-                    <ColorSwatch colorCode={colorCodeMap[selectedEntry.color]} className="w-3.5 h-3.5 rounded-sm shrink-0" />
-                  )}
-                  <span className="truncate">{selectedEntry.color}</span>
-                </span>
-              )}
-              {productType === 'product' && selectedEntry.pattern && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 max-w-full">
-                  <span className="font-medium text-gray-500 shrink-0">Pattern</span>
-                  {patternImageMap[selectedEntry.pattern] && (
-                    <img
-                      src={patternImageMap[selectedEntry.pattern]}
-                      alt={selectedEntry.pattern || 'Pattern'}
-                      className="w-5 h-5 rounded object-cover border border-gray-300 shrink-0"
-                    />
-                  )}
-                  <span className="truncate max-w-[160px]">{selectedEntry.pattern}</span>
+              {(selectedEntry.color || (productType === 'product' && selectedEntry.pattern)) && (
+                <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 max-w-full min-w-0">
+                  <span className="font-medium text-gray-500 shrink-0 text-xs">Color & pattern</span>
+                  <ProductAttributePreview
+                    color={selectedEntry.color}
+                    pattern={selectedEntry.pattern}
+                    showPattern={productType === 'product'}
+                    size="large"
+                  />
                 </span>
               )}
               {selectedEntry.category && (

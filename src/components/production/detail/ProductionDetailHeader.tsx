@@ -92,7 +92,7 @@ export default function ProductionDetailHeader({
               width={batch.width}
               lengthUnit={batch.length_unit}
               widthUnit={batch.width_unit}
-              compact
+              size="large"
               className="mt-2"
             />
           </div>

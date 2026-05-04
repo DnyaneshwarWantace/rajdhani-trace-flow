@@ -60,11 +60,11 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
     },
     {
       title: 'Total Revenue',
-      value: loading ? '...' : formatCurrency(stats.totalRevenue ?? 0),
+      value: loading ? '...' : formatCurrency(stats.totalRevenue ?? 0, { full: true }),
       icon: DollarSign,
       bgColor: 'bg-green-50',
       iconColor: 'text-green-600',
-      subtext: stats.outstandingAmount > 0 ? `${formatCurrency(stats.outstandingAmount)} pending` : 'All collected',
+      subtext: stats.outstandingAmount > 0 ? `${formatCurrency(stats.outstandingAmount, { full: true })} pending` : 'All collected',
       subtextColor: stats.outstandingAmount > 0 ? 'text-red-600' : 'text-gray-500',
       onClick: undefined as (() => void) | undefined,
     },
@@ -94,7 +94,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
     },
     {
       title: 'Manage Stock',
-      value: loading ? '...' : formatCurrency(stats.manageStockTotalValue ?? 0),
+      value: loading ? '...' : formatCurrency(stats.manageStockTotalValue ?? 0, { full: true }),
       icon: ClipboardList,
       bgColor: 'bg-slate-50',
       iconColor: 'text-slate-600',

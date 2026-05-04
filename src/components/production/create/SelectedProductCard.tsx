@@ -38,6 +38,7 @@ export default function SelectedProductCard({ product, onClear }: SelectedProduc
                 width={product.width}
                 lengthUnit={product.length_unit}
                 widthUnit={product.width_unit}
+                size="large"
                 className="mt-2"
               />
             </div>

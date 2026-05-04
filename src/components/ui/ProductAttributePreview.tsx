@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import ColorSwatch from '@/components/ui/ColorSwatch';
+import ImageViewDialog from '@/components/ui/ImageViewDialog';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 function isMeaningfulString(s?: string | null): boolean {
@@ -10,6 +12,8 @@ function isMeaningfulString(s?: string | null): boolean {
   return low !== 'n/a' && low !== 'na';
 }
 
+export type ProductAttributePreviewSize = 'compact' | 'default' | 'large';
+
 export type ProductAttributePreviewProps = {
   color?: string | null;
   pattern?: string | null;
@@ -19,7 +23,12 @@ export type ProductAttributePreviewProps = {
   lengthUnit?: string | null;
   widthUnit?: string | null;
   className?: string;
+  /** Small chips for dense tables. */
   compact?: boolean;
+  /** Visual scale: `default` matches product list (w-8 swatch & pattern). `large` for detail headers. */
+  size?: ProductAttributePreviewSize;
+  /** When true (default), clicking the pattern thumbnail opens a full-size dialog. */
+  patternLightbox?: boolean;
 };
 
 export default function ProductAttributePreview({
@@ -32,8 +41,13 @@ export default function ProductAttributePreview({
   widthUnit,
   className,
   compact = false,
+  size: sizeProp,
+  patternLightbox = true,
 }: ProductAttributePreviewProps) {
   const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null);
+
+  const resolvedSize: ProductAttributePreviewSize = compact ? 'compact' : (sizeProp ?? 'default');
 
   const hasSize = isMeaningfulString(length) && isMeaningfulString(width);
   const hasColor = isMeaningfulString(color);
@@ -43,38 +57,87 @@ export default function ProductAttributePreview({
 
   const colorKey = hasColor ? String(color).trim() : '';
   const patternKey = hasPattern ? String(pattern).trim() : '';
-  const swatchCls = compact ? 'w-3 h-3 rounded-sm shrink-0' : 'w-3.5 h-3.5 rounded-sm shrink-0';
-  const imgCls = compact
-    ? 'w-3.5 h-3.5 rounded object-cover border border-gray-200 shrink-0'
-    : 'w-4 h-4 rounded object-cover border border-gray-300 shrink-0';
-  const textCls = compact ? 'text-[10px] text-gray-600 truncate max-w-[100px]' : 'text-xs text-gray-700 truncate max-w-[160px]';
+  const patternUrl = hasPattern && patternImageMap[patternKey] ? patternImageMap[patternKey] : '';
+
+  const styles = {
+    compact: {
+      wrap: 'gap-1',
+      swatch: 'w-3 h-3 rounded-sm shrink-0',
+      img: 'w-3.5 h-3.5 rounded object-cover border border-gray-200 shrink-0',
+      text: 'text-[10px] text-gray-600 truncate max-w-[100px]',
+    },
+    default: {
+      wrap: 'gap-2',
+      swatch: 'w-8 h-8 rounded-md shrink-0',
+      img: 'w-8 h-8 rounded-md object-cover border border-gray-300 shrink-0',
+      text: 'text-sm text-gray-700 truncate max-w-[200px]',
+    },
+    large: {
+      wrap: 'gap-2.5',
+      swatch: 'w-10 h-10 rounded-lg shrink-0',
+      img: 'w-12 h-12 rounded-lg object-cover border border-gray-300 shrink-0',
+      text: 'text-sm text-gray-800 truncate max-w-[240px]',
+    },
+  }[resolvedSize];
+
+  const showColorLabel = resolvedSize === 'compact' ? !colorCodeMap[colorKey] : true;
+  const showPatternLabel = resolvedSize === 'compact' ? !patternUrl : true;
+
+  const openPattern = (e: React.MouseEvent) => {
+    if (!patternLightbox || !patternUrl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setLightbox({ url: patternUrl, alt: patternKey });
+  };
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      {hasSize && (
-        <span
-          className={cn(textCls, 'tabular-nums')}
-          title={`${length}${lengthUnit || ''} × ${width}${widthUnit || ''}`}
-        >
-          {length}
-          {lengthUnit || ''}×{width}
-          {widthUnit || ''}
-        </span>
+    <>
+      <div className={cn('flex flex-wrap items-center', styles.wrap, className)}>
+        {hasSize && (
+          <span
+            className={cn(styles.text, 'tabular-nums')}
+            title={`${length}${lengthUnit || ''} × ${width}${widthUnit || ''}`}
+          >
+            {length}
+            {lengthUnit || ''}×{width}
+            {widthUnit || ''}
+          </span>
+        )}
+        {hasColor && (
+          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={colorKey}>
+            {colorCodeMap[colorKey] && <ColorSwatch colorCode={colorCodeMap[colorKey]} className={styles.swatch} />}
+            {showColorLabel && <span className={styles.text}>{colorKey}</span>}
+          </span>
+        )}
+        {hasPattern && (
+          <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full" title={patternKey}>
+            {patternUrl &&
+              (patternLightbox ? (
+                <button
+                  type="button"
+                  className="p-0 border-0 bg-transparent leading-none cursor-zoom-in hover:opacity-90 transition-opacity"
+                  onClick={openPattern}
+                  title={`View ${patternKey}`}
+                >
+                  <img src={patternUrl} alt="" className={styles.img} />
+                </button>
+              ) : (
+                <img src={patternUrl} alt="" className={styles.img} title={patternKey} />
+              ))}
+            {showPatternLabel && <span className={styles.text}>{patternKey}</span>}
+          </span>
+        )}
+      </div>
+
+      {lightbox && (
+        <ImageViewDialog
+          isOpen={!!lightbox}
+          onClose={() => setLightbox(null)}
+          imageUrl={lightbox.url}
+          alt={lightbox.alt}
+          caption={lightbox.alt}
+        />
       )}
-      {hasColor && (
-        <span className="inline-flex items-center gap-1 min-w-0 max-w-full" title={colorKey}>
-          {colorCodeMap[colorKey] && <ColorSwatch colorCode={colorCodeMap[colorKey]} className={swatchCls} />}
-          {(!compact || !colorCodeMap[colorKey]) && <span className={textCls}>{colorKey}</span>}
-        </span>
-      )}
-      {hasPattern && (
-        <span className="inline-flex items-center gap-1 min-w-0 max-w-full" title={patternKey}>
-          {patternImageMap[patternKey] && (
-            <img src={patternImageMap[patternKey]} alt="" className={imgCls} title={patternKey} />
-          )}
-          {(!compact || !patternImageMap[patternKey]) && <span className={textCls}>{patternKey}</span>}
-        </span>
-      )}
-    </div>
+    </>
   );
 }

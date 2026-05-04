@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import type { ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { formatCurrency } from '@/utils/formatHelpers';
 import OrderItemForm from './OrderItemForm';
-import ColorSwatch from '@/components/ui/ColorSwatch';
-import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 // Carpet/roll icon for empty state
 const CarpetRollIcon = () => (
@@ -16,7 +15,7 @@ const CarpetRollIcon = () => (
   </svg>
 );
 
-const ITEM_GRID = '28px minmax(0,1fr) 72px 72px 56px 72px 96px 80px 88px 56px';
+const ITEM_GRID = '28px minmax(0,1fr) 72px 72px 56px 72px 128px 80px 88px 56px';
 
 function CollapsedItemSummary({
   item,
@@ -41,7 +40,6 @@ function CollapsedItemSummary({
   showColor: boolean;
   showRate: boolean;
 }) {
-  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const p = selectedProduct;
   const unitLabel = item.product_type === 'raw_material' ? (p?.unit || 'units') : (p?.count_unit || 'rolls');
   const pricingUnitLabel = item.pricing_unit === 'unit' ? unitLabel : (item.pricing_unit || unitLabel);
@@ -70,36 +68,21 @@ function CollapsedItemSummary({
           {item.product_name || <span className="text-slate-400 font-normal">Select product</span>}
         </p>
         {p && (p.color || (item.product_type === 'product' && p.pattern)) && (
-          <div className="flex items-center gap-1 mt-0.5 min-h-[16px]">
-            {p.color && colorCodeMap[p.color] && (
-              <ColorSwatch colorCode={colorCodeMap[p.color]} className="w-3 h-3 rounded-sm shrink-0" />
-            )}
-            {item.product_type === 'product' && p.pattern && patternImageMap[p.pattern] && (
-              <img
-                src={patternImageMap[p.pattern]}
-                alt={p.pattern || 'Pattern'}
-                className="w-4 h-4 rounded object-cover border border-slate-200 shrink-0"
-              />
-            )}
-            {item.product_type === 'product' && p.pattern && !patternImageMap[p.pattern] && (
-              <span className="text-[10px] text-slate-500 truncate max-w-[100px]" title={p.pattern}>
-                {p.pattern}
-              </span>
-            )}
+          <div className="mt-1 min-h-[2rem] flex items-center" onClick={(e) => e.stopPropagation()}>
+            <ProductAttributePreview
+              color={p.color}
+              pattern={p.pattern}
+              showPattern={item.product_type === 'product'}
+            />
           </div>
         )}
       </div>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showLength ? (specMap['Length'] || '—') : ''}</span>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showWidth  ? (specMap['Width']  || '—') : ''}</span>
       <span className="text-sm text-slate-700 tabular-nums text-right">{showGSM    ? (specMap['GSM']    || '—') : ''}</span>
-      <span className="text-sm text-slate-700 truncate text-right flex items-center justify-end gap-1 min-w-0">
+      <span className="text-sm text-slate-700 truncate text-right flex items-center justify-end gap-1 min-w-0" onClick={(e) => e.stopPropagation()}>
         {showColor && p?.color ? (
-          <>
-            {colorCodeMap[p.color] && (
-              <ColorSwatch colorCode={colorCodeMap[p.color]} className="w-3 h-3 rounded-sm shrink-0" />
-            )}
-            <span className="truncate">{p.color}</span>
-          </>
+          <ProductAttributePreview color={p.color} showPattern={false} />
         ) : (
           showColor ? '—' : ''
         )}

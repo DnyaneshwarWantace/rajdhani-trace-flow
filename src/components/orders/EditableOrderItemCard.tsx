@@ -6,8 +6,7 @@ import { Package, Edit, Check, X, QrCode, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
-import ColorSwatch from '@/components/ui/ColorSwatch';
-import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductDetails {
   color?: string;
@@ -63,7 +62,6 @@ export function EditableOrderItemCard({
   onSelectIndividualProducts,
   onDeleteItem,
 }: EditableOrderItemCardProps) {
-  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [editedQuantity, setEditedQuantity] = useState<number | string>(item.quantity);
   const [isSaving, setIsSaving] = useState(false);
@@ -142,7 +140,7 @@ export function EditableOrderItemCard({
           </div>
 
           {/* Product Details */}
-          {(length || width || weight || color || pattern || category) && (
+          {(length || width || weight || category) && (
             <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-600">
               {length && width && (
                 <div>
@@ -155,29 +153,22 @@ export function EditableOrderItemCard({
                   <span className="font-medium">GSM:</span> {weight}{weight_unit || ''}
                 </div>
               )}
-              {color && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">Color:</span>
-                  {colorCodeMap[color] && (
-                    <ColorSwatch colorCode={colorCodeMap[color]} className="w-3.5 h-3.5 rounded-sm" />
-                  )}
-                  {color}
-                </div>
-              )}
-              {pattern && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">Pattern:</span>
-                  {patternImageMap[pattern] && (
-                    <img src={patternImageMap[pattern]} alt={pattern} className="w-5 h-5 rounded object-cover border border-gray-300" />
-                  )}
-                  {pattern}
-                </div>
-              )}
               {category && (
                 <div>
                   <span className="font-medium">Category:</span> {category}
                 </div>
               )}
+            </div>
+          )}
+          {(color || (item.product_type === 'product' && pattern)) && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Color & pattern</span>
+              <ProductAttributePreview
+                color={color}
+                pattern={pattern}
+                showPattern={item.product_type === 'product'}
+                size="large"
+              />
             </div>
           )}
         </div>

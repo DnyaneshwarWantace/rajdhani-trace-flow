@@ -102,7 +102,7 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
                 <div className="flex items-center gap-3 ml-3">
                   <div className="text-right">
                     <span className="text-base font-bold text-gray-900 whitespace-nowrap block">
-                      {formatCurrency(order.totalCost)}
+                      {formatCurrency(order.totalCost, { full: true })}
                     </span>
                   </div>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color} whitespace-nowrap flex items-center gap-1`}>

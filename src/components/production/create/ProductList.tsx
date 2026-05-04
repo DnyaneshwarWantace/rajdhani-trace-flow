@@ -199,7 +199,6 @@ export default function ProductList({
                               width={product.width}
                               lengthUnit={product.length_unit}
                               widthUnit={product.width_unit}
-                              compact
                               className="max-w-full"
                             />
                           ) : (

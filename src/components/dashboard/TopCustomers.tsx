@@ -76,7 +76,7 @@ export default function TopCustomers({ customers, loading }: TopCustomersProps) 
                   <TrendingUp className="w-4 h-4 text-green-600" />
                 )}
                 <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                  {formatCurrency(customer.totalRevenue)}
+                  {formatCurrency(customer.totalRevenue, { full: true })}
                 </span>
               </div>
             </div>

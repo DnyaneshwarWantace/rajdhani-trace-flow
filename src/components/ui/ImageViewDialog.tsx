@@ -17,7 +17,7 @@ export default function ImageViewDialog({
   caption,
 }: ImageViewDialogProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         customLayout
         className="max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border border-gray-200 bg-white shadow-xl rounded-lg"

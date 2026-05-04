@@ -9,8 +9,7 @@ import { useEffect, useState } from 'react';
 import SendToProductionModal from '@/components/production/SendToProductionModal';
 import AssignMaterialTaskModal from '@/components/orders/AssignMaterialTaskModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import ColorSwatch from '@/components/ui/ColorSwatch';
-import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface OrderCardProps {
   order: Order;
@@ -33,7 +32,6 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
   const status = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   const navigate = useNavigate();
-  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
   const [rawStatuses, setRawStatuses] = useState<any[]>([]);
   const [sendToProductionItem, setSendToProductionItem] = useState<any | null>(null);
   const [pickProductOpen, setPickProductOpen] = useState(false);
@@ -290,27 +288,23 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
                                   {gsm && <span className="text-purple-600 ml-1">({gsm})</span>}
                                 </div>
                               )}
-                              {/* Color */}
-                              {item.color && (
-                                <div className="flex items-center gap-1">
-                                  <span className="font-medium">Color:</span>
-                                  {colorCodeMap[item.color] && (
-                                    <ColorSwatch colorCode={colorCodeMap[item.color]} className="w-3.5 h-3.5 rounded-sm" />
-                                  )}
-                                  {item.color}
-                                </div>
-                              )}
-                              {/* Pattern */}
-                              {item.pattern && (
-                                <div className="flex items-center gap-1">
-                                  <span className="font-medium">Pattern:</span>
-                                  {patternImageMap[item.pattern] && (
-                                    <img src={patternImageMap[item.pattern]} alt={item.pattern} className="w-5 h-5 rounded object-cover border border-gray-300" />
-                                  )}
-                                  {item.pattern}
+                              {(item.color || item.pattern) && (
+                                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                  <span className="font-medium shrink-0">Color & pattern</span>
+                                  <ProductAttributePreview
+                                    color={item.color}
+                                    pattern={item.pattern}
+                                    showPattern
+                                  />
                                 </div>
                               )}
                             </>
+                          )}
+                          {item.productType === 'raw_material' && item.color && (
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <span className="font-medium shrink-0">Color</span>
+                              <ProductAttributePreview color={item.color} showPattern={false} />
+                            </div>
                           )}
                         </div>
                       </div>

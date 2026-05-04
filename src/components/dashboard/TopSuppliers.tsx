@@ -76,7 +76,7 @@ export default function TopSuppliers({ suppliers, loading }: TopSuppliersProps) 
 
               <div className="flex items-center gap-2 ml-3">
                 <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                  {formatCurrency(supplier.totalSpent)}
+                  {formatCurrency(supplier.totalSpent, { full: true })}
                 </span>
               </div>
             </div>

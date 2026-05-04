@@ -135,6 +135,7 @@ export default function BatchDetailsForm({
                 <ProductAttributePreview
                   color={selectedProduct.color}
                   pattern={selectedProduct.pattern}
+                  size="large"
                   className="min-w-0 flex-1"
                 />
               </div>

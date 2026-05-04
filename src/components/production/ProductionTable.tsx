@@ -320,7 +320,6 @@ export default function ProductionTable({
                     width={batch.width}
                     lengthUnit={batch.length_unit}
                     widthUnit={batch.width_unit}
-                    compact
                     className="mt-1"
                   />
                 </td>
