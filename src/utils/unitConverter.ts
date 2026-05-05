@@ -365,18 +365,43 @@ export function calculatePricingUnitQuantity(
 }
 
 /**
+ * Canonical display labels for each unit.
+ * Whatever the user typed, we show this consistent label.
+ */
+export const UNIT_DISPLAY: Record<string, string> = {
+  m: 'm', meter: 'm', meters: 'm', metre: 'm', metres: 'm',
+  mr: 'm', mtr: 'm', mts: 'm', mtr.: 'm',
+  cm: 'cm', centimeter: 'cm', centimeters: 'cm', centimetre: 'cm', centimetres: 'cm',
+  mm: 'mm', millimeter: 'mm', millimeters: 'mm', millimetre: 'mm', millimetres: 'mm',
+  ft: 'feet', feet: 'feet', foot: 'feet',
+  in: 'inches', inch: 'inches', inches: 'inches',
+  yd: 'yards', yard: 'yards', yards: 'yards',
+};
+
+/**
+ * Normalizes any unit variant the user typed to a canonical stored/display value.
+ * e.g. "M", "mtr", "Meter", "metre" → "m"
+ *      "Centimeter", "CM" → "cm"
+ * Unknown units are returned as-is (trimmed, lowercased).
+ */
+export function normalizeUnit(unit: string): string {
+  if (!unit) return 'm';
+  const key = unit.trim().toLowerCase().replace(/\.$/, ''); // strip trailing dot
+  return UNIT_DISPLAY[key] ?? key;
+}
+
+/**
  * Convert value to meters
  */
 export function convertToMeters(value: number, unit: string): number {
-  const unitLower = unit.toLowerCase();
-  switch (unitLower) {
+  const u = normalizeUnit(unit);
+  switch (u) {
     case 'mm': return value / 1000;
-    case 'cm': case 'centimeters': return value / 100;
-    case 'feet': case 'ft': return value * 0.3048;
-    case 'inches': case 'in': return value * 0.0254;
-    case 'yards': case 'yd': return value * 0.9144;
-    case 'm': case 'meter': case 'meters': return value;
-    default: return value; // Assume meters if unknown
+    case 'cm': return value / 100;
+    case 'feet': return value * 0.3048;
+    case 'inches': return value * 0.0254;
+    case 'yards': return value * 0.9144;
+    default: return value; // 'm' or unknown → assume meters
   }
 }
 
@@ -384,15 +409,14 @@ export function convertToMeters(value: number, unit: string): number {
  * Convert value to feet
  */
 export function convertToFeet(value: number, unit: string): number {
-  const unitLower = unit.toLowerCase();
-  switch (unitLower) {
+  const u = normalizeUnit(unit);
+  switch (u) {
     case 'mm': return value / 304.8;
-    case 'cm': case 'centimeters': return value / 30.48;
-    case 'm': case 'meter': case 'meters': return value * 3.28084;
-    case 'inches': case 'in': return value / 12;
-    case 'yards': case 'yd': return value * 3;
-    case 'feet': case 'ft': return value;
-    default: return value; // Assume feet if unknown
+    case 'cm': return value / 30.48;
+    case 'feet': return value;
+    case 'inches': return value / 12;
+    case 'yards': return value * 3;
+    default: return value * 3.28084; // 'm' or unknown → treat as meters
   }
 }
 
