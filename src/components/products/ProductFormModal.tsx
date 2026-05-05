@@ -360,15 +360,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     setRecipeMaterials(recipeMaterials.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
 
-    // Only proceed if this is an intentional submit (user clicked the submit button)
-    if (!isSubmitting) {
-      return;
-    }
+    if (loading || isSubmitting) return;
 
+    setIsSubmitting(true);
     setLoading(true);
     setError(null);
 
@@ -854,10 +851,10 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
               </button>
             ) : (
               <button
-                type="submit"
-                disabled={loading}
-                className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-sm font-semibold text-white flex items-center gap-2 transition-colors"
-                onClick={() => setIsSubmitting(true)}
+                type="button"
+                disabled={loading || isSubmitting}
+                className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white flex items-center gap-2 transition-colors"
+                onClick={handleSubmit}
               >
                 {loading
                   ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />{mode === 'create' ? 'Creating…' : 'Saving…'}</>
