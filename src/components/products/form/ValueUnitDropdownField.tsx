@@ -33,6 +33,14 @@ interface ValueUnitDropdownFieldProps {
   fieldName?: string;
 }
 
+// Display a combined value with normalized unit, e.g. "5 m" → "5 Meter"
+const displayCombined = (combinedValue: string): string => {
+  if (!combinedValue) return combinedValue;
+  const match = combinedValue.trim().match(/^([\d.]+)\s+(.+)$/);
+  if (match) return `${match[1]} ${normalizeUnit(match[2].trim())}`;
+  return combinedValue;
+};
+
 // Parse combined value like "5 m" into { value: "5", unit: "m" }
 const parseValueWithUnit = (combinedValue: string): { value: string; unit: string } => {
   if (!combinedValue) return { value: '', unit: '' };
@@ -352,7 +360,7 @@ export default function ValueUnitDropdownField({
                       .filter((opt) => opt && opt.trim() !== '')
                       .map((unitOption) => (
                         <SelectItem key={unitOption} value={unitOption}>
-                          {unitOption}
+                          {normalizeUnit(unitOption)}
                         </SelectItem>
                       ))
                   ) : (
@@ -407,7 +415,7 @@ export default function ValueUnitDropdownField({
               disabled={!newValueInput.trim() || !newUnitInput.trim()}
               className="bg-primary-600 hover:bg-primary-700 text-white"
             >
-              Add {newValueInput || 'value'} {newUnitInput || 'unit'}
+              Add {newValueInput || 'value'} {newUnitInput ? normalizeUnit(newUnitInput) : 'unit'}
             </Button>
             <Button
               type="button"
@@ -453,7 +461,7 @@ export default function ValueUnitDropdownField({
       {/* Show current value if it's not in dropdown */}
       {currentCombinedValue && !valueExistsInDropdown && (
         <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-          <span className="text-blue-700">Current: {currentCombinedValue}</span>
+          <span className="text-blue-700">Current: {displayCombined(currentCombinedValue)}</span>
           <span className="text-blue-500 ml-2">(Not in dropdown)</span>
         </div>
       )}
@@ -470,7 +478,7 @@ export default function ValueUnitDropdownField({
       >
         <SelectTrigger>
           <SelectValue
-            placeholder={currentCombinedValue || `Select ${label.toLowerCase()}`}
+            placeholder={displayCombined(currentCombinedValue) || `Select ${label.toLowerCase()}`}
           />
         </SelectTrigger>
         <SelectContent>
@@ -500,7 +508,7 @@ export default function ValueUnitDropdownField({
             filteredValues.map((combinedValue) => (
               <div key={combinedValue} className="relative flex items-center">
                 <SelectItem value={combinedValue} className="flex-1 pr-8">
-                  <span className="truncate block max-w-[200px] text-sm">{combinedValue}</span>
+                  <span className="truncate block max-w-[200px] text-sm">{displayCombined(combinedValue)}</span>
                 </SelectItem>
                 <Button
                   type="button"
