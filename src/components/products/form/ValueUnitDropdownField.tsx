@@ -13,6 +13,7 @@ import { Trash2, Plus } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
+import { normalizeUnit } from '@/utils/unitConverter';
 
 interface ValueUnitDropdownFieldProps {
   label: string;
@@ -117,12 +118,12 @@ export default function ValueUnitDropdownField({
       setSearchTerm('');
     } else {
       const parsed = parseValueWithUnit(selectedValue);
-      // Use combined change callback if available (better for React state updates)
+      const normalizedUnit = parsed.unit ? normalizeUnit(parsed.unit) : '';
       if (onCombinedChange) {
-        onCombinedChange(parsed.value || '', parsed.unit || '');
+        onCombinedChange(parsed.value || '', normalizedUnit);
       } else {
         onValueChange(parsed.value || '');
-        onUnitChange(parsed.unit || '');
+        onUnitChange(normalizedUnit);
       }
       setSearchTerm('');
     }
@@ -140,17 +141,18 @@ export default function ValueUnitDropdownField({
     }
 
     try {
-      const combinedValue = `${newValueInput.trim()} ${newUnitInput.trim()}`;
+      const normalizedNewUnit = normalizeUnit(newUnitInput.trim());
+      const combinedValue = `${newValueInput.trim()} ${normalizedNewUnit}`;
 
       // If unit is new, add it to unit dropdown first
-      if (!unitOptions.includes(newUnitInput.trim())) {
+      if (!unitOptions.includes(normalizedNewUnit)) {
         const unitCategory = category === 'length' ? 'length_units' : category === 'width' ? 'width_units' : 'weight_units';
-        const result = await DropdownService.addOption(unitCategory, newUnitInput.trim());
-        
+        const result = await DropdownService.addOption(unitCategory, normalizedNewUnit);
+
         if (category === 'length' || category === 'width') {
           // Also add to singular category for backend validation
           const singularCategory = category === 'length' ? 'length_unit' : 'width_unit';
-          await DropdownService.addOption(singularCategory, newUnitInput.trim());
+          await DropdownService.addOption(singularCategory, normalizedNewUnit);
         }
 
         if (!result.success) {
@@ -169,7 +171,7 @@ export default function ValueUnitDropdownField({
         await onReload();
         // Set the values in the form
         onValueChange(newValueInput.trim());
-        onUnitChange(newUnitInput.trim());
+        onUnitChange(normalizedNewUnit);
         setShowAddNew(false);
         setNewValueInput('');
         setNewUnitInput('');
@@ -206,18 +208,19 @@ export default function ValueUnitDropdownField({
     }
 
     try {
+      const normalizedName = normalizeUnit(newUnitName.trim());
       const unitCategory = category === 'length' ? 'length_units' : category === 'width' ? 'width_units' : 'weight_units';
-      const result = await DropdownService.addOption(unitCategory, newUnitName.trim());
-      
+      const result = await DropdownService.addOption(unitCategory, normalizedName);
+
       if (category === 'length' || category === 'width') {
         // Also add to singular category for backend validation
         const singularCategory = category === 'length' ? 'length_unit' : 'width_unit';
-        await DropdownService.addOption(singularCategory, newUnitName.trim());
+        await DropdownService.addOption(singularCategory, normalizedName);
       }
 
       if (result.success) {
         await onReload();
-        setNewUnitInput(newUnitName.trim());
+        setNewUnitInput(normalizedName);
         setNewUnitName('');
         setShowAddUnit(false);
         toast({
@@ -330,7 +333,7 @@ export default function ValueUnitDropdownField({
                   if (selectedUnit === 'add_new_unit') {
                     setShowAddUnit(true);
                   } else {
-                    setNewUnitInput(selectedUnit);
+                    setNewUnitInput(normalizeUnit(selectedUnit));
                   }
                 }}
               >
@@ -366,14 +369,19 @@ export default function ValueUnitDropdownField({
             <div className="flex gap-2">
               <Input
                 value={newUnitName}
-                onChange={(e) => {
-                  // Only allow letters and spaces
-                  const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                  setNewUnitName(value);
-                }}
-                placeholder="Enter new unit (e.g., feet, m, cm)"
+                onChange={(e) => setNewUnitName(e.target.value)}
+                placeholder="e.g., Meter, Feet, cm, Inches, Yards"
+                list="unit-suggestions"
                 className="flex-1"
               />
+              <datalist id="unit-suggestions">
+                <option value="Meter" />
+                <option value="Feet" />
+                <option value="cm" />
+                <option value="Inches" />
+                <option value="Yards" />
+                <option value="mm" />
+              </datalist>
               <Button type="button" size="sm" onClick={handleAddUnit} className="bg-primary-600 hover:bg-primary-700 text-white">
                 Add Unit
               </Button>
