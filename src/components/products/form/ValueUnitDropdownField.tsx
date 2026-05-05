@@ -437,15 +437,13 @@ export default function ValueUnitDropdownField({
     );
   }
 
-  // Check if current value exists in dropdown options (case-insensitive and trim spaces)
-  const normalizedCurrent = currentCombinedValue.trim().toLowerCase();
+  // Match by normalizing both stored value and current value before comparing
+  const normalizedCurrentDisplay = displayCombined(currentCombinedValue).trim().toLowerCase();
   const valueExistsInDropdown = currentCombinedValue && combinedValues.some(
-    val => val.trim().toLowerCase() === normalizedCurrent
+    val => displayCombined(val).trim().toLowerCase() === normalizedCurrentDisplay
   );
-
-  // Find the exact match from dropdown (with original casing)
   const exactMatch = combinedValues.find(
-    val => val.trim().toLowerCase() === normalizedCurrent
+    val => displayCombined(val).trim().toLowerCase() === normalizedCurrentDisplay
   );
 
   // Always use empty string instead of undefined to keep it controlled

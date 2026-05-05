@@ -196,11 +196,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       const findMatchingValue = (value: string | null | undefined, options: string[]): string => {
         if (!value) return '';
         const trimmed = String(value).trim();
-        // Try exact match first
         if (options.includes(trimmed)) return trimmed;
-        // Try case-insensitive match
         const found = options.find(opt => opt.toLowerCase() === trimmed.toLowerCase());
-        return found || trimmed; // Return original if not found (will be added to dropdown)
+        return found || ''; // Clear value if it doesn't match any option
       };
       
       const unitValue = findMatchingValue(product.unit, units);
