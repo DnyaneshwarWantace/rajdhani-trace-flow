@@ -93,7 +93,6 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     const errs: string[] = [];
     if (!formData.name?.trim()) errs.push('Product Name');
     if (!formData.category?.trim()) errs.push('Category');
-    if (!formData.subcategory?.trim()) errs.push('Subcategory');
     if (!formData.unit?.trim()) errs.push('Unit');
     return errs;
   };
@@ -405,9 +404,7 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       if (!formData.category || formData.category.trim() === '') {
         missingFields.push('Category');
       }
-      if (!formData.subcategory || formData.subcategory.trim() === '') {
-        missingFields.push('Subcategory');
-      }
+      // subcategory is optional — skip validation
       if (!formData.unit || formData.unit.trim() === '') {
         missingFields.push('Unit');
       }
