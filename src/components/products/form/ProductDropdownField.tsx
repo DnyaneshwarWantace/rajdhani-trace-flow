@@ -289,7 +289,7 @@ export default function ProductDropdownField({
       <Label>{label} {required && '*'}</Label>
 
       {/* Show current value if it's not in dropdown */}
-      {value && !valueExistsInOptions && (
+      {value && !valueExistsInOptions && !isNAValue && (
         <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
           <span className="text-blue-700">Current: {value}</span>
           <span className="text-blue-500 ml-2">(Not in dropdown)</span>
