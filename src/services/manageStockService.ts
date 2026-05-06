@@ -173,13 +173,16 @@ export class ManageStockService {
           }
         }
 
+        const id = order.id || order._id || order.order_number;
+        const orderNumber = order.order_number || order.orderNumber || (id ? String(id) : '');
+
         return {
-          id: order.id,
-          order_number: order.order_number,
+          id: String(id ?? ''),
+          order_number: String(orderNumber ?? ''),
           materialName: materialName,
           materialCategory: materialDetails.materialCategory || 'Other',
-          materialBatchNumber: materialDetails.materialBatchNumber || `BATCH-${order.id}`,
-          supplier: order.supplier_name,
+          materialBatchNumber: materialDetails.materialBatchNumber || `BATCH-${id ?? 'NA'}`,
+          supplier: order.supplier_name || order.supplier || '',
           supplier_id: order.supplier_id,
           quantity: displayQuantity,
           unit: unit,

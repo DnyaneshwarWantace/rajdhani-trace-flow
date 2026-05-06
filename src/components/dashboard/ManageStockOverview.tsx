@@ -8,6 +8,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   pending: { label: 'Pending', color: 'bg-gray-100 text-gray-700', icon: Clock },
   approved: { label: 'Approved', color: 'bg-blue-100 text-blue-700', icon: CheckCircle },
   shipped: { label: 'Shipped', color: 'bg-orange-100 text-orange-700', icon: Truck },
+  received: { label: 'Received', color: 'bg-green-100 text-green-700', icon: CheckCircle },
   delivered: { label: 'Delivered', color: 'bg-green-100 text-green-700', icon: CheckCircle },
 };
 
