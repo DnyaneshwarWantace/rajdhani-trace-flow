@@ -136,9 +136,47 @@ export class IndividualProductService {
     };
   }
 
+  private static async assertBatchOpenForIndividualSave(batchIdOrNumber?: string): Promise<void> {
+    if (!batchIdOrNumber) return;
+    try {
+      const response = await fetch(`${API_URL}/production/batches/${batchIdOrNumber}`, {
+        headers: this.getHeaders(),
+      });
+      if (!response.ok) return;
+      const result = await response.json();
+      const batch = result?.data;
+      if (!batch) return;
+
+      const individualStatus = batch.individual_stage?.status;
+      const wastageStatus = batch.wastage_stage?.status;
+      const finalStatus = batch.final_stage?.status;
+      const isClosed =
+        individualStatus === 'completed' ||
+        wastageStatus === 'in_progress' ||
+        wastageStatus === 'completed' ||
+        finalStatus === 'in_progress' ||
+        finalStatus === 'completed';
+
+      if (isClosed) {
+        const completedBy =
+          batch.individual_stage?.completed_by ||
+          batch.wastage_stage?.started_by ||
+          batch.final_stage?.started_by ||
+          'another user';
+        throw new Error(`Individual stage is already completed by ${completedBy}. Refresh this page.`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already completed')) {
+        throw error;
+      }
+    }
+  }
+
   static async createIndividualProduct(
     productData: IndividualProductFormData
   ): Promise<IndividualProduct> {
+    await this.assertBatchOpenForIndividualSave(productData.batch_number);
+
     const response = await fetch(`${API_URL}/individual-products`, {
       method: 'POST',
       headers: this.getHeaders(),
