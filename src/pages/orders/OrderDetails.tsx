@@ -504,6 +504,13 @@ export default function OrderDetails() {
 
   const handleConfirmDispatch = async () => {
     if (!id) return;
+    // Fetch fresh status before dispatching to prevent duplicate action
+    const { data: fresh } = await OrderService.getOrderById(id);
+    if (fresh?.order?.status && fresh.order.status !== 'accepted' && fresh.order.status !== 'pending') {
+      toast({ title: 'Already Updated', description: `Order is already "${fresh.order.status}". Refreshing...` });
+      await loadOrderDetails();
+      return;
+    }
     setDispatchingOrder(true);
     try {
       const API_URL = getApiUrl();
@@ -567,7 +574,13 @@ export default function OrderDetails() {
 
   const handleDeliverOrder = async () => {
     if (!id) return;
-
+    // Fetch fresh status before marking delivered to prevent duplicate action
+    const { data: fresh } = await OrderService.getOrderById(id);
+    if (fresh?.order?.status && fresh.order.status !== 'dispatched') {
+      toast({ title: 'Already Updated', description: `Order is already "${fresh.order.status}". Refreshing...` });
+      await loadOrderDetails();
+      return;
+    }
     try {
       const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');

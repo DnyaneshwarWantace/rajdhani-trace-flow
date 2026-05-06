@@ -243,6 +243,17 @@ export default function ProductionWastage() {
       if (batchData) {
         console.log('✅ Batch loaded:', batchData.batch_number);
 
+        // Stage redirect guard: if wastage/final already completed, go back to production list
+        if (batchData.wastage_stage?.status === 'completed' || batchData.final_stage?.status === 'completed') {
+          const completedBy = batchData.wastage_stage?.completed_by || batchData.final_stage?.completed_by || 'another user';
+          toast({
+            title: 'Stage Already Completed',
+            description: `This batch was already completed by ${completedBy}.`,
+          });
+          navigate('/production', { replace: true, state: { section: location.state?.section || 'assigned' } });
+          return;
+        }
+
         // CRITICAL FIX: Fix stage statuses if inconsistent
         const planningStageStatus = batchData.planning_stage?.status;
         const machineStageStatus = batchData.machine_stage?.status;
