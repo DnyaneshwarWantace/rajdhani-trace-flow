@@ -5,6 +5,7 @@ import { Hash, Package, Calendar, User, Building2 } from 'lucide-react';
 import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { ProductionBatch } from '@/services/productionService';
 import { OrderService } from '@/services/orderService';
+import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductionDetailInfoProps {
   batch: ProductionBatch;
@@ -108,8 +109,6 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       label: 'Expected GSM',
       value: batch.weight && batch.weight !== 'N/A' ? `${batch.weight} ${batch.weight_unit || ''}` : 'N/A',
     },
-    { label: 'Color', value: batch.color && batch.color !== 'N/A' ? batch.color : 'N/A' },
-    { label: 'Pattern', value: batch.pattern && batch.pattern !== 'N/A' ? batch.pattern : 'N/A' },
   ];
 
   const infoItems = [
@@ -189,6 +188,15 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
               </p>
             </div>
           ))}
+        </div>
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3">
+          <p className="text-xs font-medium text-gray-600 mb-2">Appearance</p>
+          <ProductAttributePreview
+            color={batch.color}
+            pattern={batch.pattern}
+            size="large"
+            className="justify-end"
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {infoItems.map((item, index) => {
