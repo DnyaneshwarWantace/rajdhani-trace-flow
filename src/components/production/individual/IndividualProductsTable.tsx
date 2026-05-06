@@ -325,10 +325,17 @@ export default function IndividualProductsTable({
       updated[rowIndex] = newProduct;
       setLocalProductsSync(updated);
 
-      toast({
-        title: 'Saved to Stock',
-        description: `Roll ${newProduct.roll_number || newProduct.id} added and QR generated.`,
-      });
+      if (newProduct._batchCount?.over) {
+        toast({
+          title: 'Extra Roll Saved',
+          description: `Roll saved. You now have ${newProduct._batchCount.saved} rolls — ${newProduct._batchCount.saved - newProduct._batchCount.planned} more than planned (${newProduct._batchCount.planned}).`,
+        });
+      } else {
+        toast({
+          title: 'Saved to Stock',
+          description: `Roll ${newProduct.roll_number || newProduct.id} added and QR generated.`,
+        });
+      }
       onUpdate?.();
     } catch (error) {
       console.error('Error creating individual product:', error);
@@ -336,10 +343,6 @@ export default function IndividualProductsTable({
       if (msg.toLowerCase().includes('already completed')) {
         onStageCompleted?.();
         toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-      } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-        // Quota reached — refresh so this user sees what others saved
-        onUpdate?.();
-        toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
       } else {
         toast({ title: 'Error', description: msg, variant: 'destructive' });
       }
@@ -602,9 +605,6 @@ export default function IndividualProductsTable({
             if (msg.toLowerCase().includes('already completed')) {
               onStageCompleted?.();
               toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-            } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-              onUpdate?.();
-              toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
             } else {
               toast({ title: 'Error', description: msg, variant: 'destructive' });
             }
@@ -711,9 +711,6 @@ export default function IndividualProductsTable({
             if (msg.toLowerCase().includes('already completed')) {
               onStageCompleted?.();
               toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-            } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-              onUpdate?.();
-              toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
             } else {
               toast({ title: 'Error', description: msg, variant: 'destructive' });
             }
@@ -878,9 +875,6 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-          onUpdate?.();
-          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -988,9 +982,6 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-          onUpdate?.();
-          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -1104,9 +1095,6 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-          onUpdate?.();
-          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -1274,9 +1262,6 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
-        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
-          onUpdate?.();
-          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }

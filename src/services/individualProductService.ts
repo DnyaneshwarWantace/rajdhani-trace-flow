@@ -174,7 +174,7 @@ export class IndividualProductService {
 
   static async createIndividualProduct(
     productData: IndividualProductFormData
-  ): Promise<IndividualProduct> {
+  ): Promise<IndividualProduct & { _batchCount?: { saved: number; planned: number; over: boolean } }> {
     await this.assertBatchOpenForIndividualSave(productData.batch_number);
 
     const response = await fetch(`${API_URL}/individual-products`, {
@@ -189,7 +189,9 @@ export class IndividualProductService {
     }
 
     const data = await response.json();
-    return data.data;
+    const product = data.data as IndividualProduct & { _batchCount?: { saved: number; planned: number; over: boolean } };
+    if (data.batch_count) product._batchCount = data.batch_count;
+    return product;
   }
 
   static async updateIndividualProduct(
