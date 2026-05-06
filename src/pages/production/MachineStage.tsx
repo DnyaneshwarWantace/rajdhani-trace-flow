@@ -79,8 +79,8 @@ export default function MachineStage() {
         }
 
         // CRITICAL FIX: If we're on machine page but planning_stage is not completed, fix it
-        const planningStageStatus = batchData.planning_stage?.status;
-        const machineStageStatus = batchData.machine_stage?.status;
+        const planningStageStatus = batchData.planning_stage?.status as string | undefined;
+        const machineStageStatus = batchData.machine_stage?.status as string | undefined;
 
         if (planningStageStatus !== 'completed' && (machineStageStatus === 'in_progress' || machineStageStatus === 'completed' || batchData.status === 'in_production')) {
           console.log('⚠️ Planning stage is not marked as completed, but machine stage is active. Fixing planning_stage status...');

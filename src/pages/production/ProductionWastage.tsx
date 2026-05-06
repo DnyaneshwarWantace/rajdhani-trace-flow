@@ -255,9 +255,9 @@ export default function ProductionWastage() {
         }
 
         // CRITICAL FIX: Fix stage statuses if inconsistent
-        const planningStageStatus = batchData.planning_stage?.status;
-        const machineStageStatus = batchData.machine_stage?.status;
-        const wastageStageStatus = batchData.wastage_stage?.status;
+        const planningStageStatus = batchData.planning_stage?.status as string | undefined;
+        const machineStageStatus = batchData.machine_stage?.status as string | undefined;
+        const wastageStageStatus = batchData.wastage_stage?.status as string | undefined;
 
         let needsUpdate = false;
         const updateData: any = {};
