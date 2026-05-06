@@ -211,6 +211,64 @@ export class ManageStockService {
   }
 
   /**
+   * Get recent restock entries for dashboard.
+   * Falls back to raw-material purchase-history when purchase-orders are empty.
+   */
+  static async getRecentRestockOrders(limit = 5): Promise<{ data: StockOrder[]; count: number }> {
+    const direct = await this.getOrders({ limit });
+    if ((direct.data || []).length > 0) {
+      return direct;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(
+        `${API_URL}/raw-materials/purchase-history?limit=${limit}&offset=0`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      if (!response.ok) {
+        return { data: [], count: 0 };
+      }
+
+      const result = await response.json();
+      const records = result.data || [];
+
+      const mapped = records.map((r: any, idx: number) => ({
+        id: String(r.id || r._id || `hist-${idx}`),
+        order_number: String(r.invoice_number || r.id || `RESTOCK-${idx + 1}`),
+        materialName: r.material_name || 'Material Restock',
+        materialCategory: '',
+        materialBatchNumber: '',
+        supplier: r.supplier_name || '',
+        supplier_id: '',
+        quantity: Number(r.quantity || 0),
+        unit: r.unit || 'units',
+        costPerUnit: Number(r.cost_per_unit || 0),
+        totalCost: Number(r.total_cost || 0),
+        orderDate: r.createdAt || r.created_at || '',
+        expectedDelivery: '',
+        status: 'received',
+        notes: r.notes || '',
+        actualDelivery: r.createdAt || r.created_at || '',
+        minThreshold: undefined,
+        maxCapacity: undefined,
+        isRestock: true,
+      })) as StockOrder[];
+
+      return { data: mapped, count: result.count || mapped.length };
+    } catch (error) {
+      console.error('Error fetching fallback restock history:', error);
+      return { data: [], count: 0 };
+    }
+  }
+
+  /**
    * Get order by ID
    */
   static async getOrderById(orderId: string): Promise<StockOrder | null> {

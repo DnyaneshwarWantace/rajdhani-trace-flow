@@ -180,7 +180,7 @@ export default function Dashboard() {
         MaterialService.getMaterialStats().catch(() => ({ totalMaterials: 0, inStock: 0, lowStock: 0, outOfStock: 0, overstock: 0, totalValue: 0, averageValue: 0 })),
         ManageStockService.getOrderStats().catch(() => ({ totalOrders: 0, totalValue: 0, pendingOrders: 0, approvedOrders: 0, shippedOrders: 0, deliveredOrders: 0 })),
         OrderService.getOrderStats().catch(() => ({ data: null, error: null })),
-        ManageStockService.getOrders({ limit: 5 }).catch(() => ({ data: [] })),
+        ManageStockService.getRecentRestockOrders(5).catch(() => ({ data: [] })),
       ]);
 
       // Process products data

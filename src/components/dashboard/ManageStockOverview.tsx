@@ -31,7 +31,7 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
   useEffect(() => {
     if (useParentData) return;
     let cancelled = false;
-    ManageStockService.getOrders({ limit: 5 })
+    ManageStockService.getRecentRestockOrders(5)
       .then(({ data }) => {
         if (!cancelled) setOrders(data || []);
       })
