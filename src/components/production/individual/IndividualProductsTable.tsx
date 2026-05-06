@@ -336,6 +336,10 @@ export default function IndividualProductsTable({
       if (msg.toLowerCase().includes('already completed')) {
         onStageCompleted?.();
         toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+      } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+        // Quota reached — refresh so this user sees what others saved
+        onUpdate?.();
+        toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
       } else {
         toast({ title: 'Error', description: msg, variant: 'destructive' });
       }
@@ -598,6 +602,9 @@ export default function IndividualProductsTable({
             if (msg.toLowerCase().includes('already completed')) {
               onStageCompleted?.();
               toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+            } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+              onUpdate?.();
+              toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
             } else {
               toast({ title: 'Error', description: msg, variant: 'destructive' });
             }
@@ -704,6 +711,9 @@ export default function IndividualProductsTable({
             if (msg.toLowerCase().includes('already completed')) {
               onStageCompleted?.();
               toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+            } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+              onUpdate?.();
+              toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
             } else {
               toast({ title: 'Error', description: msg, variant: 'destructive' });
             }
@@ -868,6 +878,9 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+          onUpdate?.();
+          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -975,6 +988,9 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+          onUpdate?.();
+          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -1088,6 +1104,9 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+          onUpdate?.();
+          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
@@ -1255,6 +1274,9 @@ export default function IndividualProductsTable({
         if (msg.toLowerCase().includes('already completed')) {
           onStageCompleted?.();
           toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else if (msg.toLowerCase().includes('already has') && msg.toLowerCase().includes('planned rolls')) {
+          onUpdate?.();
+          toast({ title: 'Quota Reached', description: msg + ' Refreshing...', variant: 'destructive' });
         } else {
           toast({ title: 'Error', description: msg, variant: 'destructive' });
         }
