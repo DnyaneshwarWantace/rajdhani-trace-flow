@@ -205,7 +205,7 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
                   <p className="text-xs font-medium text-gray-600 mb-1">{item.label}</p>
                   <p className="text-sm font-semibold text-gray-900 break-words">
                     {item.truncate && item.value !== 'N/A' ? (
-                      <TruncatedText text={item.value} maxLength={item.maxLength || 40} as="span" />
+                      <TruncatedText text={item.value} maxLength={40} as="span" />
                     ) : (
                       item.value
                     )}
