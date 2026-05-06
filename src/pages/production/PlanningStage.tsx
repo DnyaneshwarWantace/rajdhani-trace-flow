@@ -2065,7 +2065,8 @@ export default function PlanningStage() {
             }
 
             // Navigate to machine stage ONLY if ALL steps succeeded
-            navigate(`/production/${batch.id}/machine`);
+            // replace:true removes planning page from history so back button can't return to it
+            navigate(`/production/${batch.id}/machine`, { replace: true });
           } catch (error) {
             console.error('Error creating batch:', error);
             const errorMsg = error instanceof Error ? error.message : 'Unknown error';

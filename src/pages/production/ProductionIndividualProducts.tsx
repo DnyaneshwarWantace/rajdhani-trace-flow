@@ -329,7 +329,7 @@ export default function ProductionIndividualProducts() {
     } catch (e) {
       console.error('Error setting individual/wastage stage:', e);
     }
-    navigate(`/production/${id}/wastage`, { state: { section: location.state?.section || 'assigned' } });
+    navigate(`/production/${id}/wastage`, { replace: true, state: { section: location.state?.section || 'assigned' } });
   };
 
   // Can proceed only if all existing rows have required fields filled (from table callback)

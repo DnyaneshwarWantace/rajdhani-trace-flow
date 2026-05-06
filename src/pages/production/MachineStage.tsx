@@ -382,7 +382,7 @@ export default function MachineStage() {
     // If machine stage is already completed (by this or another user), skip validation and go straight forward
     const { data: freshBatch } = await ProductionService.getBatchById(id!).catch(() => ({ data: null }));
     if (freshBatch?.machine_stage?.status === 'completed') {
-      navigate(`/production/${id}/individual-products`, { state: { section: location.state?.section || 'assigned' } });
+      navigate(`/production/${id}/individual-products`, { replace: true, state: { section: location.state?.section || 'assigned' } });
       return;
     }
 
@@ -420,7 +420,7 @@ export default function MachineStage() {
           variant: 'destructive',
         });
       }
-      navigate(`/production/${id}/individual-products`, { state: { section: location.state?.section || 'assigned' } });
+      navigate(`/production/${id}/individual-products`, { replace: true, state: { section: location.state?.section || 'assigned' } });
     } catch (error) {
       console.error('❌ Error updating machine stage:', error);
       toast({
