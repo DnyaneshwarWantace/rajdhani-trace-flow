@@ -177,25 +177,57 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       </CardHeader>
       <CardContent>
         <div className="mb-4 p-4 rounded-lg border border-gray-200 bg-gray-50/60">
-          <p className="text-xs font-medium text-gray-600 mb-2">Product Information</p>
-          <div className="mb-4 pb-4 border-b border-gray-200">
-            <p className="text-xs text-gray-600 mb-2">Color, pattern & dimensions</p>
-            <ProductAttributePreview
-              color={batch.color}
-              pattern={batch.pattern}
-              length={batch.length}
-              width={batch.width}
-              lengthUnit={batch.length_unit}
-              widthUnit={batch.width_unit}
-              size="large"
-            />
+          <p className="text-xs font-medium text-gray-600 mb-3">Product Information</p>
+
+          {/* Desktop: one-line table style */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white">
+            <table className="min-w-full text-sm">
+              <tbody>
+                <tr className="border-b border-gray-100">
+                  <td className="px-4 py-3 text-gray-600 font-medium w-48">Appearance</td>
+                  <td className="px-4 py-3">
+                    <ProductAttributePreview
+                      color={batch.color}
+                      pattern={batch.pattern}
+                      length={batch.length}
+                      width={batch.width}
+                      lengthUnit={batch.length_unit}
+                      widthUnit={batch.width_unit}
+                      size="large"
+                    />
+                  </td>
+                </tr>
+                {productInfoRows.map((row) => (
+                  <tr key={row.label} className="border-b border-gray-100 last:border-b-0">
+                    <td className="px-4 py-3 text-gray-600 font-medium w-48">{row.label}</td>
+                    <td className="px-4 py-3 text-gray-900 font-semibold break-words">
+                      {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={80} as="span" /> : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* Mobile: card style */}
+          <div className="md:hidden space-y-3">
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <p className="text-xs font-medium text-gray-600 mb-2">Appearance</p>
+              <ProductAttributePreview
+                color={batch.color}
+                pattern={batch.pattern}
+                length={batch.length}
+                width={batch.width}
+                lengthUnit={batch.length_unit}
+                widthUnit={batch.width_unit}
+                size="large"
+              />
+            </div>
             {productInfoRows.map((row) => (
-              <div key={row.label} className="space-y-1 min-w-0">
-                <p className="text-xs sm:text-sm text-gray-600">{row.label}</p>
-                <p className="text-xs sm:text-sm font-medium text-gray-900 break-words">
-                  {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={50} as="span" /> : 'N/A'}
+              <div key={row.label} className="rounded-lg border border-gray-200 bg-white p-3">
+                <p className="text-xs text-gray-600">{row.label}</p>
+                <p className="text-sm font-semibold text-gray-900 mt-1 break-words">
+                  {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={60} as="span" /> : 'N/A'}
                 </p>
               </div>
             ))}
