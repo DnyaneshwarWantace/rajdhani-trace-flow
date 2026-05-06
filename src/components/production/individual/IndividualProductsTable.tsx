@@ -85,6 +85,10 @@ interface IndividualProductsTableProps {
   onCreatedProductsCountChange?: (count: number) => void;
   /** Button label when onComplete is provided. Default: "Complete Production" */
   actionLabel?: string;
+  /** Set to true when another user has completed this stage — disables Add Row and editing */
+  stageCompleted?: boolean;
+  /** Live count of saved rows from DB (updated by polling) */
+  dbSavedCount?: number;
 }
 
 export default function IndividualProductsTable({
@@ -99,6 +103,8 @@ export default function IndividualProductsTable({
   onCanCompleteChange,
   onCreatedProductsCountChange,
   actionLabel = 'Complete Production',
+  stageCompleted = false,
+  dbSavedCount = 0,
 }: IndividualProductsTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1388,8 +1394,22 @@ export default function IndividualProductsTable({
     setValidationError(null);
   };
 
+  const savedCount = localProducts.filter(p => !p.id?.startsWith('temp-')).length;
+  const liveCount = Math.max(savedCount, dbSavedCount);
+
   return (
     <>
+    {stageCompleted && (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 font-medium">
+        This stage has been completed by another user. No more rows can be added.
+      </div>
+    )}
+    {!stageCompleted && plannedQuantity > 0 && liveCount > 0 && (
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <span className="font-semibold">{liveCount} of {plannedQuantity}</span> rolls saved so far (live)
+        {liveCount >= plannedQuantity && <span className="ml-2 text-green-700 font-semibold">— target reached!</span>}
+      </div>
+    )}
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -1422,7 +1442,8 @@ export default function IndividualProductsTable({
             <Button
               onClick={handleAddRow}
               size="sm"
-              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700"
+              disabled={stageCompleted}
+              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               Add Row

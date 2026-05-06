@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, FileText, Calendar, AlertTriangle, Clock } from 'lucide-react';
@@ -32,6 +32,7 @@ export default function MachineStage() {
   const [isMachineCompleted, setIsMachineCompleted] = useState(false);
   const [machineStageRemark, setMachineStageRemark] = useState('');
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorName = (() => {
     try {
       const raw = localStorage.getItem('user');
@@ -49,6 +50,21 @@ export default function MachineStage() {
     }
   }, [id, refreshKey]);
 
+  // Poll every 8s so if another user completes machine steps, the button enables live
+  useEffect(() => {
+    if (!id) return;
+    const poll = async () => {
+      try {
+        const { data: freshBatch } = await ProductionService.getBatchById(id);
+        if (freshBatch) {
+          await checkMachineCompletion(freshBatch);
+        }
+      } catch { /* silent */ }
+    };
+    pollIntervalRef.current = setInterval(poll, 8000);
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, [id]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -56,6 +72,12 @@ export default function MachineStage() {
       // Load batch
       const { data: batchData } = await ProductionService.getBatchById(id!);
       if (batchData) {
+        // Stage redirect guard: if machine stage is already done, send user forward
+        if (batchData.machine_stage?.status === 'completed') {
+          navigate(`/production/${id}/individual-products`, { replace: true });
+          return;
+        }
+
         // CRITICAL FIX: If we're on machine page but planning_stage is not completed, fix it
         const planningStageStatus = batchData.planning_stage?.status;
         const machineStageStatus = batchData.machine_stage?.status;
@@ -206,6 +228,12 @@ export default function MachineStage() {
         wastageStageStatus: currentBatch?.wastage_stage?.status,
       });
 
+      // If machine stage itself is marked completed, enable immediately
+      if (currentBatch?.machine_stage?.status === 'completed') {
+        setIsMachineCompleted(true);
+        return;
+      }
+
       // Check if wastage stage is already in progress or completed (means machine is done)
       if (currentBatch?.wastage_stage?.status === 'in_progress' || currentBatch?.wastage_stage?.status === 'completed') {
         console.log('✅ Wastage stage is active, machine must be completed');
@@ -351,6 +379,13 @@ export default function MachineStage() {
   };
 
   const handleNavigateToWastage = async () => {
+    // If machine stage is already completed (by this or another user), skip validation and go straight forward
+    const { data: freshBatch } = await ProductionService.getBatchById(id!).catch(() => ({ data: null }));
+    if (freshBatch?.machine_stage?.status === 'completed') {
+      navigate(`/production/${id}/individual-products`, { state: { section: location.state?.section || 'assigned' } });
+      return;
+    }
+
     const validation = await validateMachineStageCompletion();
     if (!validation.valid) {
       toast({

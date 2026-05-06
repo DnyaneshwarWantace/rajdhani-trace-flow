@@ -288,6 +288,12 @@ export default function PlanningStage() {
         return;
       }
 
+      // Stage redirect guard: if planning is already done, send user forward
+      if (batch.planning_stage?.status === 'completed') {
+        navigate(`/production/${batchId}/machine`, { replace: true });
+        return;
+      }
+
       const product = await ProductService.getProductById(batch.product_id);
       if (!product) {
         toast({ title: 'Error', description: 'Failed to load product', variant: 'destructive' });

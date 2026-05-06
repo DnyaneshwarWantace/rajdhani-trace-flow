@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Loader2, MapPin } from 'lucide-react';
@@ -36,6 +36,9 @@ export default function ProductionIndividualProducts() {
   const [, setCreatedProductsCount] = useState(0);
   const [locationFilter, setLocationFilter] = useState<string[]>([]);
   const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
+  const [isStageCompleted, setIsStageCompleted] = useState(false);
+  const [dbSavedCount, setDbSavedCount] = useState(0);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -49,6 +52,35 @@ export default function ProductionIndividualProducts() {
       .catch(() => setLocationOptions([]));
   }, []);
 
+  // Poll DB every 8s: sync table rows from DB so all users see live state,
+  // and redirect forward if another user completed the stage.
+  useEffect(() => {
+    if (!id || !batch) return;
+    const poll = async () => {
+      try {
+        const { data: freshBatch } = await ProductionService.getBatchById(id);
+        if (!freshBatch) return;
+        if (freshBatch.individual_stage?.status === 'completed') {
+          setIsStageCompleted(true);
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          navigate(`/production/${id}/wastage`, { replace: true, state: { section: location.state?.section || 'assigned' } });
+          return;
+        }
+        if (freshBatch.product_id) {
+          const { products } = await IndividualProductService.getIndividualProducts({ product_id: freshBatch.product_id });
+          const saved = products.filter((p: IndividualProduct) =>
+            (p.batch_number === id || p.batch_number === freshBatch.batch_number) && !p.id?.startsWith('temp-')
+          );
+          setDbSavedCount(saved.length);
+          // Sync table: update parent state so IndividualProductsTable merges new rows
+          setIndividualProducts(saved);
+        }
+      } catch { /* silent */ }
+    };
+    pollIntervalRef.current = setInterval(poll, 8000);
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, [id, batch]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -58,6 +90,14 @@ export default function ProductionIndividualProducts() {
       const { data: batchData } = await ProductionService.getBatchById(id!);
       if (batchData) {
         console.log('✅ Batch loaded:', batchData.batch_number);
+
+        // Stage redirect guard: if individual stage is already done, send user forward
+        if (batchData.individual_stage?.status === 'completed') {
+          navigate(`/production/${id}/wastage`, { replace: true, state: { section: location.state?.section || 'assigned' } });
+          return;
+        }
+
+        setIsStageCompleted(false);
 
         // CRITICAL FIX: Fix stage statuses if we're on individual products page
         const planningStageStatus = batchData.planning_stage?.status;
@@ -408,6 +448,8 @@ export default function ProductionIndividualProducts() {
           onCanCompleteChange={setCanProceedFromTable}
           onCreatedProductsCountChange={setCreatedProductsCount}
           actionLabel="Proceed to Wastage"
+          stageCompleted={isStageCompleted}
+          dbSavedCount={dbSavedCount}
         />
       </div>
 
