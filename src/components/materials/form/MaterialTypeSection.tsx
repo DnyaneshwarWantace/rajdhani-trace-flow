@@ -12,6 +12,11 @@ import {
 import { Plus, Trash2 } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
+import ColorSwatch from '@/components/ui/ColorSwatch';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+
+const CUSTOM_COLOR_VALUE = '__material_color_custom__';
+const ADD_COLOR_VALUE = '__material_color_add_new__';
 
 interface MaterialTypeSectionProps {
   type: string;
@@ -21,6 +26,7 @@ interface MaterialTypeSectionProps {
   onTypeChange: (value: string) => void;
   onColorChange: (value: string) => void;
   onTypesReload?: () => void;
+  colorFallbackWhenBlank?: string;
 }
 
 export default function MaterialTypeSection({
@@ -31,10 +37,16 @@ export default function MaterialTypeSection({
   onTypeChange,
   onColorChange,
   onTypesReload,
+  colorFallbackWhenBlank,
 }: MaterialTypeSectionProps) {
   const { toast } = useToast();
+  const { colorCodeMap } = useDropdownVisualMaps();
   const [showAddType, setShowAddType] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
+  const [showAddColor, setShowAddColor] = useState(false);
+  const [newColorName, setNewColorName] = useState('');
+  const [newColorCode, setNewColorCode] = useState('#2563eb');
+  const [attachColorCode, setAttachColorCode] = useState(true);
 
   // Handler for type name (max 4 words, max 15 chars per word)
   const handleTypeNameChange = (value: string) => {
@@ -167,6 +179,59 @@ export default function MaterialTypeSection({
     }
   };
 
+  const handleAddColor = async () => {
+    const colorName = newColorName.trim();
+    if (!colorName || colors.includes(colorName)) return;
+
+    try {
+      const result = await DropdownService.addOption(
+        'material_color',
+        colorName,
+        colors.length + 1,
+        undefined,
+        attachColorCode ? newColorCode : null
+      );
+
+      if (!result.success) {
+        toast({
+          title: 'Error',
+          description: result.error || 'Failed to add color',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Color Added',
+        description: `"${colorName}" has been added.`,
+      });
+
+      onColorChange(colorName);
+      setShowAddColor(false);
+      setNewColorName('');
+      setNewColorCode('#2563eb');
+      setAttachColorCode(true);
+      if (onTypesReload) onTypesReload();
+    } catch (error) {
+      console.error('Error adding color:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add color',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const inPalette = Boolean(color && colors.includes(color));
+  const selectColorValue =
+    type !== 'color'
+      ? ''
+      : colors.length === 0
+        ? CUSTOM_COLOR_VALUE
+        : inPalette
+          ? color
+          : CUSTOM_COLOR_VALUE;
+
   return (
     <>
       <div>
@@ -252,26 +317,133 @@ export default function MaterialTypeSection({
         </div>
       </div>
       {type === 'color' && (
-        <div>
+        <div className="space-y-2">
           <Label htmlFor="color">Color</Label>
-          <Select value={color || ''} onValueChange={onColorChange}>
-            <SelectTrigger id="color">
-              <SelectValue placeholder="Add color" />
-            </SelectTrigger>
-            <SelectContent>
-              {colors.length > 0 ? (
-                colors.map((colorOption) => (
-                  <SelectItem key={colorOption} value={colorOption}>
-                    {colorOption}
+          {colors.length > 0 ? (
+            <>
+              <Select
+                value={selectColorValue}
+                onValueChange={(value) => {
+                  if (value === ADD_COLOR_VALUE) {
+                    setShowAddColor(true);
+                    return;
+                  }
+                  setShowAddColor(false);
+                  if (value === CUSTOM_COLOR_VALUE) {
+                    onColorChange('');
+                  } else {
+                    onColorChange(value);
+                  }
+                }}
+              >
+                <SelectTrigger id="color" className="h-auto min-h-10 py-2">
+                  <SelectValue placeholder="Select color" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ADD_COLOR_VALUE} textValue="Add new color">
+                    <span className="flex items-center gap-2 text-primary-600 font-medium">
+                      <Plus className="w-4 h-4" />
+                      Add New Color
+                    </span>
                   </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="no_colors" disabled>
-                  No colors available
-                </SelectItem>
+                  {colors.map((colorOption) => (
+                    <SelectItem key={colorOption} value={colorOption} textValue={colorOption}>
+                      <span className="flex items-center gap-2 py-0.5">
+                        {colorCodeMap[colorOption] ? (
+                          <ColorSwatch colorCode={colorCodeMap[colorOption]} className="w-7 h-7 rounded-md shrink-0" />
+                        ) : null}
+                        <span>{colorOption}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM_COLOR_VALUE} textValue="Other custom color">
+                    Other (type a custom name)…
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {showAddColor && (
+                <div className="space-y-2 rounded-md border p-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="material-new-color-name" className="text-xs text-muted-foreground">
+                      Color name
+                    </Label>
+                    <Input
+                      id="material-new-color-name"
+                      value={newColorName}
+                      onChange={(e) => setNewColorName(e.target.value)}
+                      placeholder="e.g. Coffee Brown"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={attachColorCode}
+                      onChange={(e) => setAttachColorCode(e.target.checked)}
+                    />
+                    Add color code (optional)
+                  </label>
+                  {attachColorCode && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={newColorCode}
+                        onChange={(e) => setNewColorCode(e.target.value)}
+                        placeholder="#2563eb"
+                        className="max-w-[140px] uppercase"
+                      />
+                      <ColorSwatch colorCode={newColorCode} className="w-7 h-7 rounded-md" />
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={handleAddColor}>
+                      Add
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setShowAddColor(false);
+                        setNewColorName('');
+                        setNewColorCode('#2563eb');
+                        setAttachColorCode(true);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               )}
-            </SelectContent>
-          </Select>
+              {selectColorValue === CUSTOM_COLOR_VALUE && (
+                <div className="space-y-1">
+                  <Label htmlFor="material-custom-color" className="text-xs text-muted-foreground">
+                    Custom color name
+                  </Label>
+                  <Input
+                    id="material-custom-color"
+                    value={color}
+                    onChange={(e) => onColorChange(e.target.value)}
+                    placeholder="e.g. Solvent Blue 38"
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-1">
+              <Input
+                id="color-free"
+                value={colorFallbackWhenBlank === 'NA' && color === 'NA' ? '' : color}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (colorFallbackWhenBlank !== undefined) {
+                    onColorChange(v.trim() === '' ? colorFallbackWhenBlank : v);
+                  } else {
+                    onColorChange(v);
+                  }
+                }}
+                placeholder="No palette options — type color name"
+              />
+            </div>
+          )}
         </div>
       )}
     </>
