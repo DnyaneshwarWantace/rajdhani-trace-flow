@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, ArrowRight, Building2, Truck, CheckCircle, Clock } from 'lucide-react';
+import { ClipboardList, ArrowRight, Package, Building2, Truck, CheckCircle, Clock } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/utils/formatHelpers';
 import { ManageStockService, type StockOrder } from '@/services/manageStockService';
 
@@ -74,12 +74,13 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
         </div>
       ) : (
         <div className="space-y-3 flex-1">
-          {displayOrders.map((order) => {
+          {displayOrders.map((order, idx) => {
             const status = statusConfig[order.status] || statusConfig.pending;
             const StatusIcon = status.icon;
+            const rowKey = order.id || order.order_number || `${idx}`;
             return (
               <div
-                key={order.id}
+                key={rowKey}
                 onClick={() => navigate('/manage-stock')}
                 className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
               >
@@ -89,8 +90,14 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {order.order_number}
+                      {order.materialName || order.order_number || 'Stock Order'}
                     </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 min-w-0">
+                      <Package className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">
+                        {(order.quantity ?? 0).toLocaleString()} {order.unit || ''}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                       <Building2 className="w-3 h-3 flex-shrink-0" />
                       <span className="truncate">{order.supplier}</span>
