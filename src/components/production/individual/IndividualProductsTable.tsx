@@ -123,6 +123,20 @@ export default function IndividualProductsTable({
     localProductsRef.current = products;
     setLocalProducts(products);
   };
+
+  // After any save, merge backend's full batch product list so other users' rows appear immediately.
+  // Keeps the current user's local ordering; appends any new rows from other users at the end.
+  const mergeFromBatch = (current: IndividualProduct[], batchProducts: IndividualProduct[]): IndividualProduct[] => {
+    const byId = new Map(current.map(p => [p.id, p]));
+    const merged = current.map(p => {
+      const fresh = batchProducts.find(b => b.id === p.id);
+      return fresh ?? p;
+    });
+    batchProducts.forEach(b => {
+      if (!byId.has(b.id)) merged.push(b);
+    });
+    return merged;
+  };
   const [validationError, setValidationError] = useState<string | null>(null);
   const [copiedRowData, setCopiedRowData] = useState<{final_length?: string; final_width?: string; final_weight?: string; roll_number?: string; location?: string} | null>(null);
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
@@ -305,7 +319,7 @@ export default function IndividualProductsTable({
 
     setCreatingTempRowId(tempProduct.id);
     try {
-      const newProduct = await IndividualProductService.createIndividualProduct({
+      const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
         product_id: productId || '',
         qr_code: tempProduct.qr_code || '',
         serial_number: tempProduct.serial_number || '',
@@ -323,7 +337,7 @@ export default function IndividualProductsTable({
 
       const updated = [...localProductsRef.current];
       updated[rowIndex] = newProduct;
-      setLocalProductsSync(updated);
+      setLocalProductsSync(mergeFromBatch(updated, batchProducts));
 
       if (newProduct._batchCount?.over) {
         toast({
@@ -574,7 +588,7 @@ export default function IndividualProductsTable({
           }
           try {
             // Create the individual product — always available immediately
-            const newProduct = await IndividualProductService.createIndividualProduct({
+            const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
@@ -590,9 +604,9 @@ export default function IndividualProductsTable({
               batch_number: batchId || '',
             });
 
-            // Update local state with the real product
+            // Update local state with the real product, then merge any rows other users saved
             updated[row] = newProduct;
-            setLocalProductsSync(updated);
+            setLocalProductsSync(mergeFromBatch(updated, batchProducts));
 
             toast({
               title: 'Saved to Stock',
@@ -680,7 +694,7 @@ export default function IndividualProductsTable({
           }
           try {
             // Create the individual product
-            const newProduct = await IndividualProductService.createIndividualProduct({
+            const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
               product_id: productId,
               qr_code: tempProduct.qr_code || '',
               serial_number: tempProduct.serial_number || '',
@@ -696,9 +710,9 @@ export default function IndividualProductsTable({
               batch_number: batchId || '',
             });
 
-            // Update local state with the real product
+            // Update local state with the real product, then merge any rows other users saved
             updated[row] = newProduct;
-            setLocalProductsSync(updated);
+            setLocalProductsSync(mergeFromBatch(updated, batchProducts));
 
             toast({
               title: 'Saved to Stock',
@@ -845,7 +859,7 @@ export default function IndividualProductsTable({
     } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled, create the product
       try {
-        const newProduct = await IndividualProductService.createIndividualProduct({
+        const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
           product_id: productId!,
           qr_code: tempProduct.qr_code || '',
           serial_number: tempProduct.serial_number || '',
@@ -860,9 +874,8 @@ export default function IndividualProductsTable({
           batch_number: batchId || '',
         });
         
-        // Update local state with the real product
         updated[targetIndex] = newProduct;
-        setLocalProductsSync(updated);
+        setLocalProductsSync(mergeFromBatch(updated, batchProducts));
         
         toast({
           title: 'Filled Down & Created',
@@ -953,7 +966,7 @@ export default function IndividualProductsTable({
     } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled (including location), create the product
       try {
-        const newProduct = await IndividualProductService.createIndividualProduct({
+        const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
           product_id: productId!,
           qr_code: tempProduct.qr_code || '',
           serial_number: tempProduct.serial_number || '',
@@ -969,7 +982,7 @@ export default function IndividualProductsTable({
         });
 
         updated[targetIndex] = newProduct;
-        setLocalProductsSync(updated);
+        setLocalProductsSync(mergeFromBatch(updated, batchProducts));
 
         toast({
           title: 'Location Filled Down & Created',
@@ -1068,7 +1081,7 @@ export default function IndividualProductsTable({
     } else if (targetRow.id && targetRow.id.startsWith('temp-') && hasRequiredFields) {
       // For temp row: full-row fill down filled all required fields → create product so QR code is generated
       try {
-        const newProduct = await IndividualProductService.createIndividualProduct({
+        const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
           product_id: productId!,
           qr_code: tempProduct.qr_code || '',
           serial_number: tempProduct.serial_number || '',
@@ -1083,7 +1096,7 @@ export default function IndividualProductsTable({
           batch_number: batchId || '',
         });
         updated[targetIndex] = newProduct;
-        setLocalProductsSync(updated);
+        setLocalProductsSync(mergeFromBatch(updated, batchProducts));
         toast({
           title: 'Filled Down & Created',
           description: 'Row copied to next row and product created successfully. QR code generated.',
@@ -1232,7 +1245,7 @@ export default function IndividualProductsTable({
     } else if (productItem.id && productItem.id.startsWith('temp-') && hasRequiredFields) {
       // For temp products, if all required fields are now filled, create the product
       try {
-        const newProduct = await IndividualProductService.createIndividualProduct({
+        const { product: newProduct, batchProducts } = await IndividualProductService.createIndividualProduct({
           product_id: productId!,
           qr_code: tempProduct.qr_code || '',
           serial_number: tempProduct.serial_number || '',
@@ -1247,9 +1260,8 @@ export default function IndividualProductsTable({
           batch_number: batchId || '',
         });
         
-        // Update local state with the real product
         updated[index] = newProduct;
-        setLocalProductsSync(updated);
+        setLocalProductsSync(mergeFromBatch(updated, batchProducts));
         
         toast({
           title: 'Pasted & Created',
