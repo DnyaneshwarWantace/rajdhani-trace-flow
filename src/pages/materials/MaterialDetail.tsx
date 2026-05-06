@@ -52,7 +52,12 @@ export default function MaterialDetail() {
 
   const handleBack = () => {
     const fromPath = location.state?.fromPath;
-    navigate(fromPath === '/ink' ? '/ink' : '/materials');
+    const isInkMaterial = String(material?.category || '').trim().toLowerCase() === 'ink';
+    if (fromPath === '/ink' || (!fromPath && isInkMaterial)) {
+      navigate('/ink');
+      return;
+    }
+    navigate('/materials');
   };
 
   const handleEditSuccess = () => {
