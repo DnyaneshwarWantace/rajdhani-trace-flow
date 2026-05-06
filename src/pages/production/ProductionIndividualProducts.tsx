@@ -450,6 +450,7 @@ export default function ProductionIndividualProducts() {
           actionLabel="Proceed to Wastage"
           stageCompleted={isStageCompleted}
           dbSavedCount={dbSavedCount}
+          onStageCompleted={() => setIsStageCompleted(true)}
         />
       </div>
 

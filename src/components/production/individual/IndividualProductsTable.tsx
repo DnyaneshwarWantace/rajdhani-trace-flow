@@ -89,6 +89,8 @@ interface IndividualProductsTableProps {
   stageCompleted?: boolean;
   /** Live count of saved rows from DB (updated by polling) */
   dbSavedCount?: number;
+  /** Called when backend confirms stage is already completed (409 response) */
+  onStageCompleted?: () => void;
 }
 
 export default function IndividualProductsTable({
@@ -105,6 +107,7 @@ export default function IndividualProductsTable({
   actionLabel = 'Complete Production',
   stageCompleted = false,
   dbSavedCount = 0,
+  onStageCompleted,
 }: IndividualProductsTableProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -329,11 +332,13 @@ export default function IndividualProductsTable({
       onUpdate?.();
     } catch (error) {
       console.error('Error creating individual product:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create individual product',
-        variant: 'destructive',
-      });
+      const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+      if (msg.toLowerCase().includes('already completed')) {
+        onStageCompleted?.();
+        toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+      } else {
+        toast({ title: 'Error', description: msg, variant: 'destructive' });
+      }
     } finally {
       setCreatingTempRowId(null);
     }
@@ -589,11 +594,13 @@ export default function IndividualProductsTable({
             onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
-            toast({
-              title: 'Error',
-              description: error instanceof Error ? error.message : 'Failed to create individual product',
-              variant: 'destructive',
-            });
+            const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+            if (msg.toLowerCase().includes('already completed')) {
+              onStageCompleted?.();
+              toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+            } else {
+              toast({ title: 'Error', description: msg, variant: 'destructive' });
+            }
           }
         }
       }
@@ -693,11 +700,13 @@ export default function IndividualProductsTable({
             onUpdate?.();
           } catch (error) {
             console.error('Error creating individual product:', error);
-            toast({
-              title: 'Error',
-              description: error instanceof Error ? error.message : 'Failed to create individual product',
-              variant: 'destructive',
-            });
+            const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+            if (msg.toLowerCase().includes('already completed')) {
+              onStageCompleted?.();
+              toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+            } else {
+              toast({ title: 'Error', description: msg, variant: 'destructive' });
+            }
           }
         }
       }
@@ -855,11 +864,13 @@ export default function IndividualProductsTable({
         onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to create individual product',
-          variant: 'destructive',
-        });
+        const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+        if (msg.toLowerCase().includes('already completed')) {
+          onStageCompleted?.();
+          toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else {
+          toast({ title: 'Error', description: msg, variant: 'destructive' });
+        }
       }
     } else {
       toast({
@@ -960,11 +971,13 @@ export default function IndividualProductsTable({
         onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to create individual product',
-          variant: 'destructive',
-        });
+        const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+        if (msg.toLowerCase().includes('already completed')) {
+          onStageCompleted?.();
+          toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else {
+          toast({ title: 'Error', description: msg, variant: 'destructive' });
+        }
       }
     } else {
       toast({
@@ -1071,11 +1084,13 @@ export default function IndividualProductsTable({
         onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to create individual product',
-          variant: 'destructive',
-        });
+        const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+        if (msg.toLowerCase().includes('already completed')) {
+          onStageCompleted?.();
+          toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else {
+          toast({ title: 'Error', description: msg, variant: 'destructive' });
+        }
       }
     } else if (Object.keys(updateData).length > 0) {
       toast({
@@ -1236,11 +1251,13 @@ export default function IndividualProductsTable({
         onUpdate?.();
       } catch (error) {
         console.error('Error creating individual product:', error);
-        toast({
-          title: 'Error',
-          description: error instanceof Error ? error.message : 'Failed to create individual product',
-          variant: 'destructive',
-        });
+        const msg = error instanceof Error ? error.message : 'Failed to create individual product';
+        if (msg.toLowerCase().includes('already completed')) {
+          onStageCompleted?.();
+          toast({ title: 'Stage Completed', description: msg, variant: 'destructive' });
+        } else {
+          toast({ title: 'Error', description: msg, variant: 'destructive' });
+        }
       }
     } else {
       toast({
