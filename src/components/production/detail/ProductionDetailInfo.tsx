@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { Hash, Package, Calendar, User, Building2, Tag, Ruler, Weight } from 'lucide-react';
+import { Hash, Package, Calendar, User, Building2 } from 'lucide-react';
 import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import type { ProductionBatch } from '@/services/productionService';
 import { OrderService } from '@/services/orderService';
-import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
 interface ProductionDetailInfoProps {
   batch: ProductionBatch;
@@ -89,6 +88,30 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
     };
   }, [batch.id, batch.notes, attachedOrderNumbers.length]);
 
+  const productInfoRows = [
+    { label: 'Product Name', value: batch.product_name || 'N/A' },
+    {
+      label: 'Product Category',
+      value:
+        batch.category && batch.category !== 'N/A'
+          ? `${batch.category}${batch.subcategory && batch.subcategory !== 'N/A' ? ` / ${batch.subcategory}` : ''}`
+          : 'N/A',
+    },
+    {
+      label: 'Dimensions',
+      value:
+        batch.length && batch.width && batch.length !== 'N/A' && batch.width !== 'N/A'
+          ? `${batch.length}${batch.length_unit || ''} × ${batch.width}${batch.width_unit || ''}`
+          : 'N/A',
+    },
+    {
+      label: 'Expected GSM',
+      value: batch.weight && batch.weight !== 'N/A' ? `${batch.weight} ${batch.weight_unit || ''}` : 'N/A',
+    },
+    { label: 'Color', value: batch.color && batch.color !== 'N/A' ? batch.color : 'N/A' },
+    { label: 'Pattern', value: batch.pattern && batch.pattern !== 'N/A' ? batch.pattern : 'N/A' },
+  ];
+
   const infoItems = [
     {
       label: 'Batch Number',
@@ -99,52 +122,12 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       show: true,
     },
     {
-      label: 'Product Name',
-      value: batch.product_name || 'N/A',
-      icon: Package,
-      color: 'text-primary-600',
-      truncate: true,
-      maxLength: 40,
-      show: true,
-    },
-    {
       label: 'Planned Quantity',
       value: `${batch.planned_quantity}${batch.actual_quantity && batch.actual_quantity !== batch.planned_quantity ? ` (${batch.actual_quantity} actual)` : ''}`,
       icon: Package,
       color: 'text-blue-600',
       truncate: false,
       show: true,
-    },
-    {
-      label: 'Product Category',
-      value: batch.category && batch.category !== 'N/A'
-        ? `${batch.category}${batch.subcategory && batch.subcategory !== 'N/A' ? ` / ${batch.subcategory}` : ''}`
-        : 'N/A',
-      icon: Tag,
-      color: 'text-purple-600',
-      truncate: true,
-      maxLength: 40,
-      show: batch.category && batch.category !== 'N/A',
-    },
-    {
-      label: 'Dimensions',
-      value: batch.length && batch.width && batch.length !== 'N/A' && batch.width !== 'N/A'
-        ? `${batch.length}${batch.length_unit || ''} × ${batch.width}${batch.width_unit || ''}`
-        : 'N/A',
-      icon: Ruler,
-      color: 'text-indigo-600',
-      truncate: false,
-      show: batch.length && batch.width && batch.length !== 'N/A' && batch.width !== 'N/A',
-    },
-    {
-      label: 'Expected GSM',
-      value: batch.weight && batch.weight !== 'N/A'
-        ? `${batch.weight} ${batch.weight_unit || ''}`
-        : 'N/A',
-      icon: Weight,
-      color: 'text-green-600',
-      truncate: false,
-      show: batch.weight && batch.weight !== 'N/A',
     },
     {
       label: 'Operator',
@@ -186,7 +169,7 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
       truncate: false,
       show: !!batch.created_at && String(batch.created_at).trim() !== '',
     },
-  ].filter(item => item.show);
+  ].filter((item) => item.show);
 
   return (
     <Card className="mb-6">
@@ -194,6 +177,19 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
         <CardTitle className="text-lg sm:text-xl">Batch Information</CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/60">
+          {productInfoRows.map((row) => (
+            <div
+              key={row.label}
+              className="flex items-start justify-between gap-4 px-4 py-2.5 border-b border-gray-200 last:border-b-0"
+            >
+              <p className="text-xs font-medium text-gray-600">{row.label}</p>
+              <p className="text-sm font-semibold text-gray-900 text-right break-words">
+                {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={50} as="span" /> : 'N/A'}
+              </p>
+            </div>
+          ))}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {infoItems.map((item, index) => {
             const Icon = item.icon;
@@ -219,12 +215,6 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
             );
           })}
         </div>
-        <ProductAttributePreview
-          color={batch.color}
-          pattern={batch.pattern}
-          size="large"
-          className="mt-4 p-3 rounded-lg border border-gray-200 bg-gray-50"
-        />
         {batch.notes && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-xs font-medium text-blue-900 mb-1">Notes</p>
