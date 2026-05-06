@@ -23,7 +23,8 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const useParentData = ordersFromParent !== undefined;
+  const hasParentOrders = Array.isArray(ordersFromParent) && ordersFromParent.length > 0;
+  const useParentData = (parentLoading ?? false) || hasParentOrders;
   const displayOrders = useParentData ? (ordersFromParent ?? []) : orders;
   const displayLoading = useParentData ? (parentLoading ?? false) : loading;
 
