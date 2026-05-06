@@ -630,8 +630,11 @@ export default function NotificationsTab({ products }: NotificationsTabProps) {
                                 className="bg-green-600 text-white hover:bg-green-700 h-7 sm:h-8 text-xs flex-1 sm:flex-initial"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  navigate('/materials/manage-stock', {
+                                  navigate('/materials', {
                                     state: {
+                                      openRestockRedirect: true,
+                                      materialId: notification.related_data.material_id,
+                                      materialName: notification.related_data.material_name,
                                       selectedMaterial: {
                                         id: notification.related_data.material_id,
                                         name: notification.related_data.material_name,

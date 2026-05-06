@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { ProductionService } from '@/services/productionService';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
+import { useNavigate } from 'react-router-dom';
 
 interface OrderTableProps {
   orders: Order[];
@@ -29,6 +30,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
 };
 
 export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCreateMaterialTask }: OrderTableProps) {
+  const navigate = useNavigate();
   const [sendToProductionOrder, setSendToProductionOrder] = useState<Order | null>(null);
   const [sendToProductionItem, setSendToProductionItem] = useState<OrderItem | null>(null);
   const [pickProductionOrder, setPickProductionOrder] = useState<Order | null>(null);
@@ -428,6 +430,34 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       {(order.status === 'pending' || order.status === 'accepted') && order.items?.some((item) => item.productType === 'raw_material') && (
                         <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (pendingRawItems.length > 1) { setPickRawMaterialOrder(order); } else { setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null); setMaterialTaskOrder(order); } }} disabled={!hasRawNotStarted} className="h-7 text-xs px-2" title={hasRawNotStarted ? 'Order Stock' : 'Stock Task Active'}>
                           <ShoppingCart className="w-3 h-3" />
+                        </Button>
+                      )}
+                      {(order.status === 'pending' || order.status === 'accepted') && order.items?.some((item) => item.productType === 'raw_material') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const firstRaw = pendingRawItems[0];
+                            navigate('/materials', {
+                              state: {
+                                openRestockRedirect: true,
+                                materialId: firstRaw?.rawMaterialId || undefined,
+                                materialName: firstRaw?.productName || undefined,
+                                selectedMaterial: firstRaw?.rawMaterialId
+                                  ? { id: firstRaw.rawMaterialId, name: firstRaw.productName, unit: firstRaw.unit }
+                                  : undefined,
+                                fromOrderLowStock: true,
+                                orderId: order.id,
+                                orderNumber: order.orderNumber,
+                              },
+                            });
+                          }}
+                          disabled={!hasRawNotStarted}
+                          className="h-7 text-xs px-2"
+                          title="Open Materials restock page"
+                        >
+                          Restock
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0" title="View details">

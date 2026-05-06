@@ -1305,8 +1305,9 @@ export default function PlanningStage() {
             }}
             onOrderRawMaterial={(materialId, materialName) => {
               // Keep this action explicit: open manage stock where PO is tracked/created.
-              navigate('/manage-stock', {
+              navigate('/materials', {
                 state: {
+                  openRestockRedirect: true,
                   fromProductionLowStock: true,
                   materialId,
                   materialName,
@@ -1315,7 +1316,7 @@ export default function PlanningStage() {
               });
               toast({
                 title: 'Order Stock',
-                description: `Open Manage Stock to create/track purchase order for ${materialName}.`,
+                description: `Opening Materials page for restock of ${materialName}.`,
               });
             }}
           />

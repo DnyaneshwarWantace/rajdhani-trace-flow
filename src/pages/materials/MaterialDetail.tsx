@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { MaterialService } from '@/services/materialService';
 import type { RawMaterial } from '@/types/material';
@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function MaterialDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [material, setMaterial] = useState<RawMaterial | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +51,8 @@ export default function MaterialDetail() {
   };
 
   const handleBack = () => {
-    navigate('/materials');
+    const fromPath = location.state?.fromPath;
+    navigate(fromPath === '/ink' ? '/ink' : '/materials');
   };
 
   const handleEditSuccess = () => {

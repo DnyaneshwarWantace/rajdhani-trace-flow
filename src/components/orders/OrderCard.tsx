@@ -78,6 +78,21 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
     const statusInfo = rawStatusByKey.get(String((item as any).rawMaterialId || '')) || rawStatusByKey.get(String(item.productName || ''));
     return String(statusInfo?.procurement_status || 'not_started') === 'not_started';
   });
+  const goToMaterialsRestock = (material?: any) => {
+    navigate('/materials', {
+      state: {
+        openRestockRedirect: true,
+        materialId: material?.rawMaterialId || undefined,
+        materialName: material?.productName || undefined,
+        selectedMaterial: material?.rawMaterialId
+          ? { id: material.rawMaterialId, name: material.productName, unit: material.unit }
+          : undefined,
+        fromOrderLowStock: true,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      },
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -405,6 +420,19 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
                   {pendingRawItems.length > 0 ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}` : 'Stock Task Active'}
                 </Button>
               )}
+              {rawItems.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pendingRawItems.length === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToMaterialsRestock(pendingRawItems.length === 1 ? pendingRawItems[0] : undefined);
+                  }}
+                >
+                  Restock Page
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -468,6 +496,19 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
                   }}
                 >
                   {pendingRawItems.length > 0 ? `Order Stock${pendingRawItems.length > 1 ? ` (${pendingRawItems.length})` : ''}` : 'Stock Task Active'}
+                </Button>
+              )}
+              {rawItems.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pendingRawItems.length === 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToMaterialsRestock(pendingRawItems.length === 1 ? pendingRawItems[0] : undefined);
+                  }}
+                >
+                  Restock Page
                 </Button>
               )}
             </div>

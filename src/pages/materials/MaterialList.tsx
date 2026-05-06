@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import MaterialHeader from '@/components/materials/MaterialHeader';
 import MaterialStatsBoxes from '@/components/materials/MaterialStatsBoxes';
@@ -60,6 +60,7 @@ export interface MaterialListProps {
 
 export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }: MaterialListProps = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabValue>('inventory');
   const [materials, setMaterials] = useState<RawMaterial[]>([]);
@@ -191,6 +192,35 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       loadStats();
     }
   }, [materials]);
+
+  useEffect(() => {
+    const navState = location.state as any;
+    if (!navState?.openRestockRedirect) return;
+
+    const targetId = String(navState.materialId || navState.selectedMaterial?.id || '');
+    const targetName = String(navState.materialName || navState.selectedMaterial?.name || '');
+
+    const matchedMaterial = materials.find((m) => {
+      if (targetId && String(m.id) === targetId) return true;
+      if (targetName && String(m.name || '').toLowerCase() === targetName.toLowerCase()) return true;
+      return false;
+    });
+
+    const fallbackMaterial = navState.selectedMaterial ? ({ ...navState.selectedMaterial } as RawMaterial) : null;
+    const materialToOpen = matchedMaterial || fallbackMaterial;
+    if (!materialToOpen) return;
+
+    setActiveTab('inventory');
+    setSelectedRestockMaterial(materialToOpen);
+    setRestockForm((prev) => ({
+      ...prev,
+      supplier: navState.preferredSupplier || materialToOpen.supplier_name || prev.supplier || '',
+      quantity: navState.requiredQuantity ? String(navState.requiredQuantity) : prev.quantity,
+    }));
+    setIsRestockDialogOpen(true);
+
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.state, materials, navigate]);
 
   // Track last loaded filters to prevent unnecessary reloads
   const lastLoadedFiltersRef = useRef<string | null>(null);
@@ -422,7 +452,9 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
 
   // Material handlers
   const handleView = (material: RawMaterial) => {
-    navigate(`/materials/${material.id}`);
+    navigate(`/materials/${material.id}`, {
+      state: { fromPath: categoryFilter ? '/ink' : '/materials' },
+    });
   };
 
   const handleEdit = (material: RawMaterial) => {
