@@ -176,27 +176,30 @@ export default function ProductionDetailInfo({ batch }: ProductionDetailInfoProp
         <CardTitle className="text-lg sm:text-xl">Batch Information</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/60">
-          {productInfoRows.map((row) => (
-            <div
-              key={row.label}
-              className="flex items-start justify-between gap-4 px-4 py-2.5 border-b border-gray-200 last:border-b-0"
-            >
-              <p className="text-xs font-medium text-gray-600">{row.label}</p>
-              <p className="text-sm font-semibold text-gray-900 text-right break-words">
-                {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={50} as="span" /> : 'N/A'}
-              </p>
-            </div>
-          ))}
-        </div>
-        <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3">
-          <p className="text-xs font-medium text-gray-600 mb-2">Appearance</p>
-          <ProductAttributePreview
-            color={batch.color}
-            pattern={batch.pattern}
-            size="large"
-            className="justify-end"
-          />
+        <div className="mb-4 p-4 rounded-lg border border-gray-200 bg-gray-50/60">
+          <p className="text-xs font-medium text-gray-600 mb-2">Product Information</p>
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <p className="text-xs text-gray-600 mb-2">Color, pattern & dimensions</p>
+            <ProductAttributePreview
+              color={batch.color}
+              pattern={batch.pattern}
+              length={batch.length}
+              width={batch.width}
+              lengthUnit={batch.length_unit}
+              widthUnit={batch.width_unit}
+              size="large"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {productInfoRows.map((row) => (
+              <div key={row.label} className="space-y-1 min-w-0">
+                <p className="text-xs sm:text-sm text-gray-600">{row.label}</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-900 break-words">
+                  {row.value !== 'N/A' ? <TruncatedText text={row.value} maxLength={50} as="span" /> : 'N/A'}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {infoItems.map((item, index) => {
