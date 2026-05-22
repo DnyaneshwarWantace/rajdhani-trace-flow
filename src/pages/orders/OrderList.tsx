@@ -13,6 +13,7 @@ import Pagination from '@/components/ui/pagination';
 import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type ViewMode = 'table' | 'grid';
 
@@ -45,6 +46,8 @@ export default function OrderList() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
     status: [] as string[],
@@ -198,6 +201,22 @@ export default function OrderList() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    const { error } = await OrderService.updateOrderStatus(cancelTarget.id, 'cancelled');
+    setCancelling(false);
+    if (error) {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+    } else {
+      toast({ title: 'Order Cancelled', description: `Order ${cancelTarget.orderNumber} has been cancelled and reserved stock released.` });
+      setOrders(prev => prev.map(o => o.id === cancelTarget.id ? { ...o, status: 'cancelled' } : o));
+      loadOrders(false);
+      loadStats();
+    }
+    setCancelTarget(null);
   };
 
   const handleViewDetails = (order: Order) => {
@@ -359,16 +378,18 @@ export default function OrderList() {
                   onStatusUpdate={handleStatusUpdate}
                   onViewDetails={handleViewDetails}
                   onCreateMaterialTask={handleCreateMaterialTask}
+                  onCancel={setCancelTarget}
                 />
               ) : (
-                <div className="columns-1 lg:columns-2 xl:columns-3 gap-4 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                   {orders.map((order) => (
-                    <div key={order.id} className="break-inside-avoid mb-4">
+                    <div key={order.id}>
                       <OrderCard
                         order={order}
                         onStatusUpdate={handleStatusUpdate}
                         onViewDetails={handleViewDetails}
                         onCreateMaterialTask={handleCreateMaterialTask}
+                        onCancel={setCancelTarget}
                       />
                     </div>
                   ))}
@@ -402,6 +423,20 @@ export default function OrderList() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleCancelConfirm}
+        title="Cancel Order"
+        description={cancelTarget
+          ? `Cancel order ${cancelTarget.orderNumber}?\n\nAny reserved individual products will be released back to available stock. The order history and all item details will be preserved.\n\nThis cannot be undone.`
+          : ''}
+        confirmText="Yes, Cancel Order"
+        cancelText="Keep Order"
+        variant="danger"
+        isLoading={cancelling}
+      />
     </Layout>
   );
 }
