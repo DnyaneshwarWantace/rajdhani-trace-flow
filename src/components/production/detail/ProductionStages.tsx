@@ -14,6 +14,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 interface ProductionStagesProps {
   batchId: string;
@@ -75,15 +76,6 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   if (loading) {
     return <div className="text-center py-8">Loading stage details...</div>;
@@ -179,7 +171,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                     {material.consumed_at && (
                       <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                         <Calendar className="w-3 h-3" />
-                        {formatDate(material.consumed_at)}
+                        {formatIndianDateTime(material.consumed_at)}
                       </div>
                     )}
                   </div>
@@ -274,13 +266,13 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                       {step.started_at && (
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          Started: {formatDate(step.started_at)}
+                          Started: {formatIndianDateTime(step.started_at)}
                         </div>
                       )}
                       {step.completed_at && (
                         <div className="flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-green-600" />
-                          Completed: {formatDate(step.completed_at)}
+                          Completed: {formatIndianDateTime(step.completed_at)}
                         </div>
                       )}
                     </div>
@@ -360,7 +352,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                         {wastage.recorded_at && (
                           <>
                             <span>•</span>
-                            {formatDate(wastage.recorded_at)}
+                            {formatIndianDateTime(wastage.recorded_at)}
                           </>
                         )}
                       </div>
@@ -453,7 +445,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
 
                     {product.created_at && (
                       <div className="mt-2 text-xs text-gray-500">
-                        Created: {formatDate(product.created_at)}
+                        Created: {formatIndianDateTime(product.created_at)}
                       </div>
                     )}
                   </div>

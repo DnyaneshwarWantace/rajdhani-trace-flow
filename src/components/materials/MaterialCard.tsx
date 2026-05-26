@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { ShoppingCart, Edit, Trash2, Droplets } from 'lucide-react';
+import { ShoppingCart, Edit, Droplets } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
 import {
   Tooltip,
@@ -16,7 +15,6 @@ interface MaterialCardProps {
   material: RawMaterial;
   onView?: (material: RawMaterial) => void;
   onEdit?: (material: RawMaterial) => void;
-  onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
   onRecordUsage?: (material: RawMaterial) => void;
   showActions?: boolean;
@@ -28,15 +26,12 @@ export default function MaterialCard({
   material,
   onView,
   onEdit,
-  onDelete,
   onOrder,
   onRecordUsage,
   showActions = true,
   isSelected = false,
   onClick,
 }: MaterialCardProps) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const [imageViewOpen, setImageViewOpen] = useState(false);
   
   // Calculate available stock for raw materials
@@ -246,20 +241,6 @@ export default function MaterialCard({
               >
                 <Edit className="w-3 h-3 mr-1" />
                 Edit
-              </Button>
-            )}
-            {onDelete && isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(material);
-                }}
-                className="flex-1 text-[10px] py-1.5 h-auto text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Delete
               </Button>
             )}
             {onOrder && (

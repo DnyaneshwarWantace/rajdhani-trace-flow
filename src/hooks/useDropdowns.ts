@@ -8,24 +8,25 @@ interface UseToast {
 
 export function useDropdowns(toast: UseToast['toast']) {
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOption[]>([]);
+  const [usageMap, setUsageMap] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const loadDropdowns = useCallback(async () => {
     try {
       setLoading(true);
-      // Use DropdownService which has proper headers and error handling
       const { getApiUrl } = await import('@/utils/apiConfig');
       const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_URL}/dropdowns`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` }),
+      };
+
+      const [response, usageResponse] = await Promise.all([
+        fetch(`${API_URL}/dropdowns`, { method: 'GET', headers }),
+        fetch(`${API_URL}/dropdowns/usage`, { method: 'GET', headers }),
+      ]);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -34,8 +35,7 @@ export function useDropdowns(toast: UseToast['toast']) {
       }
 
       const result = await response.json();
-      
-      // Backend returns { success: true, data: options[] } where options is a flat array
+
       if (result.success && Array.isArray(result.data)) {
         setDropdownOptions(result.data);
       } else if (Array.isArray(result.data)) {
@@ -43,6 +43,13 @@ export function useDropdowns(toast: UseToast['toast']) {
       } else {
         console.warn('Unexpected dropdown data format:', result);
         setDropdownOptions([]);
+      }
+
+      if (usageResponse.ok) {
+        const usageResult = await usageResponse.json();
+        if (usageResult.success && usageResult.data) {
+          setUsageMap(usageResult.data);
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load dropdowns';
@@ -193,14 +200,19 @@ export function useDropdowns(toast: UseToast['toast']) {
 
   const toggleActive = async (option: DropdownOption) => {
     try {
-      // Prefer custom id field, fallback to _id
       const idToToggle = option.id || option._id;
       await DropdownService.toggleActive(idToToggle);
+      setDropdownOptions(prev =>
+        prev.map(opt =>
+          (opt._id === option._id || opt.id === option.id)
+            ? { ...opt, is_active: !opt.is_active }
+            : opt
+        )
+      );
       toast({
         title: 'Success',
         description: `Option ${option.is_active ? 'deactivated' : 'activated'} successfully`,
       });
-      await loadDropdowns();
     } catch (err) {
       toast({
         title: 'Error',
@@ -212,6 +224,7 @@ export function useDropdowns(toast: UseToast['toast']) {
 
   return {
     dropdownOptions,
+    usageMap,
     loading,
     saving,
     getOptionsByCategory,
@@ -223,4 +236,3 @@ export function useDropdowns(toast: UseToast['toast']) {
     reload: loadDropdowns,
   };
 }
-

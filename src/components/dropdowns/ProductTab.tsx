@@ -7,7 +7,7 @@ interface ProductTabProps {
   getOptionsByCategory: (category: string) => DropdownOption[];
   formData: Record<string, { value: string; unit: string }>;
   simpleFormData: Record<string, string>;
-  onEdit: (option: DropdownOption) => void;
+  usageMap: Record<string, boolean>;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   onAddCombined: (valueCategory: string) => void;
@@ -20,7 +20,7 @@ export default function ProductTab({
   getOptionsByCategory,
   formData,
   simpleFormData,
-  onEdit,
+  usageMap,
   onDelete,
   onToggleActive,
   onAddCombined,
@@ -42,7 +42,7 @@ export default function ProductTab({
           units={getOptionsByCategory(section.unitCategory) || []}
           formData={formData[section.valueCategory] || { value: '', unit: '' }}
           simpleFormData={simpleFormData[section.unitCategory] || ''}
-          onEdit={onEdit}
+          usageMap={usageMap}
           onDelete={onDelete}
           onToggleActive={onToggleActive}
           onAddCombined={onAddCombined}
@@ -59,7 +59,7 @@ export default function ProductTab({
           category={category}
           options={getOptionsByCategory(category.category) || []}
           formValue={simpleFormData[category.category] || ''}
-          onEdit={onEdit}
+          usageMap={usageMap}
           onDelete={onDelete}
           onToggleActive={onToggleActive}
           onAdd={onAddSimple}
@@ -69,4 +69,3 @@ export default function ProductTab({
     </>
   );
 }
-

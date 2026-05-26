@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { History, Package, CheckCircle, DollarSign, Edit, AlertCircle } from 'lucide-react';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 interface ActivityLog {
   action: string;
@@ -105,7 +106,7 @@ export function ActivityTimeline({ activities }: ActivityTimelineProps) {
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
                     <span className="font-medium">{activity.performed_by}</span>
                     <span>•</span>
-                    <span>{new Date(activity.timestamp).toLocaleString()}</span>
+                    <span>{formatIndianDateTime(activity.timestamp)}</span>
                   </div>
 
                   {/* Show additional details if available */}

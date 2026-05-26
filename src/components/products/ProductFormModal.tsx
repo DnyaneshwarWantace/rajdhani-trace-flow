@@ -167,15 +167,19 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
     lengthUnits,
     widthUnits,
     weightUnits,
-    lengths, // Combined values
-    widths, // Combined values
-    weights, // Combined values
+    lengths,
+    widths,
+    weights,
     reloadDropdowns,
-    deleteCategory,
-    deleteSubcategory,
-    deleteColor,
-    deletePattern,
-    deleteUnit,
+    categoryOptions,
+    subcategoryOptions,
+    colorOptions,
+    patternOptions,
+    unitOptions,
+    lengthOptions,
+    widthOptions,
+    weightOptions,
+    usageMap,
   } = useProductFormDropdowns();
 
   // Load dropdowns when dialog opens
@@ -715,23 +719,25 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                   patterns={patterns}
                   patternImageMap={patternImageMap}
                   onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                  onDeleteCategory={deleteCategory}
-                  onDeleteSubcategory={deleteSubcategory}
-                  onDeleteColor={deleteColor}
-                  onDeletePattern={deletePattern}
                   reloadDropdowns={reloadDropdowns}
                   touchedFields={touchedFields}
                   markFieldTouched={markFieldTouched}
+                  categoryOptions={categoryOptions}
+                  subcategoryOptions={subcategoryOptions}
+                  colorOptions={colorOptions}
+                  patternOptions={patternOptions}
+                  usageMap={usageMap}
                 />
                 <ProductStockSection
                   formData={formData}
                   units={units}
                   onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                  onDeleteUnit={deleteUnit}
                   reloadDropdowns={reloadDropdowns}
                   mode={mode}
                   touchedFields={touchedFields}
                   markFieldTouched={markFieldTouched}
+                  unitOptions={unitOptions}
+                  usageMap={usageMap}
                 />
               </div>
             )}
@@ -751,6 +757,10 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
                   onReload={reloadDropdowns}
                   touchedFields={touchedFields}
                   markFieldTouched={markFieldTouched}
+                  lengthOptions={lengthOptions}
+                  widthOptions={widthOptions}
+                  weightOptions={weightOptions}
+                  usageMap={usageMap}
                 />
                 <ProductNotesSection
                   formData={formData}

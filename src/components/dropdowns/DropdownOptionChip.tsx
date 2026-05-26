@@ -1,10 +1,10 @@
-import { Edit, Trash2, Plus, X } from 'lucide-react';
+import { Trash2, Check, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { DropdownOption } from '@/types/dropdown';
 
 interface DropdownOptionChipProps {
   option: DropdownOption;
-  onEdit: (option: DropdownOption) => void;
+  isUsed: boolean;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   variant?: 'value' | 'unit';
@@ -12,7 +12,7 @@ interface DropdownOptionChipProps {
 
 export default function DropdownOptionChip({
   option,
-  onEdit,
+  isUsed,
   onDelete,
   onToggleActive,
   variant = 'value',
@@ -25,15 +25,6 @@ export default function DropdownOptionChip({
       <Button
         size="sm"
         variant="ghost"
-        onClick={() => onEdit(option)}
-        className={`h-4 w-4 p-0 hover:${variant === 'value' ? 'bg-blue-200' : 'bg-green-200'}`}
-        title="Edit"
-      >
-        <Edit className="w-3 h-3" />
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
         onClick={() => onToggleActive(option)}
         className={`h-4 w-4 p-0 ${
           option.is_active
@@ -42,18 +33,19 @@ export default function DropdownOptionChip({
         }`}
         title={option.is_active ? 'Deactivate' : 'Activate'}
       >
-        {option.is_active ? <Plus className="w-3 h-3" /> : <X className="w-3 h-3" />}
+        {option.is_active ? <Check className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
       </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => onDelete(option)}
-        className="h-4 w-4 p-0 text-red-600 hover:bg-red-100"
-        title="Delete"
-      >
-        <Trash2 className="w-3 h-3" />
-      </Button>
+      {!isUsed && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => onDelete(option)}
+          className="h-4 w-4 p-0 text-red-600 hover:bg-red-100"
+          title="Delete"
+        >
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      )}
     </div>
   );
 }
-

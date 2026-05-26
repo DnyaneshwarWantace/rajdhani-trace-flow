@@ -37,11 +37,28 @@ export default function OrderItemForm({
   onCollapse,
   isCollapsible = false,
 }: OrderItemFormProps) {
-  const selectedProduct = item.product_id
+  const foundProduct = item.product_id
     ? item.product_type === 'raw_material'
       ? rawMaterials.find(p => p.id === item.product_id)
       : products.find(p => p.id === item.product_id)
     : null;
+
+  const selectedProduct = foundProduct ?? (item.product_id ? {
+    length: item.product_dimensions?.length,
+    width: item.product_dimensions?.width,
+    weight: item.product_dimensions?.weight,
+    gsm: (item.product_dimensions as any)?.gsm,
+    color: (item as any).color,
+    pattern: (item as any).pattern,
+    count_unit: (item as any).count_unit || item.unit,
+    unit: item.unit,
+    individual_stock_tracking: (item as any).individual_stock_tracking !== false,
+    available_stock: (item as any).available_stock ?? 0,
+    current_stock: (item as any).available_stock ?? 0,
+    length_unit: (item.product_dimensions as any)?.length_unit || (item as any).length_unit,
+    width_unit: (item.product_dimensions as any)?.width_unit || (item as any).width_unit,
+    weight_unit: (item as any).weight_unit,
+  } : null);
 
   const productWithUnits = selectedProduct ? {
     ...selectedProduct,
@@ -212,30 +229,36 @@ export default function OrderItemForm({
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Price/</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Price per</Label>
           <Select value={item.pricing_unit} onValueChange={(v: PricingUnit) => onUpdate(item.id, 'pricing_unit', v)}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {item.product_type === 'raw_material' ? (
-                selectedProduct && <SelectItem value="unit">Per {selectedProduct.unit || 'unit'}</SelectItem>
-              ) : (
-                <>
-                  {selectedProduct && <SelectItem value="unit">Per {selectedProduct.count_unit || 'roll'}</SelectItem>}
-                  <SelectItem value="sqm">SQM</SelectItem>
-                  <SelectItem value="sqft">SQFT</SelectItem>
-                  <SelectItem value="running_meter">Running Meter</SelectItem>
-                  <SelectItem value="gsm">GSM</SelectItem>
-                  <SelectItem value="kg">KG</SelectItem>
-                </>
-              )}
+                <SelectItem value="unit">Per {selectedProduct?.unit || 'unit'}</SelectItem>
+              ) : (() => {
+                const rawUnit = selectedProduct?.count_unit || 'Roll';
+                const countLabel = rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1).toLowerCase();
+                const hasDims = !!(selectedProduct?.length && selectedProduct?.width);
+                const hasWeight = !!(selectedProduct?.weight || selectedProduct?.gsm);
+                return (
+                  <>
+                    <SelectItem value="unit">Per {countLabel}</SelectItem>
+                    <SelectItem value="sqm">SQM</SelectItem>
+                    <SelectItem value="sqft">SQFT</SelectItem>
+                    <SelectItem value="running_meter">Running Meter</SelectItem>
+                    {hasWeight && <SelectItem value="gsm">GSM</SelectItem>}
+                    {hasWeight && hasDims && <SelectItem value="kg">KG</SelectItem>}
+                  </>
+                );
+              })()}
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate (₹)</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate/unit (₹)</Label>
           <Input
             type="number"
             value={item.unit_price || ''}

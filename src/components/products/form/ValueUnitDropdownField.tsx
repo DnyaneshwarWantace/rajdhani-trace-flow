@@ -9,11 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Check, EyeOff } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
-import { normalizeUnit } from '@/utils/unitConverter';
+import { normalizeUnit, displayUnit } from '@/utils/unitConverter';
+import type { DropdownOption } from '@/types/dropdown';
 
 interface ValueUnitDropdownFieldProps {
   label: string;
@@ -31,13 +42,16 @@ interface ValueUnitDropdownFieldProps {
   onReload: () => Promise<void>;
   markFieldTouched?: (fieldName: string) => void;
   fieldName?: string;
+  // Inline management
+  fullOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
-// Display a combined value with normalized unit, e.g. "5 m" → "5 Meter"
+// Display a combined value with human label, e.g. "5 m" → "5 Meter"
 const displayCombined = (combinedValue: string): string => {
   if (!combinedValue) return combinedValue;
   const match = combinedValue.trim().match(/^([\d.]+)\s+(.+)$/);
-  if (match) return `${match[1]} ${normalizeUnit(match[2].trim())}`;
+  if (match) return `${match[1]} ${displayUnit(match[2].trim())}`;
   return combinedValue;
 };
 
@@ -74,6 +88,8 @@ export default function ValueUnitDropdownField({
   onReload,
   markFieldTouched,
   fieldName,
+  fullOptions,
+  usageMap,
 }: ValueUnitDropdownFieldProps) {
   const { toast } = useToast();
   const [showAddNew, setShowAddNew] = useState(false);
@@ -82,6 +98,9 @@ export default function ValueUnitDropdownField({
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [togglingOption, setTogglingOption] = useState<DropdownOption | null>(null);
+  const [deletingOption, setDeletingOption] = useState<DropdownOption | null>(null);
 
   // Get current combined value for display
   // Ensure value is properly formatted (convert number to string if needed)
@@ -252,65 +271,6 @@ export default function ValueUnitDropdownField({
     }
   };
 
-  // Delete combined value from dropdown
-  const handleDelete = async (combinedValue: string) => {
-    try {
-      const { getApiUrl } = await import('@/utils/apiConfig');
-      const API_URL = getApiUrl();
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_URL}/dropdowns`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch dropdowns');
-      }
-
-      const result = await response.json();
-      const allDropdowns = result.success && Array.isArray(result.data) 
-        ? result.data 
-        : (Array.isArray(result.data) ? result.data : []);
-      
-      const option = allDropdowns.find((opt: any) => opt.category === category && opt.value === combinedValue);
-      
-      if (option) {
-        // Prefer custom id field, fallback to _id
-        const idToDelete = option.id || option._id;
-        await DropdownService.deleteDropdown(idToDelete);
-        await onReload();
-        
-        // If deleted value was selected, clear the form
-        if (currentCombinedValue === combinedValue) {
-          onValueChange('');
-          onUnitChange('');
-        }
-        
-        toast({
-          title: 'Success',
-          description: 'Value deleted successfully',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Value not found',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting value:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete value',
-        variant: 'destructive',
-      });
-    }
-  };
-
   if (showAddNew) {
     return (
       <div>
@@ -346,7 +306,9 @@ export default function ValueUnitDropdownField({
                 }}
               >
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select unit *" />
+                  <SelectValue placeholder="Select unit *">
+                    {newUnitInput ? displayUnit(newUnitInput) : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="add_new_unit" className="text-primary-600 font-medium">
@@ -360,7 +322,7 @@ export default function ValueUnitDropdownField({
                       .filter((opt) => opt && opt.trim() !== '')
                       .map((unitOption) => (
                         <SelectItem key={unitOption} value={unitOption}>
-                          {normalizeUnit(unitOption)}
+                          {displayUnit(unitOption)}
                         </SelectItem>
                       ))
                   ) : (
@@ -415,7 +377,7 @@ export default function ValueUnitDropdownField({
               disabled={!newValueInput.trim() || !newUnitInput.trim()}
               className="bg-primary-600 hover:bg-primary-700 text-white"
             >
-              Add {newValueInput || 'value'} {newUnitInput ? normalizeUnit(newUnitInput) : 'unit'}
+              Add {newValueInput || 'value'} {newUnitInput ? displayUnit(newUnitInput) : 'unit'}
             </Button>
             <Button
               type="button"
@@ -437,6 +399,52 @@ export default function ValueUnitDropdownField({
     );
   }
 
+  const findFullOption = (val: string): DropdownOption | undefined =>
+    fullOptions?.find((o) => o.value === val);
+
+  const isUsed = (val: string): boolean =>
+    usageMap?.[`${category}:${val}`] === true;
+
+  const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSelectOpen(false);
+    setTogglingOption(opt);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSelectOpen(false);
+    setDeletingOption(opt);
+  };
+
+  const confirmToggle = async () => {
+    if (!togglingOption) return;
+    try {
+      await DropdownService.toggleActive(togglingOption.id || togglingOption._id);
+      await onReload();
+      toast({ title: 'Success', description: `"${togglingOption.value}" ${togglingOption.is_active ? 'deactivated' : 'activated'}` });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to toggle option', variant: 'destructive' });
+    }
+    setTogglingOption(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingOption) return;
+    try {
+      await DropdownService.deleteDropdown(deletingOption.id || deletingOption._id);
+      await onReload();
+      toast({ title: 'Success', description: `"${deletingOption.value}" deleted` });
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete option', variant: 'destructive' });
+    }
+    setDeletingOption(null);
+  };
+
+  const hasManagement = !!fullOptions && fullOptions.length > 0;
+
   // Match by normalizing both stored value and current value before comparing
   const normalizedCurrentDisplay = displayCombined(currentCombinedValue).trim().toLowerCase();
   const valueExistsInDropdown = currentCombinedValue && combinedValues.some(
@@ -446,7 +454,6 @@ export default function ValueUnitDropdownField({
     val => displayCombined(val).trim().toLowerCase() === normalizedCurrentDisplay
   );
 
-  // Always use empty string instead of undefined to keep it controlled
   const selectValue = valueExistsInDropdown && exactMatch ? exactMatch : '';
 
   return (
@@ -456,7 +463,6 @@ export default function ValueUnitDropdownField({
       </Label>
       {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
 
-      {/* Show current value if it's not in dropdown */}
       {currentCombinedValue && !valueExistsInDropdown && (
         <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
           <span className="text-blue-700">Current: {displayCombined(currentCombinedValue)}</span>
@@ -465,22 +471,22 @@ export default function ValueUnitDropdownField({
       )}
 
       <Select
-        value={selectValue}
-        onValueChange={handleSelectChange}
+        open={selectOpen}
         onOpenChange={(open) => {
-          // When dropdown closes (open = false), mark field as touched
-          if (!open && markFieldTouched && fieldName) {
-            markFieldTouched(fieldName);
-          }
+          setSelectOpen(open);
+          if (!open && markFieldTouched && fieldName) markFieldTouched(fieldName);
+        }}
+        value={selectValue}
+        onValueChange={(selectedValue) => {
+          handleSelectChange(selectedValue);
+          if (selectedValue !== 'add_new') setSelectOpen(false);
+          else setSelectOpen(false);
         }}
       >
         <SelectTrigger>
-          <SelectValue
-            placeholder={displayCombined(currentCombinedValue) || `Select ${label.toLowerCase()}`}
-          />
+          <SelectValue placeholder={displayCombined(currentCombinedValue) || `Select ${label.toLowerCase()}`} />
         </SelectTrigger>
         <SelectContent>
-          {/* Search Input */}
           <div className="p-2 border-b">
             <Input
               placeholder={`Search ${label.toLowerCase()}...`}
@@ -491,7 +497,6 @@ export default function ValueUnitDropdownField({
             />
           </div>
 
-          {/* Add New Option */}
           <SelectItem value="add_new" className="text-primary-600 font-medium pr-10 pl-7 text-left">
             <div className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
@@ -499,39 +504,86 @@ export default function ValueUnitDropdownField({
             </div>
           </SelectItem>
 
-          {/* N/A Option - Completely removed for required fields (length, width, weight) */}
-
-          {/* Combined Values with Delete */}
           {filteredValues.length > 0 ? (
-            filteredValues.map((combinedValue) => (
-              <div key={combinedValue} className="relative flex items-center">
-                <SelectItem value={combinedValue} className="flex-1 pr-8">
-                  <span className="truncate block max-w-[200px] text-sm">{displayCombined(combinedValue)}</span>
-                </SelectItem>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 z-10"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleDelete(combinedValue);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))
+            filteredValues.map((combinedValue) => {
+              const fullOpt = findFullOption(combinedValue);
+              const used = isUsed(combinedValue);
+              return (
+                <div key={combinedValue} className="relative flex items-center group">
+                  <SelectItem value={combinedValue} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>
+                    <span className="truncate block max-w-[200px] text-sm">{displayCombined(combinedValue)}</span>
+                  </SelectItem>
+                  {hasManagement && fullOpt && (
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
+                      <button
+                        type="button"
+                        title={fullOpt.is_active ? 'Deactivate' : 'Activate'}
+                        className="p-1 rounded hover:bg-gray-100"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => handleToggleClick(e, fullOpt)}
+                      >
+                        {fullOpt.is_active
+                          ? <Check className="w-3 h-3 text-green-600" />
+                          : <EyeOff className="w-3 h-3 text-gray-400" />}
+                      </button>
+                      {!used && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          className="p-1 rounded hover:bg-red-50"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => handleDeleteClick(e, fullOpt)}
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
             <div className="p-2 text-sm text-gray-500 text-center">
-              {searchTerm
-                ? `No ${label.toLowerCase()} found matching "${searchTerm}"`
-                : `No ${label.toLowerCase()} available`}
+              {searchTerm ? `No ${label.toLowerCase()} found matching "${searchTerm}"` : `No ${label.toLowerCase()} available`}
             </div>
           )}
         </SelectContent>
       </Select>
+
+      <AlertDialog open={!!togglingOption} onOpenChange={(open) => !open && setTogglingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{togglingOption?.is_active ? 'Deactivate Option' : 'Activate Option'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {togglingOption?.is_active
+                ? `Deactivate "${togglingOption?.value}"? It will be hidden from dropdowns but existing records keep it.`
+                : `Activate "${togglingOption?.value}"? It will become available in dropdowns again.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmToggle}
+              className={togglingOption?.is_active ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}
+            >
+              {togglingOption?.is_active ? 'Deactivate' : 'Activate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deletingOption} onOpenChange={(open) => !open && setDeletingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Option</AlertDialogTitle>
+            <AlertDialogDescription>Delete &quot;{deletingOption?.value}&quot;? This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

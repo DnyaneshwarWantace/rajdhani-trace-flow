@@ -5,13 +5,12 @@ import DropdownTabs from '@/components/dropdowns/DropdownTabs';
 import ProductTab from '@/components/dropdowns/ProductTab';
 import MaterialTab from '@/components/dropdowns/MaterialTab';
 import ProductionTab from '@/components/dropdowns/ProductionTab';
-import EditDropdownDialog from '@/components/dropdowns/EditDropdownDialog';
 import DeleteDropdownDialog from '@/components/dropdowns/DeleteDropdownDialog';
+import ToggleDropdownDialog from '@/components/dropdowns/ToggleDropdownDialog';
 import { useDropdowns } from '@/hooks/useDropdowns';
 import type { DropdownOption } from '@/types/dropdown';
 import type { TabType } from '@/config/dropdownConfig';
 
-// Simple toast implementation - memoized to prevent re-renders
 const toastFunction = ({
   title,
   description,
@@ -31,32 +30,20 @@ const toastFunction = ({
 
 export default function DropdownMaster() {
   const [activeTab, setActiveTab] = useState<TabType>('product');
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingOption, setEditingOption] = useState<DropdownOption | null>(null);
   const [deletingOption, setDeletingOption] = useState<DropdownOption | null>(null);
+  const [togglingOption, setTogglingOption] = useState<DropdownOption | null>(null);
   const [formData, setFormData] = useState<Record<string, { value: string; unit: string }>>({});
   const [simpleFormData, setSimpleFormData] = useState<Record<string, string>>({});
 
   const {
     loading,
-    saving,
+    usageMap,
     getOptionsByCategory,
     addCombined,
     addSimple,
-    updateOption,
     deleteOption,
     toggleActive,
   } = useDropdowns(toastFunction);
-
-  const handleEdit = (option: DropdownOption) => {
-    setEditingOption(option);
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSaveEdit = async (id: string, value: string, displayOrder: number) => {
-    await updateOption(id, value, displayOrder);
-    setIsEditDialogOpen(false);
-  };
 
   const handleAddCombined = async (valueCategory: string) => {
     const data = formData[valueCategory] || { value: '', unit: '' };
@@ -99,19 +86,17 @@ export default function DropdownMaster() {
           <p className="text-sm text-gray-600">Manage all dropdown options, units, and data</p>
         </div>
 
-        {/* Navigation Tabs - Same style as Product page */}
         <DropdownTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Tab Content */}
         <div className="space-y-6">
           {activeTab === 'product' && (
             <ProductTab
               getOptionsByCategory={getOptionsByCategory}
               formData={formData}
               simpleFormData={simpleFormData}
-              onEdit={handleEdit}
+              usageMap={usageMap}
               onDelete={(opt) => setDeletingOption(opt)}
-              onToggleActive={toggleActive}
+              onToggleActive={(opt) => setTogglingOption(opt)}
               onAddCombined={handleAddCombined}
               onAddSimple={handleAddSimple}
               onFormDataChange={handleFormDataChange}
@@ -123,9 +108,9 @@ export default function DropdownMaster() {
             <MaterialTab
               getOptionsByCategory={getOptionsByCategory}
               simpleFormData={simpleFormData}
-              onEdit={handleEdit}
+              usageMap={usageMap}
               onDelete={(opt) => setDeletingOption(opt)}
-              onToggleActive={toggleActive}
+              onToggleActive={(opt) => setTogglingOption(opt)}
               onAddSimple={handleAddSimple}
               onSimpleFormDataChange={handleSimpleFormDataChange}
             />
@@ -135,30 +120,27 @@ export default function DropdownMaster() {
             <ProductionTab
               getOptionsByCategory={getOptionsByCategory}
               simpleFormData={simpleFormData}
-              onEdit={handleEdit}
+              usageMap={usageMap}
               onDelete={(opt) => setDeletingOption(opt)}
-              onToggleActive={toggleActive}
+              onToggleActive={(opt) => setTogglingOption(opt)}
               onAddSimple={handleAddSimple}
               onSimpleFormDataChange={handleSimpleFormDataChange}
             />
           )}
         </div>
 
-        {/* Edit Dialog */}
-        <EditDropdownDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          option={editingOption}
-          onSave={handleSaveEdit}
-          saving={saving}
-        />
-
-        {/* Delete Confirmation Dialog */}
         <DeleteDropdownDialog
           open={!!deletingOption}
           onOpenChange={(open: boolean) => !open && setDeletingOption(null)}
           option={deletingOption}
           onDelete={deleteOption}
+        />
+
+        <ToggleDropdownDialog
+          open={!!togglingOption}
+          onOpenChange={(open: boolean) => !open && setTogglingOption(null)}
+          option={togglingOption}
+          onConfirm={toggleActive}
         />
       </div>
     </Layout>

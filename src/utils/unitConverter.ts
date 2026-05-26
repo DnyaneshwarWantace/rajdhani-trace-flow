@@ -365,8 +365,44 @@ export function calculatePricingUnitQuantity(
 }
 
 /**
- * Canonical display labels for each unit.
- * Whatever the user typed, we show this consistent label.
+ * Maps any unit variant → the canonical storage key (matches what backend stores).
+ * e.g. "Meter", "M", "mtr" → "m"   "Feet", "FT" → "feet"
+ */
+const UNIT_STORAGE_KEY: Record<string, string> = {
+  // Meter
+  m: 'm', meter: 'm', meters: 'm', metre: 'm', metres: 'm',
+  mr: 'm', mtr: 'm', mts: 'm', 'mtr.': 'm',
+  // cm
+  cm: 'cm', centimeter: 'cm', centimeters: 'cm', centimetre: 'cm', centimetres: 'cm',
+  // mm
+  mm: 'mm', millimeter: 'mm', millimeters: 'mm', millimetre: 'mm', millimetres: 'mm',
+  // Feet
+  ft: 'feet', feet: 'feet', foot: 'feet',
+  // Inches
+  in: 'inch', inch: 'inch', inches: 'inch',
+  // Yards
+  yd: 'yard', yard: 'yard', yards: 'yard',
+  // km
+  km: 'km', kilometer: 'km', kilometers: 'km', kilometre: 'km', kilometres: 'km',
+  // GSM
+  gsm: 'GSM', 'g/sm': 'GSM', 'g/m²': 'GSM', 'g/m2': 'GSM',
+};
+
+/** Maps storage key → human-readable display label shown in UI. */
+const UNIT_DISPLAY_LABEL: Record<string, string> = {
+  m: 'Meter',
+  cm: 'cm',
+  mm: 'mm',
+  feet: 'Feet',
+  inch: 'Inches',
+  yard: 'Yards',
+  km: 'km',
+  GSM: 'GSM',
+};
+
+/**
+ * Kept for backward-compat — used internally.
+ * @deprecated Use normalizeUnit + displayUnit separately.
  */
 export const UNIT_DISPLAY: Record<string, string> = {
   m: 'Meter', meter: 'Meter', meters: 'Meter', metre: 'Meter', metres: 'Meter',
@@ -379,15 +415,25 @@ export const UNIT_DISPLAY: Record<string, string> = {
 };
 
 /**
- * Normalizes any unit variant the user typed to a canonical stored/display value.
- * e.g. "M", "mtr", "Meter", "metre" → "m"
- *      "Centimeter", "CM" → "cm"
- * Unknown units are returned as-is (trimmed, lowercased).
+ * Normalizes any unit variant to the canonical storage key (what backend stores).
+ * "Meter" | "M" | "mtr" → "m"    "Feet" | "FT" → "feet"
+ * Unknown units are returned lowercased and trimmed.
  */
 export function normalizeUnit(unit: string): string {
   if (!unit) return 'm';
-  const key = unit.trim().toLowerCase().replace(/\.$/, ''); // strip trailing dot
-  return UNIT_DISPLAY[key] ?? key;
+  const key = unit.trim().toLowerCase().replace(/\.$/, '');
+  return UNIT_STORAGE_KEY[key] ?? UNIT_STORAGE_KEY[unit.trim()] ?? key;
+}
+
+/**
+ * Returns the human-readable display label for any unit variant.
+ * "m" | "M" | "Meter" | "mtr" → "Meter"
+ * "feet" | "ft" | "Feet" → "Feet"
+ */
+export function displayUnit(unit: string): string {
+  if (!unit) return '';
+  const storageKey = normalizeUnit(unit);
+  return UNIT_DISPLAY_LABEL[storageKey] ?? UNIT_DISPLAY[unit.trim().toLowerCase().replace(/\.$/, '')] ?? storageKey;
 }
 
 /**

@@ -5,7 +5,7 @@ import { simpleCategories } from '@/config/dropdownConfig';
 interface MaterialTabProps {
   getOptionsByCategory: (category: string) => DropdownOption[];
   simpleFormData: Record<string, string>;
-  onEdit: (option: DropdownOption) => void;
+  usageMap: Record<string, boolean>;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   onAddSimple: (category: string) => void;
@@ -15,7 +15,7 @@ interface MaterialTabProps {
 export default function MaterialTab({
   getOptionsByCategory,
   simpleFormData,
-  onEdit,
+  usageMap,
   onDelete,
   onToggleActive,
   onAddSimple,
@@ -31,7 +31,7 @@ export default function MaterialTab({
           category={category}
           options={getOptionsByCategory(category.category) || []}
           formValue={simpleFormData[category.category] || ''}
-          onEdit={onEdit}
+          usageMap={usageMap}
           onDelete={onDelete}
           onToggleActive={onToggleActive}
           onAdd={onAddSimple}
@@ -41,4 +41,3 @@ export default function MaterialTab({
     </>
   );
 }
-

@@ -9,9 +9,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Check, EyeOff } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
+import type { DropdownOption } from '@/types/dropdown';
 
 interface MaterialUnitSectionProps {
   unit: string;
@@ -21,13 +32,51 @@ interface MaterialUnitSectionProps {
   hasError?: boolean;
   touchedFields?: Set<string>;
   markFieldTouched?: (fieldName: string) => void;
+  fullOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
 const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionProps>(
-  ({ unit, units, onUnitChange, onUnitsReload, hasError = false, touchedFields = new Set(), markFieldTouched = () => {} }, ref) => {
+  ({ unit, units, onUnitChange, onUnitsReload, hasError = false, touchedFields = new Set(), markFieldTouched = () => {}, fullOptions, usageMap }, ref) => {
   const { toast } = useToast();
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitName, setNewUnitName] = useState('');
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [togglingOption, setTogglingOption] = useState<DropdownOption | null>(null);
+  const [deletingOption, setDeletingOption] = useState<DropdownOption | null>(null);
+
+  const findFullOption = (val: string): DropdownOption | undefined =>
+    fullOptions?.find((o) => o.value === val);
+  const isUsed = (val: string): boolean =>
+    usageMap?.[`material_unit:${val}`] === true;
+  const hasManagement = !!fullOptions && fullOptions.length > 0;
+
+  const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation(); e.preventDefault();
+    setSelectOpen(false); setTogglingOption(opt);
+  };
+  const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation(); e.preventDefault();
+    setSelectOpen(false); setDeletingOption(opt);
+  };
+  const confirmToggle = async () => {
+    if (!togglingOption) return;
+    try {
+      await DropdownService.toggleActive(togglingOption.id || togglingOption._id);
+      onUnitsReload();
+      toast({ title: 'Success', description: `"${togglingOption.value}" ${togglingOption.is_active ? 'deactivated' : 'activated'}` });
+    } catch { toast({ title: 'Error', description: 'Failed to toggle', variant: 'destructive' }); }
+    setTogglingOption(null);
+  };
+  const confirmDelete = async () => {
+    if (!deletingOption) return;
+    try {
+      await DropdownService.deleteDropdown(deletingOption.id || deletingOption._id);
+      onUnitsReload();
+      toast({ title: 'Success', description: `"${deletingOption.value}" deleted` });
+    } catch { toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' }); }
+    setDeletingOption(null);
+  };
 
   // Handler for unit name: letters and spaces only (no numbers/special chars), max 2 words, max 10 chars per word
   const handleUnitNameChange = (value: string) => {
@@ -115,76 +164,23 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
     }
   };
 
-  const handleDeleteUnit = async (unitToDelete: string) => {
-    try {
-      const { getApiUrl } = await import('@/utils/apiConfig');
-      const API_URL = getApiUrl();
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_URL}/dropdowns`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch dropdowns');
-      }
-
-      const result = await response.json();
-      const allDropdowns = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result.data) ? result.data : []);
-      const option = allDropdowns.find((opt: any) => opt.category === 'material_unit' && opt.value === unitToDelete);
-      
-      if (option && option._id) {
-        await DropdownService.deleteDropdown(option._id);
-        toast({
-          title: 'Unit Deleted',
-          description: `"${unitToDelete}" has been deleted.`,
-        });
-        if (unit === unitToDelete) {
-          onUnitChange('');
-        }
-        onUnitsReload();
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Unit option not found',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting unit:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete unit',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <div>
       <Label htmlFor="unit">Unit *</Label>
       <div className="space-y-2">
         <Select
+          open={selectOpen}
+          onOpenChange={(open) => {
+            setSelectOpen(open);
+            if (!open) markFieldTouched('unit');
+          }}
           value={unit || ''}
           onValueChange={(value) => {
-            if (value === 'add_new') {
-              setShowAddUnit(true);
-            } else {
-              onUnitChange(value);
-              markFieldTouched('unit');
-            }
-          }}
-          onOpenChange={(open) => {
-            if (!open) {
-              markFieldTouched('unit');
-            }
+            if (value === 'add_new') { setShowAddUnit(true); setSelectOpen(false); }
+            else { onUnitChange(value); markFieldTouched('unit'); setSelectOpen(false); }
           }}
         >
-          <SelectTrigger 
+          <SelectTrigger
             ref={ref}
             id="unit"
             className={(hasError || (touchedFields.has('unit') && !unit.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
@@ -193,37 +189,32 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
           </SelectTrigger>
           <SelectContent>
             {units.length > 0 ? (
-              units
-                .filter((u) => u && u.trim() !== '')
-                .map((u) => (
-                  <div key={u} className="relative flex items-center">
-                    <SelectItem value={u} className="flex-1">
-                      {u}
-                    </SelectItem>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleDeleteUnit(u);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+              units.filter((u) => u && u.trim() !== '').map((u) => {
+                const fullOpt = findFullOption(u);
+                const used = isUsed(u);
+                return (
+                  <div key={u} className="relative flex items-center group">
+                    <SelectItem value={u} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>{u}</SelectItem>
+                    {hasManagement && fullOpt && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
+                        <button type="button" title={fullOpt.is_active ? 'Deactivate' : 'Activate'} className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
+                          {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                        </button>
+                        {!used && (
+                          <button type="button" title="Delete" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))
+                );
+              })
             ) : (
-              <SelectItem value="no_units" disabled>
-                No units available
-              </SelectItem>
+              <SelectItem value="no_units" disabled>No units available</SelectItem>
             )}
             <SelectItem value="add_new" className="text-primary-600 font-medium">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add New Unit
-              </div>
+              <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Unit</div>
             </SelectItem>
           </SelectContent>
         </Select>
@@ -263,6 +254,38 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!togglingOption} onOpenChange={(open) => !open && setTogglingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{togglingOption?.is_active ? 'Deactivate Option' : 'Activate Option'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {togglingOption?.is_active
+                ? `Deactivate "${togglingOption?.value}"? It will be hidden from dropdowns but existing records keep it.`
+                : `Activate "${togglingOption?.value}"? It will become available again.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmToggle} className={togglingOption?.is_active ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}>
+              {togglingOption?.is_active ? 'Deactivate' : 'Activate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deletingOption} onOpenChange={(open) => !open && setDeletingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Option</AlertDialogTitle>
+            <AlertDialogDescription>Delete &quot;{deletingOption?.value}&quot;? This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 });

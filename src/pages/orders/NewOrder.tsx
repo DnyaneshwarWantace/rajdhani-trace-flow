@@ -13,7 +13,7 @@ import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
 import { usePricingCalculator, type ExtendedOrderItem } from '@/hooks/usePricingCalculator';
 import { type ProductDimensions } from '@/utils/unitConverter';
-import { formatCurrency, formatErrorMessage } from '@/utils/formatHelpers';
+import { formatCurrency, formatErrorMessage, formatIndianDate } from '@/utils/formatHelpers';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 import CustomerSelection from '@/components/orders/CustomerSelection';
 import CustomerForm from '@/components/orders/CustomerForm';
@@ -179,9 +179,9 @@ export default function NewOrder() {
   const [productCategoryFilter, setProductCategoryFilter] = useState('all');
   const [productColorFilter, setProductColorFilter] = useState('all');
   const [productPage, setProductPage] = useState(1);
-  const [productItemsPerPage] = useState(500);
+  const [productItemsPerPage] = useState(20);
   const [materialPage, setMaterialPage] = useState(1);
-  const [materialItemsPerPage] = useState(500);
+  const [materialItemsPerPage] = useState(20);
   const [productSortBy, setProductSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
   const [productSortOrder, setProductSortOrder] = useState<'asc' | 'desc'>('asc');
   const [materialSortBy, setMaterialSortBy] = useState<'name' | 'stock' | 'category' | 'recent'>('name');
@@ -194,15 +194,20 @@ export default function NewOrder() {
   const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{ address: string; city: string; state: string; pincode: string } | null>(null);
   const [showAddressEditor, setShowAddressEditor] = useState(false);
 
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const saveDraft = useCallback(() => {
     if (!draftRestoredRef.current) return;
-    try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
-        step, selectedCustomer, orderItems, orderDetails,
-        transportType, transportVehicleNo, transportRemark, orderDeliveryAddress,
-      }));
-      setDraftSavedAt(new Date());
-    } catch { }
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
+          step, selectedCustomer, orderItems, orderDetails,
+          transportType, transportVehicleNo, transportRemark, orderDeliveryAddress,
+        }));
+        setDraftSavedAt(new Date());
+      } catch { }
+    }, 800);
   }, [step, selectedCustomer, orderItems, orderDetails, transportType, transportVehicleNo, transportRemark, orderDeliveryAddress]);
 
   useEffect(() => { saveDraft(); }, [saveDraft]);
@@ -238,7 +243,11 @@ export default function NewOrder() {
     loadRawMaterialsWithFilters();
   }, []);
 
-  useEffect(() => { loadProductsWithFilters(); }, [productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder]);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => { setProductPage(1); loadProductsWithFilters(); }, productSearchTerm ? 350 : 0);
+  }, [productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder]);
   useEffect(() => { loadRawMaterialsWithFilters(); }, [materialSortBy, materialSortOrder]);
 
   const loadCustomers = async () => {
@@ -248,12 +257,12 @@ export default function NewOrder() {
 
   const loadProductsWithFilters = async () => {
     try {
-      const filters: any = { page: 1, limit: productItemsPerPage, sortBy: productSortBy === 'recent' ? 'created_at' : productSortBy, sortOrder: productSortOrder };
-      if (productSearchTerm) filters.search = productSearchTerm;
-      if (productCategoryFilter !== 'all') filters.category = [productCategoryFilter];
-      if (productColorFilter !== 'all') filters.color = [productColorFilter];
-      const { products: data } = await ProductService.getProducts(filters);
-      setRealProducts((data || []).map((p: any) => ({
+      const baseFilters: any = { limit: 100, sortBy: productSortBy === 'recent' ? 'created_at' : productSortBy, sortOrder: productSortOrder };
+      if (productSearchTerm) baseFilters.search = productSearchTerm;
+      if (productCategoryFilter !== 'all') baseFilters.category = [productCategoryFilter];
+      if (productColorFilter !== 'all') baseFilters.color = [productColorFilter];
+
+      const mapProduct = (p: any) => ({
         id: p.id || p._id, name: p.name, price: p.price || 0,
         current_stock: p.current_stock || p.base_quantity || 0, stock: p.current_stock || p.base_quantity || 0,
         category: p.category, subcategory: p.subcategory || '', color: p.color, pattern: p.pattern,
@@ -264,15 +273,27 @@ export default function NewOrder() {
         individual_stock_tracking: p.individual_stock_tracking !== false,
         individualStockTracking: p.individual_stock_tracking !== false,
         imageUrl: p.image_url || '',
-      })));
+      });
+
+      const first = await ProductService.getProducts({ ...baseFilters, page: 1 });
+      const all = [...(first.products || [])];
+      const total = first.total || 0;
+      const pages = Math.ceil(total / 100);
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, i) =>
+          ProductService.getProducts({ ...baseFilters, page: i + 2 })
+        )
+      );
+      rest.forEach(r => all.push(...(r.products || [])));
+      setRealProducts(all.map(mapProduct));
     } catch (e) { console.error(e); }
   };
 
   const loadRawMaterialsWithFilters = async () => {
     try {
-      const filters: any = { page: 1, limit: materialItemsPerPage, sortBy: materialSortBy === 'recent' ? 'created_at' : materialSortBy, sortOrder: materialSortOrder };
-      const result = await MaterialService.getMaterials(filters);
-      setRawMaterials((result.materials || []).map((m: any) => ({
+      const baseFilters: any = { limit: 100, sortBy: materialSortBy === 'recent' ? 'created_at' : materialSortBy, sortOrder: materialSortOrder };
+
+      const mapMaterial = (m: any) => ({
         id: m.id || m._id, name: m.name, price: m.cost_per_unit || 0,
         current_stock: m.current_stock || 0, stock: m.current_stock || 0,
         available_stock: m.available_stock, reserved: m.reserved, in_production: m.in_production,
@@ -280,7 +301,19 @@ export default function NewOrder() {
         brand: m.supplier_name || 'Unknown', unit: m.unit,
         supplier: m.supplier_name || 'Unknown', supplier_name: m.supplier_name || 'Unknown',
         batch_number: m.batch_number, status: m.status || 'in-stock', location: 'Warehouse',
-      })));
+      });
+
+      const first = await MaterialService.getMaterials({ ...baseFilters, page: 1 });
+      const all = [...(first.materials || [])];
+      const total = first.total || 0;
+      const pages = Math.ceil(total / 100);
+      const rest = await Promise.all(
+        Array.from({ length: pages - 1 }, (_, i) =>
+          MaterialService.getMaterials({ ...baseFilters, page: i + 2 })
+        )
+      );
+      rest.forEach(r => all.push(...(r.materials || [])));
+      setRawMaterials(all.map(mapMaterial));
     } catch (e) { console.error(e); }
   };
 
@@ -312,6 +345,9 @@ export default function NewOrder() {
           updated.unit = updated.product_type === 'raw_material' ? (product.unit || 'units') : (product.count_unit || 'rolls');
           const productDimensions: ProductDimensions = { productType: updated.product_type === 'raw_material' ? 'raw_material' : 'carpet', width: product.width, length: product.length, weight: product.weight, gsm: product.gsm, length_unit: product.length_unit, width_unit: product.width_unit } as any;
           (updated as any).length_unit = product.length_unit; (updated as any).width_unit = product.width_unit; (updated as any).weight_unit = product.weight_unit;
+          (updated as any).color = product.color; (updated as any).pattern = product.pattern;
+          (updated as any).count_unit = product.count_unit; (updated as any).individual_stock_tracking = product.individual_stock_tracking;
+          (updated as any).available_stock = product.available_stock ?? product.current_stock ?? 0;
           updated.product_dimensions = productDimensions; updated.pricing_unit = 'unit';
           const calc = pricingCalculator.calculateItemPrice(updated);
           updated.subtotal = calc.subtotal; updated.gst_amount = calc.gstAmount; updated.total_price = calc.totalPrice; updated.unit_value = calc.unitValue; updated.isValid = calc.isValid; updated.errorMessage = calc.errorMessage;
@@ -748,7 +784,7 @@ export default function NewOrder() {
                 <div className="grid grid-cols-4 divide-x divide-slate-100">
                   <div className="px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Delivery date</p>
-                    <p className="text-sm text-slate-800 font-medium">{orderDetails.expectedDelivery || '—'}</p>
+                    <p className="text-sm text-slate-800 font-medium">{orderDetails.expectedDelivery ? formatIndianDate(orderDetails.expectedDelivery) : '—'}</p>
                   </div>
                   <div className="px-4 py-3">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Transport</p>

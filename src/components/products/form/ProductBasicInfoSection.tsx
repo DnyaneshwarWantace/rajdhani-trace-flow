@@ -2,6 +2,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProductDropdownField from './ProductDropdownField';
 import type { ProductFormData } from '@/types/product';
+import type { DropdownOption } from '@/types/dropdown';
 
 interface ProductBasicInfoSectionProps {
   formData: ProductFormData;
@@ -12,13 +13,14 @@ interface ProductBasicInfoSectionProps {
   patterns: string[];
   patternImageMap?: Record<string, string>;
   onFormDataChange: (data: Partial<ProductFormData>) => void;
-  onDeleteCategory: (value: string) => Promise<void>;
-  onDeleteSubcategory: (value: string) => Promise<void>;
-  onDeleteColor: (value: string) => Promise<void>;
-  onDeletePattern: (value: string) => Promise<void>;
   reloadDropdowns: () => Promise<void>;
   touchedFields?: Set<string>;
   markFieldTouched?: (fieldName: string) => void;
+  categoryOptions?: DropdownOption[];
+  subcategoryOptions?: DropdownOption[];
+  colorOptions?: DropdownOption[];
+  patternOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
 export default function ProductBasicInfoSection({
@@ -30,13 +32,14 @@ export default function ProductBasicInfoSection({
   patterns,
   patternImageMap = {},
   onFormDataChange,
-  onDeleteCategory,
-  onDeleteSubcategory,
-  onDeleteColor,
-  onDeletePattern,
   reloadDropdowns,
   touchedFields = new Set(),
   markFieldTouched = () => {},
+  categoryOptions,
+  subcategoryOptions,
+  colorOptions,
+  patternOptions,
+  usageMap,
 }: ProductBasicInfoSectionProps) {
   return (
     <>
@@ -135,10 +138,11 @@ export default function ProductBasicInfoSection({
             onValueChange={(value) => {
               onFormDataChange({ category: value });
             }}
-            onDelete={onDeleteCategory}
             reloadDropdowns={reloadDropdowns}
             markFieldTouched={markFieldTouched}
             fieldName="category"
+            fullOptions={categoryOptions}
+            usageMap={usageMap}
           />
           {touchedFields.has('category') && !formData.category.trim() && (
             <p className="text-xs text-red-500 mt-1">
@@ -155,8 +159,9 @@ export default function ProductBasicInfoSection({
           allowNA
           category="subcategory"
           onValueChange={(value) => onFormDataChange({ subcategory: value })}
-          onDelete={onDeleteSubcategory}
           reloadDropdowns={reloadDropdowns}
+          fullOptions={subcategoryOptions}
+          usageMap={usageMap}
         />
       </div>
 
@@ -171,8 +176,9 @@ export default function ProductBasicInfoSection({
           allowNA
           category="color"
           onValueChange={(value) => onFormDataChange({ color: value })}
-          onDelete={onDeleteColor}
           reloadDropdowns={reloadDropdowns}
+          fullOptions={colorOptions}
+          usageMap={usageMap}
         />
 
         <ProductDropdownField
@@ -184,8 +190,9 @@ export default function ProductBasicInfoSection({
           allowNA
           category="pattern"
           onValueChange={(value) => onFormDataChange({ pattern: value })}
-          onDelete={onDeletePattern}
           reloadDropdowns={reloadDropdowns}
+          fullOptions={patternOptions}
+          usageMap={usageMap}
         />
       </div>
     </>

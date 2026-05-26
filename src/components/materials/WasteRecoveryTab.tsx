@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -284,10 +285,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                         </td>
                         <td className="px-4 py-4">
                           {waste.generation_date && (
-                            <>
-                              <div className="text-sm text-gray-600">{new Date(waste.generation_date).toLocaleDateString()}</div>
-                              <div className="text-xs text-gray-500 mt-0.5">{new Date(waste.generation_date).toLocaleTimeString()}</div>
-                            </>
+                            <div className="text-sm text-gray-600">{formatIndianDateTime(waste.generation_date)}</div>
                           )}
                           {waste.added_at && (
                             <div className="text-xs text-green-600 mt-1">

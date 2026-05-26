@@ -1,5 +1,6 @@
 import ValueUnitDropdownField from './ValueUnitDropdownField';
 import type { ProductFormData } from '@/types/product';
+import type { DropdownOption } from '@/types/dropdown';
 
 interface ProductDimensionsSectionProps {
   formData: ProductFormData;
@@ -13,6 +14,10 @@ interface ProductDimensionsSectionProps {
   onReload: () => Promise<void>;
   touchedFields?: Set<string>;
   markFieldTouched?: (fieldName: string) => void;
+  lengthOptions?: DropdownOption[];
+  widthOptions?: DropdownOption[];
+  weightOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
 export default function ProductDimensionsSection({
@@ -27,6 +32,10 @@ export default function ProductDimensionsSection({
   onReload,
   touchedFields = new Set(),
   markFieldTouched = () => {},
+  lengthOptions,
+  widthOptions,
+  weightOptions,
+  usageMap,
 }: ProductDimensionsSectionProps) {
   const lengthEmpty = !formData.length || !String(formData.length).trim();
   const lengthUnitEmpty = !formData.length_unit || !String(formData.length_unit).trim();
@@ -62,6 +71,8 @@ export default function ProductDimensionsSection({
             onReload={onReload}
             markFieldTouched={markFieldTouched}
             fieldName="length"
+            fullOptions={lengthOptions}
+            usageMap={usageMap}
           />
           {touchedFields.has('length') && (lengthEmpty || lengthUnitEmpty) && (
             <p className="text-xs text-red-500 mt-1">
@@ -93,6 +104,8 @@ export default function ProductDimensionsSection({
             onReload={onReload}
             markFieldTouched={markFieldTouched}
             fieldName="width"
+            fullOptions={widthOptions}
+            usageMap={usageMap}
           />
           {touchedFields.has('width') && (widthEmpty || widthUnitEmpty) && (
             <p className="text-xs text-red-500 mt-1">
@@ -126,6 +139,8 @@ export default function ProductDimensionsSection({
           onReload={onReload}
           markFieldTouched={markFieldTouched}
           fieldName="weight"
+          fullOptions={weightOptions}
+          usageMap={usageMap}
         />
         {touchedFields.has('weight') && (weightEmpty || weightUnitEmpty) && (
           <p className="text-xs text-red-500 mt-1">

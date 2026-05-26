@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle, Package, DollarSign, QrCode, Edit, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 interface ActivityLog {
   action: string;
@@ -108,7 +109,7 @@ export function ActivityLogTimeline({ logs }: ActivityLogTimelineProps) {
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-600">
                     <span className="font-medium">{log.performed_by}</span>
                     <span>•</span>
-                    <span>{new Date(log.timestamp).toLocaleString()}</span>
+                    <span>{formatIndianDateTime(log.timestamp)}</span>
                   </div>
                   {log.details && Object.keys(log.details).length > 0 && (
                     <div className="mt-2 text-xs text-gray-600 bg-white bg-opacity-50 p-2 rounded">

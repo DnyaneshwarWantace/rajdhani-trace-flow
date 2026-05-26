@@ -9,11 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2, Check, EyeOff } from 'lucide-react';
 import { DropdownService } from '@/services/dropdownService';
 import { useToast } from '@/hooks/use-toast';
 import ColorSwatch from '@/components/ui/ColorSwatch';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
+import type { DropdownOption } from '@/types/dropdown';
 
 const CUSTOM_COLOR_VALUE = '__material_color_custom__';
 const ADD_COLOR_VALUE = '__material_color_add_new__';
@@ -27,6 +38,8 @@ interface MaterialTypeSectionProps {
   onColorChange: (value: string) => void;
   onTypesReload?: () => void;
   colorFallbackWhenBlank?: string;
+  typeFullOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
 export default function MaterialTypeSection({
@@ -38,11 +51,49 @@ export default function MaterialTypeSection({
   onColorChange,
   onTypesReload,
   colorFallbackWhenBlank,
+  typeFullOptions,
+  usageMap,
 }: MaterialTypeSectionProps) {
   const { toast } = useToast();
   const { colorCodeMap } = useDropdownVisualMaps();
   const [showAddType, setShowAddType] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
+  const [selectOpen, setSelectOpen] = useState(false);
+  const [togglingOption, setTogglingOption] = useState<DropdownOption | null>(null);
+  const [deletingOption, setDeletingOption] = useState<DropdownOption | null>(null);
+
+  const findFullOption = (val: string): DropdownOption | undefined =>
+    typeFullOptions?.find((o) => o.value === val);
+  const isUsed = (val: string): boolean =>
+    usageMap?.[`material_type:${val}`] === true;
+  const hasManagement = !!typeFullOptions && typeFullOptions.length > 0;
+
+  const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation(); e.preventDefault();
+    setSelectOpen(false); setTogglingOption(opt);
+  };
+  const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
+    e.stopPropagation(); e.preventDefault();
+    setSelectOpen(false); setDeletingOption(opt);
+  };
+  const confirmToggle = async () => {
+    if (!togglingOption) return;
+    try {
+      await DropdownService.toggleActive(togglingOption.id || togglingOption._id);
+      if (onTypesReload) onTypesReload();
+      toast({ title: 'Success', description: `"${togglingOption.value}" ${togglingOption.is_active ? 'deactivated' : 'activated'}` });
+    } catch { toast({ title: 'Error', description: 'Failed to toggle', variant: 'destructive' }); }
+    setTogglingOption(null);
+  };
+  const confirmDelete = async () => {
+    if (!deletingOption) return;
+    try {
+      await DropdownService.deleteDropdown(deletingOption.id || deletingOption._id);
+      if (onTypesReload) onTypesReload();
+      toast({ title: 'Success', description: `"${deletingOption.value}" deleted` });
+    } catch { toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' }); }
+    setDeletingOption(null);
+  };
   const [showAddColor, setShowAddColor] = useState(false);
   const [newColorName, setNewColorName] = useState('');
   const [newColorCode, setNewColorCode] = useState('#2563eb');
@@ -130,55 +181,6 @@ export default function MaterialTypeSection({
     }
   };
 
-  const handleDeleteType = async (typeToDelete: string) => {
-    try {
-      const { getApiUrl } = await import('@/utils/apiConfig');
-      const API_URL = getApiUrl();
-      const token = localStorage.getItem('auth_token');
-
-      const response = await fetch(`${API_URL}/dropdowns`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch dropdowns');
-      }
-
-      const result = await response.json();
-      const allDropdowns = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result.data) ? result.data : []);
-      const option = allDropdowns.find((opt: any) => opt.category === 'material_type' && opt.value === typeToDelete);
-
-      if (option && option._id) {
-        await DropdownService.deleteDropdown(option._id);
-        toast({
-          title: 'Type Deleted',
-          description: `"${typeToDelete}" has been deleted.`,
-        });
-        if (type === typeToDelete) {
-          onTypeChange('');
-        }
-        if (onTypesReload) onTypesReload();
-      } else {
-        toast({
-          title: 'Error',
-          description: 'Type option not found',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      console.error('Error deleting type:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete type',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleAddColor = async () => {
     const colorName = newColorName.trim();
     if (!colorName || colors.includes(colorName)) return;
@@ -233,18 +235,17 @@ export default function MaterialTypeSection({
           : CUSTOM_COLOR_VALUE;
 
   return (
-    <>
+    <div className="space-y-3">
       <div>
         <Label htmlFor="type">Material Type</Label>
         <div className="space-y-2">
           <Select
+            open={selectOpen}
+            onOpenChange={setSelectOpen}
             value={type || ''}
             onValueChange={(value) => {
-              if (value === 'add_new') {
-                setShowAddType(true);
-              } else {
-                onTypeChange(value);
-              }
+              if (value === 'add_new') { setShowAddType(true); setSelectOpen(false); }
+              else { onTypeChange(value); setSelectOpen(false); }
             }}
           >
             <SelectTrigger id="type">
@@ -252,35 +253,34 @@ export default function MaterialTypeSection({
             </SelectTrigger>
             <SelectContent>
               {types.length > 0 ? (
-                types.map((typeOption) => (
-                  <div key={typeOption} className="relative flex items-center">
-                    <SelectItem value={typeOption} className="flex-1">
-                      {typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
-                    </SelectItem>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleDeleteType(typeOption);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))
+                types.map((typeOption) => {
+                  const fullOpt = findFullOption(typeOption);
+                  const used = isUsed(typeOption);
+                  return (
+                    <div key={typeOption} className="relative flex items-center group">
+                      <SelectItem value={typeOption} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>
+                        {typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
+                      </SelectItem>
+                      {hasManagement && fullOpt && (
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
+                          <button type="button" title={fullOpt.is_active ? 'Deactivate' : 'Activate'} className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
+                            {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                          </button>
+                          {!used && (
+                            <button type="button" title="Delete" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
+                              <Trash2 className="w-3 h-3 text-red-500" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
-                <SelectItem value="no_types" disabled>
-                  No types available
-                </SelectItem>
+                <SelectItem value="no_types" disabled>No types available</SelectItem>
               )}
               <SelectItem value="add_new" className="text-primary-600 font-medium">
-                <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Add New Type
-                </div>
+                <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Type</div>
               </SelectItem>
             </SelectContent>
           </Select>
@@ -446,6 +446,38 @@ export default function MaterialTypeSection({
           )}
         </div>
       )}
-    </>
+
+      <AlertDialog open={!!togglingOption} onOpenChange={(open) => !open && setTogglingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{togglingOption?.is_active ? 'Deactivate Option' : 'Activate Option'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {togglingOption?.is_active
+                ? `Deactivate "${togglingOption?.value}"? It will be hidden from dropdowns but existing records keep it.`
+                : `Activate "${togglingOption?.value}"? It will become available again.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmToggle} className={togglingOption?.is_active ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}>
+              {togglingOption?.is_active ? 'Deactivate' : 'Activate'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deletingOption} onOpenChange={(open) => !open && setDeletingOption(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Option</AlertDialogTitle>
+            <AlertDialogDescription>Delete &quot;{deletingOption?.value}&quot;? This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

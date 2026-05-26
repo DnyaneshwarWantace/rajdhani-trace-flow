@@ -2,28 +2,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ProductDropdownField from './ProductDropdownField';
 import type { ProductFormData } from '@/types/product';
+import type { DropdownOption } from '@/types/dropdown';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface ProductStockSectionProps {
   formData: ProductFormData;
   units: string[];
   onFormDataChange: (data: Partial<ProductFormData>) => void;
-  onDeleteUnit: (value: string) => Promise<void>;
   reloadDropdowns: () => Promise<void>;
   mode?: 'create' | 'edit' | 'duplicate';
   touchedFields?: Set<string>;
   markFieldTouched?: (fieldName: string) => void;
+  unitOptions?: DropdownOption[];
+  usageMap?: Record<string, boolean>;
 }
 
 export default function ProductStockSection({
   formData,
   units,
   onFormDataChange,
-  onDeleteUnit,
   reloadDropdowns,
   mode = 'create',
   touchedFields = new Set(),
   markFieldTouched = () => {},
+  unitOptions,
+  usageMap,
 }: ProductStockSectionProps) {
   const isEditMode = mode === 'edit';
   const isQuantityDisabled = isEditMode;
@@ -83,10 +86,11 @@ export default function ProductStockSection({
             onValueChange={(value) => {
               onFormDataChange({ unit: value });
             }}
-            onDelete={onDeleteUnit}
             reloadDropdowns={reloadDropdowns}
             markFieldTouched={markFieldTouched}
             fieldName="unit"
+            fullOptions={unitOptions}
+            usageMap={usageMap}
           />
           {touchedFields.has('unit') && !formData.unit.trim() && (
             <p className="text-xs text-red-500 mt-1">

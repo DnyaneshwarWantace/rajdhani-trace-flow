@@ -9,7 +9,7 @@ interface SimpleCategoryCardProps {
   category: SimpleCategoryConfig;
   options: DropdownOption[];
   formValue: string;
-  onEdit: (option: DropdownOption) => void;
+  usageMap: Record<string, boolean>;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   onAdd: (category: string) => void;
@@ -20,7 +20,7 @@ export default function SimpleCategoryCard({
   category,
   options,
   formValue,
-  onEdit,
+  usageMap,
   onDelete,
   onToggleActive,
   onAdd,
@@ -47,7 +47,7 @@ export default function SimpleCategoryCard({
               <DropdownOptionChip
                 key={option._id}
                 option={option}
-                onEdit={onEdit}
+                isUsed={usageMap[`${option.category}:${option.value}`] ?? false}
                 onDelete={onDelete}
                 onToggleActive={onToggleActive}
                 variant="value"
@@ -69,4 +69,3 @@ export default function SimpleCategoryCard({
     </Card>
   );
 }
-

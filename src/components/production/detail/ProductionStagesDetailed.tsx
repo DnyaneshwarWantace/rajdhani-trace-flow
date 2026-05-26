@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { ProductionService } from '@/services/productionService';
 import type { ProductionBatch } from '@/services/productionService';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 interface ProductionStagesDetailedProps {
   batch: ProductionBatch;
@@ -156,16 +157,8 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   };
 
   const formatDate = (date: string | Date | undefined, showInProgress: boolean = false) => {
-    if (!date) {
-      return showInProgress ? 'In Progress' : 'N/A';
-    }
-    return new Date(date).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!date) return showInProgress ? 'In Progress' : 'N/A';
+    return formatIndianDateTime(date);
   };
 
   if (loading) {

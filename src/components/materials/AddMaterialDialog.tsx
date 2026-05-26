@@ -45,6 +45,10 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
   const [units, setUnits] = useState<string[]>([]);
   const [types, setTypes] = useState<string[]>([]);
   const [colors, setColors] = useState<string[]>([]);
+  const [categoryFullOptions, setCategoryFullOptions] = useState<DropdownOption[]>([]);
+  const [unitFullOptions, setUnitFullOptions] = useState<DropdownOption[]>([]);
+  const [typeFullOptions, setTypeFullOptions] = useState<DropdownOption[]>([]);
+  const [usageMap, setUsageMap] = useState<Record<string, boolean>>({});
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState('');
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
@@ -229,6 +233,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         categoryValues = categoryValues.filter((c: string) => !excludeCategories!.includes(c));
       }
       setCategories(categoryValues);
+      setCategoryFullOptions(categoryOptions.filter((opt: DropdownOption) => !excludeCategories?.includes(opt.value)));
 
       // Filter units
       const unitOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_unit' && opt.is_active !== false);
@@ -236,6 +241,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setUnits(unitValues);
+      setUnitFullOptions(unitOptions);
 
       // Filter types
       const typeOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_type' && opt.is_active !== false);
@@ -243,6 +249,17 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setTypes(typeValues);
+      setTypeFullOptions(typeOptions);
+
+      // Fetch usageMap
+      const usageResponse = await fetch(`${API_URL}/dropdowns/usage`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) },
+      });
+      if (usageResponse.ok) {
+        const usageResult = await usageResponse.json();
+        if (usageResult.success && usageResult.data) setUsageMap(usageResult.data);
+      }
       
       // Filter colors (material_color category)
       const colorOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_color' && opt.is_active !== false);
@@ -455,7 +472,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       if (!formData.supplier || formData.supplier.trim() === '') {
         missingFields.push('supplier');
       }
-      if (!fixedCategory && (!formData.category || formData.category.trim() === '')) {
+      if (!(fixedCategory && mode === 'create') && (!formData.category || formData.category.trim() === '')) {
         missingFields.push('category');
       }
       if (!formData.unit || formData.unit.trim() === '') {
@@ -511,7 +528,9 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         return;
       }
 
-      const effectiveCategory = (fixedCategory || formData.category || '').trim();
+      const effectiveCategory = mode === 'edit'
+        ? (formData.category || '').trim()
+        : (fixedCategory || formData.category || '').trim();
 
       // Validate expected delivery date is in the future (only for create mode)
       // Only validate if the date is actually filled (already checked above, but double-check)
@@ -845,7 +864,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
-            {fixedCategory ? (
+            {fixedCategory && mode === 'create' ? (
               <div>
                 <Label htmlFor="category-fixed">Category</Label>
                 <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
@@ -869,27 +888,33 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
                 hasError={invalidFields.has('category')}
                 touchedFields={touchedFields}
                 markFieldTouched={markFieldTouched}
+                fullOptions={categoryFullOptions}
+                usageMap={usageMap}
               />
             )}
           </div>
 
           {/* Material Type and Unit on same line */}
           <div className="grid grid-cols-2 gap-4">
-            <MaterialTypeSection
-              type={formData.type}
-              color={formData.color}
-              types={types}
-              colors={colors}
-              onTypeChange={(value: string) =>
-                setFormData({
-                  ...formData,
-                  type: value,
-                  color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
-                })
-              }
-              onColorChange={(value) => setFormData({ ...formData, color: value })}
-              onTypesReload={loadDropdowns}
-            />
+            <div className="space-y-4">
+              <MaterialTypeSection
+                type={formData.type}
+                color={formData.color}
+                types={types}
+                colors={colors}
+                onTypeChange={(value: string) =>
+                  setFormData({
+                    ...formData,
+                    type: value,
+                    color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
+                  })
+                }
+                onColorChange={(value) => setFormData({ ...formData, color: value })}
+                onTypesReload={loadDropdowns}
+                typeFullOptions={typeFullOptions}
+                usageMap={usageMap}
+              />
+            </div>
 
             <MaterialUnitSection
               ref={unitRef}
@@ -907,6 +932,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
               hasError={invalidFields.has('unit')}
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
+              fullOptions={unitFullOptions}
+              usageMap={usageMap}
             />
           </div>
 

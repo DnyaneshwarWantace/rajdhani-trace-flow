@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── CSS variables for shadcn components ──────────────────────────── */
+@layer base {
+  :root {
+    --primary-foreground: 0 0% 100%; /* white — text on blue/primary backgrounds */
+    --destructive-foreground: 0 0% 100%;
+  }
+}
+
 /* Set body and html background to match app background */
 html,
 body {
@@ -140,19 +148,22 @@ html.modal-open {
   opacity: 1 !important;
 }
 
-/* Ensure primary buttons (blue) have white text */
-button.bg-primary-600,
-button.bg-primary-700,
-button[class*="bg-primary-600"],
-button[class*="bg-primary-700"],
-.bg-primary-600 button,
-.bg-primary-700 button {
-  color: white !important;
-}
-
-/* Also apply to any element with primary background */
+/* ── Global: dark blue/primary backgrounds must have white text ──────── */
+/* Only covers shades 500+ (dark enough for white text). Light shades    */
+/* (50, 100, 200, 300, 400) are intentionally excluded.                  */
+.bg-primary,
+.bg-primary-500,
 .bg-primary-600,
-.bg-primary-700 {
+.bg-primary-700,
+.bg-primary-800,
+.bg-primary-900,
+.bg-primary-950,
+.bg-blue-500,
+.bg-blue-600,
+.bg-blue-700,
+.bg-blue-800,
+.bg-blue-900,
+.bg-blue-950 {
   color: white !important;
 }
 

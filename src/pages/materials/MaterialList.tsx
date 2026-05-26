@@ -42,7 +42,7 @@ import { SupplierService, type Supplier } from '@/services/supplierService';
 import type { Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { canCreate, canDelete, canView } from '@/utils/permissions';
+import { canCreate, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
@@ -126,7 +126,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [materialToDelete, setMaterialToDelete] = useState<RawMaterial | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [canDeleteMaterials, setCanDeleteMaterials] = useState(false);
 
   // Periodic usage (e.g. Ink) - 10-day reminder: load due materials and show reminder + toast
   const [periodicDueMaterials, setPeriodicDueMaterials] = useState<PeriodicDueMaterial[]>([]);
@@ -151,10 +150,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Check delete permission on mount
-  useEffect(() => {
-    setCanDeleteMaterials(canDelete('materials'));
-  }, []);
 
   // Load materials FIRST, then stats in background
   const [hasLoadedInitial, setHasLoadedInitial] = useState(false);
@@ -461,11 +456,6 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     setSelectedMaterial(material);
     setEditMode('edit');
     setIsAddMaterialOpen(true);
-  };
-
-  const handleDelete = (material: RawMaterial) => {
-    setMaterialToDelete(material);
-    setIsDeleteDialogOpen(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -890,10 +880,8 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onLimitChange={handleLimitChange}
             onView={handleView}
             onEdit={handleEdit}
-            onDelete={handleDelete}
             onOrder={handleOrder}
             onRecordUsage={handleRecordUsage}
-            canDelete={canDeleteMaterials}
           />
         )}
 

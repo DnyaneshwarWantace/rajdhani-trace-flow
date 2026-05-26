@@ -19,10 +19,8 @@ interface MaterialInventoryTabProps {
   onLimitChange: (limit: number) => void;
   onView?: (material: RawMaterial) => void;
   onEdit?: (material: RawMaterial) => void;
-  onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
   onRecordUsage?: (material: RawMaterial) => void;
-  canDelete?: boolean;
 }
 
 export default function MaterialInventoryTab({
@@ -40,10 +38,8 @@ export default function MaterialInventoryTab({
   onLimitChange,
   onView,
   onEdit,
-  onDelete,
   onOrder,
   onRecordUsage,
-  canDelete = false,
 }: MaterialInventoryTabProps) {
   return (
     <>
@@ -74,7 +70,6 @@ export default function MaterialInventoryTab({
                 materials={materials}
                 onView={onView}
                 onEdit={onEdit}
-                onDelete={canDelete ? onDelete : undefined}
                 onOrder={onOrder}
                 onRecordUsage={onRecordUsage}
               />
@@ -86,7 +81,7 @@ export default function MaterialInventoryTab({
                       material={material}
                       onView={onView}
                       onEdit={onEdit}
-                      onDelete={canDelete ? onDelete : undefined}
+  
                       onOrder={onOrder}
                       onRecordUsage={onRecordUsage}
                     />
@@ -105,7 +100,7 @@ export default function MaterialInventoryTab({
                     material={material}
                     onView={onView}
                     onEdit={onEdit}
-                    onDelete={canDelete ? onDelete : undefined}
+
                     onOrder={onOrder}
                     onRecordUsage={onRecordUsage}
                   />

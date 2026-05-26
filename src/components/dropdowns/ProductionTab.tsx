@@ -5,7 +5,7 @@ import { productionCategories } from '@/config/dropdownConfig';
 interface ProductionTabProps {
   getOptionsByCategory: (category: string) => DropdownOption[];
   simpleFormData: Record<string, string>;
-  onEdit: (option: DropdownOption) => void;
+  usageMap: Record<string, boolean>;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   onAddSimple: (category: string) => void;
@@ -15,7 +15,7 @@ interface ProductionTabProps {
 export default function ProductionTab({
   getOptionsByCategory,
   simpleFormData,
-  onEdit,
+  usageMap,
   onDelete,
   onToggleActive,
   onAddSimple,
@@ -29,7 +29,7 @@ export default function ProductionTab({
           category={category}
           options={getOptionsByCategory(category.category) || []}
           formValue={simpleFormData[category.category] || ''}
-          onEdit={onEdit}
+          usageMap={usageMap}
           onDelete={onDelete}
           onToggleActive={onToggleActive}
           onAdd={onAddSimple}
@@ -39,4 +39,3 @@ export default function ProductionTab({
     </>
   );
 }
-

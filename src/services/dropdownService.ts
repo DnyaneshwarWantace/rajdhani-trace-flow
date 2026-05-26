@@ -82,7 +82,7 @@ export class DropdownService {
   }
 
   static async toggleActive(id: string): Promise<DropdownOption> {
-    const response = await fetch(`${API_URL}/dropdowns/${id}/toggle-active`, {
+    const response = await fetch(`${API_URL}/dropdowns/${id}/toggle`, {
       method: 'PATCH',
       headers: this.getHeaders(),
     });

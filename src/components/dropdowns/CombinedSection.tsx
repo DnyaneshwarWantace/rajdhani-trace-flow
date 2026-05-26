@@ -11,7 +11,7 @@ interface CombinedSectionProps {
   units: DropdownOption[];
   formData: { value: string; unit: string };
   simpleFormData: string;
-  onEdit: (option: DropdownOption) => void;
+  usageMap: Record<string, boolean>;
   onDelete: (option: DropdownOption) => void;
   onToggleActive: (option: DropdownOption) => void;
   onAddCombined: (valueCategory: string) => void;
@@ -26,7 +26,7 @@ export default function CombinedSection({
   units,
   formData,
   simpleFormData,
-  onEdit,
+  usageMap,
   onDelete,
   onToggleActive,
   onAddCombined,
@@ -51,7 +51,7 @@ export default function CombinedSection({
             <DropdownOptionChip
               key={option._id}
               option={option}
-              onEdit={onEdit}
+              isUsed={usageMap[`${option.category}:${option.value}`] ?? false}
               onDelete={onDelete}
               onToggleActive={onToggleActive}
               variant="value"
@@ -85,7 +85,7 @@ export default function CombinedSection({
             <DropdownOptionChip
               key={option._id}
               option={option}
-              onEdit={onEdit}
+              isUsed={usageMap[`${option.category}:${option.value}`] ?? false}
               onDelete={onDelete}
               onToggleActive={onToggleActive}
               variant="unit"
@@ -107,4 +107,3 @@ export default function CombinedSection({
     </DropdownSectionCard>
   );
 }
-

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSign, Edit, Check, X } from 'lucide-react';
-import { formatCurrency } from '@/utils/formatHelpers';
+import { formatCurrency, formatIndianDateTime } from '@/utils/formatHelpers';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -237,7 +237,7 @@ export function EditablePaymentCard({
                     {formatCurrency(history.previous_paid_amount, { full: true })} → {formatCurrency(history.new_paid_amount, { full: true })}
                   </div>
                   <div className="text-gray-500 mt-1">
-                    {new Date(history.changed_at).toLocaleString()}
+                    {formatIndianDateTime(history.changed_at)}
                   </div>
                   {history.notes && (
                     <div className="text-gray-600 mt-1 italic">{history.notes}</div>

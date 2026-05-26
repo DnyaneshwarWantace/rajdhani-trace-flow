@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
-import { formatIndianDate } from '@/utils/formatHelpers';
+import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import { getApiUrl } from '@/utils/apiConfig';
 import { OrderStatusCard } from '@/components/orders/OrderStatusCard';
 import { EditableOrderItemCard } from '@/components/orders/EditableOrderItemCard';
@@ -796,7 +796,7 @@ export default function OrderDetails() {
                     {order.status === 'dispatched' && (
                       <>
                         <div className="text-orange-700">
-                          <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? new Date(order.dispatchedAt).toLocaleString() : 'N/A'}
+                          <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? formatIndianDateTime(order.dispatchedAt) : 'N/A'}
                         </div>
                         {(order as any).transport_type && (
                           <div className="text-orange-700">
@@ -823,7 +823,7 @@ export default function OrderDetails() {
                     {order.status === 'delivered' && (
                       <>
                         <div className="text-green-700">
-                          <span className="font-medium">Delivered on:</span> {order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : 'N/A'}
+                          <span className="font-medium">Delivered on:</span> {order.deliveredAt ? formatIndianDateTime(order.deliveredAt) : 'N/A'}
                         </div>
                         <div className="text-green-700">
                           <span className="font-medium">Status:</span> Successfully Delivered

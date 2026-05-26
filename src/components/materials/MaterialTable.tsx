@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import type { RawMaterial } from '@/types/material';
 import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { Eye, ShoppingCart, Edit, Trash2, Droplets } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Eye, ShoppingCart, Edit, Droplets } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
 import {
@@ -16,7 +15,6 @@ interface MaterialTableProps {
   materials: RawMaterial[];
   onView?: (material: RawMaterial) => void;
   onEdit?: (material: RawMaterial) => void;
-  onDelete?: (material: RawMaterial) => void;
   onOrder?: (material: RawMaterial) => void;
   onRecordUsage?: (material: RawMaterial) => void;
 }
@@ -25,12 +23,9 @@ export default function MaterialTable({
   materials,
   onView,
   onEdit,
-  onDelete,
   onOrder,
   onRecordUsage,
 }: MaterialTableProps) {
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const [selectedImage, setSelectedImage] = useState<{ url: string; alt: string } | null>(null);
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -167,15 +162,6 @@ export default function MaterialTable({
                         title="Edit Material"
                       >
                         <Edit className="w-4 h-4" />
-                      </button>
-                    )}
-                    {onDelete && isAdmin && (
-                      <button
-                        onClick={() => onDelete(material)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete Material"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                     {onOrder && (
