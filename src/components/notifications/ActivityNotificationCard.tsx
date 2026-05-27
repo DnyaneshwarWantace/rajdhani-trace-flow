@@ -688,6 +688,69 @@ export default function ActivityNotificationCard({
                   action || userName) && (
                 <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
               {/* Production Batch Info */}
+              {(action === 'PRODUCTION_TASK_ASSIGN' || action === 'PRODUCTION_TASK_STATUS') && metadata?.task_id && (
+                <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                    <Factory className="w-4 h-4" />
+                    {action === 'PRODUCTION_TASK_ASSIGN' ? 'Task Assignment' : 'Task Status Update'}
+                  </h4>
+                  <div className="space-y-2">
+                    {metadata.order_number && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Order:</p>
+                          <p className="text-sm font-semibold text-gray-900">{metadata.order_number}</p>
+                        </div>
+                        {metadata.customer_name && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">Customer:</p>
+                            <p className="text-sm text-gray-900">{metadata.customer_name}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {metadata.product_name && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Product:</p>
+                        <p className="text-sm text-gray-900">{metadata.product_name}</p>
+                      </div>
+                    )}
+                    {metadata.planned_quantity && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-700">Quantity:</p>
+                        <p className="text-sm text-gray-900">{metadata.planned_quantity} units</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-blue-200">
+                      {metadata.assigned_by && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Assigned By:</p>
+                          <p className="text-xs text-gray-900">{metadata.assigned_by}</p>
+                        </div>
+                      )}
+                      {metadata.assigned_to_name && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Assigned To:</p>
+                          <p className="text-xs font-semibold text-blue-700">{metadata.assigned_to_name}</p>
+                        </div>
+                      )}
+                      {metadata.new_status && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">New Status:</p>
+                          <p className="text-xs font-semibold text-gray-900 capitalize">{metadata.new_status.replace('_', ' ')}</p>
+                        </div>
+                      )}
+                      {metadata.changed_by && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-700">Changed By:</p>
+                          <p className="text-xs text-gray-900">{metadata.changed_by}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {(action.includes('PRODUCTION') || actionCategory === 'PRODUCTION') && metadata?.batch_number && (
                 <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
                   <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
@@ -728,7 +791,23 @@ export default function ActivityNotificationCard({
                         </Badge>
                       </div>
                     )}
-                    {(metadata.operator || metadata.supervisor) && (
+                    {metadata.cancelled_by && (
+                      <div className="pt-2 border-t border-orange-200">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <p className="text-xs font-medium text-gray-700">Cancelled By:</p>
+                            <p className="text-xs text-red-700 font-semibold">{metadata.cancelled_by}</p>
+                          </div>
+                          {metadata.cancellation_reason && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-700">Reason:</p>
+                              <p className="text-xs text-gray-900">{metadata.cancellation_reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {(metadata.operator || metadata.supervisor) && !metadata.cancelled_by && (
                       <div className="grid grid-cols-2 gap-2 pt-2 border-t border-orange-200">
                         {metadata.operator && (
                           <div>

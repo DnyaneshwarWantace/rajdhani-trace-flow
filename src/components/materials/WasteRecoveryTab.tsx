@@ -1,5 +1,5 @@
+import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
-import { formatIndianDateTime } from '@/utils/formatHelpers';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -289,7 +289,7 @@ export default function WasteRecoveryTab({ onRefresh }: WasteRecoveryTabProps) {
                           )}
                           {waste.added_at && (
                             <div className="text-xs text-green-600 mt-1">
-                              Added: {new Date(waste.added_at).toLocaleDateString()}
+                              Added: {formatIndianDate(waste.added_at)}
                             </div>
                           )}
                         </td>

@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Trash2, Factory, Package, AlertTriangle, CheckCircle, XCircle, Table, Grid } from 'lucide-react';
 import type { WasteItem } from '@/services/wasteService';
-import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
+import { formatIndianNumberWithDecimals, formatIndianDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 
 interface WastageSummaryProps {
@@ -130,7 +130,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                           </td>
                           <td className="px-4 py-3">{getStatusBadge(waste.status)}</td>
                           <td className="px-4 py-3 text-gray-600">
-                            {waste.generation_date ? new Date(waste.generation_date).toLocaleDateString() : 'N/A'}
+                            {waste.generation_date ? formatIndianDate(waste.generation_date) : 'N/A'}
                           </td>
                         </tr>
                       ))}
@@ -177,7 +177,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                           <td className="px-4 py-3 text-gray-600">{waste.unit}</td>
                           <td className="px-4 py-3">{getStatusBadge(waste.status)}</td>
                           <td className="px-4 py-3 text-gray-600">
-                            {waste.generation_date ? new Date(waste.generation_date).toLocaleDateString() : 'N/A'}
+                            {waste.generation_date ? formatIndianDate(waste.generation_date) : 'N/A'}
                           </td>
                         </tr>
                       ))}
@@ -262,7 +262,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                       <div>
                         <p className="text-gray-500">Generated Date</p>
                         <p className="font-medium text-gray-900">
-                          {waste.generation_date ? new Date(waste.generation_date).toLocaleDateString() : 'N/A'}
+                          {waste.generation_date ? formatIndianDate(waste.generation_date) : 'N/A'}
                         </p>
                       </div>
                     </div>
@@ -328,7 +328,7 @@ export default function WastageSummary({ wasteItems }: WastageSummaryProps) {
                       <div>
                         <p className="text-gray-500">Generated Date</p>
                         <p className="font-medium text-gray-900">
-                          {waste.generation_date ? new Date(waste.generation_date).toLocaleDateString() : 'N/A'}
+                          {waste.generation_date ? formatIndianDate(waste.generation_date) : 'N/A'}
                         </p>
                       </div>
                     </div>

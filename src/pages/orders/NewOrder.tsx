@@ -166,6 +166,7 @@ export default function NewOrder() {
   const draftRestoredRef = useRef(false);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
 
@@ -251,8 +252,15 @@ export default function NewOrder() {
   useEffect(() => { loadRawMaterialsWithFilters(); }, [materialSortBy, materialSortOrder]);
 
   const loadCustomers = async () => {
-    const { data } = await CustomerService.getCustomers().catch(() => ({ data: [] }));
-    setCustomers(data || []);
+    setCustomersLoading(true);
+    try {
+      const { data } = await CustomerService.getCustomers();
+      setCustomers(Array.isArray(data) ? data : []);
+    } catch {
+      setCustomers([]);
+    } finally {
+      setCustomersLoading(false);
+    }
   };
 
   const loadProductsWithFilters = async () => {
@@ -366,14 +374,19 @@ export default function NewOrder() {
 
   const removeOrderItem = (id: string) => setOrderItems(items => items.filter(i => i.id !== id));
 
-  const calculateOrderBreakdown = () => ({
-    subtotal: orderItems.reduce((s, i) => s + (i.subtotal || 0), 0),
-    gstAmount: orderItems.reduce((s, i) => s + (i.gst_amount || 0), 0),
-    total: orderItems.reduce((s, i) => s + (i.total_price || 0), 0),
-  });
+  const calculateOrderBreakdown = () => {
+    const subtotal = orderItems.reduce((s, i) => s + (i.subtotal || 0), 0);
+    const gstAmount = orderItems.reduce((s, i) => s + (i.gst_amount || 0), 0);
+    const rawTotal = orderItems.reduce((s, i) => s + (i.total_price || 0), 0);
+    return { subtotal, gstAmount, total: Math.round(rawTotal) };
+  };
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (orderItems.length === 0 || orderItems.some(i => !i.product_id)) {
+      toast({ title: 'No product selected', description: 'Please select at least one product or raw material.', variant: 'destructive' });
+      return;
+    }
     if (!orderDetails.expectedDelivery) {
       toast({ title: 'Missing delivery date', description: 'Please set an expected delivery date in step 3.', variant: 'destructive' });
       return;
@@ -450,7 +463,7 @@ export default function NewOrder() {
   };
 
   const { subtotal, gstAmount, total } = calculateOrderBreakdown();
-  const canGoNextFromItems = orderItems.length > 0 && orderItems.every(i => i.isValid);
+  const canGoNextFromItems = orderItems.length > 0 && orderItems.every(i => i.isValid && !!i.product_id);
 
   return (
     <Layout>
@@ -527,6 +540,7 @@ export default function NewOrder() {
               {!showNewCustomerForm ? (
                 <CustomerSelection
                   customers={customers}
+                  customersLoading={customersLoading}
                   selectedCustomer={selectedCustomer}
                   onSelectCustomer={handleCustomerSelected}
                   showToggleButtons={false}
@@ -833,7 +847,7 @@ export default function NewOrder() {
               onBack={handleBack}
               onNext={handleSubmit}
               nextLabel={isSubmitting ? 'Placing order…' : 'Place order'}
-              nextDisabled={isSubmitting || orderItems.length === 0}
+              nextDisabled={isSubmitting || !canGoNextFromItems}
             />
           </div>
         )}

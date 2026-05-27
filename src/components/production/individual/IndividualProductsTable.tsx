@@ -44,13 +44,13 @@ function getRollNumberDatePrefix(dateInput?: string): string {
   const source = dateInput ? new Date(dateInput) : new Date();
   if (Number.isNaN(source.getTime())) {
     const fallback = new Date();
-    const yy = String(fallback.getFullYear()).slice(-2);
     const mm = String(fallback.getMonth() + 1).padStart(2, '0');
-    return `${yy}-${mm}-`;
+    const yy = fallback.getFullYear().toString().slice(-2);
+    return `${mm}-${yy}-`;
   }
-  const yy = String(source.getFullYear()).slice(-2);
   const mm = String(source.getMonth() + 1).padStart(2, '0');
-  return `${yy}-${mm}-`;
+  const yy = source.getFullYear().toString().slice(-2);
+  return `${mm}-${yy}-`;
 }
 
 function normalizeRollNumberInput(rawValue: string, productionDate?: string): string {
@@ -1441,9 +1441,12 @@ export default function IndividualProductsTable({
       </div>
     )}
     {!stageCompleted && plannedQuantity > 0 && liveCount > 0 && (
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <span className="font-semibold">{liveCount} of {plannedQuantity}</span> rolls saved so far (live)
-        {liveCount >= plannedQuantity && <span className="ml-2 text-green-700 font-semibold">— target reached!</span>}
+      <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${liveCount > plannedQuantity ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>
+        <span className="font-semibold">{liveCount}</span> of <span className="font-semibold">{plannedQuantity}</span> planned rolls saved
+        {liveCount > plannedQuantity && (
+          <span className="ml-2 text-amber-700 font-semibold">— {liveCount - plannedQuantity} extra beyond target (final qty: {liveCount})</span>
+        )}
+        {liveCount === plannedQuantity && <span className="ml-2 text-green-700 font-semibold">— target reached! Final qty: {liveCount}</span>}
       </div>
     )}
     <Card>
@@ -1479,10 +1482,11 @@ export default function IndividualProductsTable({
               onClick={handleAddRow}
               size="sm"
               disabled={stageCompleted}
-              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed ${localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+              title={localProducts.length >= plannedQuantity && plannedQuantity > 0 ? `Add extra row beyond planned ${plannedQuantity}` : 'Add row'}
             >
               <Plus className="w-4 h-4" />
-              Add Row
+              {localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'Add Extra Row' : 'Add Row'}
             </Button>
             <Button
               onClick={handleBulkDownloadQrs}
@@ -1652,7 +1656,7 @@ export default function IndividualProductsTable({
                           disabled={saving === productItem.id}
                         />
                         <p className="mt-1 text-[11px] text-gray-500">
-                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (year-month + serial, enter serial like 101)
+                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (month-year + serial, enter serial like 101)
                         </p>
                       </div>
                     ) : (

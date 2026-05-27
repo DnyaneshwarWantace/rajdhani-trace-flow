@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -108,7 +109,7 @@ export default function IndividualProductsSection({
                 </div>
                 {product.created_at && (
                   <p className="text-xs text-gray-500 mt-2">
-                    Created: {new Date(product.created_at).toLocaleDateString()}
+                    Created: {formatIndianDate(product.created_at)}
                   </p>
                 )}
               </div>

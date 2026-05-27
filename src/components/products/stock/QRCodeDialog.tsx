@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import {
   Dialog,
   DialogContent,
@@ -95,10 +96,10 @@ export default function QRCodeDialog({
               <strong>Production Date:</strong>{' '}
               {individualProduct.production_date &&
               individualProduct.production_date !== 'null'
-                ? new Date(individualProduct.production_date).toLocaleDateString()
+                ? formatIndianDate(individualProduct.production_date)
                 : individualProduct.completion_date &&
                   individualProduct.completion_date !== 'null'
-                ? new Date(individualProduct.completion_date).toLocaleDateString()
+                ? formatIndianDate(individualProduct.completion_date)
                 : 'N/A'}
             </p>
             <p>

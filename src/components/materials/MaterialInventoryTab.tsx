@@ -70,6 +70,7 @@ export default function MaterialInventoryTab({
                 materials={materials}
                 onView={onView}
                 onEdit={onEdit}
+
                 onOrder={onOrder}
                 onRecordUsage={onRecordUsage}
               />
@@ -81,7 +82,7 @@ export default function MaterialInventoryTab({
                       material={material}
                       onView={onView}
                       onEdit={onEdit}
-  
+      
                       onOrder={onOrder}
                       onRecordUsage={onRecordUsage}
                     />
@@ -100,7 +101,7 @@ export default function MaterialInventoryTab({
                     material={material}
                     onView={onView}
                     onEdit={onEdit}
-
+    
                     onOrder={onOrder}
                     onRecordUsage={onRecordUsage}
                   />

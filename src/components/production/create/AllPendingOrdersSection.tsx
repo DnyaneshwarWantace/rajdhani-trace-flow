@@ -11,13 +11,12 @@ import {
   CheckCircle2,
   ArrowRight,
   Clock,
-  Lock,
+  ClipboardList,
 } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { OrderService } from '@/services/orderService';
 import { ProductionService } from '@/services/productionService';
 import { formatIndianDate } from '@/utils/formatHelpers';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface PendingOrder {
   order_id: string;
@@ -33,6 +32,12 @@ interface PendingOrder {
   product_name?: string;
   current_stock?: number;
   shortage?: number;
+}
+
+interface TaskInfo {
+  assigned_to_id: string;
+  assigned_to_name: string;
+  task_status: string;
 }
 
 interface Props {
@@ -62,53 +67,39 @@ function getDaysUntil(dateStr: string): number {
 
 function DeliveryBadge({ dateStr }: { dateStr: string }) {
   const days = getDaysUntil(dateStr);
-  if (days < 0) {
-    return (
-      <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
-        <AlertTriangle className="h-3 w-3" />
-        {Math.abs(days)}d overdue
-      </span>
-    );
-  }
-  if (days === 0) {
-    return (
-      <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
-        <Clock className="h-3 w-3" />
-        Due today
-      </span>
-    );
-  }
-  if (days <= 3) {
-    return (
-      <span className="flex items-center gap-1 text-xs font-semibold text-red-500">
-        <Clock className="h-3 w-3" />
-        {days}d left
-      </span>
-    );
-  }
-  if (days <= 7) {
-    return (
-      <span className="flex items-center gap-1 text-xs font-semibold text-orange-500">
-        <Clock className="h-3 w-3" />
-        {days}d left
-      </span>
-    );
-  }
+  if (days < 0) return (
+    <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+      <AlertTriangle className="h-3 w-3" />{Math.abs(days)}d overdue
+    </span>
+  );
+  if (days === 0) return (
+    <span className="flex items-center gap-1 text-xs font-semibold text-red-600">
+      <Clock className="h-3 w-3" />Due today
+    </span>
+  );
+  if (days <= 3) return (
+    <span className="flex items-center gap-1 text-xs font-semibold text-red-500">
+      <Clock className="h-3 w-3" />{days}d left
+    </span>
+  );
+  if (days <= 7) return (
+    <span className="flex items-center gap-1 text-xs font-semibold text-orange-500">
+      <Clock className="h-3 w-3" />{days}d left
+    </span>
+  );
   return (
     <span className="flex items-center gap-1 text-xs text-gray-500">
-      <Calendar className="h-3 w-3" />
-      {days}d left
+      <Calendar className="h-3 w-3" />{days}d left
     </span>
   );
 }
 
 export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
-  const { user } = useAuth();
   const [orders, setOrders] = useState<PendingOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  // Map of order_item_id → { assigned_to_id, assigned_to_name } for active tasks
-  const [taskAssignments, setTaskAssignments] = useState<Record<string, { assigned_to_id: string; assigned_to_name: string }>>({});
-  // Set of order_item_ids that already have an active production batch — hide these cards
+  // task assignment per order_item_id
+  const [taskMap, setTaskMap] = useState<Record<string, TaskInfo>>({});
+  // order_item_ids that already have an active (non-cancelled) batch
   const [batchedItemIds, setBatchedItemIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -125,7 +116,6 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
         if (cancelled || error || !data) return;
 
-        // Flatten to one row per product item
         const productRows: PendingOrder[] = [];
         for (const order of data) {
           const productItems = order.items.filter((item) => item.productType === 'product');
@@ -148,7 +138,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
         if (cancelled) return;
 
-        // Fetch stock for all products in parallel
+        // Fetch stock
         const uniqueProductIds = [...new Set(productRows.map((r) => r.product_id).filter(Boolean))] as string[];
         const stockMap: Record<string, number> = {};
         await Promise.all(
@@ -156,9 +146,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
             try {
               const product = await ProductService.getProductById(productId);
               stockMap[productId] = product?.current_stock ?? 0;
-            } catch {
-              stockMap[productId] = 0;
-            }
+            } catch { stockMap[productId] = 0; }
           })
         );
 
@@ -166,61 +154,71 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
         const enriched: PendingOrder[] = productRows.map((row) => {
           const stock = row.product_id ? (stockMap[row.product_id] ?? 0) : 0;
-          return {
-            ...row,
-            current_stock: stock,
-            shortage: Math.max(0, row.quantity_needed - stock),
-          };
+          return { ...row, current_stock: stock, shortage: Math.max(0, row.quantity_needed - stock) };
         });
 
         setOrders(enriched);
 
-        // Fetch active tasks (assignments) and active batches in parallel for all orders
-        const orderIds = [...new Set(enriched.map((r) => r.order_id))];
-        const assignments: Record<string, { assigned_to_id: string; assigned_to_name: string }> = {};
+        // Fetch all tasks + batches in one shot
+        const [allTasksResult, allBatchesResult] = await Promise.all([
+          ProductionService.getTasks({ limit: 1000 }),
+          ProductionService.getBatches({ limit: 1000 }),
+        ]);
+
+        if (cancelled) return;
+
+        const allTasks = allTasksResult?.data || [];
+        const allBatches = allBatchesResult?.data || [];
+
+        // Build task map: order_item_id → TaskInfo
+        const tasks: Record<string, TaskInfo> = {};
+        for (const task of allTasks) {
+          if (!['assigned', 'in_progress', 'planning'].includes(task.status)) continue;
+          const matchedRow = enriched.find((row) =>
+            (task.order_item_id && row.order_item_id === task.order_item_id) ||
+            (row.order_id === task.order_id && row.product_id === task.stage_product_id)
+          );
+          if (matchedRow && !tasks[matchedRow.order_item_id]) {
+            tasks[matchedRow.order_item_id] = {
+              assigned_to_id: task.assigned_to_id,
+              assigned_to_name: task.assigned_to_name,
+              task_status: task.status,
+            };
+          }
+        }
+
+        // Build batched set: order_item_ids with an active (non-cancelled) batch
+        // Also parse notes to find order references stored only in notes
+        const getOrderIdsFromNotes = (notes: string) => {
+          const m = (notes || '').match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+          return m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
+        };
+        const getOrderNumsFromNotes = (notes: string) => {
+          const m = (notes || '').match(/Attached Orders:\s*(.+?)(?:\s*·|$)/i);
+          return m ? m[1].split(',').map((s) => s.trim()).filter(Boolean) : [];
+        };
+
         const batched = new Set<string>();
-
-        await Promise.all(
-          orderIds.map(async (orderId) => {
-            try {
-              const [tasksResult, batchesResult] = await Promise.all([
-                ProductionService.getTasks({ order_id: orderId, limit: 50 }),
-                ProductionService.getBatches({ order_id: orderId }),
-              ]);
-
-              // Track task assignments per order_item_id
-              for (const task of tasksResult.data || []) {
-                if (task.order_item_id && ['assigned', 'in_progress', 'planning'].includes(task.status)) {
-                  assignments[task.order_item_id] = {
-                    assigned_to_id: task.assigned_to_id,
-                    assigned_to_name: task.assigned_to_name,
-                  };
-                }
-              }
-
-              // Track which order_item_ids already have an active batch
-              for (const batch of batchesResult.data || []) {
-                if (batch.status !== 'cancelled' && batch.order_item_id) {
-                  batched.add(batch.order_item_id);
-                }
-                // Also match by order_id + product_id if order_item_id not stored on batch
-                if (batch.status !== 'cancelled' && !batch.order_item_id && batch.order_id === orderId) {
-                  // Mark all items for this order+product combo as batched
-                  enriched.forEach((row) => {
-                    if (row.order_id === orderId && row.product_id === batch.product_id) {
-                      batched.add(row.order_item_id);
-                    }
-                  });
-                }
-              }
-            } catch {
-              // ignore per-order failures
+        for (const batch of allBatches) {
+          if (batch.status === 'cancelled') continue;
+          const attachedIds = getOrderIdsFromNotes(batch.notes || '');
+          const attachedNums = getOrderNumsFromNotes(batch.notes || '');
+          for (const row of enriched) {
+            const sameOrder =
+              batch.order_id === row.order_id ||
+              batch.order_number === row.order_number ||
+              attachedIds.includes(row.order_id) ||
+              (row.order_number && attachedNums.includes(row.order_number));
+            const sameProduct = batch.product_id === row.product_id;
+            const sameItem = batch.order_item_id && batch.order_item_id === row.order_item_id;
+            if (sameItem || (sameOrder && sameProduct)) {
+              batched.add(row.order_item_id);
             }
-          })
-        );
+          }
+        }
 
         if (!cancelled) {
-          setTaskAssignments(assignments);
+          setTaskMap(tasks);
           setBatchedItemIds(batched);
         }
       } finally {
@@ -231,6 +229,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
     return () => { cancelled = true; };
   }, []);
 
+  // Hide orders that already have an active batch
   const visibleOrders = orders.filter((o) => !batchedItemIds.has(o.order_item_id));
 
   if (loading) {
@@ -257,7 +256,6 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Section header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5 text-gray-600" />
@@ -269,20 +267,17 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
         <div className="flex items-center gap-2">
           {urgentCount > 0 && (
             <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
-              <Clock className="h-3 w-3" />
-              {urgentCount} urgent
+              <Clock className="h-3 w-3" />{urgentCount} urgent
             </span>
           )}
           {shortageCount > 0 && (
             <span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
-              <AlertTriangle className="h-3 w-3" />
-              {shortageCount} need production
+              <AlertTriangle className="h-3 w-3" />{shortageCount} need production
             </span>
           )}
         </div>
       </div>
 
-      {/* Order cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleOrders.map((order, index) => {
           const days = getDaysUntil(order.expected_delivery);
@@ -292,39 +287,39 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
           const priorityConf = PRIORITY_CONFIG[order.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium;
           const statusConf = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
 
-          const assignment = taskAssignments[order.order_item_id];
-          const isAssignedToMe = assignment && assignment.assigned_to_id === user?.id;
-          const isAssignedToOther = assignment && assignment.assigned_to_id !== user?.id;
-          const blocked = isAssignedToOther;
+          const task = taskMap[order.order_item_id];
+          // If ANY task is assigned for this order+product, block batch creation here
+          const hasAssignedTask = Boolean(task);
+
+          const borderClass = hasAssignedTask
+            ? 'border-blue-200 bg-blue-50/20'
+            : isOverdue
+            ? 'border-red-300 hover:border-red-400 hover:shadow-md cursor-pointer'
+            : isVeryUrgent
+            ? 'border-orange-300 hover:border-orange-400 hover:shadow-md cursor-pointer'
+            : 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer';
+
+          const accentClass = hasAssignedTask
+            ? 'bg-blue-400'
+            : isOverdue
+            ? 'bg-red-500'
+            : isVeryUrgent
+            ? 'bg-orange-400'
+            : 'bg-blue-400';
 
           return (
             <div
               key={`${order.order_id}-${index}`}
-              className={`group relative bg-white rounded-xl border transition-all duration-150 overflow-hidden ${
-                blocked
-                  ? 'border-gray-300 opacity-70 cursor-not-allowed'
-                  : isOverdue
-                  ? 'border-red-300 hover:border-red-400 hover:shadow-md cursor-pointer'
-                  : isVeryUrgent
-                  ? 'border-orange-300 hover:border-orange-400 hover:shadow-md cursor-pointer'
-                  : 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
-              }`}
-              onClick={() => { if (!blocked) onSelectOrder(order, order.product_id ?? ''); }}
+              className={`group relative bg-white rounded-xl border transition-all duration-150 overflow-hidden ${borderClass}`}
+              onClick={() => { if (!hasAssignedTask) onSelectOrder(order, order.product_id ?? ''); }}
             >
-              {/* Top accent bar */}
-              <div
-                className={`h-1 w-full ${
-                  blocked ? 'bg-gray-300' : isOverdue ? 'bg-red-500' : isVeryUrgent ? 'bg-orange-400' : 'bg-blue-400'
-                }`}
-              />
+              <div className={`h-1 w-full ${accentClass}`} />
 
               <div className="p-4 space-y-3">
-                {/* Header row */}
+                {/* Header */}
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 tracking-wide uppercase">
-                      {order.order_number}
-                    </p>
+                    <p className="text-xs font-bold text-gray-400 tracking-wide uppercase">{order.order_number}</p>
                     <p className="text-sm font-semibold text-gray-800 mt-0.5 flex items-center gap-1">
                       <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
                       {order.customer_name}
@@ -370,40 +365,34 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
                   </div>
                 </div>
 
-                {/* Assignment banner */}
-                {isAssignedToOther && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                    <Lock className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Assigned to <span className="font-semibold">{assignment.assigned_to_name}</span> — only they can create the batch</span>
-                  </div>
-                )}
-                {isAssignedToMe && (
+                {/* Assigned task banner */}
+                {hasAssignedTask && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
-                    <User className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>Assigned to you</span>
+                    <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span>
+                      Assigned to <span className="font-semibold">{task.assigned_to_name}</span> — start batch from <span className="font-semibold">Assigned Tasks</span> above
+                    </span>
                   </div>
                 )}
 
-                {/* Delivery + CTA */}
+                {/* Footer */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5 text-gray-400" />
                     <span className="text-xs text-gray-600">{formatIndianDate(order.expected_delivery)}</span>
                     <DeliveryBadge dateStr={order.expected_delivery} />
                   </div>
-                  {blocked ? (
-                    <Button size="sm" disabled className="h-7 px-3 text-xs gap-1 cursor-not-allowed">
-                      <Lock className="h-3 w-3" />
-                      Locked
+
+                  {hasAssignedTask ? (
+                    <Button size="sm" disabled className="h-7 px-3 text-xs gap-1 opacity-50 cursor-not-allowed">
+                      <ClipboardList className="h-3 w-3" />
+                      Use Assigned Tasks
                     </Button>
                   ) : (
                     <Button
                       size="sm"
                       className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 group-hover:translate-x-0.5 transition-transform"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectOrder(order, order.product_id ?? '');
-                      }}
+                      onClick={(e) => { e.stopPropagation(); onSelectOrder(order, order.product_id ?? ''); }}
                     >
                       Create Batch
                       <ArrowRight className="h-3 w-3" />

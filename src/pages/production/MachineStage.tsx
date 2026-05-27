@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
@@ -477,9 +478,7 @@ export default function MachineStage() {
           today.setHours(0, 0, 0, 0);
           scheduleDate.setHours(0, 0, 0, 0);
           const diffDays = Math.floor((today.getTime() - scheduleDate.getTime()) / (1000 * 60 * 60 * 24));
-          const formattedDate = new Date(batch.machine_stage.schedule_date).toLocaleDateString('en-IN', {
-            day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata',
-          });
+          const formattedDate = formatIndianDate(batch.machine_stage.schedule_date);
           const isOverdue = diffDays > 0 && batch.machine_stage.status !== 'completed';
           const isToday = diffDays === 0 && batch.machine_stage.status !== 'completed';
           if (batch.machine_stage.status === 'completed') return null;

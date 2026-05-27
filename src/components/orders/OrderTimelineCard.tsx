@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 
 interface ActivityLog {
   action: string;
@@ -42,14 +43,7 @@ export function OrderTimelineCard({
   // Helper function to format date
   const formatDate = (date: string | undefined) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
+    return formatIndianDateTime(date);
   };
 
   // Build timeline data

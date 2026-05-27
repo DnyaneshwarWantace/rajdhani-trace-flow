@@ -303,6 +303,8 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       // Build API filters - when categoryFilter is set (e.g. Ink Management), always filter by it
       const apiFilters: any = {
         category: categoryFilter ? [categoryFilter] : (filters.category && filters.category.length > 0 ? filters.category : undefined),
+        // On the plain Materials page (no categoryFilter), exclude Ink — those belong to Ink Management
+        usage_type: categoryFilter ? undefined : 'per_batch',
         status: filters.status && filters.status.length > 0 ? filters.status : undefined,
         type: filters.type && filters.type.length > 0 ? filters.type : undefined,
         color: filters.color && filters.color.length > 0 ? filters.color : undefined,
@@ -457,6 +459,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     setEditMode('edit');
     setIsAddMaterialOpen(true);
   };
+
 
   const handleConfirmDelete = async () => {
     if (!materialToDelete) return;
@@ -668,9 +671,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       loadAssignedTasks();
 
       // Refresh materials list
-      const { materials: data, total } = await MaterialService.getMaterials(filters);
-      setMaterials(data);
-      setTotalMaterials(total || data.length);
+      loadMaterialsFast();
       loadStats();
     } catch (error) {
       console.error('Error restocking material:', error);
@@ -705,14 +706,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   const handleMaterialSuccess = async () => {
     // Reload data in background without showing full page loading
     try {
-      const { materials: data, total } = await MaterialService.getMaterials(filters);
-      setMaterials(data);
-      setTotalMaterials(total || data.length);
+      loadMaterialsFast();
       loadStats();
     } catch (err) {
       console.error('Error refreshing materials:', err);
-      // Fallback to full reload if silent refresh fails
-      loadMaterialsFast();
     }
     setSelectedMaterial(null);
     setEditMode('create');
@@ -784,16 +781,9 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
   };
 
   const handleWasteRefresh = async () => {
-    // Reload data in background without showing full page loading
     loadWasteCount();
-    try {
-      const { materials: data, total } = await MaterialService.getMaterials(filters);
-      setMaterials(data);
-      setTotalMaterials(total || data.length);
-      loadStats();
-    } catch (err) {
-      console.error('Error refreshing materials:', err);
-    }
+    loadMaterialsFast();
+    loadStats();
   };
 
   if (!canView('materials')) {
@@ -1005,11 +995,9 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           materials={materials}
           suppliers={suppliers}
           onClose={() => setIsBulkRestockOpen(false)}
-          onSuccess={async () => {
+          onSuccess={() => {
             setIsBulkRestockOpen(false);
-            const { materials: data, total } = await MaterialService.getMaterials(filters);
-            setMaterials(data);
-            setTotalMaterials(total || data.length);
+            loadMaterialsFast();
             loadStats();
             loadAssignedTasks();
           }}

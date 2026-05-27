@@ -43,6 +43,8 @@ export default function OrderItemForm({
       : products.find(p => p.id === item.product_id)
     : null;
 
+  // Fall back to fields stored on the item itself (set at selection time)
+  // so product info stays visible even after the products list reloads
   const selectedProduct = foundProduct ?? (item.product_id ? {
     length: item.product_dimensions?.length,
     width: item.product_dimensions?.width,

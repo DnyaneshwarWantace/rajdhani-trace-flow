@@ -13,7 +13,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 };
 
 interface ManageStockOverviewProps {
-  /** When provided, use this data and parent loading; no internal fetch. */
+  /** When provided, use this data and skip internal fetch. */
   orders?: StockOrder[];
   loading?: boolean;
 }
@@ -23,13 +23,13 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
   const [orders, setOrders] = useState<StockOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const hasParentOrders = Array.isArray(ordersFromParent) && ordersFromParent.length > 0;
-  const useParentData = (parentLoading ?? false) || hasParentOrders;
-  const displayOrders = useParentData ? (ordersFromParent ?? []) : orders;
-  const displayLoading = useParentData ? (parentLoading ?? false) : loading;
+  // Parent explicitly controls data when it passes the orders prop (even if empty)
+  const hasParentControl = ordersFromParent !== undefined;
+  const displayOrders = hasParentControl ? (ordersFromParent ?? []) : orders;
+  const displayLoading = hasParentControl ? (parentLoading ?? false) : loading;
 
   useEffect(() => {
-    if (useParentData) return;
+    if (hasParentControl) return;
     let cancelled = false;
     ManageStockService.getRecentRestockOrders(5)
       .then(({ data }) => {
@@ -42,7 +42,7 @@ export default function ManageStockOverview({ orders: ordersFromParent, loading:
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [useParentData]);
+  }, [hasParentControl]);
 
   if (displayLoading) {
     return (

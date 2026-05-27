@@ -202,6 +202,7 @@ export function useDropdowns(toast: UseToast['toast']) {
     try {
       const idToToggle = option.id || option._id;
       await DropdownService.toggleActive(idToToggle);
+      // Update local state — no full reload
       setDropdownOptions(prev =>
         prev.map(opt =>
           (opt._id === option._id || opt.id === option.id)
@@ -236,3 +237,4 @@ export function useDropdowns(toast: UseToast['toast']) {
     reload: loadDropdowns,
   };
 }
+

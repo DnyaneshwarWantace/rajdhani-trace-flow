@@ -299,16 +299,27 @@ export default function ProductionIndividualProducts() {
     // Refetch from backend so we validate against latest saved data
     const freshProducts = await refetchIndividualProducts();
     const createdProducts = freshProducts.filter(p => p.id && !p.id.startsWith('temp-'));
-    const requiredFields = ['final_weight', 'final_width', 'final_length'];
-    const completeProducts = createdProducts.filter(p =>
-      requiredFields.every(field => p[field as keyof IndividualProduct] &&
-        (typeof p[field as keyof IndividualProduct] === 'string' &&
-         (p[field as keyof IndividualProduct] as string).trim() !== ''))
-    );
-    if (completeProducts.length === 0) {
+
+    if (createdProducts.length === 0) {
       toast({
         title: 'Cannot Proceed to Wastage',
-        description: 'You must fill in all required fields (Final GSM, Final Width, Final Length) for at least 1 product before proceeding.',
+        description: 'You must save at least one individual product before proceeding.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const requiredFields = ['final_weight', 'final_width', 'final_length', 'location', 'roll_number'] as const;
+    const incompleteProducts = createdProducts.filter(p =>
+      !requiredFields.every(field => {
+        const val = p[field as keyof IndividualProduct];
+        return val && typeof val === 'string' && val.trim() !== '';
+      })
+    );
+    if (incompleteProducts.length > 0) {
+      toast({
+        title: 'Cannot Proceed to Wastage',
+        description: `${incompleteProducts.length} row(s) are missing required fields (Roll No, GSM, Width, Length, Location). Fill them in or delete those rows first.`,
         variant: 'destructive',
       });
       return;

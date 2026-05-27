@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, Package, User, Calendar, FileText, MapPin,
-  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail, Printer, Plus, Truck
+  Loader2, CheckCircle, Clock, AlertTriangle, Download, Phone, Mail, Printer, Plus, Truck, XCircle, Edit2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -118,6 +118,11 @@ export default function OrderDetails() {
   // Add item inline
   const [showAddItemPanel, setShowAddItemPanel] = useState(false);
   const [emptyOrderPendingItems, setEmptyOrderPendingItems] = useState(false);
+  // Date editing
+  const [editingDates, setEditingDates] = useState(false);
+  const [editOrderDate, setEditOrderDate] = useState('');
+  const [editExpectedDelivery, setEditExpectedDelivery] = useState('');
+  const [savingDates, setSavingDates] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const latestOrderRef = useRef<{ id: string; orderNumber: string; status: string } | null>(null);
 
@@ -572,6 +577,40 @@ export default function OrderDetails() {
     }
   };
 
+  const handleSaveDates = async () => {
+    if (!id) return;
+    setSavingDates(true);
+    const { error } = await OrderService.updateOrderDates(id, editOrderDate || undefined, editExpectedDelivery || undefined);
+    setSavingDates(false);
+    if (error) {
+      toast({ title: 'Error', description: error, variant: 'destructive' });
+    } else {
+      toast({ title: 'Dates updated', description: 'Order dates have been saved.' });
+      setEditingDates(false);
+      loadOrderDetails();
+    }
+  };
+
+  const handleCancelOrder = () => {
+    setConfirmDialogConfig({
+      title: 'Cancel Order',
+      description: 'Are you sure you want to cancel this order? Any selected individual products will be released back to available stock. This cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setShowConfirmDialog(false);
+        if (!id) return;
+        const { error } = await OrderService.updateOrderStatus(id, 'cancelled');
+        if (error) {
+          toast({ title: 'Error', description: error, variant: 'destructive' });
+        } else {
+          toast({ title: 'Order Cancelled', description: 'Order has been cancelled and any reserved stock released.' });
+          loadOrderDetails();
+        }
+      },
+    });
+    setShowConfirmDialog(true);
+  };
+
   const handleDeliverOrder = async () => {
     if (!id) return;
     // Fetch fresh status before marking delivered to prevent duplicate action
@@ -642,6 +681,7 @@ export default function OrderDetails() {
     <Layout>
       <div className="w-full max-w-full space-y-6">
         {/* Header */}
+        <div className="flex flex-col gap-3 w-full">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate('/orders')}>
@@ -656,6 +696,10 @@ export default function OrderDetails() {
           <div className="flex gap-2">
             {order.status === 'pending' && (
               <>
+                <Button variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Cancel Order
+                </Button>
                 <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
                   <Download className="w-4 h-4 mr-2" />
                   Generate Bill
@@ -681,20 +725,10 @@ export default function OrderDetails() {
 
               return (
                 <>
-                  {!allProductsSelected && incompleteItems.length > 0 && (
-                    <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs">
-                      Complete roll selection before shipping. Remaining: {incompleteItems.map((item: any) => {
-                        const requiredQty = Number(item.quantity || 0);
-                        const selectedCount = Array.isArray((item as any).selected_individual_products)
-                          ? (item as any).selected_individual_products.length
-                          : Array.isArray((item as any).selectedProducts)
-                            ? (item as any).selectedProducts.length
-                            : 0;
-                        const remaining = Math.max(requiredQty - selectedCount, 0);
-                        return `${item.product_name} (${remaining})`;
-                      }).join(', ')}
-                    </div>
-                  )}
+                  <Button variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50">
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Cancel Order
+                  </Button>
                   {allProductsSelected && (
                     <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
                       <Package className="w-4 h-4 mr-2" />
@@ -729,6 +763,36 @@ export default function OrderDetails() {
               </Button>
             )}
           </div>
+        </div>
+
+        {/* Roll selection warning — full width below header so it doesn't crowd the buttons */}
+        {order.status === 'accepted' && (() => {
+          const productItems = orderItems.filter((item: any) => item.product_type === 'product');
+          const incompleteItems = productItems.filter((item: any) => {
+            const requiredQty = Number(item.quantity || 0);
+            const selectedCount = Array.isArray((item as any).selected_individual_products)
+              ? (item as any).selected_individual_products.length
+              : Array.isArray((item as any).selectedProducts)
+                ? (item as any).selectedProducts.length
+                : 0;
+            return requiredQty > 0 && selectedCount < requiredQty;
+          });
+          if (incompleteItems.length === 0) return null;
+          return (
+            <div className="px-3 py-2 rounded-md border border-amber-200 bg-amber-50 text-amber-800 text-xs w-full">
+              Complete roll selection before shipping. Remaining: {incompleteItems.map((item: any) => {
+                const requiredQty = Number(item.quantity || 0);
+                const selectedCount = Array.isArray((item as any).selected_individual_products)
+                  ? (item as any).selected_individual_products.length
+                  : Array.isArray((item as any).selectedProducts)
+                    ? (item as any).selectedProducts.length
+                    : 0;
+                const remaining = Math.max(requiredQty - selectedCount, 0);
+                return `${item.product_name} (${remaining})`;
+              }).join(', ')}
+            </div>
+          );
+        })()}
         </div>
 
         {/* Order Status Card */}
@@ -942,34 +1006,20 @@ export default function OrderDetails() {
               })()}
               discountAmount={order.discountAmount}
               totalAmount={(() => {
-                // Calculate total from items (sum of all item total_price)
                 const itemsTotal = orderItems.reduce((sum, item) => {
                   return sum + parseFloat(item.total_price || '0');
                 }, 0);
-
-                // If items total is greater than order.totalAmount, use items total (correct value)
-                if (itemsTotal > parseFloat(order.totalAmount.toString())) {
-                  return itemsTotal;
-                }
-
-                return parseFloat(order.totalAmount.toString());
+                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                return Math.round(itemsTotal - discount);
               })()}
               paidAmount={parseFloat(order.paidAmount.toString())}
               outstandingAmount={(() => {
-                // Recalculate outstanding based on correct total
                 const itemsTotal = orderItems.reduce((sum, item) => {
                   return sum + parseFloat(item.total_price || '0');
                 }, 0);
-
-                const correctTotal = itemsTotal > parseFloat(order.totalAmount.toString())
-                  ? itemsTotal
-                  : parseFloat(order.totalAmount.toString());
-
                 const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
-                const finalTotal = correctTotal - discount;
-                const outstanding = finalTotal - parseFloat(order.paidAmount.toString());
-
-                return outstanding;
+                const finalTotal = Math.round(itemsTotal - discount);
+                return finalTotal - parseFloat(order.paidAmount.toString());
               })()}
               paymentHistory={(order as any).payment_history}
               onUpdatePayment={handleUpdatePayment}
@@ -983,30 +1033,78 @@ export default function OrderDetails() {
             {/* Important Dates */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Calendar className="w-5 h-5" />
-                  Important Dates
+                <CardTitle className="flex items-center justify-between text-base">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Important Dates
+                  </div>
+                  {!editingDates && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" onClick={() => {
+                      setEditOrderDate(order.orderDate ? order.orderDate.split('T')[0] : '');
+                      setEditExpectedDelivery(order.expectedDelivery ? order.expectedDelivery.split('T')[0] : '');
+                      setEditingDates(true);
+                    }} title="Edit dates">
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-gray-600">Order Date</p>
-                  <p className="font-semibold">{formatIndianDate(order.orderDate)}</p>
-                </div>
-                {order.expectedDelivery && (() => {
-                  const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
-                  const today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  expectedDate.setHours(0, 0, 0, 0);
-                  const notDelivered = order.status !== 'delivered';
-                  const isOverdue = notDelivered && expectedDate < today;
-                  return (
+                {editingDates ? (
+                  <div className="space-y-3">
                     <div>
-                      <p className="text-sm text-gray-600">Expected Delivery</p>
-                      <p className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</p>
+                      <Label className="text-sm text-gray-600">Order Date</Label>
+                      <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="mt-1" />
                     </div>
-                  );
-                })()}
+                    <div>
+                      <Label className="text-sm text-gray-600">Expected Delivery</Label>
+                      <Input type="date" value={editExpectedDelivery} onChange={e => setEditExpectedDelivery(e.target.value)} className="mt-1" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveDates} disabled={savingDates} className="flex-1">
+                        {savingDates ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingDates(false)} className="flex-1">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-sm text-gray-600">Order Date</p>
+                      <p className="font-semibold">{formatIndianDate(order.orderDate)}</p>
+                    </div>
+                    {order.expectedDelivery && (() => {
+                      const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      expectedDate.setHours(0, 0, 0, 0);
+                      const notDelivered = order.status !== 'delivered';
+                      const isOverdue = notDelivered && expectedDate < today;
+                      return (
+                        <div>
+                          <p className="text-sm text-gray-600">Expected Delivery</p>
+                          <p className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</p>
+                        </div>
+                      );
+                    })()}
+                    {/* Date change history */}
+                    {(order as any).date_history && (order as any).date_history.length > 0 && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 font-medium mb-1">Date Changes</p>
+                        <div className="space-y-1">
+                          {(order as any).date_history.map((h: any, i: number) => (
+                            <div key={i} className="text-xs text-gray-500">
+                              <span className="font-medium">{h.field === 'order_date' ? 'Order Date' : 'Delivery Date'}:</span>{' '}
+                              {formatIndianDate(h.previous_date)} → {formatIndianDate(h.new_date)}
+                              <span className="text-gray-400 ml-1">by {h.changed_by}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
                 {order.acceptedAt && (
                   <div>
                     <p className="text-sm text-gray-600">Accepted On</p>

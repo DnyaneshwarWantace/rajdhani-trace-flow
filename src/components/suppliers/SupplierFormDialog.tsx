@@ -40,16 +40,20 @@ export default function SupplierFormDialog({
   // Track which fields have been touched
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const markFieldTouched = (fieldName: string) => {
     setTouchedFields(prev => new Set(prev).add(fieldName));
   };
+
+  const isTouched = (field: string) => submitAttempted || touchedFields.has(field);
 
   // Reset touched fields when dialog closes
   useEffect(() => {
     if (!isOpen) {
       setTouchedFields(new Set());
       setEmailError(null);
+      setSubmitAttempted(false);
     }
   }, [isOpen]);
 
@@ -283,7 +287,14 @@ export default function SupplierFormDialog({
             {selectedSupplier ? 'Update supplier information' : 'Enter supplier details'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }} className="space-y-4">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          setSubmitAttempted(true);
+          const phoneEmpty = !formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91' || /^\+\d{1,4}$/.test(formData.phone.trim());
+          const phoneInvalid = !phoneEmpty && !isValidPhoneNumber(formData.phone || '');
+          if (!formData.name.trim() || phoneEmpty || phoneInvalid) return;
+          onSubmit();
+        }} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Name *</Label>
@@ -293,7 +304,7 @@ export default function SupplierFormDialog({
                 onBlur={() => markFieldTouched('name')}
                 placeholder="e.g., Acme Corporation"
               />
-              {touchedFields.has('name') && !formData.name.trim() ? (
+              {isTouched('name') && !formData.name.trim() ? (
                 <p className="text-xs text-red-500 mt-1">
                   Supplier name is required
                 </p>
@@ -331,7 +342,7 @@ export default function SupplierFormDialog({
                 const isJustCountryCode = formData.phone && /^\+\d{1,4}$/.test(formData.phone.trim());
                 const isEmpty = !formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91';
                 const isValid = formData.phone && isValidPhoneNumber(formData.phone);
-                const showError = touchedFields.has('phone') && (isEmpty || isJustCountryCode || !isValid);
+                const showError = isTouched('phone') && (isEmpty || isJustCountryCode || !isValid);
                 
                 if (showError) {
                   if (isEmpty || isJustCountryCode) {
@@ -472,15 +483,7 @@ export default function SupplierFormDialog({
             </Button>
             <Button
               type="submit"
-              disabled={
-                submitting ||
-                !formData.name.trim() ||
-                !formData.phone ||
-                formData.phone.trim() === '' ||
-                formData.phone.trim() === '+91' ||
-                /^\+\d{1,4}$/.test(formData.phone.trim()) ||
-                !isValidPhoneNumber(formData.phone)
-              }
+              disabled={submitting}
               className="bg-primary-600 hover:bg-primary-700 text-white disabled:bg-primary-400 disabled:text-white"
             >
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}

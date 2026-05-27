@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Product, ProductFormData } from '@/types/product';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
-import { MaterialService } from '@/services/materialService';
 import { RecipeService } from '@/services/recipeService';
 import { uploadImageToR2 } from '@/services/imageService';
 import type { RecipeMaterial as BackendRecipeMaterial } from '@/types/recipe';
@@ -81,6 +80,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
+  // Tracks whether loadRecipe has finished — prevents deleting recipe when it just hasn't loaded yet
+  const recipeLoadedRef = useRef(false);
+  const loadedRecipeIdRef = useRef<string | null>(null);
 
   // Track which fields have been touched for validation messages
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
@@ -186,30 +188,26 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
   useEffect(() => {
     if (isOpen) {
       reloadDropdowns();
-      loadMaterials();
-      loadProducts();
     }
   }, [isOpen]);
 
-  // Populate form when product data changes - ensure dropdowns are loaded first
+  // Populate form fields — re-runs when dropdowns arrive so values match options
   useEffect(() => {
     if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
-      // Ensure values match dropdown options (trim and handle empty strings)
-      // Find matching values in dropdowns to ensure exact match
       const findMatchingValue = (value: string | null | undefined, options: string[]): string => {
         if (!value) return '';
         const trimmed = String(value).trim();
         if (options.includes(trimmed)) return trimmed;
         const found = options.find(opt => opt.toLowerCase() === trimmed.toLowerCase());
-        return found || ''; // Clear value if it doesn't match any option
+        return found || '';
       };
-      
+
       const unitValue = findMatchingValue(product.unit, units);
       const patternValue = findMatchingValue(product.pattern, patterns);
       const colorValue = findMatchingValue(product.color, colors);
       const categoryValue = findMatchingValue(product.category, categories);
       const subcategoryValue = findMatchingValue(product.subcategory, subcategories);
-      
+
       setFormData({
         name: product.name || '',
         category: categoryValue,
@@ -232,25 +230,31 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         image_url: product.image_url || '',
         status: product.status || 'active',
       });
-      
+
       if (product.image_url) {
         setImagePreview(product.image_url);
       } else {
         setImagePreview('');
       }
       setImageFile(null);
-      // Load recipe for this product
-      loadRecipe(product.id);
     } else if (isOpen && !product && mode === 'create') {
       resetForm();
     }
   }, [isOpen, product, mode, categories, units, patterns, colors, subcategories]);
 
+  // Load recipe once when product/mode changes — separate from form fields to avoid re-fetching on dropdown updates
+  useEffect(() => {
+    if (isOpen && product && (mode === 'edit' || mode === 'duplicate')) {
+      recipeLoadedRef.current = false;
+      loadRecipe(product.id);
+    }
+  }, [isOpen, product?.id, mode]);
+
   const loadRecipe = async (productId: string) => {
     try {
       const recipe = await RecipeService.getRecipeByProductId(productId);
       if (recipe && recipe.materials) {
-        // Convert recipe materials to form format
+        loadedRecipeIdRef.current = recipe.id || null;
         const materials: RecipeMaterial[] = recipe.materials.map((mat: BackendRecipeMaterial) => ({
           materialId: mat.material_id,
           materialName: mat.material_name,
@@ -260,11 +264,15 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
         }));
         setRecipeMaterials(materials);
       } else {
+        loadedRecipeIdRef.current = null;
         setRecipeMaterials([]);
       }
     } catch (err) {
       console.error('Failed to load recipe:', err);
+      loadedRecipeIdRef.current = null;
       setRecipeMaterials([]);
+    } finally {
+      recipeLoadedRef.current = true;
     }
   };
 
@@ -301,24 +309,9 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       unit: '',
       cost: '',
     });
-    // Reset touched fields when form is reset
+    loadedRecipeIdRef.current = null;
+    recipeLoadedRef.current = false;
     setTouchedFields(new Set());
-  };
-
-  const loadMaterials = async () => {
-    try {
-      await MaterialService.getMaterials({ limit: 1000 });
-    } catch (err) {
-      console.error('Failed to load materials:', err);
-    }
-  };
-
-  const loadProducts = async () => {
-    try {
-      await ProductService.getProducts({ limit: 1000 });
-    } catch (err) {
-      console.error('Failed to load products:', err);
-    }
   };
 
   const handleImageUpload = (file: File) => {
@@ -519,14 +512,15 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
       if (mode === 'edit' && product) {
         createdProduct = await ProductService.updateProduct(product.id, finalFormData);
       } else {
-        createdProduct = await ProductService.createProduct(finalFormData);
+        createdProduct = await ProductService.createProduct(finalFormData as any);
       }
 
       // Save or update recipe if materials are provided
       if (createdProduct && recipeMaterials.length > 0) {
         try {
-          const existingRecipe = await RecipeService.getRecipeByProductId(createdProduct.id);
-          
+          // Use cached recipe ID from load — avoid a redundant fetch
+          const existingRecipeId = mode === 'edit' ? loadedRecipeIdRef.current : null;
+
           // Get user info for created_by
           const userInfo = localStorage.getItem('user');
           let createdBy = 'system';
@@ -539,63 +533,35 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
             }
           }
 
-          // Determine material type - use stored type if available, otherwise guess from unit
           const getMaterialType = (mat: RecipeMaterial): 'raw_material' | 'product' => {
-            // If materialType was stored when selected, use it
-            if (mat.materialType) {
-              return mat.materialType;
-            }
-            // Fallback: Check if unit suggests it's a product
-            if (mat.unit === 'roll' || mat.unit === 'rolls' || mat.unit === 'sqm' || mat.unit === 'SQM') {
-              return 'product';
-            }
-            // Default to raw_material
+            if (mat.materialType) return mat.materialType;
+            if (mat.unit === 'roll' || mat.unit === 'rolls' || mat.unit === 'sqm' || mat.unit === 'SQM') return 'product';
             return 'raw_material';
           };
 
-          const recipeData = {
-            product_id: createdProduct.id,
-            materials: recipeMaterials.map(mat => {
-              const materialType = getMaterialType(mat);
-              console.log('📦 Creating recipe material:', {
-                materialId: mat.materialId,
-                materialName: mat.materialName,
-                materialType,
-                quantity: mat.quantity,
-                unit: mat.unit,
-              });
-              return {
-                material_id: mat.materialId,
-                material_name: mat.materialName,
-                material_type: materialType,
-                quantity_per_sqm: parseFloat(mat.quantity) || 0,
-                unit: mat.unit,
-                cost_per_unit: parseFloat(mat.cost || '0') || 0,
-              };
-            }),
+          const recipePayload = {
+            materials: recipeMaterials.map(mat => ({
+              material_id: mat.materialId,
+              material_name: mat.materialName,
+              material_type: getMaterialType(mat),
+              quantity_per_sqm: parseFloat(mat.quantity) || 0,
+              unit: mat.unit,
+              cost_per_unit: parseFloat(mat.cost || '0') || 0,
+            })),
             description: `Recipe for ${createdProduct.name}`,
             version: '1.0',
             created_by: createdBy,
           };
 
-          console.log('📋 Recipe data to send:', recipeData);
-
-          // Delete existing recipe if editing (not duplicating)
-          if (existingRecipe && mode === 'edit') {
-            await RecipeService.deleteRecipe(existingRecipe.id);
+          // Delete existing recipe if editing
+          if (existingRecipeId) {
+            await RecipeService.deleteRecipe(existingRecipeId);
           }
-          
-          // Create new recipe via RecipeService (or recreate if editing)
+
           try {
-            await RecipeService.createRecipe(createdProduct.id, {
-              materials: recipeData.materials,
-              description: recipeData.description,
-              version: recipeData.version,
-              created_by: recipeData.created_by,
-            });
+            await RecipeService.createRecipe(createdProduct.id, recipePayload);
           } catch (recipeError: any) {
             console.error('Failed to save recipe:', recipeError);
-            // Show warning but don't fail the product save
             toast({
               title: 'Recipe Warning',
               description: recipeError?.message || 'Recipe could not be saved, but product was created successfully',
@@ -604,14 +570,12 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
           }
         } catch (recipeError) {
           console.error('Error saving recipe:', recipeError);
-          // Don't fail the entire operation if recipe save fails
         }
-      } else if (createdProduct && mode === 'edit' && recipeMaterials.length === 0) {
-        // If editing and recipe is removed, delete the recipe
+      } else if (createdProduct && mode === 'edit' && recipeMaterials.length === 0 && recipeLoadedRef.current) {
+        // Only delete recipe if it was loaded and user explicitly removed all materials
         try {
-          const existingRecipe = await RecipeService.getRecipeByProductId(createdProduct.id);
-          if (existingRecipe) {
-            await RecipeService.deleteRecipe(existingRecipe.id);
+          if (loadedRecipeIdRef.current) {
+            await RecipeService.deleteRecipe(loadedRecipeIdRef.current);
           }
         } catch (recipeError) {
           console.error('Error deleting recipe:', recipeError);

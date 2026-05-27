@@ -1,4 +1,4 @@
-import { ShoppingCart, User, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, MapPin } from 'lucide-react';
+import { ShoppingCart, User, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, MapPin, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { OrderService, type Order } from '@/services/orderService';
@@ -29,7 +29,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
-export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCreateMaterialTask }: OrderCardProps) {
+export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCreateMaterialTask, onCancel }: OrderCardProps) {
   const status = statusConfig[order.status] || statusConfig.pending;
   const StatusIcon = status.icon;
   const navigate = useNavigate();
@@ -379,17 +379,28 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
               <Clock className="w-4 h-4" />
               <span>Order Pending - Awaiting Acceptance</span>
             </div>
-            <Button
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onStatusUpdate(order.id, 'accepted');
-              }}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Accept Order
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusUpdate(order.id, 'accepted');
+                }}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Accept Order
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => { e.stopPropagation(); onCancel?.(order); }}
+                className="text-red-600 border-red-300 hover:bg-red-50 px-2"
+                title="Cancel order"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
               {producibleItems.length > 0 && (
                 <Button
@@ -445,24 +456,46 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
               <span>Order Accepted - Ready to Ship</span>
             </div>
             {canDispatchOrder(order) ? (
-              <Button
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-                size="sm"
-                onClick={handleDispatch}
-              >
-                <Package className="w-4 h-4 mr-2" />
-                Ship
-              </Button>
-            ) : (
-              <>
+              <div className="flex gap-2">
                 <Button
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                   size="sm"
                   onClick={handleDispatch}
                 >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Select Individual Products
+                  <Package className="w-4 h-4 mr-2" />
+                  Ship
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => { e.stopPropagation(); onCancel?.(order); }}
+                  className="text-red-600 border-red-300 hover:bg-red-50 px-2"
+                  title="Cancel order"
+                >
+                  <XCircle className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                    onClick={handleDispatch}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Select Individual Products
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); onCancel?.(order); }}
+                    className="text-red-600 border-red-300 hover:bg-red-50 px-2"
+                    title="Cancel order"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </Button>
+                </div>
                 <div className="text-xs text-gray-600 text-center mt-1">
                   Individual product selection required
                 </div>
@@ -552,7 +585,7 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
               </div>
             </div>
             <div className="text-xs text-green-600">
-              Delivered on {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString() : 'N/A'}
+              Delivered on {order.deliveredAt ? formatIndianDate(order.deliveredAt) : 'N/A'}
             </div>
           </div>
         )}

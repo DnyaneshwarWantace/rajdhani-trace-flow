@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -131,10 +132,13 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
       setLoading(true);
       const { products } = await IndividualProductService.getIndividualProducts({
         product_id: batch.product_id,
-        batch_number: batch.batch_number,
-        limit: 500,
       });
-      setIndividualProducts(products || []);
+      // Products are stored with batch_number = batch.id (the route id field).
+      // Also check batch.batch_number for legacy data.
+      const batchProducts = (products || []).filter((p: any) =>
+        p.batch_number === batch.id || p.batch_number === batch.batch_number
+      );
+      setIndividualProducts(batchProducts);
     } catch (error) {
       console.error('Error loading individual products:', error);
       setIndividualProducts([]);
@@ -290,7 +294,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                   </td>
                   <td className="border border-gray-200 p-2 text-sm text-gray-900">{product.inspector || '—'}</td>
                   <td className="border border-gray-200 p-2 text-sm text-gray-900">
-                    {product.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}
+                    {product.created_at ? formatIndianDate(product.created_at) : '—'}
                   </td>
                   <td className="border border-gray-200 p-2 text-center">
                     {product.qr_code ? (

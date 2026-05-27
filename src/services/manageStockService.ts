@@ -211,15 +211,9 @@ export class ManageStockService {
   }
 
   /**
-   * Get recent restock entries for dashboard.
-   * Falls back to raw-material purchase-history when purchase-orders are empty.
+   * Get recent restock entries for dashboard from direct restock history.
    */
   static async getRecentRestockOrders(limit = 5): Promise<{ data: StockOrder[]; count: number }> {
-    const direct = await this.getOrders({ limit });
-    if ((direct.data || []).length > 0) {
-      return direct;
-    }
-
     try {
       const token = localStorage.getItem('auth_token');
       const response = await fetch(
@@ -253,7 +247,7 @@ export class ManageStockService {
         totalCost: Number(r.total_cost || 0),
         orderDate: r.createdAt || r.created_at || '',
         expectedDelivery: '',
-        status: 'received',
+        status: 'received' as const,
         notes: r.notes || '',
         actualDelivery: r.createdAt || r.created_at || '',
         minThreshold: undefined,
@@ -263,7 +257,7 @@ export class ManageStockService {
 
       return { data: mapped, count: result.count || mapped.length };
     } catch (error) {
-      console.error('Error fetching fallback restock history:', error);
+      console.error('Error fetching restock history:', error);
       return { data: [], count: 0 };
     }
   }

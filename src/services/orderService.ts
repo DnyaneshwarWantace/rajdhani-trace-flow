@@ -455,6 +455,24 @@ export class OrderService {
     }
   }
 
+  static async updateOrderDates(orderId: string, orderDate?: string, expectedDelivery?: string): Promise<{ data: Order | null; error: string | null }> {
+    try {
+      const body: Record<string, string> = {};
+      if (orderDate) body.order_date = orderDate;
+      if (expectedDelivery) body.expected_delivery = expectedDelivery;
+      const response = await fetch(`${API_URL}/orders/${orderId}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(body),
+      });
+      const result = await response.json();
+      if (!result.success) return { data: null, error: result.error || 'Failed to update dates' };
+      return { data: result.data, error: null };
+    } catch (error: any) {
+      return { data: null, error: error.message || 'Failed to update dates' };
+    }
+  }
+
   static async updateOrderPayment(orderId: string, paidAmount: number): Promise<{ data: Order | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/orders/${orderId}/payment`, {

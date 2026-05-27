@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import type { Supplier } from '@/services/supplierService';
 import {
   Dialog,
@@ -65,7 +66,7 @@ export default function SupplierDetailModal({
                 <InfoRow
                   icon={Calendar}
                   label="Added On"
-                  value={new Date(supplier.created_at).toLocaleDateString()}
+                  value={formatIndianDate(supplier.created_at)}
                 />
               )}
             </div>

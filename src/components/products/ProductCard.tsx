@@ -3,7 +3,7 @@ import type { Product } from '@/types/product';
 import { formatStockRolls } from '@/utils/stockFormatter';
 import { calculateStockStatus } from '@/utils/stockStatus';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
-import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText } from 'lucide-react';
+import { Package, Edit, Eye, Copy, BarChart3, Factory, QrCode, FileText, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
@@ -279,6 +279,21 @@ export default function ProductCard({
                     <Factory className="w-3 h-3" />
                   </button>
                 )}
+              </div>
+            )}
+            {_onDelete && _canDelete && (
+              <div className="mt-1.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    _onDelete(product);
+                  }}
+                  className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                  title="Delete product"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete
+                </button>
               </div>
             )}
           </div>

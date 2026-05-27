@@ -289,6 +289,17 @@ export default function ProductList() {
     setIsQRCodeDialogOpen(true);
   };
 
+  const handleDelete = async (product: Product) => {
+    if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    try {
+      await ProductService.deleteProduct(product.id || (product as any)._id);
+      toast({ title: 'Product deleted', description: `"${product.name}" has been deleted.` });
+      loadProducts();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to delete product', variant: 'destructive' });
+    }
+  };
+
   const handleCreate = () => {
     setSelectedProduct(null);
     setFormMode('create');
@@ -485,6 +496,7 @@ export default function ProductList() {
                       onQRCode={handleQRCode}
                       canEdit={canEdit('products')}
                       canDelete={canDelete('products')}
+                      onDelete={handleDelete}
           />
         )}
 

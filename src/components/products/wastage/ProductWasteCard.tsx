@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Package, Calendar, Hash, Factory, TrendingDown } from 'lucide-react';
@@ -123,7 +124,7 @@ export default function ProductWasteCard({ waste }: ProductWasteCardProps) {
                 Generated
               </span>
               <span className="text-gray-900">
-                {new Date(waste.generation_date).toLocaleDateString()}
+                {formatIndianDate(waste.generation_date)}
               </span>
             </div>
           )}
@@ -152,7 +153,7 @@ export default function ProductWasteCard({ waste }: ProductWasteCardProps) {
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-500">Created</span>
                         <span className="text-gray-700">
-                          {new Date(indProduct.created_at).toLocaleDateString()}
+                          {formatIndianDate(indProduct.created_at)}
                         </span>
                       </div>
                     )}

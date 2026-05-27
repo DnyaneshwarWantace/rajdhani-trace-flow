@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Package, Factory, ShoppingCart, CheckCircle, Clock, ArrowDownCircle } from 'lucide-react';
@@ -263,13 +264,7 @@ export default function MaterialDetailTransactionHistory({
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     try {
-      return new Date(dateString).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      return formatIndianDateTime(dateString);
     } catch {
       return dateString;
     }
@@ -373,7 +368,7 @@ export default function MaterialDetailTransactionHistory({
                       <td className="px-4 py-3 text-right font-semibold text-green-700">+{r.quantity} {r.unit}</td>
                       <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{r.new_stock} {r.unit}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{r.new_stock != null ? parseFloat(Number(r.new_stock).toFixed(4)).toString() : '—'} {r.unit}</td>
                       <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{r.notes || '—'}</td>
                     </tr>
                   ))}

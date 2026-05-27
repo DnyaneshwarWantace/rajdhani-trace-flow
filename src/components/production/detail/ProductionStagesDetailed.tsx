@@ -133,13 +133,15 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       try {
         const { IndividualProductService } = await import('@/services/individualProductService');
         const { products: individualProducts } = await IndividualProductService.getIndividualProducts({
-          product_id: batch.product_id
+          product_id: batch.product_id,
         });
+        // Products are stored with batch_number = batch.id (the id field, e.g. "BATCH-260514-007").
+        // Also check batch.batch_number for legacy data.
         const batchProducts = individualProducts.filter(
           (p: any) => p.batch_number === batch.id || p.batch_number === batch.batch_number
         );
         setIndividualProductsCount(batchProducts.length);
-        console.log('📦 Individual products count loaded:', batchProducts.length);
+        console.log('📦 Individual products count loaded:', batchProducts.length, '(batch.id:', batch.id, 'batch.batch_number:', batch.batch_number, ')');
       } catch (error) {
         console.error('Error loading individual products count:', error);
         setIndividualProductsCount(0);
@@ -224,11 +226,12 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
   // - Completion: When machine step status is 'completed' (not just when wastage step exists)
   // - Status: "in_progress" if machine step exists but not completed, "completed" if machine step status is 'completed'
   const machineStartDate = machineStep?.start_time || machineStep?.started_at || machineStep?.created_at || machineStep?.createdAt || planningCompletionDate;
-  const machineCompletionDate = machineStep?.status === 'completed' 
-    ? (machineStep?.end_time || machineStep?.completed_at || machineStep?.endTime || wastageStep?.created_at || wastageStep?.createdAt || null)
+  // Consider machine completed if either the flow step says so OR the batch stage field says so
+  const machineIsCompleted = machineStep?.status === 'completed' || batch.machine_stage?.status === 'completed';
+  const machineCompletionDate = machineIsCompleted
+    ? (machineStep?.end_time || machineStep?.completed_at || machineStep?.endTime || batch.machine_stage?.completed_at || wastageStep?.created_at || wastageStep?.createdAt || null)
     : null;
-  const machineIsCompleted = machineStep?.status === 'completed';
-  const machineIsInProgress = !!machineStep && machineStep.status === 'in_progress' && !machineIsCompleted;
+  const machineIsInProgress = (!!machineStep && machineStep.status === 'in_progress' && !machineIsCompleted) || (batch.machine_stage?.status === 'in_progress' && !machineIsCompleted);
 
   const machineStage = {
     status: machineIsCompleted ? 'completed' : (machineIsInProgress ? 'in_progress' : 'not_started'),

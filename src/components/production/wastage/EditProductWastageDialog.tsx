@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -289,7 +290,7 @@ export default function EditProductWastageDialog({
                           )}
                           {product.created_at && (
                             <p className="text-xs text-gray-500">
-                              Created: {new Date(product.created_at).toLocaleDateString()}
+                              Created: {formatIndianDate(product.created_at)}
                             </p>
                           )}
                         </div>

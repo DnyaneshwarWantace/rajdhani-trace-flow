@@ -384,20 +384,12 @@ export default function Dashboard() {
         {/* Stats Cards */}
         <DashboardStatsCards stats={dashboardData.stats} loading={loading} />
 
-        {/* Masonry-style dashboard cards (prevents one tall card stretching others) */}
-        <div className="columns-1 lg:columns-2 gap-6 space-y-6">
-          <div className="break-inside-avoid">
-            <RecentOrders orders={dashboardData.recentOrders} loading={loading} />
-          </div>
-          <div className="break-inside-avoid">
-            <ProductionOverview batches={dashboardData.productionBatches} loading={loading} />
-          </div>
-          <div className="break-inside-avoid">
-            <InventoryAlerts products={dashboardData.lowStockProducts} loading={loading} />
-          </div>
-          <div className="break-inside-avoid">
-            <ManageStockOverview orders={dashboardData.manageStockOrders} loading={loading} />
-          </div>
+        {/* 2×2 dashboard grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RecentOrders orders={dashboardData.recentOrders} loading={loading} />
+          <ProductionOverview batches={dashboardData.productionBatches} loading={loading} />
+          <InventoryAlerts products={dashboardData.lowStockProducts} loading={loading} />
+          <ManageStockOverview orders={dashboardData.manageStockOrders} loading={loading} />
         </div>
       </div>
     </Layout>

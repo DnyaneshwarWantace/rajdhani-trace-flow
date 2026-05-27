@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
+import { formatIndianDateTime } from '@/utils/formatHelpers';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, Package } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -69,11 +70,7 @@ export default function ManageStock() {
 
   const totalPages = Math.ceil(total / limit);
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) +
-      ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatDate = (iso: string) => formatIndianDateTime(iso);
 
   const filtered = records.filter((r) => {
     if (!search) return true;
@@ -148,7 +145,7 @@ export default function ManageStock() {
                       <td className="px-4 py-3 text-right text-gray-900 font-medium">+{r.quantity} {r.unit}</td>
                       <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</td>
-                      <td className="px-4 py-3 text-right text-green-700 font-medium">{r.new_stock} {r.unit}</td>
+                      <td className="px-4 py-3 text-right text-green-700 font-medium">{r.new_stock != null ? parseFloat(Number(r.new_stock).toFixed(4)).toString() : '—'} {r.unit}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -175,7 +172,7 @@ export default function ManageStock() {
                     <div className="text-gray-500">Total</div>
                     <div className="font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</div>
                     <div className="text-gray-500">Stock After</div>
-                    <div className="text-gray-900">{r.new_stock} {r.unit}</div>
+                    <div className="text-gray-900">{r.new_stock != null ? parseFloat(Number(r.new_stock).toFixed(4)).toString() : '—'} {r.unit}</div>
                   </div>
                   {r.notes && (
                     <div className="mt-2 text-xs text-gray-500 border-t pt-2">{r.notes}</div>

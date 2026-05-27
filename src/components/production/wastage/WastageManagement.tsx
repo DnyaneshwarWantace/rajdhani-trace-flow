@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -539,7 +540,7 @@ export default function WastageManagement({
                     </div>
                     {waste.generation_date && (
                       <p className="text-xs text-gray-500 mt-2">
-                        Generated: {new Date(waste.generation_date).toLocaleDateString()}
+                        Generated: {formatIndianDate(waste.generation_date)}
                       </p>
                     )}
                   </div>
@@ -666,7 +667,7 @@ export default function WastageManagement({
                     </div>
                     {waste.generation_date && (
                       <p className="text-xs text-gray-500 mt-2">
-                        Generated: {new Date(waste.generation_date).toLocaleDateString()}
+                        Generated: {formatIndianDate(waste.generation_date)}
                       </p>
                     )}
                   </div>

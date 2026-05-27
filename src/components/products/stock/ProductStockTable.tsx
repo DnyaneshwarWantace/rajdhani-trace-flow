@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { QrCode, Hash, Eye, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -138,9 +139,9 @@ export default function ProductStockTable({
               </td>
               <td className="p-3 text-sm hidden md:table-cell">
                 {item.production_date && item.production_date !== 'null'
-                  ? new Date(item.production_date).toLocaleDateString()
+                  ? formatIndianDate(item.production_date)
                   : item.completion_date && item.completion_date !== 'null'
-                  ? new Date(item.completion_date).toLocaleDateString()
+                  ? formatIndianDate(item.completion_date)
                   : 'N/A'}
               </td>
               <td className="p-3 text-sm">

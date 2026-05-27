@@ -198,9 +198,12 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
         return;
       }
 
-      const [productionResult, materialResult] = await Promise.all([
+      const [productionResult, batchResult, materialResult] = await Promise.all([
         canAccessPage('production')
           ? ProductionService.getTasks({ assigned_to: user.id, limit: 300 })
+          : Promise.resolve({ data: [], error: null } as any),
+        canAccessPage('production')
+          ? ProductionService.getBatches({ limit: 500 })
           : Promise.resolve({ data: [], error: null } as any),
         canAccessPage('materials')
           ? OrderService.getMyMaterialProcurementTasks()
@@ -209,9 +212,37 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
       if (cancelled) return;
 
-      const productionActive = (productionResult?.data || []).filter((task: any) =>
-        String(task?.status || '').toLowerCase() === 'assigned'
-      ).length;
+      // Mirror the same logic as loadAssignedTasks in ProductionList:
+      // A task is only counted if it has no batch at all (including cancelled ones).
+      // Parse order IDs/numbers from batch notes (same as getAttachedOrderIdsFromNotes).
+      const allBatches: any[] = batchResult?.data || [];
+      const getOrderIdsFromNotes = (notes: string): string[] => {
+        if (!notes) return [];
+        const m = notes.match(/Attached Order IDs:\s*(.+?)(?:\s*·|$)/i);
+        return m ? m[1].split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+      };
+      const getOrderNumbersFromNotes = (notes: string): string[] => {
+        if (!notes) return [];
+        const m = notes.match(/Attached Orders:\s*(.+?)(?:\s*·|$)/i);
+        return m ? m[1].split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+      };
+      const hasAnyBatch = (task: any) =>
+        allBatches.some((b) => {
+          const attachedIds = getOrderIdsFromNotes(b.notes || '');
+          const attachedNums = getOrderNumbersFromNotes(b.notes || '');
+          const sameOrder =
+            b.order_id === task.order_id ||
+            b.order_number === task.order_number ||
+            attachedIds.includes(task.order_id || '') ||
+            (task.order_number && attachedNums.includes(task.order_number));
+          const sameProduct = b.product_id === task.stage_product_id;
+          return sameOrder && sameProduct;
+        });
+
+      const productionActive = (productionResult?.data || []).filter((task: any) => {
+        const status = String(task?.status || '').toLowerCase();
+        return (status === 'assigned' || status === 'in_progress') && !hasAnyBatch(task);
+      }).length;
       const materialsPending = (materialResult?.data || []).filter((task: any) => {
         const taskStatus = String(task?.related_data?.task_status || '').toLowerCase();
         const notificationStatus = String(task?.status || '').toLowerCase();

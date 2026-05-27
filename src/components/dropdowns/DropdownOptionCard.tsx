@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { Edit, Trash2, Power, PowerOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +35,7 @@ export default function DropdownOptionCard({
             <span>Order: {option.display_order}</span>
             {option.updated_at && (
               <span>
-                Updated: {new Date(option.updated_at).toLocaleDateString()}
+                Updated: {formatIndianDate(option.updated_at)}
               </span>
             )}
           </div>

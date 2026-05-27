@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -168,13 +169,13 @@ export default function MachineStepCard({
           {step.start_time && (
             <div className="flex items-center gap-2 text-gray-600">
               <Clock className="w-4 h-4" />
-              <span>Started: {new Date(step.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Started: {formatIndianDate(step.start_time)}</span>
             </div>
           )}
           {step.end_time && (
             <div className="flex items-center gap-2 text-gray-600">
               <CheckCircle className="w-4 h-4" />
-              <span>Completed: {new Date(step.end_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              <span>Completed: {formatIndianDate(step.end_time)}</span>
             </div>
           )}
         </div>

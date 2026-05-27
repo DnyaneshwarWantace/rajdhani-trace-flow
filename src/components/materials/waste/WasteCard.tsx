@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ export default function WasteCard({ waste, onReturn, isReturning }: WasteCardPro
                 Generated
               </span>
               <span className="text-gray-900">
-                {new Date(waste.generation_date).toLocaleDateString()}
+                {formatIndianDate(waste.generation_date)}
               </span>
             </div>
           )}
@@ -101,7 +102,7 @@ export default function WasteCard({ waste, onReturn, isReturning }: WasteCardPro
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-500">Added</span>
               <span className="text-green-600 font-medium">
-                {new Date(waste.added_at).toLocaleDateString()}
+                {formatIndianDate(waste.added_at)}
               </span>
             </div>
           )}

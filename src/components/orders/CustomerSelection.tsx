@@ -6,6 +6,7 @@ import type { Customer } from '@/services/customerService';
 
 interface CustomerSelectionProps {
   customers: Customer[];
+  customersLoading?: boolean;
   selectedCustomer: Customer | null;
   onSelectCustomer: (customer: Customer) => void;
   onShowNewCustomerForm?: () => void;
@@ -14,6 +15,7 @@ interface CustomerSelectionProps {
 
 export default function CustomerSelection({
   customers,
+  customersLoading = false,
   selectedCustomer,
   onSelectCustomer,
   onShowNewCustomerForm,
@@ -21,16 +23,17 @@ export default function CustomerSelection({
 }: CustomerSelectionProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredCustomers = customers.filter(customer => {
-    if (!searchTerm) return true;
-    const s = searchTerm.toLowerCase();
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const filteredCustomers = safeCustomers.filter(customer => {
+    if (!searchTerm || !searchTerm.trim()) return true;
+    const s = searchTerm.trim().toLowerCase();
     return (
-      customer.name?.toLowerCase().includes(s) ||
-      customer.phone?.toLowerCase().includes(s) ||
-      customer.email?.toLowerCase().includes(s) ||
-      customer.gst_number?.toLowerCase().includes(s) ||
-      customer.company_name?.toLowerCase().includes(s) ||
-      customer.city?.toLowerCase().includes(s)
+      (customer.name || '').toLowerCase().includes(s) ||
+      (customer.phone || '').toLowerCase().includes(s) ||
+      (customer.email || '').toLowerCase().includes(s) ||
+      (customer.gst_number || '').toLowerCase().includes(s) ||
+      (customer.company_name || '').toLowerCase().includes(s) ||
+      (customer.city || '').toLowerCase().includes(s)
     );
   });
 
@@ -58,11 +61,16 @@ export default function CustomerSelection({
           onChange={e => setSearchTerm(e.target.value)}
           autoFocus
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">{filteredCustomers.length}</span>
+        {!customersLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">{filteredCustomers.length}</span>}
       </div>
 
-      {filteredCustomers.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-6">No customers found</p>
+      {customersLoading ? (
+        <div className="flex items-center justify-center py-10 text-slate-400 gap-2">
+          <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+          <span className="text-sm">Loading customers…</span>
+        </div>
+      ) : filteredCustomers.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-6">{searchTerm ? 'No customers match your search' : 'No customers found'}</p>
       ) : (
         <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-md overflow-hidden flex flex-col">
           {/* Table header */}

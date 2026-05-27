@@ -82,7 +82,7 @@ export default function ProductionList() {
     cancelled: 0,
   });
   const [assignedTasks, setAssignedTasks] = useState<ProductionTask[]>([]);
-  const assignedTaskCount = assignedTasks.filter((t) => t.status === 'assigned').length;
+  const assignedTaskCount = assignedTasks.filter((t) => t.status === 'assigned' || t.status === 'in_progress').length;
 
   // Product-scoped page: from path /production/product/:productId or query ?productId=
   const searchParams = new URLSearchParams(location.search);
@@ -482,11 +482,11 @@ export default function ProductionList() {
       }
 
       const { data: batchesData } = await ProductionService.getBatches({ limit: 500 });
-      // A task is "started as batch" if ANY non-cancelled batch exists for that order-stage pair,
-      // including completed batches. Otherwise completed work appears again as "not started".
-      const linkedBatches = (batchesData || []).filter((b) => b.status !== 'cancelled');
-      const hasStartedBatchForTask = (task: ProductionTask) =>
-        linkedBatches.some((b) => {
+      // A task is "started as batch" if ANY batch (including cancelled) exists for that order-stage pair.
+      // If the batch was cancelled, the task is still considered handled — don't re-surface it.
+      const allBatchesForTask = batchesData || [];
+      const hasAnyBatchForTask = (task: ProductionTask) =>
+        allBatchesForTask.some((b) => {
           const attachedOrderIds = getAttachedOrderIdsFromNotes(b.notes);
           const attachedOrderNumbers = getAttachedOrderNumbersFromNotes(b.notes);
           const sameOrder =
@@ -498,7 +498,7 @@ export default function ProductionList() {
         });
 
       setAssignedTasks(
-        tasks.filter((t) => (t.status === 'assigned' || t.status === 'in_progress' || t.status === 'planning') && !hasStartedBatchForTask(t))
+        tasks.filter((t) => (t.status === 'assigned' || t.status === 'in_progress') && !hasAnyBatchForTask(t))
       );
     } catch (error) {
       console.error('Error loading assigned production tasks:', error);
@@ -678,42 +678,14 @@ export default function ProductionList() {
           }}
         />
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-          </div>
-        ) : filteredBatches.length === 0 ? (
-          // On "Assigned" tab, hide the generic empty-batch card so assignment tasks remain primary.
-          activeSection === 'assigned' ? null : <ProductionEmptyState onCreate={handleCreate} />
-        ) : viewMode === 'table' ? (
-          <ProductionTable
-            batches={filteredBatches}
-            onView={handleView}
-            onDelete={handleDelete}
-            onDuplicate={handleDuplicate}
-            canDelete={canDelete('production')}
-            allBatches={allBatches}
-            activeSection={activeSection}
-          />
-        ) : (
-          <ProductionGrid
-            batches={filteredBatches}
-            onDelete={handleDelete}
-            onDuplicate={handleDuplicate}
-            canDelete={canDelete('production')}
-            allBatches={allBatches}
-          />
-        )}
-
-        {/* Assignment-only tasks (no batch created yet) */}
+        {/* Assignment-only tasks (no batch created yet) — shown at top so user sees them immediately */}
         {activeSection === 'assigned' && assignedTasks.length > 0 && (
-          <div className="mt-6 bg-white rounded-lg border border-gray-200 p-4">
+          <div className="mb-6 bg-white rounded-lg border border-gray-200 p-4">
             <h3 className="text-base font-semibold text-gray-900 mb-3">Assigned Tasks (Not Started as Batch)</h3>
             <div className="space-y-2">
               {assignedTasks.map((task) => {
                 const createdAtValue = task.createdAt || task.created_at;
                 const assignedBy = task.created_by_name?.trim();
-                const isPlanning = task.status === 'planning';
                 return (
                   <div key={task.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -757,7 +729,6 @@ export default function ProductionList() {
                       size="sm"
                       variant="outline"
                       className="sm:shrink-0"
-                      disabled={isPlanning}
                       onClick={() =>
                         navigate('/production/create', {
                           state: {
@@ -776,13 +747,45 @@ export default function ProductionList() {
                         })
                       }
                     >
-                      {isPlanning ? 'In Planning' : 'Start Production'}
+                      Start Production
                     </Button>
                   </div>
                 );
               })}
             </div>
           </div>
+        )}
+
+        {/* Production batches */}
+        {activeSection === 'assigned' && filteredBatches.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-3">Production Batches</h3>
+          </div>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+          </div>
+        ) : filteredBatches.length === 0 ? (
+          activeSection === 'assigned' ? null : <ProductionEmptyState onCreate={handleCreate} />
+        ) : viewMode === 'table' ? (
+          <ProductionTable
+            batches={filteredBatches}
+            onView={handleView}
+            onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
+            canDelete={canDelete('production')}
+            allBatches={allBatches}
+            activeSection={activeSection}
+          />
+        ) : (
+          <ProductionGrid
+            batches={filteredBatches}
+            onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
+            canDelete={canDelete('production')}
+            allBatches={allBatches}
+          />
         )}
 
         {/* Pending orders — shown below assigned batches on the Assigned to Me tab */}

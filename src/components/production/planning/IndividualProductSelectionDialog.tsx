@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -261,7 +262,7 @@ export default function IndividualProductSelectionDialog({
                             <div>
                               <span className="text-gray-500">Production:</span>
                               <span className="ml-1 font-medium">
-                                {new Date(product.production_date).toLocaleDateString()}
+                                {formatIndianDate(product.production_date)}
                               </span>
                             </div>
                           )}

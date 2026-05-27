@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useNavigate } from 'react-router-dom';
 import { Factory, ArrowRight, Clock, Play, CheckCircle, AlertCircle, Calendar, AlertTriangle } from 'lucide-react';
 
@@ -106,11 +107,7 @@ export default function ProductionOverview({ batches, loading }: ProductionOverv
                         <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
                           <Calendar className={`w-3 h-3 ${overdue ? 'text-red-600' : ''}`} />
                           <span className="whitespace-nowrap">
-                            {new Date(batch.completion_date).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
+                            {formatIndianDate(batch.completion_date)}
                           </span>
                           {overdue && (
                             <AlertTriangle className="w-3 h-3 text-red-600 ml-1" />

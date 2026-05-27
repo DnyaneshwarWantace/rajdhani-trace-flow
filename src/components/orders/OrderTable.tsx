@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ShoppingCart, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, Info } from 'lucide-react';
+import { ShoppingCart, Calendar, CheckCircle, Clock, Factory, Package, Truck, AlertTriangle, Eye, Edit, Info, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { OrderService, type Order, type OrderItem } from '@/services/orderService';
@@ -30,7 +30,7 @@ const statusConfig: Record<string, { label: string; icon: any; color: string }> 
   cancelled: { label: 'Cancelled', icon: AlertTriangle, color: 'bg-red-100 text-red-800' },
 };
 
-export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCreateMaterialTask }: OrderTableProps) {
+export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCreateMaterialTask, onCancel }: OrderTableProps) {
   const navigate = useNavigate();
   const [sendToProductionOrder, setSendToProductionOrder] = useState<Order | null>(null);
   const [sendToProductionItem, setSendToProductionItem] = useState<OrderItem | null>(null);
@@ -383,27 +383,12 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2 w-[200px] min-w-[200px]">
+                  <td className="px-4 py-2 w-[220px] min-w-[220px]">
                     <div className="flex items-center justify-end gap-1 flex-nowrap">
+                      {/* 1. Primary status action */}
                       {order.status === 'pending' && (
                         <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusUpdate(order.id, 'accepted'); }} className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white px-2">
                           <CheckCircle className="w-3 h-3 mr-1" />Accept
-                        </Button>
-                      )}
-                      {canShowProduceButton && (
-                        <Button size="sm"
-                          onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }}
-                          disabled={!!orderResponsibleUsers[order.id]}
-                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2"
-                          title={orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
-                        >
-                          <Factory className="w-3 h-3 mr-1" />
-                          {producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
-                        </Button>
-                      )}
-                      {!!firstProductItem?.productId && (
-                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0" title="Production Info">
-                          <Info className="w-3.5 h-3.5" />
                         </Button>
                       )}
                       {order.status === 'accepted' && (() => {
@@ -428,6 +413,25 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           <CheckCircle className="w-3 h-3 mr-1" />Deliver
                         </Button>
                       )}
+                      {/* 2. Produce */}
+                      {canShowProduceButton && (
+                        <Button size="sm"
+                          onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }}
+                          disabled={!!orderResponsibleUsers[order.id]}
+                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2"
+                          title={orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
+                        >
+                          <Factory className="w-3 h-3 mr-1" />
+                          {producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
+                        </Button>
+                      )}
+                      {/* 3. Production info */}
+                      {!!firstProductItem?.productId && (
+                        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setProductionInfoOrder(order); }} className="h-7 w-7 p-0" title="Production Info">
+                          <Info className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                      {/* 4. Raw material actions */}
                       {(order.status === 'pending' || order.status === 'accepted') && order.items?.some((item) => item.productType === 'raw_material') && (
                         <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); if (pendingRawItems.length > 1) { setPickRawMaterialOrder(order); } else { setSelectedRawMaterialId(pendingRawItems[0]?.rawMaterialId || null); setMaterialTaskOrder(order); } }} disabled={!hasRawNotStarted} className="h-7 text-xs px-2" title={hasRawNotStarted ? 'Order Stock' : 'Stock Task Active'}>
                           <ShoppingCart className="w-3 h-3" />
@@ -461,9 +465,16 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                           Restock
                         </Button>
                       )}
+                      {/* 5. View */}
                       <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onViewDetails(order); }} className="h-7 w-7 p-0" title="View details">
                         <Eye className="w-3.5 h-3.5" />
                       </Button>
+                      {/* 6. Cancel — last, destructive */}
+                      {(order.status === 'pending' || order.status === 'accepted') && onCancel && (
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); onCancel(order); }} className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" title="Cancel order">
+                          <XCircle className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

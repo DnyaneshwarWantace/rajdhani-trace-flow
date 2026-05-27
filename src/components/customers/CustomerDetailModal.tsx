@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { formatCurrency } from '@/utils/formatHelpers';
+import { formatCurrency, formatIndianDate } from '@/utils/formatHelpers';
 import { Badge } from '@/components/ui/badge';
 import { Mail, Phone, FileText, Calendar } from 'lucide-react';
 
@@ -97,7 +97,7 @@ export default function CustomerDetailModal({
               {customer.gst_number && (
                 <InfoRow icon={FileText} label="GST Number" value={customer.gst_number} />
               )}
-              <InfoRow icon={Calendar} label="Registered On" value={new Date(customer.registration_date || customer.created_at).toLocaleDateString()} />
+              <InfoRow icon={Calendar} label="Registered On" value={formatIndianDate(customer.registration_date || customer.created_at)} />
             </div>
           </div>
 
@@ -138,7 +138,7 @@ export default function CustomerDetailModal({
                 <div className="bg-purple-50 rounded-lg p-4">
                   <p className="text-xs text-purple-600 font-medium">Last Order</p>
                   <p className="text-sm font-bold text-purple-900 mt-1">
-                    {new Date(customer.last_order_date).toLocaleDateString()}
+                    {formatIndianDate(customer.last_order_date)}
                   </p>
                 </div>
               )}

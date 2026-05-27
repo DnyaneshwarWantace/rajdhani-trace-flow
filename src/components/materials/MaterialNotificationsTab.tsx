@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TruncatedText } from '@/components/ui/TruncatedText';
-import { formatIndianDateTime } from '@/utils/formatHelpers';
+import { formatIndianDateTime, formatIndianDate } from '@/utils/formatHelpers';
 import { Bell, CheckCircle, Loader2, Clock, AlertTriangle, AlertCircle, Info, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { NotificationService, type Notification } from '@/services/notificationService';
 import { useToast } from '@/hooks/use-toast';
@@ -249,7 +249,7 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
                                     <div className="flex items-center gap-2 text-xs">
                                       <span className="text-gray-500 font-medium">Delivery:</span>
                                       <span className="text-red-700 font-semibold">
-                                        {new Date(notification.related_data.expected_delivery).toLocaleDateString('en-IN')}
+                                        {formatIndianDate(notification.related_data.expected_delivery)}
                                       </span>
                                     </div>
                                   )}

@@ -1,3 +1,4 @@
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -405,7 +406,7 @@ export default function Settings() {
                       <div>
                         <Label className="text-sm font-medium text-gray-500">Account Created</Label>
                         <p className="text-lg font-medium mt-1">
-                          {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
+                          {user?.created_at ? formatIndianDate(user.created_at) : 'N/A'}
                         </p>
                       </div>
                     </div>
