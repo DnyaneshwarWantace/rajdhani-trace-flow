@@ -229,7 +229,7 @@ export default function OrderItemForm({
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Price per</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Unit for Pricing</Label>
           <Select value={item.pricing_unit} onValueChange={(v: PricingUnit) => onUpdate(item.id, 'pricing_unit', v)}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
@@ -258,7 +258,7 @@ export default function OrderItemForm({
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate/unit (₹)</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate per unit (₹)</Label>
           <Input
             type="number"
             value={item.unit_price || ''}

@@ -34,6 +34,8 @@ interface ProductDropdownFieldProps {
   touchedFields?: Set<string>;
   markFieldTouched?: (fieldName: string) => void;
   fieldName?: string;
+  fullOptions?: any[];
+  usageMap?: Record<string, boolean>;
 }
 
 export default function ProductDropdownField({

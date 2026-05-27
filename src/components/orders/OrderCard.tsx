@@ -16,6 +16,7 @@ interface OrderCardProps {
   onStatusUpdate: (orderId: string, newStatus: string) => void;
   onViewDetails: (order: Order) => void;
   onCreateMaterialTask: (order: Order, payload: { assigned_to_id?: string; material_id?: string }) => Promise<void>;
+  onCancel?: (order: Order) => void;
 }
 
 const statusConfig: Record<string, { label: string; icon: any; color: string }> = {
