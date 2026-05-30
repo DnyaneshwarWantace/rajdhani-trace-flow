@@ -9,7 +9,6 @@ import { SupplierService } from '@/services/supplierService';
 import type { RawMaterialFormData } from '@/types/material';
 import type { DropdownOption } from '@/types/dropdown';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 import MaterialBasicInfo from './form/MaterialBasicInfo';
 import MaterialSupplierSection from './form/MaterialSupplierSection';
 import MaterialCategorySection from './form/MaterialCategorySection';
@@ -36,8 +35,6 @@ interface Supplier {
 
 export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixedCategory, excludeCategories = [] }: AddToInventoryDialogProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const [loading, setLoading] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -323,16 +320,14 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
         missingFields.push('Unit');
       }
       
-      // Validate current stock if admin (can be 0, but must be a valid number)
-      if (isAdmin) {
-        if (formData.currentStock === '' || formData.currentStock.trim() === '') {
-          missingFields.push('Current Stock');
-        } else {
-          const currentStock = parseFloat(formData.currentStock);
-          if (isNaN(currentStock) || currentStock < 0) {
-            if (!missingFields.includes('Current Stock')) {
-              missingFields.push('Current Stock (must be >= 0)');
-            }
+      // Validate current stock
+      if (formData.currentStock === '' || formData.currentStock.trim() === '') {
+        missingFields.push('Current Stock');
+      } else {
+        const currentStock = parseFloat(formData.currentStock);
+        if (isNaN(currentStock) || currentStock < 0) {
+          if (!missingFields.includes('Current Stock')) {
+            missingFields.push('Current Stock (must be >= 0)');
           }
         }
       }
@@ -637,7 +632,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
             minThreshold={formData.minThreshold}
             maxCapacity={formData.maxCapacity}
             showCurrentStock={true}
-            isCurrentStockEditable={isAdmin}
+            isCurrentStockEditable={true}
             onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
             onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
             onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
