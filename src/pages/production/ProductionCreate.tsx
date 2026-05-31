@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2, ArrowRight, User } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ProductionService, type CreateProductionBatchData, type ProductionBatch } from '@/services/productionService';
@@ -638,29 +638,56 @@ export default function ProductionCreate() {
                               <strong>{productBatchSummary.cancelled}</strong>
                             </p>
                             {productBatchSummary.latest.length > 0 && (
-                              <div className="space-y-1">
+                              <div className="space-y-2">
                                 <p className={`font-medium text-[11px] ${hasDuplicate ? 'text-red-900' : 'text-blue-900'}`}>
                                   Latest batches:
                                 </p>
-                                <ul className="space-y-0.5">
+                                <div className="space-y-2">
                                   {productBatchSummary.latest.map((b) => {
                                     const isActive = b.status === 'in_progress' || b.status === 'in_production' || b.status === 'planned';
+                                    const assignedName = b.current_stage_assigned_to_name || b.assigned_to_name;
+                                    const getBatchLink = () => {
+                                      if (b.status === 'planned') return `/production/planning?batchId=${b.id}`;
+                                      if (b.status === 'in_progress' || b.status === 'in_production') return `/production/${b.id}/machine`;
+                                      return `/production/${b.id}`;
+                                    };
+                                    const getBatchLabel = () => {
+                                      if (b.status === 'planned') return 'Go to Planning';
+                                      if (b.status === 'in_progress' || b.status === 'in_production') return 'Go to Machine Stage';
+                                      return 'View Batch';
+                                    };
                                     return (
-                                      <li
+                                      <div
                                         key={b.id}
-                                        className={`text-[11px] flex justify-between gap-2 ${isActive ? 'font-semibold text-red-800' : textClass}`}
+                                        className={`rounded-md border p-2 text-[11px] flex items-center justify-between gap-2 ${isActive ? 'border-red-300 bg-red-100/60' : 'border-gray-200 bg-white/60'}`}
                                       >
-                                        <span className="truncate">
-                                          #{b.batch_number}{' '}
-                                          <span className="uppercase tracking-wide text-[10px]">
-                                            {b.status}
-                                          </span>
-                                        </span>
-                                        <span>Qty: {b.planned_quantity}</span>
-                                      </li>
+                                        <div className="min-w-0">
+                                          <div className={`font-semibold truncate ${isActive ? 'text-red-900' : textClass}`}>
+                                            #{b.batch_number} <span className="uppercase tracking-wide text-[10px] font-normal">{b.status}</span>
+                                          </div>
+                                          <div className="text-gray-500 mt-0.5">Qty: {b.planned_quantity}</div>
+                                          {assignedName && (
+                                            <div className="flex items-center gap-1 text-gray-500 mt-0.5">
+                                              <User className="w-3 h-3" />
+                                              <span>{assignedName}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                        {isActive && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            className="shrink-0 h-7 text-[11px] bg-red-700 hover:bg-red-800 text-white"
+                                            onClick={() => navigate(getBatchLink())}
+                                          >
+                                            <ArrowRight className="w-3 h-3 mr-1" />
+                                            {getBatchLabel()}
+                                          </Button>
+                                        )}
+                                      </div>
                                     );
                                   })}
-                                </ul>
+                                </div>
                               </div>
                             )}
                             <div className="pt-1">
