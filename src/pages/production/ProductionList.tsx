@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Loader2, Plus, Grid3x3, List, ArrowLeft, UserRound, ClipboardList, Target, PackageCheck, CalendarClock } from 'lucide-react';
+import { Loader2, Plus, Grid3x3, List, ArrowLeft, UserRound, ClipboardList, Target, PackageCheck, CalendarClock, ArrowRight } from 'lucide-react';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { OrderService } from '@/services/orderService';
@@ -690,10 +690,17 @@ export default function ProductionList() {
                   <div key={task.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-                          <ClipboardList className="w-3.5 h-3.5" />
-                          Task
-                        </span>
+                        {task.parent_batch_id ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
+                            <ArrowRight className="w-3.5 h-3.5" />
+                            Sub-Product Ready
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
+                            <ClipboardList className="w-3.5 h-3.5" />
+                            Task
+                          </span>
+                        )}
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold">
                           <Target className="w-3.5 h-3.5" />
                           {task.stage_product_name}
@@ -725,30 +732,46 @@ export default function ProductionList() {
                         )}
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="sm:shrink-0"
-                      onClick={() =>
-                        navigate('/production/create', {
-                          state: {
-                            fromTask: true,
-                            productId: task.stage_product_id,
-                            productName: task.stage_product_name,
-                            planned_quantity: task.planned_quantity,
-                            orderId: task.order_id,
-                            orderItemId: task.order_item_id,
-                            order_number: task.order_number,
-                            customer_name: task.customer_name,
-                            taskId: task.id,
-                            assigned_to_id: task.assigned_to_id,
-                            assigned_to_name: task.assigned_to_name,
-                          },
-                        })
-                      }
-                    >
-                      Start Production
-                    </Button>
+                    {task.parent_batch_id ? (
+                      <Button
+                        size="sm"
+                        className="sm:shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() =>
+                          navigate(`/production/planning?batchId=${task.parent_batch_id}`, {
+                            state: { section: 'assigned' },
+                          })
+                        }
+                        title="Sub-product is ready — continue the parent production's planning stage"
+                      >
+                        <ArrowRight className="w-4 h-4 mr-1" />
+                        Continue Planning
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="sm:shrink-0"
+                        onClick={() =>
+                          navigate('/production/create', {
+                            state: {
+                              fromTask: true,
+                              productId: task.stage_product_id,
+                              productName: task.stage_product_name,
+                              planned_quantity: task.planned_quantity,
+                              orderId: task.order_id,
+                              orderItemId: task.order_item_id,
+                              order_number: task.order_number,
+                              customer_name: task.customer_name,
+                              taskId: task.id,
+                              assigned_to_id: task.assigned_to_id,
+                              assigned_to_name: task.assigned_to_name,
+                            },
+                          })
+                        }
+                      >
+                        Start Production
+                      </Button>
+                    )}
                   </div>
                 );
               })}

@@ -127,6 +127,7 @@ export interface ProductionTask {
   created_by_name?: string;
   status: 'assigned' | 'in_progress' | 'planning' | 'completed' | 'cancelled';
   notes?: string;
+  parent_batch_id?: string | null;
   created_at?: string;
   updated_at?: string;
   createdAt?: string;
@@ -777,6 +778,7 @@ export class ProductionService {
     assigned_to_id: string;
     assigned_to_name: string;
     notes?: string;
+    parent_batch_id?: string | null;
   }): Promise<{ data: ProductionTask | null; error: string | null }> {
     try {
       const response = await fetch(`${API_URL}/production/tasks`, {

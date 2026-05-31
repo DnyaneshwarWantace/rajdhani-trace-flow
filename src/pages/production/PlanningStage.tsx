@@ -2137,6 +2137,7 @@ export default function PlanningStage() {
               assigned_to_id: _userId,
               assigned_to_name: _userName,
               notes: `Sub-production task created from planning stage for "${selectedProduct.name}".`,
+              parent_batch_id: currentBatch?.id || null,
             });
 
             if (error) {
