@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { ProductionService, type CreateProductionBatchData, type ProductionBatch } from '@/services/productionService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +24,7 @@ export default function ProductionCreate() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [duplicateAcknowledged, setDuplicateAcknowledged] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedOrderDeliveryDate, setSelectedOrderDeliveryDate] = useState<string | null>(null);
   const [productBatchSummary, setProductBatchSummary] = useState<{
@@ -404,16 +407,16 @@ export default function ProductionCreate() {
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
-    // Clear any order-based delivery constraint when user picks a product manually
     setSelectedOrderDeliveryDate(null);
+    setDuplicateAcknowledged(false);
     setFormData((prev) => ({ ...prev, product_id: product.id }));
   };
 
   const handleProductClear = () => {
     setSelectedProduct(null);
-    // Also clear any order-based delivery constraint
     setSelectedOrderDeliveryDate(null);
     setSelectedOrderIds([]);
+    setDuplicateAcknowledged(false);
     setFormData((prev) => ({ ...prev, product_id: '' }));
   };
 
@@ -588,78 +591,107 @@ export default function ProductionCreate() {
                   </CardContent>
                 </Card>
 
-                {selectedProduct && (
-                  <Card className="border border-blue-200 bg-blue-50">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-blue-500" />
-                        <CardTitle className="text-sm font-semibold text-blue-900">
-                          Current production for this product
-                        </CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      {loadingProductBatches && (
-                        <p className="text-xs text-blue-900/80">Checking ongoing and past batches…</p>
-                      )}
-                      {!loadingProductBatches && !productBatchSummary && (
-                        <p className="text-xs text-blue-900/80">
-                          No previous production batches found for this product.
-                        </p>
-                      )}
-                      {!loadingProductBatches && productBatchSummary && (
-                        <div className="space-y-2 text-xs text-blue-900/80">
-                          <p>
-                            Total: <strong>{productBatchSummary.total}</strong> · Planned:{' '}
-                            <strong>{productBatchSummary.planned}</strong> · Ongoing:{' '}
-                            <strong>{productBatchSummary.active}</strong> · Completed:{' '}
-                            <strong>{productBatchSummary.completed}</strong> · Cancelled:{' '}
-                            <strong>{productBatchSummary.cancelled}</strong>
-                          </p>
-                          {productBatchSummary.latest.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="font-medium text-[11px] text-blue-900">
-                                Latest batches:
-                              </p>
-                              <ul className="space-y-0.5">
-                                {productBatchSummary.latest.map((b) => (
-                                  <li
-                                    key={b.id}
-                                    className="text-[11px] text-blue-900/80 flex justify-between gap-2"
-                                  >
-                                    <span className="truncate">
-                                      #{b.batch_number}{' '}
-                                      <span className="uppercase tracking-wide text-[10px] font-semibold">
-                                        {b.status}
-                                      </span>
-                                    </span>
-                                    <span className="text-blue-900/70">
-                                      Qty: {b.planned_quantity}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                          <div className="pt-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (selectedProduct) {
-                                  navigate(`/production/product/${selectedProduct.id}`);
-                                }
-                              }}
-                            >
-                              View full production history
-                            </Button>
-                          </div>
+                {selectedProduct && (() => {
+                  const activeBatches = (productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0);
+                  const hasDuplicate = !loadingProductBatches && activeBatches > 0;
+                  const cardClass = hasDuplicate
+                    ? 'border border-red-300 bg-red-50'
+                    : 'border border-blue-200 bg-blue-50';
+                  const titleClass = hasDuplicate ? 'text-red-900' : 'text-blue-900';
+                  const textClass = hasDuplicate ? 'text-red-900/80' : 'text-blue-900/80';
+
+                  return (
+                    <Card className={cardClass}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center gap-2">
+                          {hasDuplicate
+                            ? <AlertTriangle className="w-4 h-4 text-red-500" />
+                            : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                          <CardTitle className={`text-sm font-semibold ${titleClass}`}>
+                            {hasDuplicate
+                              ? `Warning: ${activeBatches} active production${activeBatches > 1 ? 's' : ''} already exist for this product`
+                              : 'Current production for this product'}
+                          </CardTitle>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                        {hasDuplicate && (
+                          <p className="text-xs text-red-700 mt-1">
+                            Creating another production will consume raw materials a second time. Check if one of the batches below is already being worked on before proceeding.
+                          </p>
+                        )}
+                      </CardHeader>
+                      <CardContent className="pt-0 space-y-3">
+                        {loadingProductBatches && (
+                          <p className={`text-xs ${textClass}`}>Checking ongoing and past batches…</p>
+                        )}
+                        {!loadingProductBatches && !productBatchSummary && (
+                          <p className={`text-xs ${textClass}`}>
+                            No previous production batches found for this product.
+                          </p>
+                        )}
+                        {!loadingProductBatches && productBatchSummary && (
+                          <div className={`space-y-2 text-xs ${textClass}`}>
+                            <p>
+                              Total: <strong>{productBatchSummary.total}</strong> · Planned:{' '}
+                              <strong className={productBatchSummary.planned > 0 ? 'text-orange-700' : ''}>{productBatchSummary.planned}</strong> · Ongoing:{' '}
+                              <strong className={productBatchSummary.active > 0 ? 'text-red-700' : ''}>{productBatchSummary.active}</strong> · Completed:{' '}
+                              <strong>{productBatchSummary.completed}</strong> · Cancelled:{' '}
+                              <strong>{productBatchSummary.cancelled}</strong>
+                            </p>
+                            {productBatchSummary.latest.length > 0 && (
+                              <div className="space-y-1">
+                                <p className={`font-medium text-[11px] ${hasDuplicate ? 'text-red-900' : 'text-blue-900'}`}>
+                                  Latest batches:
+                                </p>
+                                <ul className="space-y-0.5">
+                                  {productBatchSummary.latest.map((b) => {
+                                    const isActive = b.status === 'in_progress' || b.status === 'in_production' || b.status === 'planned';
+                                    return (
+                                      <li
+                                        key={b.id}
+                                        className={`text-[11px] flex justify-between gap-2 ${isActive ? 'font-semibold text-red-800' : textClass}`}
+                                      >
+                                        <span className="truncate">
+                                          #{b.batch_number}{' '}
+                                          <span className="uppercase tracking-wide text-[10px]">
+                                            {b.status}
+                                          </span>
+                                        </span>
+                                        <span>Qty: {b.planned_quantity}</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+                            <div className="pt-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => navigate(`/production/product/${selectedProduct.id}`)}
+                              >
+                                View full production history
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {hasDuplicate && (
+                          <div className="flex items-start gap-2 pt-1 border-t border-red-200">
+                            <Checkbox
+                              id="duplicate-ack"
+                              checked={duplicateAcknowledged}
+                              onCheckedChange={(v) => setDuplicateAcknowledged(!!v)}
+                            />
+                            <Label htmlFor="duplicate-ack" className="text-xs text-red-800 leading-snug cursor-pointer">
+                              I have checked the existing productions above and confirm I need to create a new one. I understand raw materials will be consumed again.
+                            </Label>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 <div className="flex gap-3">
                   <Button
@@ -674,7 +706,13 @@ export default function ProductionCreate() {
                   <Button
                     type="submit"
                     className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
-                    disabled={submitting || !formData.product_id || formData.planned_quantity <= 0 || !formData.completion_date}
+                    disabled={
+                      submitting ||
+                      !formData.product_id ||
+                      formData.planned_quantity <= 0 ||
+                      !formData.completion_date ||
+                      (!duplicateAcknowledged && !loadingProductBatches && ((productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0)) > 0)
+                    }
                   >
                     {submitting ? (
                       <>
