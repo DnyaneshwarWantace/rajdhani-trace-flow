@@ -16,6 +16,7 @@ import ConsumedMaterialsDisplay from '@/components/production/machine/ConsumedMa
 import ProductionStageProgress from '@/components/production/planning/ProductionStageProgress';
 import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
 import ProductionOverviewStats from '@/components/production/planning/ProductionOverviewStats';
+import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import type { Product } from '@/types/product';
 
 export default function MachineStage() {
@@ -34,6 +35,9 @@ export default function MachineStage() {
   const [machineStageRemark, setMachineStageRemark] = useState('');
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consumedMaterialsRef = useRef<any[]>([]);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const actorName = (() => {
     try {
       const raw = localStorage.getItem('user');
@@ -187,6 +191,7 @@ export default function MachineStage() {
           }
           
           setConsumedMaterials(consumed);
+          consumedMaterialsRef.current = consumed;
           console.log('✅ Loaded consumed materials:', consumed.length, 'items');
           console.log('📦 Individual product IDs:', consumed
             .filter(m => m.material_type === 'product')
@@ -275,17 +280,18 @@ export default function MachineStage() {
 
       console.log('✅ All machine steps completed:', allCompleted);
 
-      // Also check if consumed materials exist and products have individual IDs
-      const productMaterials = consumedMaterials.filter(m => m.material_type === 'product');
+      // Use ref so the poll closure always reads fresh materials regardless of capture time
+      const currentMaterials = consumedMaterialsRef.current;
+      const productMaterials = currentMaterials.filter(m => m.material_type === 'product');
       const hasIndividualProducts = productMaterials.length === 0 || productMaterials.every(
         m => m.individual_product_ids && m.individual_product_ids.length > 0
       );
 
-      const isCompleted = allCompleted && consumedMaterials.length > 0 && hasIndividualProducts;
+      const isCompleted = allCompleted && currentMaterials.length > 0 && hasIndividualProducts;
 
       console.log('🎯 Machine completion result:', {
         allStepsCompleted: allCompleted,
-        hasMaterials: consumedMaterials.length > 0,
+        hasMaterials: currentMaterials.length > 0,
         hasIndividualProducts,
         finalResult: isCompleted,
       });
@@ -347,7 +353,8 @@ export default function MachineStage() {
       }
 
       // Check 4: Material consumption must exist
-      if (!consumedMaterials || consumedMaterials.length === 0) {
+      const currentMaterials = consumedMaterialsRef.current;
+      if (!currentMaterials || currentMaterials.length === 0) {
         return {
           valid: false,
           error: 'Material consumption records not found. Please ensure materials are consumed.'
@@ -355,7 +362,7 @@ export default function MachineStage() {
       }
 
       // Check 5: Products must have individual_product_ids
-      const productMaterials = consumedMaterials.filter(m => m.material_type === 'product');
+      const productMaterials = currentMaterials.filter(m => m.material_type === 'product');
       const missingIndividualProducts = productMaterials.filter(
         m => !m.individual_product_ids || m.individual_product_ids.length === 0
       );
@@ -376,6 +383,27 @@ export default function MachineStage() {
         valid: false,
         error: 'Error validating machine stage. Please try again.'
       };
+    }
+  };
+
+  const handleDeleteConfirm = async (reason: string) => {
+    if (!batch) return;
+    try {
+      setIsDeleting(true);
+      const { data, error } = await ProductionService.deleteBatch(batch.id, reason);
+      if (error) {
+        toast({ title: 'Error', description: error, variant: 'destructive' });
+        return;
+      }
+      if (data) {
+        toast({ title: 'Deleted', description: 'Production batch deleted and all materials reverted.' });
+        setIsDeleteDialogOpen(false);
+        navigate('/production', { state: { section: location.state?.section || 'assigned' } });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete production batch.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -464,6 +492,7 @@ export default function MachineStage() {
           }}
           onWastage={handleNavigateToWastage}
           onRefresh={handleRefresh}
+          onDelete={() => setIsDeleteDialogOpen(true)}
           shift={machineShift}
           wastageDisabled={!isMachineCompleted}
         />
@@ -582,6 +611,14 @@ export default function MachineStage() {
         </div>
       </div>
 
+      <ProductionDeleteDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        batch={batch}
+        isDeleting={isDeleting}
+        mode="delete"
+      />
     </Layout>
   );
 }

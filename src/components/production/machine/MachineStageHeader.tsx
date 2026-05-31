@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, FileText, RefreshCw, UserPlus, User } from 'lucide-react';
+import { ArrowLeft, FileText, RefreshCw, Trash2, UserPlus, User } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 
@@ -9,6 +9,7 @@ interface MachineStageHeaderProps {
   onBack: () => void;
   onWastage: () => void;
   onRefresh: () => void;
+  onDelete?: () => void;
   onAssign?: () => void;
   shift?: 'day' | 'night';
   wastageDisabled?: boolean;
@@ -19,6 +20,7 @@ export default function MachineStageHeader({
   onBack,
   onWastage,
   onRefresh,
+  onDelete,
   onAssign,
   shift,
   wastageDisabled = false,
@@ -86,6 +88,17 @@ export default function MachineStageHeader({
           <RefreshCw className="w-4 h-4" />
           Refresh
         </Button>
+        {onDelete && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDelete}
+            className="text-red-700 border-red-300 hover:bg-red-50 flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </Button>
+        )}
         <Button
           onClick={onWastage}
           disabled={wastageDisabled}

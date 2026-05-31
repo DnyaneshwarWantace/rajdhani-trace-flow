@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Copy, AlertTriangle } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Copy, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -391,6 +391,18 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
               >
                 <X className="w-3 h-3 mr-1" />
                 Cancel
+              </Button>
+            )}
+            {/* Delete button for any non-planned, non-cancelled stage */}
+            {batch.status !== 'planned' && batch.status !== 'cancelled' && canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs py-1 h-7 px-2 text-red-700 hover:text-red-900 hover:bg-red-50 border-red-400"
+                onClick={() => onDelete(batch)}
+                title="Delete Production (full revert)"
+              >
+                <Trash2 className="w-3 h-3 mr-1" /> Delete
               </Button>
             )}
           </div>

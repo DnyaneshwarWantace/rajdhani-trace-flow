@@ -920,6 +920,7 @@ export default function ProductionList() {
           onConfirm={handleConfirmDelete}
           batch={selectedBatch}
           isDeleting={isDeleting}
+          mode={selectedBatch?.status === 'planned' ? 'cancel' : 'delete'}
         />
 
         <ProductionDuplicateDialog

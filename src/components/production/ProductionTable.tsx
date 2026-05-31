@@ -1,7 +1,7 @@
 import type { ProductionBatch } from '@/services/productionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy, AlertTriangle } from 'lucide-react';
+import { X, Eye, ClipboardList, Factory, Trash, Package, CheckCircle, Copy, AlertTriangle, Trash2 } from 'lucide-react';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 import { formatDate } from '@/utils/formatHelpers';
@@ -435,6 +435,18 @@ export default function ProductionTable({
                         title="Cancel Production"
                       >
                         <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                    {/* Delete button for any non-planned, non-cancelled stage */}
+                    {batch.status !== 'planned' && batch.status !== 'cancelled' && canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDelete(batch)}
+                        className="text-red-700 hover:text-red-900 hover:bg-red-50 h-7 px-2 flex items-center gap-1 text-xs"
+                        title="Delete Production (full revert)"
+                      >
+                        <Trash2 className="w-3 h-3" /> Delete
                       </Button>
                     )}
                   </div>
