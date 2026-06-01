@@ -31,6 +31,7 @@ interface MaterialRequirementsTableProps {
   selectedIndividualProducts?: Record<string, any[]>;
   recipeBased?: boolean;
   consumedMaterialIds?: string[]; // IDs of materials that are in consumption
+  existingSubTasks?: Record<string, { assigned_to_name: string; status: string }>;
 }
 
 export default function MaterialRequirementsTable({
@@ -47,6 +48,7 @@ export default function MaterialRequirementsTable({
   selectedIndividualProducts = {},
   recipeBased = false,
   consumedMaterialIds = [],
+  existingSubTasks = {},
 }: MaterialRequirementsTableProps) {
   // Local state to track input values as strings (allows typing "0", "0.", "0.3")
   const [quantityInputs, setQuantityInputs] = useState<Record<string, string>>({});
@@ -174,18 +176,24 @@ export default function MaterialRequirementsTable({
                       <div className="flex items-center gap-2">
                         {/* Sub-production button (for product-type shortages) */}
                         {material.material_type === 'product' &&
-                          (material.status === 'low' || material.status === 'unavailable') &&
-                          onStartSubProduction && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onStartSubProduction(material.material_id, material.material_name)}
-                            className="text-amber-700 border-amber-300 hover:bg-amber-50"
-                            title="Start production to create this material"
-                          >
-                            <Factory className="w-4 h-4 mr-2" />
-                            Sub-Produce
-                          </Button>
+                          (material.status === 'low' || material.status === 'unavailable') && (
+                          existingSubTasks[material.material_id] ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-700 font-medium">
+                              <Factory className="w-3.5 h-3.5" />
+                              Assigned → {existingSubTasks[material.material_id].assigned_to_name}
+                            </span>
+                          ) : onStartSubProduction ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onStartSubProduction(material.material_id, material.material_name)}
+                              className="text-amber-700 border-amber-300 hover:bg-amber-50"
+                              title="Start production to create this material"
+                            >
+                              <Factory className="w-4 h-4 mr-2" />
+                              Sub-Produce
+                            </Button>
+                          ) : null
                         )}
                         {/* Order stock button (for raw-material shortages) */}
                         {material.material_type === 'raw_material' &&

@@ -230,7 +230,22 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
         </div>
 
         <div className="space-y-1 text-[10px] mb-2">
-          {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) && (
+          {(batch.order_id || '').startsWith('SUB-') ? (
+            <>
+              <div className="flex justify-between items-start gap-2 min-w-0">
+                <span className="text-gray-600 flex-shrink-0">Type:</span>
+                <span className="text-purple-700 font-medium min-w-0 flex-1 text-right">Sub-Production</span>
+              </div>
+              {getAttachedOrderNumbers(batch.notes)[0] && (
+                <div className="flex justify-between items-start gap-2 min-w-0">
+                  <span className="text-gray-600 flex-shrink-0">Parent Batch:</span>
+                  <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">
+                    {getAttachedOrderNumbers(batch.notes)[0]}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) && (
             <>
               <div className="flex justify-between items-start gap-2 min-w-0">
                 <span className="text-gray-600 flex-shrink-0">Order:</span>

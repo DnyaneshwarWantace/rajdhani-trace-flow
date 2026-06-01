@@ -133,7 +133,10 @@ export default function IndividualProductsTable({
       return fresh ?? p;
     });
     batchProducts.forEach(b => {
-      if (!byId.has(b.id)) merged.push(b);
+      if (!byId.has(b.id)) {
+        byId.set(b.id, b);
+        merged.push(b);
+      }
     });
     return merged;
   };
@@ -251,10 +254,18 @@ export default function IndividualProductsTable({
       }
     }
 
+    // Deduplicate by id before committing (guards against location-filter subset + full batchProducts merge)
+    const seen = new Set<string>();
+    const deduped = merged.filter(p => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+
     const localIds = localProducts.map(p => p.id).join(',');
-    const mergedIds = merged.map(p => p.id).join(',');
-    if (localIds !== mergedIds || merged.length !== localProducts.length) {
-      setLocalProductsSync(merged);
+    const mergedIds = deduped.map(p => p.id).join(',');
+    if (localIds !== mergedIds || deduped.length !== localProducts.length) {
+      setLocalProductsSync(deduped);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [individualProducts, plannedQuantity, productId, batchId]);

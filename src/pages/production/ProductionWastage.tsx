@@ -5,6 +5,7 @@ import { Loader2, CheckCircle, XCircle, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
+import { NotificationService } from '@/services/notificationService';
 import { ProductService } from '@/services/productService';
 import { WasteService } from '@/services/wasteService';
 import { OrderService, type Order } from '@/services/orderService';
@@ -101,7 +102,31 @@ export default function ProductionWastage() {
         });
 
         if (targetOrders.size === 0) {
-          if (!cancelled) setNextStageTasks([]);
+          // Sub-production batch: no real order, but there may be a parent batch task to notify.
+          if ((batch.order_id || '').startsWith('SUB-')) {
+            // Find the task that links this sub-batch to a parent batch
+            const { data: allTasks } = await ProductionService.getTasks({ limit: 200 });
+            const linkedTask = (allTasks || []).find(
+              (t) =>
+                t.stage_product_id === batch.product_id &&
+                (t.order_id === batch.order_id || t.order_number === batch.order_number) &&
+                t.parent_batch_id
+            );
+            if (linkedTask && !cancelled) {
+              setNextStageTasks([{
+                orderId: linkedTask.order_id || batch.order_id || '',
+                orderNumber: linkedTask.order_number || batch.batch_number || '',
+                customerName: linkedTask.final_product_name || 'Parent Batch',
+                productId: linkedTask.final_product_id || '',
+                productName: linkedTask.final_product_name || 'Main Product',
+                requiredQuantity: linkedTask.planned_quantity || 1,
+              }]);
+            } else if (!cancelled) {
+              setNextStageTasks([]);
+            }
+          } else if (!cancelled) {
+            setNextStageTasks([]);
+          }
           return;
         }
 
@@ -651,6 +676,38 @@ export default function ProductionWastage() {
             if (!selectedTasks || selectedTasks.length === 0) {
               throw new Error('No next-stage order tasks found to assign');
             }
+
+            // Sub-production batch: mark the linked task as completed to notify parent batch owner
+            if ((batch.order_id || '').startsWith('SUB-')) {
+              const { data: allTasks } = await ProductionService.getTasks({ limit: 200 });
+              const linkedTask = (allTasks || []).find(
+                (t) =>
+                  t.stage_product_id === batch.product_id &&
+                  (t.order_id === batch.order_id || t.order_number === batch.order_number) &&
+                  t.parent_batch_id
+              );
+              if (linkedTask) {
+                await ProductionService.updateTaskStatus(linkedTask.id, 'completed');
+                await NotificationService.createNotification({
+                  type: 'success',
+                  title: 'Sub-Product Ready',
+                  message: `${batch.product_name || 'Sub-product'} has been completed. You can now continue planning for the parent batch.`,
+                  priority: 'high',
+                  status: 'unread',
+                  module: 'production',
+                  related_id: linkedTask.parent_batch_id || linkedTask.id,
+                  related_data: {
+                    task_id: linkedTask.id,
+                    parent_batch_id: linkedTask.parent_batch_id,
+                    batch_number: batch.batch_number,
+                    product_name: batch.product_name,
+                  },
+                });
+              }
+              navigate('/notifications');
+              return;
+            }
+
             const createResults = await Promise.all(
               selectedTasks.map((task) =>
                 ProductionService.createTask({

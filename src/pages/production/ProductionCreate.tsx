@@ -365,7 +365,7 @@ export default function ProductionCreate() {
           active,
           completed,
           cancelled: cancelledBatches,
-          latest: sorted.slice(0, 5),
+          latest: sorted.filter((b) => b.status !== 'completed' && b.status !== 'cancelled').slice(0, 5),
         });
       } catch (error) {
         if (!cancelled) {

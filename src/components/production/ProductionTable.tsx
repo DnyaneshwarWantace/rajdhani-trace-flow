@@ -324,7 +324,18 @@ export default function ProductionTable({
                   />
                 </td>
                 <td className="px-4 py-2 max-w-[130px]">
-                  {(batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
+                  {(batch.order_id || '').startsWith('SUB-') ? (
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-medium text-purple-700">Sub-Production</div>
+                      {(() => {
+                        const attachedOrders = getAttachedOrderNumbers(batch.notes);
+                        const parentBatch = attachedOrders[0];
+                        return parentBatch ? (
+                          <div className="text-xs text-gray-500 truncate">Parent: {parentBatch}</div>
+                        ) : null;
+                      })()}
+                    </div>
+                  ) : (batch.order_number || batch.customer_name || getAttachedOrderNumbers(batch.notes).length > 0) ? (
                     <div className="space-y-0.5">
                       {(() => {
                         const attachedOrders = getAttachedOrderNumbers(batch.notes);

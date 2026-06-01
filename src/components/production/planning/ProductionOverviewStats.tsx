@@ -1,5 +1,4 @@
-import { Card } from '@/components/ui/card';
-import { Package, Boxes, Ruler, Weight, Factory } from 'lucide-react';
+import { Package, Boxes, Ruler, Weight } from 'lucide-react';
 
 interface ProductionOverviewStatsProps {
   targetQuantity: number;
@@ -18,73 +17,27 @@ export default function ProductionOverviewStats({
   expectedWidth,
   expectedWeight,
 }: ProductionOverviewStatsProps) {
+  const stats = [
+    { icon: Package, color: 'text-blue-600 bg-blue-50', value: `${targetQuantity} ${unit}`, label: 'Target Qty' },
+    { icon: Boxes,   color: 'text-green-600 bg-green-50', value: `${materialsUsed} Selected`, label: 'Materials' },
+    ...(expectedLength ? [{ icon: Ruler, color: 'text-purple-600 bg-purple-50', value: `${expectedLength}M × ${expectedWidth || 0}M`, label: 'Length × Width' }] : []),
+    ...(expectedWeight ? [{ icon: Weight, color: 'text-orange-600 bg-orange-50', value: `${expectedWeight} GSM`, label: 'Expected GSM' }] : []),
+  ];
+
   return (
-    <div className="mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Factory className="w-6 h-6 text-primary-600" />
-        <h2 className="text-xl font-bold text-gray-900">Production Overview</h2>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Target Quantity */}
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
-            </div>
+    <div className="flex items-center gap-3 mb-4 flex-wrap">
+      {stats.map((s, i) => {
+        const Icon = s.icon;
+        return (
+          <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg ${s.color.split(' ')[1]} border border-gray-100`}>
+            <Icon className={`w-4 h-4 ${s.color.split(' ')[0]}`} />
             <div>
-              <p className="text-2xl font-bold text-blue-600">{targetQuantity}</p>
-              <p className="text-sm text-gray-600">{unit}</p>
+              <p className={`text-sm font-semibold ${s.color.split(' ')[0]}`}>{s.value}</p>
+              <p className="text-xs text-gray-500">{s.label}</p>
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-700 mt-2">Target Quantity</p>
-        </Card>
-
-        {/* Materials Used */}
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Boxes className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{materialsUsed}</p>
-              <p className="text-sm text-gray-600">Materials Used</p>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mt-2">{materialsUsed} selected</p>
-        </Card>
-
-        {/* Expected Length */}
-        {expectedLength && (
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Ruler className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-600">{expectedLength}</p>
-                <p className="text-sm text-gray-600">Expected Length</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-500 mt-2">{expectedWidth || 0} width</p>
-          </Card>
-        )}
-
-        {/* Expected Weight */}
-        {expectedWeight && (
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-100 rounded-lg">
-                <Weight className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-orange-600">{expectedWeight}</p>
-                <p className="text-sm text-gray-600">Expected GSM</p>
-              </div>
-            </div>
-          </Card>
-        )}
-      </div>
+        );
+      })}
     </div>
   );
 }

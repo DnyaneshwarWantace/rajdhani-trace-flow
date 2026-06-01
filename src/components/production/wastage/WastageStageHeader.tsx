@@ -141,40 +141,53 @@ export default function WastageStageHeader({
               Production Completed!
             </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-gray-600">
-            Do you want to assign next-stage work for attached orders to another user?
-          </p>
-          <div className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2 text-xs text-green-800">
-            Current stage <span className="font-semibold">{batch.product_name || batch.product_id || 'This product'}</span> is completed.
-            Select remaining next-stage items to assign.
-          </div>
-          {nextStageTasks.length > 0 && (
-            <div className="max-h-44 overflow-y-auto border rounded-md p-2 bg-gray-50 text-xs text-gray-700 space-y-1">
-              {nextStageTasks.map((task, index) => (
-                <label
-                  key={`${task.orderId}-${task.productId}-${index}`}
-                  className="flex items-start gap-2 rounded border border-gray-200 bg-white px-2 py-1.5 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5"
-                    checked={selectedTaskKeys.has(taskKey(task))}
-                    onChange={(e) => {
-                      setSelectedTaskKeys((prev) => {
-                        const next = new Set(prev);
-                        const key = taskKey(task);
-                        if (e.target.checked) next.add(key);
-                        else next.delete(key);
-                        return next;
-                      });
-                    }}
-                  />
-                  <span>
-                    <span className="font-medium">{task.orderNumber}</span> · {task.customerName} · {task.productName} · Qty: {task.requiredQuantity}
-                  </span>
-                </label>
-              ))}
-            </div>
+          {(batch.order_id || '').startsWith('SUB-') ? (
+            <>
+              <p className="text-sm text-gray-600">
+                This is a sub-production batch. Notify the parent batch owner that <strong>{batch.product_name}</strong> is ready so they can continue their production.
+              </p>
+              <div className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2 text-xs text-green-800">
+                <span className="font-semibold">{batch.product_name}</span> completed. Click "Notify Parent" to let the main batch owner know they can continue.
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Do you want to assign next-stage work for attached orders to another user?
+              </p>
+              <div className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2 text-xs text-green-800">
+                Current stage <span className="font-semibold">{batch.product_name || batch.product_id || 'This product'}</span> is completed.
+                Select remaining next-stage items to assign.
+              </div>
+              {nextStageTasks.length > 0 && (
+                <div className="max-h-44 overflow-y-auto border rounded-md p-2 bg-gray-50 text-xs text-gray-700 space-y-1">
+                  {nextStageTasks.map((task, index) => (
+                    <label
+                      key={`${task.orderId}-${task.productId}-${index}`}
+                      className="flex items-start gap-2 rounded border border-gray-200 bg-white px-2 py-1.5 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={selectedTaskKeys.has(taskKey(task))}
+                        onChange={(e) => {
+                          setSelectedTaskKeys((prev) => {
+                            const next = new Set(prev);
+                            const key = taskKey(task);
+                            if (e.target.checked) next.add(key);
+                            else next.delete(key);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>
+                        <span className="font-medium">{task.orderNumber}</span> · {task.customerName} · {task.productName} · Qty: {task.requiredQuantity}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <DialogFooter className="flex gap-2 mt-2">
             <Button
@@ -187,15 +200,20 @@ export default function WastageStageHeader({
               No, I'm done
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setShowForwardDialog(false);
-                setShowAssignModal(true);
+                if ((batch.order_id || '').startsWith('SUB-')) {
+                  // Sub-production: notify and navigate — onAssignAfterComplete handles navigation
+                  await onAssignAfterComplete?.('system', 'system', nextStageTasks);
+                } else {
+                  setShowAssignModal(true);
+                }
               }}
-              disabled={selectedTasks.length === 0}
+              disabled={(batch.order_id || '').startsWith('SUB-') ? false : selectedTasks.length === 0}
               className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
             >
               <UserPlus className="w-4 h-4" />
-              Yes, Forward
+              {(batch.order_id || '').startsWith('SUB-') ? 'Notify Parent Batch Owner' : 'Yes, Forward'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -74,6 +74,7 @@ export default function PlanningStage() {
 
   const [subProductionMaterial, setSubProductionMaterial] = useState<{ id: string; name: string } | null>(null);
   const [showSubProductionModal, setShowSubProductionModal] = useState(false);
+  const [existingSubTasks, setExistingSubTasks] = useState<Record<string, { assigned_to_name: string; status: string }>>({});
 
   const getAttachedOrderIdsFromNotes = (notes?: string): string[] => {
     if (!notes) return [];
@@ -304,6 +305,17 @@ export default function PlanningStage() {
       setSelectedProduct(product);
       setCurrentBatchId(batch.id); // Store the batch ID
       setCurrentBatch(batch); // Store the batch object
+
+      // Load existing sub-product tasks for this batch so we can show assigned state on material cards
+      ProductionService.getTasks({ limit: 100 }).then(({ data }) => {
+        if (!data) return;
+        const map: Record<string, { assigned_to_name: string; status: string }> = {};
+        data
+          .filter(t => t.parent_batch_id === batch.id && !['completed', 'cancelled'].includes(t.status))
+          .forEach(t => { map[t.stage_product_id] = { assigned_to_name: t.assigned_to_name, status: t.status }; });
+        setExistingSubTasks(map);
+      }).catch(() => {});
+
       const completionDate =
         batch.completion_date ? batch.completion_date.split('T')[0] : '';
 
@@ -1290,6 +1302,7 @@ export default function PlanningStage() {
             recipeBased={Boolean(recipe?.materials?.length)}
             selectedIndividualProducts={selectedIndividualProducts}
             consumedMaterialIds={consumedMaterials.map(m => m.material_id)}
+            existingSubTasks={existingSubTasks}
             onAddMaterial={() => setShowMaterialDialog(true)}
             onRemoveMaterial={handleRemoveMaterial}
             onRemoveMaterialFromDraft={handleRemoveMaterialFromDraft}
@@ -2143,6 +2156,12 @@ export default function PlanningStage() {
             if (error) {
               throw new Error(error);
             }
+
+            // Mark this material as already assigned so the button changes immediately
+            setExistingSubTasks(prev => ({
+              ...prev,
+              [subProductionMaterial.id]: { assigned_to_name: _userName, status: 'assigned' },
+            }));
 
             toast({
               title: 'Task Assigned',

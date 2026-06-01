@@ -67,10 +67,8 @@ export default function ProductionIndividualProducts() {
           return;
         }
         if (freshBatch.product_id) {
-          const { products } = await IndividualProductService.getIndividualProducts({ product_id: freshBatch.product_id });
-          const saved = products.filter((p: IndividualProduct) =>
-            (p.batch_number === id || p.batch_number === freshBatch.batch_number) && !p.id?.startsWith('temp-')
-          );
+          const { products } = await IndividualProductService.getIndividualProducts({ product_id: freshBatch.product_id, batch_number: id });
+          const saved = products.filter((p: IndividualProduct) => !p.id?.startsWith('temp-'));
           setDbSavedCount(saved.length);
           // Sync table: update parent state so IndividualProductsTable merges new rows
           setIndividualProducts(saved);
@@ -172,14 +170,10 @@ export default function ProductionIndividualProducts() {
         try {
           const { products } = await IndividualProductService.getIndividualProducts({
             product_id: batchData.product_id,
+            batch_number: id,
           });
-          
-          // Filter by batch_number matching the batch ID
-          // Note: Status update from "in_production" to "used" is now handled
-          // in ProductionWastage.tsx before navigation
-          const batchProducts = products.filter((p: IndividualProduct) => 
-            p.batch_number === id || p.batch_number === batchData.batch_number
-          );
+
+          const batchProducts = products;
           
           console.log('✅ Individual products loaded:', batchProducts.length);
           console.log('📊 Product statuses:', batchProducts.map(p => `${p.id}: ${p.status}`).join(', '));
@@ -265,12 +259,10 @@ export default function ProductionIndividualProducts() {
     try {
       const { products } = await IndividualProductService.getIndividualProducts({
         product_id: batch.product_id,
+        batch_number: id,
       });
-      const batchProducts = products.filter((p: IndividualProduct) =>
-        p.batch_number === id || p.batch_number === batch.batch_number
-      );
-      setIndividualProducts(batchProducts);
-      return batchProducts;
+      setIndividualProducts(products);
+      return products;
     } catch (error) {
       console.error('Error refetching individual products:', error);
       return individualProducts;
@@ -278,17 +270,14 @@ export default function ProductionIndividualProducts() {
   };
 
   // Silent refresh: only refetch individual products. No full-page loading.
-  // Used when table saves/deletes/creates so the page doesn't reload or show loading spinner.
   const handleTableUpdate = async () => {
     if (!batch?.product_id) return;
     try {
       const { products } = await IndividualProductService.getIndividualProducts({
         product_id: batch.product_id,
+        batch_number: id,
       });
-      const batchProducts = products.filter((p: IndividualProduct) =>
-        p.batch_number === id || p.batch_number === batch.batch_number
-      );
-      setIndividualProducts(batchProducts);
+      setIndividualProducts(products);
     } catch (error) {
       console.error('Error refetching individual products:', error);
     }

@@ -223,7 +223,8 @@ export class IndividualProductService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to delete individual product');
+      const error = await response.json().catch(() => ({}));
+      throw new Error(getServiceError(response, error));
     }
   }
 

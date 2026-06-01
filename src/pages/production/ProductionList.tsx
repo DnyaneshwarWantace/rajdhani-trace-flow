@@ -20,6 +20,7 @@ import PermissionDenied from '@/components/ui/PermissionDenied';
 import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import ProductionDuplicateDialog from '@/components/production/ProductionDuplicateDialog';
 import { type ProductionTask } from '@/services/productionService';
+import { NotificationService } from '@/services/notificationService';
 import {
   Select,
   SelectContent,
@@ -467,7 +468,7 @@ export default function ProductionList() {
       const primary = await ProductionService.getTasks({ assigned_to: myId, limit: 200 });
       let tasks = primary.data || [];
 
-      // Fallback query (all visible tasks), then resilient client-side match for legacy data.
+      // Fallback: fetch all and filter client-side — catches ID format mismatches
       if (tasks.length === 0) {
         const fallback = await ProductionService.getTasks({ limit: 200 });
         tasks = (fallback.data || []).filter((t) => {
@@ -482,9 +483,8 @@ export default function ProductionList() {
       }
 
       const { data: batchesData } = await ProductionService.getBatches({ limit: 500 });
-      // A task is "started as batch" if ANY batch (including cancelled) exists for that order-stage pair.
-      // If the batch was cancelled, the task is still considered handled — don't re-surface it.
       const allBatchesForTask = batchesData || [];
+
       const hasAnyBatchForTask = (task: ProductionTask) =>
         allBatchesForTask.some((b) => {
           const attachedOrderIds = getAttachedOrderIdsFromNotes(b.notes);
@@ -497,9 +497,36 @@ export default function ProductionList() {
           return sameOrder && sameProduct;
         });
 
-      setAssignedTasks(
-        tasks.filter((t) => (t.status === 'assigned' || t.status === 'in_progress') && !hasAnyBatchForTask(t))
+      // Also fetch completed sub-product tasks linked to batches owned by this user
+      // so the parent batch owner sees "Continue Planning" after worker marks done.
+      const myBatchIds = new Set(
+        allBatchesForTask
+          .filter(b =>
+            b.created_by === myId ||
+            (b.operator || '').toLowerCase().trim() === myName ||
+            (b.supervisor || '').toLowerCase().trim() === myName
+          )
+          .map(b => b.id)
       );
+      const { data: completedSubTasks } = await ProductionService.getTasks({ limit: 200 });
+      const parentNotifications = (completedSubTasks || []).filter(t =>
+        t.status === 'completed' &&
+        t.parent_batch_id &&
+        myBatchIds.has(t.parent_batch_id) &&
+        // Don't show as parent notification if this user is the sub-product worker — they just marked it done
+        String(t.assigned_to_id || '').trim() !== myId
+      );
+
+      const activeTasks = tasks.filter((t) => {
+        if (!['assigned', 'in_progress', 'planning'].includes(t.status)) return false;
+        if (t.parent_batch_id) return true;
+        return !hasAnyBatchForTask(t);
+      });
+
+      // Merge: active tasks + parent notifications (deduplicate by id)
+      const seen = new Set(activeTasks.map(t => t.id));
+      const merged = [...activeTasks, ...parentNotifications.filter(t => !seen.has(t.id))];
+      setAssignedTasks(merged);
     } catch (error) {
       console.error('Error loading assigned production tasks:', error);
       setAssignedTasks([]);
@@ -686,15 +713,64 @@ export default function ProductionList() {
               {assignedTasks.map((task) => {
                 const createdAtValue = task.createdAt || task.created_at;
                 const assignedBy = task.created_by_name?.trim();
+
+                // Sub-product task marked done by worker = task status is completed
+                const workerMarkedDone = task.status === 'completed';
+
+                // Sub-product batch completed = worker marked done OR a completed batch exists
+                const subBatchCompleted = workerMarkedDone || (task.parent_batch_id
+                  ? allBatches.some(
+                      (b) =>
+                        b.product_id === task.stage_product_id &&
+                        (b.order_id === task.order_id || b.order_number === task.order_number) &&
+                        b.status === 'completed'
+                    )
+                  : false);
+
+                // Sub-product batch started (but not yet completed)
+                const subBatchStarted = task.parent_batch_id
+                  ? allBatches.some(
+                      (b) =>
+                        b.product_id === task.stage_product_id &&
+                        (b.order_id === task.order_id || b.order_number === task.order_number) &&
+                        b.status !== 'cancelled'
+                    )
+                  : false;
+
+                // Parent batch owner — only they see "Continue Planning"
+                const parentBatch = task.parent_batch_id
+                  ? allBatches.find((b) => b.id === task.parent_batch_id)
+                  : null;
+                const isParentBatchOwner = parentBatch
+                  ? parentBatch.created_by === String(user?.id) ||
+                    parentBatch.operator === user?.full_name ||
+                    parentBatch.supervisor === user?.full_name
+                  : false;
+
+                // This user is the sub-product worker
+                const isSubProductWorker = String(task.assigned_to_id) === String(user?.id);
+
                 return (
                   <div key={task.id} className="border border-gray-200 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {task.parent_batch_id ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
-                            <ArrowRight className="w-3.5 h-3.5" />
-                            Sub-Product Ready
-                          </span>
+                          subBatchCompleted ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-50 text-green-700 text-xs font-semibold border border-green-200">
+                              <ArrowRight className="w-3.5 h-3.5" />
+                              Sub-Product Ready
+                            </span>
+                          ) : subBatchStarted ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+                              <ClipboardList className="w-3.5 h-3.5" />
+                              Sub-Product In Progress
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-50 text-yellow-700 text-xs font-semibold border border-yellow-200">
+                              <ClipboardList className="w-3.5 h-3.5" />
+                              Sub-Product Not Started
+                            </span>
+                          )
                         ) : (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
                             <ClipboardList className="w-3.5 h-3.5" />
@@ -708,8 +784,20 @@ export default function ProductionList() {
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-gray-700">
-                        <div><span className="font-semibold text-gray-900">Order:</span> {task.order_number || task.order_id}</div>
-                        <div><span className="font-semibold text-gray-900">Customer:</span> {task.customer_name || '-'}</div>
+                        <div>
+                          <span className="font-semibold text-gray-900">Order:</span>{' '}
+                          {(task.order_id || '').startsWith('SUB-')
+                            ? <span className="text-purple-700 font-medium">Sub-Production</span>
+                            : (task.order_number || task.order_id)}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-gray-900">
+                            {(task.order_id || '').startsWith('SUB-') ? 'Parent Batch:' : 'Customer:'}
+                          </span>{' '}
+                          {(task.order_id || '').startsWith('SUB-')
+                            ? (parentBatch?.batch_number || task.order_number || '-')
+                            : (task.customer_name || '-')}
+                        </div>
                         <div className="flex items-center gap-1.5">
                           <PackageCheck className="w-3.5 h-3.5 text-gray-500" />
                           <span><span className="font-semibold text-gray-900">Final Product:</span> {task.final_product_name || '-'}</span>
@@ -733,19 +821,101 @@ export default function ProductionList() {
                       </div>
                     </div>
                     {task.parent_batch_id ? (
-                      <Button
-                        size="sm"
-                        className="sm:shrink-0 bg-green-600 hover:bg-green-700 text-white"
-                        onClick={() =>
-                          navigate(`/production/planning?batchId=${task.parent_batch_id}`, {
-                            state: { section: 'assigned' },
-                          })
-                        }
-                        title="Sub-product is ready — continue the parent production's planning stage"
-                      >
-                        <ArrowRight className="w-4 h-4 mr-1" />
-                        Continue Planning
-                      </Button>
+                      <div className="flex flex-col gap-2 sm:shrink-0">
+                        {/* Worker role takes priority — they must mark done before parent can continue */}
+                        {isSubProductWorker ? (
+                          !subBatchStarted ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate('/production/create', {
+                                  state: {
+                                    fromTask: true,
+                                    productId: task.stage_product_id,
+                                    productName: task.stage_product_name,
+                                    planned_quantity: task.planned_quantity,
+                                    orderId: task.order_id,
+                                    orderItemId: task.order_item_id,
+                                    order_number: task.order_number,
+                                    customer_name: task.customer_name,
+                                    taskId: task.id,
+                                    assigned_to_id: task.assigned_to_id,
+                                    assigned_to_name: task.assigned_to_name,
+                                  },
+                                })
+                              }
+                            >
+                              Start Sub-Product Batch
+                            </Button>
+                          ) : subBatchCompleted && !workerMarkedDone ? (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={async () => {
+                                const { error } = await ProductionService.updateTaskStatus(task.id, 'completed');
+                                if (error) {
+                                  toast({ title: 'Error', description: error, variant: 'destructive' });
+                                  return;
+                                }
+                                await NotificationService.createNotification({
+                                  type: 'success',
+                                  title: 'Sub-Product Ready',
+                                  message: `${task.stage_product_name} has been completed by ${user?.full_name || 'worker'}. You can now continue planning for ${task.final_product_name || 'the parent batch'}.`,
+                                  priority: 'high',
+                                  status: 'unread',
+                                  module: 'production',
+                                  related_id: task.parent_batch_id || task.id,
+                                  related_data: {
+                                    task_id: task.id,
+                                    parent_batch_id: task.parent_batch_id,
+                                    stage_product_name: task.stage_product_name,
+                                    final_product_name: task.final_product_name,
+                                    completed_by: user?.full_name || user?.email,
+                                  },
+                                });
+                                navigate('/notifications');
+                              }}
+                            >
+                              ✓ Mark Done & Notify
+                            </Button>
+                          ) : workerMarkedDone ? (
+                            <span className="text-xs text-green-700 font-medium text-right">
+                              ✓ Done & Notified
+                            </span>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const subBatch = allBatches.find(
+                                  (b) => b.product_id === task.stage_product_id &&
+                                    (b.order_id === task.order_id || b.order_number === task.order_number)
+                                );
+                                if (subBatch) navigate(`/production/planning?batchId=${subBatch.id}`);
+                              }}
+                            >
+                              Continue Sub-Product Batch
+                            </Button>
+                          )
+                        ) : isParentBatchOwner ? (
+                          // Not the worker — show parent batch owner view
+                          subBatchCompleted ? (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                              onClick={() => navigate(`/production/planning?batchId=${task.parent_batch_id}`)}
+                            >
+                              <ArrowRight className="w-4 h-4 mr-1" />
+                              Continue Planning
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-yellow-700 font-medium text-right">
+                              ⏳ Waiting for sub-product…
+                            </span>
+                          )
+                        ) : null}
+                      </div>
                     ) : (
                       <Button
                         size="sm"
