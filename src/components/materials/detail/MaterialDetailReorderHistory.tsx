@@ -251,7 +251,7 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 pt-3 border-t">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3 pt-3 border-t">
                     <div className="flex items-center gap-2 min-w-0">
                       <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
@@ -274,6 +274,15 @@ export default function MaterialDetailReorderHistory({ material }: MaterialDetai
                     <div>
                       <p className="text-xs text-gray-500">Cost/Unit</p>
                       <p className="text-sm font-medium text-gray-900">{formatCurrency(order.costPerUnit)}</p>
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-gray-500">Ordered By</p>
+                        <p className="text-sm font-medium text-gray-900 break-words">
+                          {(order as any).created_by || 'N/A'}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
