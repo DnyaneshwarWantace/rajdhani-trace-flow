@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Eye, ClipboardList, Factory, Copy, AlertTriangle, Trash2 } from 'lucide-react';
+import { X, Trash2, Eye, ClipboardList, Factory, Copy, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/utils/formatHelpers';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 import type { ProductionBatch } from '@/services/productionService';
@@ -380,7 +380,7 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
                 <Copy className="w-3 h-3" />
               </Button>
             )}
-            {/* Only show Cancel button for planned stage */}
+            {/* Cancel — planning stage only */}
             {batch.status === 'planned' && canDelete && (
               <Button
                 variant="outline"

@@ -8,11 +8,14 @@ interface MaterialDetailStatsProps {
 }
 
 export default function MaterialDetailStats({ material }: MaterialDetailStatsProps) {
-  // Use available_stock if available, otherwise fall back to current_stock (same as list page)
-  const displayStock = material.available_stock ?? material.current_stock ?? 0;
-  
-  const stockPercentage = material.max_capacity > 0 
-    ? (displayStock / material.max_capacity) * 100 
+  // Show physical stock (current_stock includes in_production portion)
+  const physicalStock = material.current_stock ?? 0;
+  const availableStock = material.available_stock ?? physicalStock;
+  const inProduction = material.in_production ?? 0;
+  const displayStock = physicalStock;
+
+  const stockPercentage = material.max_capacity > 0
+    ? (displayStock / material.max_capacity) * 100
     : 0;
 
   const getStockColor = () => {
@@ -28,11 +31,16 @@ export default function MaterialDetailStats({ material }: MaterialDetailStatsPro
         <CardContent className="p-4 sm:p-6">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-gray-600 mb-1">Current Stock</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Physical Stock</p>
               <p className="text-xl sm:text-2xl font-bold text-gray-900">
                 {formatIndianNumberWithDecimals(displayStock, 2)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">{material.unit}</p>
+              <p className="text-xs text-gray-500 mt-1">{material.unit} total</p>
+              {inProduction > 0 && (
+                <p className="text-xs text-orange-600 mt-0.5">
+                  {formatIndianNumberWithDecimals(availableStock, 2)} free · {formatIndianNumberWithDecimals(inProduction, 2)} in prod
+                </p>
+              )}
             </div>
             <div className="flex-shrink-0 ml-4">
               <Package className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600 opacity-50" />

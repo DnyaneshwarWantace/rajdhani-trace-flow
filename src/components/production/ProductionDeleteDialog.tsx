@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader2, XCircle, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, XCircle } from 'lucide-react';
 import type { ProductionBatch } from '@/services/productionService';
 import { TruncatedText } from '@/components/ui/TruncatedText';
 
@@ -20,6 +20,7 @@ interface ProductionDeleteDialogProps {
   onConfirm: (reason: string) => void;
   batch: ProductionBatch | null;
   isDeleting: boolean;
+  /** 'cancel' = planning-stage soft cancel; 'delete' = full revert at any stage */
   mode?: 'cancel' | 'delete';
 }
 
@@ -31,7 +32,6 @@ export default function ProductionDeleteDialog({
   isDeleting,
   mode = 'cancel',
 }: ProductionDeleteDialogProps) {
-  const isDelete = mode === 'delete';
   const [reason, setReason] = useState('');
   const [validationError, setValidationError] = useState('');
 
@@ -80,67 +80,61 @@ export default function ProductionDeleteDialog({
 
   const wordCount = reason.trim() ? reason.trim().split(/\s+/).length : 0;
 
+  const isDelete = mode === 'delete';
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{isDelete ? 'Delete Production Batch' : 'Cancel Production Batch'}</DialogTitle>
+          <DialogTitle className={isDelete ? 'text-red-700' : undefined}>
+            {isDelete ? 'Delete Production Batch' : 'Cancel Production Batch'}
+          </DialogTitle>
           <DialogDescription className="break-words">
             {isDelete ? (
               <>
-                Permanently delete batch "
+                You are about to <strong>delete</strong> batch "
                 {batch?.batch_number ? (
                   <TruncatedText text={batch.batch_number} maxLength={50} as="span" className="font-semibold" />
-                ) : (
-                  'this batch'
-                )}
-                "? This will:
-                <ul className="list-disc list-inside mt-2 space-y-1 text-sm">
-                  <li>Return all raw material stock to inventory</li>
-                  <li>Delete all individual products created</li>
-                  <li>Update product stock counts</li>
-                  <li>Keep batch record marked as cancelled for admin audit</li>
+                ) : 'this batch'}
+                " which is currently in <strong>{batch?.status}</strong> stage.
+                <br /><br />
+                This will:
+                <ul className="list-disc pl-4 mt-1 space-y-0.5 text-sm">
+                  <li>Return all reserved and consumed raw materials back to stock</li>
+                  <li>Delete any individual products created for this batch</li>
+                  <li>Update product stock counts accordingly</li>
                 </ul>
+                <br />
+                The batch record will remain visible to admin for audit. This action cannot be undone.
               </>
             ) : (
               <>
                 Are you sure you want to cancel batch "
                 {batch?.batch_number ? (
                   <TruncatedText text={batch.batch_number} maxLength={50} as="span" className="font-semibold" />
-                ) : (
-                  'this batch'
-                )}
-                "? All consumed materials will be returned to inventory.
+                ) : 'this batch'}
+                "? Allocated materials will be returned to inventory.
               </>
             )}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Reason */}
         <div className="space-y-2">
-          <Label htmlFor="cancel-reason">{isDelete ? 'Deletion Reason (Optional)' : 'Cancellation Reason (Optional)'}</Label>
+          <Label htmlFor="cancel-reason">{isDelete ? 'Delete' : 'Cancellation'} Reason (Optional)</Label>
           <Textarea
             id="cancel-reason"
-            placeholder="E.g., Material shortage, Order cancelled, Design change..."
+            placeholder="E.g., Material shortage, Order cancelled, Mistake..."
             value={reason}
             onChange={handleReasonChange}
             disabled={isDeleting}
             rows={3}
             className={`resize-none ${validationError ? 'border-red-500 focus:ring-red-500' : ''}`}
           />
-
-          {/* Validation Error */}
           {validationError && (
-            <p className="text-xs text-red-600 font-medium">
-              {validationError}
-            </p>
+            <p className="text-xs text-red-600 font-medium">{validationError}</p>
           )}
-
-          {/* Word Count and Help Text */}
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              Max 20 words, each word max 15 characters
-            </p>
+            <p className="text-xs text-gray-500">Max 20 words, each word max 15 characters</p>
             <p className={`text-xs font-medium ${wordCount > 20 ? 'text-red-600' : 'text-gray-600'}`}>
               {wordCount}/20 words
             </p>
@@ -164,7 +158,7 @@ export default function ProductionDeleteDialog({
             ) : isDelete ? (
               <>
                 <Trash2 className="w-4 h-4 mr-2" />
-                Delete &amp; Revert
+                Delete & Revert
               </>
             ) : (
               <>

@@ -82,7 +82,7 @@ export default function MaterialDetailTransactionHistory({
       );
       if (!res.ok) return;
       const data = await res.json();
-      const purchases = (data.data || []).filter((m: any) => m.reason === 'purchase' && m.movement_type === 'in');
+      const purchases = (data.data || []).filter((m: any) => m.movement_type === 'in');
       purchases.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setPurchaseRecords(purchases);
     } catch {
@@ -297,7 +297,7 @@ export default function MaterialDetailTransactionHistory({
               }`}
             >
               <ArrowDownCircle className="w-4 h-4 text-green-600" />
-              Purchase History
+              Stock In History
               {purchaseRecords.length > 0 && (
                 <span className="bg-green-100 text-green-700 text-xs rounded-full px-1.5 py-0.5">{purchaseRecords.length}</span>
               )}
@@ -341,7 +341,7 @@ export default function MaterialDetailTransactionHistory({
           ) : purchaseRecords.length === 0 ? (
             <div className="text-center py-12">
               <ArrowDownCircle className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">No purchase records yet</p>
+              <p className="text-gray-500 font-medium">No stock-in records yet</p>
               <p className="text-gray-400 text-sm mt-1">Use Restock on the Materials page to add stock</p>
             </div>
           ) : (
@@ -350,6 +350,7 @@ export default function MaterialDetailTransactionHistory({
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Supplier</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No.</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Qty Added</th>
@@ -360,9 +361,18 @@ export default function MaterialDetailTransactionHistory({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {purchaseRecords.map((r, i) => (
+                  {purchaseRecords.map((r: any, i) => (
                     <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                       <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                      <td className="px-4 py-3">
+                        {r.reason === 'purchase' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Purchase</span>
+                        ) : r.reason === 'adjustment' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Restock</span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{r.reason || '—'}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-800">{r.supplier_name || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-700">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">+{r.quantity} {r.unit}</td>

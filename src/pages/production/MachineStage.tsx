@@ -11,12 +11,12 @@ import { ProductionService, type ProductionBatch } from '@/services/productionSe
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import MachineStageHeader from '@/components/production/machine/MachineStageHeader';
+import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import MachineStepsList from '@/components/production/machine/MachineStepsList';
 import ConsumedMaterialsDisplay from '@/components/production/machine/ConsumedMaterialsDisplay';
 import ProductionStageProgress from '@/components/production/planning/ProductionStageProgress';
 import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
 import ProductionOverviewStats from '@/components/production/planning/ProductionOverviewStats';
-import ProductionDeleteDialog from '@/components/production/ProductionDeleteDialog';
 import type { Product } from '@/types/product';
 
 export default function MachineStage() {
@@ -29,15 +29,15 @@ export default function MachineStage() {
   const [loading, setLoading] = useState(true);
   const [productionFlow, setProductionFlow] = useState<any>(null);
   const [consumedMaterials, setConsumedMaterials] = useState<any[]>([]);
+  const consumedMaterialsRef = useRef<any[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [machineShift, setMachineShift] = useState<'day' | 'night' | undefined>(undefined);
   const [isMachineCompleted, setIsMachineCompleted] = useState(false);
   const [machineStageRemark, setMachineStageRemark] = useState('');
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const consumedMaterialsRef = useRef<any[]>([]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorName = (() => {
     try {
       const raw = localStorage.getItem('user');
@@ -280,7 +280,8 @@ export default function MachineStage() {
 
       console.log('✅ All machine steps completed:', allCompleted);
 
-      // Use ref so the poll closure always reads fresh materials regardless of capture time
+      // Also check if consumed materials exist and products have individual IDs
+      // Use ref so we always read the latest loaded materials, not a stale closure value
       const currentMaterials = consumedMaterialsRef.current;
       const productMaterials = currentMaterials.filter(m => m.material_type === 'product');
       const hasIndividualProducts = productMaterials.length === 0 || productMaterials.every(
@@ -310,6 +311,27 @@ export default function MachineStage() {
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
+  };
+
+  const handleDeleteConfirm = async (reason: string) => {
+    if (!batch) return;
+    try {
+      setIsDeleting(true);
+      const { data, error } = await ProductionService.deleteBatch(batch.id, reason);
+      if (error) {
+        toast({ title: 'Error', description: error, variant: 'destructive' });
+        return;
+      }
+      if (data) {
+        toast({ title: 'Deleted', description: 'Production batch deleted and all materials reverted.' });
+        setIsDeleteDialogOpen(false);
+        navigate('/production', { state: { section: location.state?.section || 'assigned' } });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete production batch.', variant: 'destructive' });
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const validateMachineStageCompletion = async (): Promise<{ valid: boolean; error?: string }> => {
@@ -383,27 +405,6 @@ export default function MachineStage() {
         valid: false,
         error: 'Error validating machine stage. Please try again.'
       };
-    }
-  };
-
-  const handleDeleteConfirm = async (reason: string) => {
-    if (!batch) return;
-    try {
-      setIsDeleting(true);
-      const { data, error } = await ProductionService.deleteBatch(batch.id, reason);
-      if (error) {
-        toast({ title: 'Error', description: error, variant: 'destructive' });
-        return;
-      }
-      if (data) {
-        toast({ title: 'Deleted', description: 'Production batch deleted and all materials reverted.' });
-        setIsDeleteDialogOpen(false);
-        navigate('/production', { state: { section: location.state?.section || 'assigned' } });
-      }
-    } catch {
-      toast({ title: 'Error', description: 'Failed to delete production batch.', variant: 'destructive' });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
