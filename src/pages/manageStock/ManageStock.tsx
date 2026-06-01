@@ -20,6 +20,7 @@ interface PurchaseRecord {
   supplier_name?: string;
   invoice_number?: string;
   notes?: string;
+  operator?: string;
   createdAt: string;
 }
 
@@ -125,23 +126,25 @@ export default function ManageStock() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700">Date</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-700">Material</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-700">Added By</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-700">Supplier</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700">Invoice No.</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700">Qty</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700">Price/Unit</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700">Total</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700">Stock After</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Invoice No.</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Qty</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Price/Unit</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Total</th>
+                    <th className="text-right px-4 py-3 font-medium text-gray-700 whitespace-nowrap">Stock After</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((r) => (
                     <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(r.createdAt)}</td>
-                      <td className="px-4 py-3 font-medium text-gray-900">{r.material_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.supplier_name || <span className="text-gray-400 italic">—</span>}</td>
-                      <td className="px-4 py-3 text-gray-600 font-mono text-xs">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900 max-w-[160px]"><div className="truncate" title={r.material_name}>{r.material_name}</div></td>
+                      <td className="px-4 py-3 text-gray-700 max-w-[120px]"><div className="truncate" title={r.operator || ''}>{r.operator || <span className="text-gray-400 italic">—</span>}</div></td>
+                      <td className="px-4 py-3 text-gray-600 max-w-[140px]"><div className="truncate" title={r.supplier_name || ''}>{r.supplier_name || <span className="text-gray-400 italic">—</span>}</div></td>
+                      <td className="px-4 py-3 text-gray-600 font-mono text-xs whitespace-nowrap">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-right text-gray-900 font-medium">+{r.quantity} {r.unit}</td>
                       <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</td>
@@ -161,8 +164,10 @@ export default function ManageStock() {
                     <div className="text-xs text-gray-500">{formatDate(r.createdAt)}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <div className="text-gray-500">Added By</div>
+                    <div className="text-gray-900">{r.operator || '—'}</div>
                     <div className="text-gray-500">Supplier</div>
-                    <div className="text-gray-900">{r.supplier_name || '—'}</div>
+                    <div className="text-gray-900 truncate">{r.supplier_name || '—'}</div>
                     <div className="text-gray-500">Invoice</div>
                     <div className="text-gray-900 font-mono text-xs">{r.invoice_number || '—'}</div>
                     <div className="text-gray-500">Quantity</div>

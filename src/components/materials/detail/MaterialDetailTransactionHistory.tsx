@@ -374,8 +374,8 @@ export default function MaterialDetailTransactionHistory({
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{r.reason || '—'}</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-800">{r.operator || <span className="text-gray-400 italic">—</span>}</td>
-                      <td className="px-4 py-3 text-sm text-gray-800">{r.supplier_name || <span className="text-gray-400 italic">—</span>}</td>
+                      <td className="px-4 py-3 text-sm text-gray-800 max-w-[120px]"><div className="truncate" title={r.operator || ''}>{r.operator || <span className="text-gray-400 italic">—</span>}</div></td>
+                      <td className="px-4 py-3 text-sm text-gray-800 max-w-[140px]"><div className="truncate" title={r.supplier_name || ''}>{r.supplier_name || <span className="text-gray-400 italic">—</span>}</div></td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-700">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">+{r.quantity} {r.unit}</td>
                       <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
