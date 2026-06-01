@@ -351,6 +351,7 @@ export default function MaterialDetailTransactionHistory({
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Added By</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Supplier</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Invoice No.</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Qty Added</th>
@@ -373,6 +374,7 @@ export default function MaterialDetailTransactionHistory({
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{r.reason || '—'}</span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-sm text-gray-800">{r.operator || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-sm text-gray-800">{r.supplier_name || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-xs font-mono text-gray-700">{r.invoice_number || <span className="text-gray-400 italic">—</span>}</td>
                       <td className="px-4 py-3 text-right font-semibold text-green-700">+{r.quantity} {r.unit}</td>
