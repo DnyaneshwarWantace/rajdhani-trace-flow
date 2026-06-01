@@ -40,6 +40,7 @@ interface Supplier {
 export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material, mode = 'create', fixedCategory, excludeCategories = [] }: AddMaterialDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [loadingDropdowns, setLoadingDropdowns] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [units, setUnits] = useState<string[]>([]);
@@ -99,11 +100,14 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   useEffect(() => {
     if (isOpen) {
+      setLoadingDropdowns(true);
       loadDropdowns();
       setTouchedFields(new Set());
       if (mode === 'create') {
         resetCreateForm();
       }
+    } else {
+      setLoadingDropdowns(false);
     }
   }, [isOpen, mode, fixedCategory]);
 
@@ -195,6 +199,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   const loadDropdowns = async () => {
     try {
+      setLoadingDropdowns(true);
       // Load suppliers
       const suppliersResponse = await SupplierService.getSuppliers();
       if (suppliersResponse.data && Array.isArray(suppliersResponse.data)) {
@@ -279,6 +284,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         description: error instanceof Error ? error.message : 'Failed to load form options',
         variant: 'destructive',
       });
+    } finally {
+      setLoadingDropdowns(false);
     }
   };
 
@@ -824,6 +831,14 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         </div>
 
         {/* Scrollable Content */}
+        {loadingDropdowns ? (
+          <div className="flex-1 flex items-center justify-center p-12">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"></div>
+              <p className="text-sm text-gray-500">Loading {mode === 'edit' ? 'material data' : 'form options'}...</p>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           <MaterialImageUpload
             imagePreview={imagePreview}
@@ -1065,14 +1080,16 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
           </div>
 
         </form>
+        )}
 
-        {/* Fixed Footer */}
+        {/* Fixed Footer — hidden while loading */}
+        {!loadingDropdowns && (
         <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
           <Button type="button" variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             onClick={handleSubmit}
             disabled={loading}
             className="bg-primary-600 text-white hover:bg-primary-700"
@@ -1087,6 +1104,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
             )}
           </Button>
         </div>
+        )}
       </div>
     </div>
   );

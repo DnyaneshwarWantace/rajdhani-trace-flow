@@ -9,7 +9,6 @@ import MaterialDetailInfo from '@/components/materials/detail/MaterialDetailInfo
 import MaterialDetailStock from '@/components/materials/detail/MaterialDetailStock';
 import MaterialDetailReorderHistory from '@/components/materials/detail/MaterialDetailReorderHistory';
 import MaterialDetailTransactionHistory from '@/components/materials/detail/MaterialDetailTransactionHistory';
-import MaterialDetailOrders from '@/components/materials/detail/MaterialDetailOrders';
 import AddMaterialDialog from '@/components/materials/AddMaterialDialog';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -116,10 +115,7 @@ export default function MaterialDetail() {
           <MaterialDetailInfo material={material} />
         </div>
 
-        {/* Orders Using This Material */}
-        <MaterialDetailOrders material={material} />
-
-        {/* Reorder History */}
+        {/* Purchase Order History */}
         <MaterialDetailReorderHistory material={material} />
 
         {/* Transaction History */}
