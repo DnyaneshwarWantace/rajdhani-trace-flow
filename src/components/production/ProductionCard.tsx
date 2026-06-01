@@ -393,8 +393,8 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
                 Cancel
               </Button>
             )}
-            {/* Delete button for any non-planned, non-cancelled stage */}
-            {batch.status !== 'planned' && batch.status !== 'cancelled' && canDelete && (
+            {/* Delete — active non-planning, non-cancelled, non-completed stages only */}
+            {batch.status !== 'planned' && batch.status !== 'cancelled' && batch.status !== 'completed' && canDelete && (
               <Button
                 variant="outline"
                 size="sm"
@@ -402,7 +402,7 @@ export default function ProductionCard({ batch, onDelete, onDuplicate, canDelete
                 onClick={() => onDelete(batch)}
                 title="Delete Production (full revert)"
               >
-                <Trash2 className="w-3 h-3 mr-1" /> Delete
+                <Trash2 className="w-3 h-3" />
               </Button>
             )}
           </div>

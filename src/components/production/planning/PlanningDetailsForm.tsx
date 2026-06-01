@@ -85,13 +85,12 @@ export default function PlanningDetailsForm({ formData, onChange }: PlanningDeta
           value={formData.completion_date || ''}
           onChange={(e) => handleChange('completion_date', e.target.value)}
           className="mt-1"
-          min={new Date().toISOString().split('T')[0]}
           required
         />
         <div className="flex items-start gap-2 mt-2 p-2 bg-blue-50 rounded-lg">
           <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700">
-            Target date for completing this production batch. Start date will be set automatically when production begins.
+            Target date for completing this production batch. Past dates allowed if recording work done earlier.
           </p>
         </div>
       </div>

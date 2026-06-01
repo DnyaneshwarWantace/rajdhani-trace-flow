@@ -437,8 +437,8 @@ export default function ProductionTable({
                         <X className="w-4 h-4" />
                       </Button>
                     )}
-                    {/* Delete button for any non-planned, non-cancelled stage */}
-                    {batch.status !== 'planned' && batch.status !== 'cancelled' && canDelete && (
+                    {/* Delete — active non-planning, non-cancelled, non-completed stages only */}
+                    {batch.status !== 'planned' && batch.status !== 'cancelled' && batch.status !== 'completed' && canDelete && (
                       <Button
                         variant="ghost"
                         size="sm"

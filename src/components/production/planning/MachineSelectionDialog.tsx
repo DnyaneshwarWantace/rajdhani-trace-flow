@@ -339,13 +339,12 @@ export default function MachineSelectionDialog({
             <Input
               type="date"
               value={scheduleDate}
-              min={new Date().toISOString().split('T')[0]}
               onChange={(e) => setScheduleDate(e.target.value)}
               className="w-full"
             />
             <p className="text-xs text-gray-500 flex items-start gap-1">
               <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0 text-amber-500" />
-              Set a future date when machine production should start. A reminder will be sent the day before, and daily overdue alerts if not started on time.
+              Set the date when machine production started or should start. Past dates allowed for recording work done earlier.
             </p>
           </div>
         </div>
