@@ -1485,7 +1485,7 @@ export default function PlanningStage() {
                       (!m.individual_product_ids || m.individual_product_ids.length === 0)
                     )
                   }
-                  className="bg-green-600 hover:bg-green-700"
+                  className="bg-green-600 hover:bg-green-700 text-white"
                   size="lg"
                 >
                   {submitting ? (
