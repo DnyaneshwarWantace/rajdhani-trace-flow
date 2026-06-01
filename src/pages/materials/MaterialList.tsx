@@ -635,6 +635,19 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
       const API_URL = getApiUrl();
       const token = localStorage.getItem('auth_token');
 
+      // Get current user name from stored profile or JWT payload
+      let operatorName = 'Unknown';
+      try {
+        const stored = localStorage.getItem('auth_user') || localStorage.getItem('user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          operatorName = u.full_name || u.name || u.email || 'Unknown';
+        } else if (token) {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          operatorName = payload.full_name || payload.name || payload.email || 'Unknown';
+        }
+      } catch { /* keep default */ }
+
       const response = await fetch(
         `${API_URL}/raw-materials/${encodeURIComponent(selectedRestockMaterial.id)}/adjust-stock`,
         {
@@ -646,7 +659,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           body: JSON.stringify({
             quantity,
             reason: 'purchase',
-            operator: 'user',
+            operator: operatorName,
             notes: restockForm.notes || undefined,
             supplier_name: restockForm.supplier || undefined,
             cost_per_unit: costPerUnit,
