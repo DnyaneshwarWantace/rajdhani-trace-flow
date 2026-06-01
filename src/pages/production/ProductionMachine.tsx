@@ -46,7 +46,7 @@ export default function ProductionMachine() {
               <p className="text-sm text-gray-600 mt-1">Batch: {batch.batch_number}</p>
             </div>
           </div>
-          <Button onClick={() => navigate(`/production/${id}/wastage`)} className="bg-orange-600 hover:bg-orange-700">
+          <Button onClick={() => navigate(`/production/${id}/wastage`)} className="bg-orange-600 hover:bg-orange-700 text-white">
             <Trash2 className="w-4 h-4 mr-2" />
             Wastage Stage
           </Button>
