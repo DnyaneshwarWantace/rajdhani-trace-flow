@@ -64,6 +64,7 @@ interface DashboardData {
     inStockMaterials: number;
     lowStockMaterials: number;
     outOfStockMaterials: number;
+    overstockMaterials: number;
     manageStockPending: number;
     manageStockApproved: number;
     manageStockShipped: number;
@@ -109,6 +110,7 @@ export default function Dashboard() {
       inStockMaterials: 0,
       lowStockMaterials: 0,
       outOfStockMaterials: 0,
+      overstockMaterials: 0,
       manageStockPending: 0,
       manageStockApproved: 0,
       manageStockShipped: 0,
@@ -272,6 +274,7 @@ export default function Dashboard() {
       const inStockMaterials = materialStatsResponse?.inStock ?? 0;
       const lowStockMaterials = materialStatsResponse?.lowStock ?? 0;
       const outOfStockMaterials = materialStatsResponse?.outOfStock ?? 0;
+      const overstockMaterials = materialStatsResponse?.overstock ?? 0;
 
       const manageStockPending = manageStockStatsResponse?.pendingOrders ?? 0;
       const manageStockApproved = manageStockStatsResponse?.approvedOrders ?? 0;
@@ -302,6 +305,7 @@ export default function Dashboard() {
           inStockMaterials,
           lowStockMaterials,
           outOfStockMaterials,
+          overstockMaterials,
           manageStockPending,
           manageStockApproved,
           manageStockShipped,

@@ -19,6 +19,7 @@ interface StatsCardsProps {
     inStockMaterials: number;
     lowStockMaterials: number;
     outOfStockMaterials: number;
+    overstockMaterials: number;
     manageStockPending: number;
     manageStockApproved: number;
     manageStockShipped: number;
@@ -88,7 +89,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
       iconColor: 'text-amber-600',
       subtext: loading
         ? 'Loading material stats...'
-        : `In stock: ${(stats.inStockMaterials ?? 0).toLocaleString()} • Low: ${(stats.lowStockMaterials ?? 0).toLocaleString()} • Out: ${(stats.outOfStockMaterials ?? 0).toLocaleString()}`,
+        : `In stock: ${(stats.inStockMaterials ?? 0).toLocaleString()} · Low: ${(stats.lowStockMaterials ?? 0).toLocaleString()} · Out: ${(stats.outOfStockMaterials ?? 0).toLocaleString()} · Overstock: ${(stats.overstockMaterials ?? 0).toLocaleString()}`,
       subtextColor: 'text-gray-500',
       onClick: () => navigate('/materials'),
     },
