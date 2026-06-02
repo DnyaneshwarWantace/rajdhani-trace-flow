@@ -247,8 +247,13 @@ export default function NewOrder() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => { setProductPage(1); loadProductsWithFilters(); }, productSearchTerm ? 350 : 0);
-  }, [productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder]);
+    const isMaterial = currentOrderItem?.product_type === 'raw_material';
+    if (isMaterial) {
+      searchTimerRef.current = setTimeout(() => { setMaterialPage(1); loadRawMaterialsWithFilters(productSearchTerm); }, productSearchTerm ? 350 : 0);
+    } else {
+      searchTimerRef.current = setTimeout(() => { setProductPage(1); loadProductsWithFilters(); }, productSearchTerm ? 350 : 0);
+    }
+  }, [productSearchTerm, productCategoryFilter, productColorFilter, productSortBy, productSortOrder, currentOrderItem?.product_type]);
   useEffect(() => { loadRawMaterialsWithFilters(); }, [materialSortBy, materialSortOrder]);
 
   const loadCustomers = async () => {
@@ -297,9 +302,10 @@ export default function NewOrder() {
     } catch (e) { console.error(e); }
   };
 
-  const loadRawMaterialsWithFilters = async () => {
+  const loadRawMaterialsWithFilters = async (searchTerm = '') => {
     try {
       const baseFilters: any = { limit: 100, sortBy: materialSortBy === 'recent' ? 'created_at' : materialSortBy, sortOrder: materialSortOrder };
+      if (searchTerm) baseFilters.search = searchTerm;
 
       const mapMaterial = (m: any) => ({
         id: m.id || m._id, name: m.name, price: m.cost_per_unit || 0,
