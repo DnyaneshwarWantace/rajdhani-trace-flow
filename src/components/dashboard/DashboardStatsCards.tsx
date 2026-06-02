@@ -43,7 +43,7 @@ export default function DashboardStatsCards({ stats, loading }: StatsCardsProps)
   const shipped = stats.manageStockShipped ?? 0;
   const delivered = stats.manageStockDelivered ?? 0;
 
-  const productionTotal = (stats.productionPlanned ?? 0) + (stats.productionInProgress ?? 0) + (stats.productionCompleted ?? 0) + (stats.productionCancelled ?? 0);
+  const productionTotal = (stats.productionPlanned ?? 0) + (stats.productionInProgress ?? 0) + (stats.productionCompleted ?? 0);
 
   const cards = [
     {

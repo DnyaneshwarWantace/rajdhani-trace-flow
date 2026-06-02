@@ -194,14 +194,15 @@ export default function Dashboard() {
       // Count products with recipes
       const productsWithRecipes = products.filter((p: any) => p.has_recipe).length;
 
-      // Process orders data and apply month filter
+      // Process orders data and apply month filter — exclude cancelled from all counts
       let orders = ordersResponse.data || [];
       if (monthKey) {
         orders = orders.filter((o: any) => isDateInMonth(o.orderDate, monthKey));
       }
+      const activeOrders = orders.filter((o: any) => o.status !== 'cancelled');
       const pendingOrders = orders.filter((o: any) => o.status === 'pending');
-      const totalRevenue = orders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0);
-      const outstandingAmount = orders.reduce((sum: number, order: any) => sum + (order.outstandingAmount || 0), 0);
+      const totalRevenue = activeOrders.reduce((sum: number, order: any) => sum + (order.totalAmount || 0), 0);
+      const outstandingAmount = activeOrders.reduce((sum: number, order: any) => sum + (order.outstandingAmount || 0), 0);
 
       // Calculate customer data
       const customerMap = new Map();
@@ -279,15 +280,15 @@ export default function Dashboard() {
       const manageStockTotalValue = manageStockStatsResponse?.totalValue ?? 0;
 
       const orderStatsData = orderStatsResponse?.data;
-      const ordersPending = orderStatsData?.pending ?? orders.filter((o: any) => o.status === 'pending').length;
-      const ordersAccepted = orderStatsData?.accepted ?? orders.filter((o: any) => o.status === 'accepted').length;
-      const ordersDispatched = orderStatsData?.dispatched ?? orders.filter((o: any) => o.status === 'dispatched').length;
-      const ordersDelivered = orderStatsData?.delivered ?? orders.filter((o: any) => o.status === 'delivered').length;
+      const ordersPending = orderStatsData?.pending ?? activeOrders.filter((o: any) => o.status === 'pending').length;
+      const ordersAccepted = orderStatsData?.accepted ?? activeOrders.filter((o: any) => o.status === 'accepted').length;
+      const ordersDispatched = orderStatsData?.dispatched ?? activeOrders.filter((o: any) => o.status === 'dispatched').length;
+      const ordersDelivered = orderStatsData?.delivered ?? activeOrders.filter((o: any) => o.status === 'delivered').length;
 
       const nextData: DashboardData = {
         stats: {
           totalProducts: productStatsResponse.total_products || products.length,
-          totalOrders: orders.length,
+          totalOrders: orderStatsData?.total ?? activeOrders.length,
           pendingOrders: pendingOrders.length,
           totalRevenue,
           outstandingAmount,

@@ -43,17 +43,15 @@ export default function MaterialCard({
     }
     
     // Otherwise, calculate from breakdown if available
+    // sold/used are already deducted from current_stock — only subtract in_production and reserved
     const inProduction = material.in_production ?? 0;
     const reserved = material.reserved ?? 0;
-    const sold = material.sold ?? 0;
-    const used = material.used ?? 0;
     const currentStock = material.current_stock ?? 0;
-    
-    // If we have breakdown data, calculate available = current - (in_production + reserved + sold + used)
-    if (inProduction > 0 || reserved > 0 || sold > 0 || used > 0) {
-      return Math.max(0, currentStock - (inProduction + reserved + sold + used));
+
+    if (inProduction > 0 || reserved > 0) {
+      return Math.max(0, currentStock - inProduction - reserved);
     }
-    
+
     // If no breakdown data, assume all current_stock is available
     return currentStock;
   };
