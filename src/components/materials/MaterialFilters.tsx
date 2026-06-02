@@ -48,7 +48,10 @@ export default function MaterialFilters({
         .map((opt: any) => opt.value.trim());
 
       // Also get categories from materials (in case some exist in DB but not in dropdown)
-      const { materials } = await MaterialService.getMaterials({ limit: 1000 });
+      const { materials } = await MaterialService.getMaterials({
+        limit: 1000,
+        ...(excludeCategories?.includes('Ink') ? { usage_type: 'per_batch' } : {}),
+      });
       const fromMaterials = Array.from(
         new Set(materials.map((m: any) => m.category).filter((c) => c && String(c).trim() !== '' && c !== 'N/A'))
       );

@@ -43,6 +43,8 @@ export interface ProductionBatch {
   };
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  created_by_name?: string;
   // Product details (populated when needed)
   category?: string;
   subcategory?: string;

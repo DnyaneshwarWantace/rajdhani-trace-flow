@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -82,7 +82,9 @@ export default function MaterialSelectionDialog({
   const [widthFilter, setWidthFilter] = useState<string[]>([]); // Multi-select
   const [weightFilter, setWeightFilter] = useState<string[]>([]); // Multi-select
   const [rawMaterials, setRawMaterials] = useState<Material[]>([]);
+  const [allRawMaterials, setAllRawMaterials] = useState<Material[]>([]);
   const [products, setProducts] = useState<Material[]>([]);
+  const [allProducts, setAllProducts] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const prevIsOpenRef = useRef(false);
   const [selectedMaterials, setSelectedMaterials] = useState<Map<string, SelectedMaterial>>(
@@ -95,7 +97,6 @@ export default function MaterialSelectionDialog({
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const itemsPerPage = 10;
 
   // Dynamic filter options
@@ -171,24 +172,10 @@ export default function MaterialSelectionDialog({
     return () => { cancelled = true; };
   }, [isOpen]);
 
-  // When user changes search/filters: refetch current tab only (do not refetch on tab switch)
+  // Reset page when tab or filters change
   useEffect(() => {
-    if (!isOpen) return;
-    if (isOpen && !prevIsOpenRef.current) {
-      prevIsOpenRef.current = true;
-      return;
-    }
     setCurrentPage(1);
-    loadMaterials();
-  }, [isOpen, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
-
-  // Keep totalPages in sync with cached list when switching tabs (no refetch); reset to page 1
-  useEffect(() => {
-    if (!isOpen) return;
-    const list = activeTab === 'raw_materials' ? rawMaterials : products;
-    setTotalPages(Math.max(1, Math.ceil(list.length / itemsPerPage)));
-    setCurrentPage(1);
-  }, [isOpen, activeTab, rawMaterials.length, products.length]);
+  }, [activeTab, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter]);
 
   const loadRawMaterialsOnly = async (): Promise<void> => {
     try {
@@ -198,33 +185,7 @@ export default function MaterialSelectionDialog({
         usage_type: 'per_batch',
       });
       const all = response.materials || [];
-      let materialsData = [...all];
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        materialsData = materialsData.filter((m: any) =>
-          m.name?.toLowerCase().includes(searchLower) ||
-          m.id?.toLowerCase().includes(searchLower) ||
-          m.category?.toLowerCase().includes(searchLower) ||
-          m.type?.toLowerCase().includes(searchLower) ||
-          m.material_type?.toLowerCase().includes(searchLower) ||
-          m.color?.toLowerCase().includes(searchLower) ||
-          m.supplier_name?.toLowerCase().includes(searchLower) ||
-          m.batch_number?.toLowerCase().includes(searchLower)
-        );
-      }
-      if (categoryFilter.length > 0) {
-        materialsData = materialsData.filter((m: any) => categoryFilter.includes(m.category));
-      }
-      if (materialTypeFilter.length > 0) {
-        materialsData = materialsData.filter((m: any) => materialTypeFilter.includes(m.type || m.material_type));
-      }
-      if (colorFilter.length > 0) {
-        materialsData = materialsData.filter((m: any) => colorFilter.includes(m.color));
-      }
-      if (supplierFilter.length > 0) {
-        materialsData = materialsData.filter((m: any) => supplierFilter.includes(m.supplier_name));
-      }
-      const list = materialsData.map((m: any) => ({
+      const list = all.map((m: any) => ({
         id: m.id,
         name: m.name,
         current_stock: m.current_stock || 0,
@@ -238,8 +199,8 @@ export default function MaterialSelectionDialog({
         cost: m.cost_per_unit,
         color: m.color,
       }));
+      setAllRawMaterials(list);
       setRawMaterials(list);
-      setTotalPages(Math.ceil(list.length / itemsPerPage));
       setRawMaterialCategories(Array.from(new Set(all.map((m: any) => m.category).filter(Boolean))).sort());
       setMaterialTypes(Array.from(new Set(all.map((m: any) => m.type || m.material_type).filter(Boolean))).sort());
       setMaterialColors(Array.from(new Set(all.map((m: any) => m.color).filter((c: any) => c && c !== 'N/A'))).sort());
@@ -253,45 +214,13 @@ export default function MaterialSelectionDialog({
     try {
       const [response, dropdownData] = await Promise.all([
         ProductService.getProducts({
-          search: searchQuery || undefined,
           page: 1,
           limit: 1000,
         }),
         ProductService.getDropdownData().catch(() => null),
       ]);
       const all = response.products || [];
-      let productsData = [...all];
-      if (categoryFilter.length > 0) {
-        productsData = productsData.filter((p: any) => categoryFilter.includes(p.category));
-      }
-      if (subcategoryFilter.length > 0) {
-        productsData = productsData.filter((p: any) => subcategoryFilter.includes(p.subcategory));
-      }
-      if (colorFilter.length > 0) {
-        productsData = productsData.filter((p: any) => colorFilter.includes(p.color));
-      }
-      if (patternFilter.length > 0) {
-        productsData = productsData.filter((p: any) => patternFilter.includes(p.pattern));
-      }
-      if (lengthFilter.length > 0) {
-        productsData = productsData.filter((p: any) => {
-          const productLength = `${p.length} ${p.length_unit || ''}`.trim();
-          return lengthFilter.includes(productLength) || lengthFilter.includes(p.length?.toString());
-        });
-      }
-      if (widthFilter.length > 0) {
-        productsData = productsData.filter((p: any) => {
-          const productWidth = `${p.width} ${p.width_unit || ''}`.trim();
-          return widthFilter.includes(productWidth) || widthFilter.includes(p.width?.toString());
-        });
-      }
-      if (weightFilter.length > 0) {
-        productsData = productsData.filter((p: any) => {
-          const productWeight = `${p.weight || ''} ${p.weight_unit || ''}`.trim();
-          return weightFilter.includes(productWeight) || weightFilter.includes(p.weight?.toString());
-        });
-      }
-      const productsWithStock = productsData.map((p: any) => ({
+      const productsWithStock = all.map((p: any) => ({
         id: p.id,
         name: p.name,
         current_stock: p.current_stock ?? 0,
@@ -308,8 +237,8 @@ export default function MaterialSelectionDialog({
         color: p.color,
         pattern: p.pattern,
       }));
+      setAllProducts(productsWithStock);
       setProducts(productsWithStock);
-      setTotalPages(Math.ceil(productsWithStock.length / itemsPerPage));
       setProductCategories(Array.from(new Set(all.map((p: any) => p.category).filter(Boolean))).sort());
       setProductSubcategories(Array.from(new Set(all.map((p: any) => p.subcategory).filter(Boolean))).sort());
       setProductColors(Array.from(new Set(all.map((p: any) => p.color).filter((c: any) => c && c !== 'N/A'))).sort());
@@ -330,19 +259,6 @@ export default function MaterialSelectionDialog({
       setProductWeights(Array.from(new Set(all.map((p: any) => p.weight).filter(Boolean))).sort((a: string, b: string) => parseFloat(a) - parseFloat(b)));
     } catch (error) {
       console.error('Error loading products:', error);
-    }
-  };
-
-  const loadMaterials = async () => {
-    setLoading(true);
-    try {
-      if (activeTab === 'raw_materials') {
-        await loadRawMaterialsOnly();
-      } else {
-        await loadProductsOnly();
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -540,34 +456,53 @@ export default function MaterialSelectionDialog({
     );
   };
 
-  const currentMaterials = activeTab === 'raw_materials' ? rawMaterials : products;
+  const sortedMaterials = useMemo(() => {
+    const base = activeTab === 'raw_materials' ? allRawMaterials : allProducts;
+    let data = base;
 
-  // Apply sorting
-  const sortedMaterials = [...currentMaterials].sort((a, b) => {
-    let compareValue = 0;
-
-    switch (sortBy) {
-      case 'name':
-        compareValue = (a.name || '').localeCompare(b.name || '');
-        break;
-      case 'stock': {
-        const stockA = a.available_stock !== undefined ? a.available_stock : a.current_stock;
-        const stockB = b.available_stock !== undefined ? b.available_stock : b.current_stock;
-        compareValue = stockA - stockB;
-        break;
-      }
-      case 'category':
-        compareValue = (a.category || '').localeCompare(b.category || '');
-        break;
-      case 'recent':
-        compareValue = new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime();
-        break;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      data = data.filter((m) =>
+        m.name?.toLowerCase().includes(q) ||
+        m.id?.toLowerCase().includes(q) ||
+        m.category?.toLowerCase().includes(q) ||
+        (m as any).material_type?.toLowerCase().includes(q) ||
+        m.color?.toLowerCase().includes(q) ||
+        (m as any).supplier?.toLowerCase().includes(q)
+      );
+    }
+    if (activeTab === 'raw_materials') {
+      if (categoryFilter.length > 0) data = data.filter((m) => categoryFilter.includes(m.category || ''));
+      if (materialTypeFilter.length > 0) data = data.filter((m) => materialTypeFilter.includes((m as any).material_type || ''));
+      if (colorFilter.length > 0) data = data.filter((m) => colorFilter.includes(m.color || ''));
+      if (supplierFilter.length > 0) data = data.filter((m) => supplierFilter.includes((m as any).supplier || ''));
+    } else {
+      if (categoryFilter.length > 0) data = data.filter((m) => categoryFilter.includes(m.category || ''));
+      if (subcategoryFilter.length > 0) data = data.filter((m) => subcategoryFilter.includes(m.subcategory || ''));
+      if (colorFilter.length > 0) data = data.filter((m) => colorFilter.includes(m.color || ''));
+      if (patternFilter.length > 0) data = data.filter((m) => patternFilter.includes(m.pattern || ''));
+      if (lengthFilter.length > 0) data = data.filter((m) => lengthFilter.includes(m.length?.toString() || ''));
+      if (widthFilter.length > 0) data = data.filter((m) => widthFilter.includes(m.width?.toString() || ''));
+      if (weightFilter.length > 0) data = data.filter((m) => weightFilter.includes(m.weight?.toString() || ''));
     }
 
-    return sortOrder === 'asc' ? compareValue : -compareValue;
-  });
+    return [...data].sort((a, b) => {
+      let compareValue = 0;
+      switch (sortBy) {
+        case 'name': compareValue = (a.name || '').localeCompare(b.name || ''); break;
+        case 'stock': {
+          const sA = a.available_stock !== undefined ? a.available_stock : a.current_stock;
+          const sB = b.available_stock !== undefined ? b.available_stock : b.current_stock;
+          compareValue = sA - sB; break;
+        }
+        case 'category': compareValue = (a.category || '').localeCompare(b.category || ''); break;
+        case 'recent': compareValue = new Date((b as any).created_at || 0).getTime() - new Date((a as any).created_at || 0).getTime(); break;
+      }
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+  }, [activeTab, allRawMaterials, allProducts, searchQuery, categoryFilter, subcategoryFilter, materialTypeFilter, colorFilter, patternFilter, supplierFilter, lengthFilter, widthFilter, weightFilter, sortBy, sortOrder]);
 
-  // Apply client-side pagination AFTER sorting so ordering is global across all pages
+  const totalPages = Math.max(1, Math.ceil(sortedMaterials.length / itemsPerPage));
   const startIdx = (currentPage - 1) * itemsPerPage;
   const endIdx = startIdx + itemsPerPage;
   const paginatedMaterials = sortedMaterials.slice(startIdx, endIdx);

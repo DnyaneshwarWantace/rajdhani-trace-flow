@@ -1491,7 +1491,7 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
           )}
         <div className="space-y-1">
           <Label className="text-xs">Quantity</Label>
-          <Input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} className="h-8 text-sm" />
+          <Input type="number" min="1" value={quantity} onKeyDown={e => ['-','+','e','E'].includes(e.key) && e.preventDefault()} onChange={e => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))} className="h-8 text-sm" />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Unit</Label>
@@ -1515,7 +1515,7 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
         </div>
         <div className="space-y-1">
           <Label className="text-xs">GST %</Label>
-          <Input type="number" min="0" max="28" value={gstRate} onChange={e => setGstRate(e.target.value)} className="h-8 text-sm" />
+          <Input type="number" min="0" max="28" value={gstRate} onKeyDown={e => ['-','+','e','E'].includes(e.key) && e.preventDefault()} onChange={e => setGstRate(e.target.value.replace(/[^0-9.]/g, ''))} className="h-8 text-sm" />
         </div>
         <div className="col-span-2 flex items-center gap-2">
           <input
@@ -1528,7 +1528,7 @@ function AddItemInlineForm({ onSave, onCancel }: { onSave: (data: any) => Promis
         </div>
         <div className="col-span-2 space-y-1">
           <Label className="text-xs">Unit Price (₹)</Label>
-          <Input type="number" min="0" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} className="h-8 text-sm" placeholder="0" />
+          <Input type="number" min="0" value={unitPrice} onKeyDown={e => ['-','+','e','E'].includes(e.key) && e.preventDefault()} onChange={e => setUnitPrice(e.target.value.replace(/[^0-9.]/g, ''))} className="h-8 text-sm" placeholder="0" />
         </div>
       </div>
       <div className="flex gap-2 justify-end">

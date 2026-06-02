@@ -196,8 +196,8 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     const targetName = String(navState.materialName || navState.selectedMaterial?.name || '');
 
     const matchedMaterial = materials.find((m) => {
-      if (targetId && String(m.id) === targetId) return true;
-      if (targetName && String(m.name || '').toLowerCase() === targetName.toLowerCase()) return true;
+      if (targetId) return String(m.id) === targetId;
+      if (targetName) return String(m.name || '').toLowerCase() === targetName.toLowerCase();
       return false;
     });
 
@@ -1107,11 +1107,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                     min="0.01"
                     step="0.01"
                     value={restockForm.quantity}
+                    onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (/^\d*\.?\d*$/.test(v) && v !== '0')) {
-                        setRestockForm({ ...restockForm, quantity: v });
-                      }
+                      const v = e.target.value.replace(/[^0-9.]/g, '');
+                      setRestockForm({ ...restockForm, quantity: v });
                     }}
                     onBlur={(e) => {
                       if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
@@ -1132,11 +1131,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                     min="0.01"
                     step="0.01"
                     value={restockForm.costPerUnit}
+                    onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === '' || (/^\d*\.?\d*$/.test(v) && v !== '0')) {
-                        setRestockForm({ ...restockForm, costPerUnit: v });
-                      }
+                      const v = e.target.value.replace(/[^0-9.]/g, '');
+                      setRestockForm({ ...restockForm, costPerUnit: v });
                     }}
                     onBlur={(e) => {
                       if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
@@ -1157,7 +1155,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
                 <Input
                   id="restockInvoice"
                   value={restockForm.invoiceNumber}
-                  onChange={(e) => setRestockForm({ ...restockForm, invoiceNumber: e.target.value })}
+                  onChange={(e) => setRestockForm({ ...restockForm, invoiceNumber: e.target.value.replace(/[^a-zA-Z0-9\-\/]/g, '') })}
                   placeholder="Enter invoice / bill number"
                   required
                 />

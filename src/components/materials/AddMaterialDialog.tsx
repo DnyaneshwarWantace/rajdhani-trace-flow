@@ -144,8 +144,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         return found ? found.name : trimmed;
       };
       
-      // Only populate if dropdowns are loaded (at least units and categories)
-      if (units.length > 0 && categories.length > 0) {
+      // Only populate once all dropdowns are fully loaded
+      if (!loadingDropdowns) {
         const matchingUnit = findMatchingValue(material.unit, units);
         const matchingCategory = findMatchingValue(material.category, categories);
         const matchingType = findMatchingValue(material.type, types);
@@ -182,7 +182,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         setImageFile(null);
       }
     }
-  }, [isOpen, mode, material, units, categories, types, colors, suppliers]);
+  }, [isOpen, mode, material, loadingDropdowns, units, categories, types, colors, suppliers]);
 
   // Lock body scroll when dialog is open
   useEffect(() => {
@@ -273,9 +273,9 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setColors(colorValues);
       
-      // Set default type if available
-      if (typeValues.length > 0 && !typeValues.includes(formData.type)) {
-        setFormData({ ...formData, type: typeValues[0] });
+      // Set default type if available (functional update avoids stale closure)
+      if (typeValues.length > 0) {
+        setFormData(prev => (!typeValues.includes(prev.type) ? { ...prev, type: typeValues[0] } : prev));
       }
     } catch (error) {
       console.error('Error loading dropdowns:', error);
