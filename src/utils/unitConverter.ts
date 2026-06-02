@@ -444,10 +444,10 @@ export function convertToMeters(value: number, unit: string): number {
   switch (u) {
     case 'mm': return value / 1000;
     case 'cm': return value / 100;
-    case 'Feet': return value * 0.3048;
-    case 'Inches': return value * 0.0254;
-    case 'Yards': return value * 0.9144;
-    default: return value; // 'Meter' or unknown → assume meters
+    case 'feet': return value * 0.3048;
+    case 'inch': return value * 0.0254;
+    case 'yard': return value * 0.9144;
+    default: return value; // 'm' or unknown → assume meters
   }
 }
 
@@ -459,10 +459,10 @@ export function convertToFeet(value: number, unit: string): number {
   switch (u) {
     case 'mm': return value / 304.8;
     case 'cm': return value / 30.48;
-    case 'Feet': return value;
-    case 'Inches': return value / 12;
-    case 'Yards': return value * 3;
-    default: return value * 3.28084; // 'Meter' or unknown → treat as meters
+    case 'feet': return value;
+    case 'inch': return value / 12;
+    case 'yard': return value * 3;
+    default: return value * 3.28084; // 'm' or unknown → treat as meters
   }
 }
 
