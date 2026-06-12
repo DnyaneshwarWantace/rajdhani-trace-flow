@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,8 @@ import { formatCurrency } from '@/utils/formatHelpers';
 import { calculateSQM } from '@/utils/sqmCalculator';
 import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
+import { IndividualProductService } from '@/services/individualProductService';
+import { getApiUrl } from '@/utils/apiConfig';
 
 interface ProductDetails {
   color?: string;
@@ -65,6 +67,33 @@ export function EditableOrderItemCard({
   const [isEditingQty, setIsEditingQty] = useState(false);
   const [editedQuantity, setEditedQuantity] = useState<number | string>(item.quantity);
   const [isSaving, setIsSaving] = useState(false);
+  const [fullIndividualProducts, setFullIndividualProducts] = useState<any[]>([]);
+  const [qrProduct, setQrProduct] = useState<any>(null);
+
+  useEffect(() => {
+    const selected = item.selected_individual_products;
+    if (!selected || selected.length === 0) { setFullIndividualProducts([]); return; }
+
+    // Always fetch fresh from backend by QR code to get accurate roll_number and dimensions
+    const token = localStorage.getItem('auth_token');
+    Promise.all(
+      selected.map(async (ip: any) => {
+        const qrCode = ip.qr_code || ip.qrCode;
+        if (!qrCode) return ip;
+        try {
+          const res = await fetch(
+            `${getApiUrl()}/individual-products/qr/${encodeURIComponent(qrCode)}`,
+            { headers: { 'Content-Type': 'application/json', ...(token && { Authorization: `Bearer ${token}` }) } }
+          );
+          if (!res.ok) return ip;
+          const data = await res.json();
+          return data.data ? { ...ip, ...data.data } : ip;
+        } catch {
+          return ip;
+        }
+      })
+    ).then(setFullIndividualProducts);
+  }, [item.selected_individual_products]);
 
   const handleSaveQuantity = async () => {
     const qty = typeof editedQuantity === 'string' ? parseFloat(editedQuantity) : editedQuantity;
@@ -129,32 +158,32 @@ export function EditableOrderItemCard({
   return (
     <div className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-sm transition-shadow">
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <Package className="w-4 h-4 text-gray-400" />
-            <h3 className="font-semibold text-base">{item.product_name}</h3>
-            <Badge variant="outline" className="text-xs">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <Package className="w-4 h-4 text-gray-400 shrink-0" />
+            <h3 className="font-semibold text-base break-words min-w-0 flex-1">{item.product_name}</h3>
+            <Badge variant="outline" className="text-xs shrink-0">
               {item.product_type === 'raw_material' ? 'Raw Material' : 'Product'}
             </Badge>
           </div>
 
           {/* Product Details */}
           {(length || width || weight || category) && (
-            <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-gray-600">
+            <div className="mt-2 flex flex-col xs:flex-row xs:flex-wrap gap-x-4 gap-y-2 text-xs text-gray-600">
               {length && width && (
-                <div>
+                <div className="min-w-0 break-words">
                   <span className="font-medium">Size:</span> {length}{length_unit} × {width}{width_unit}
-                  {sqm > 0 && <span className="text-blue-600 ml-1">({sqm.toFixed(2)} SQM)</span>}
+                  {sqm > 0 && <span className="text-blue-600 ml-1 block xs:inline">({sqm.toFixed(2)} SQM)</span>}
                 </div>
               )}
               {weight && (
-                <div>
+                <div className="min-w-0">
                   <span className="font-medium">GSM:</span> {weight}{weight_unit || ''}
                 </div>
               )}
               {category && (
-                <div>
+                <div className="min-w-0">
                   <span className="font-medium">Category:</span> {category}
                 </div>
               )}
@@ -172,12 +201,14 @@ export function EditableOrderItemCard({
             </div>
           )}
         </div>
-        <div className="text-right ml-4 min-w-[190px]">
-          <p className="text-xs text-gray-500">Unit Price</p>
-          <p className="text-sm font-semibold text-gray-900">
-            {formatCurrency(parseFloat(item.unit_price || '0'), { full: true })} / {getPriceUnitLabel(item.pricing_unit, item.unit)}
-          </p>
-          <div className="mt-1 flex items-center justify-end gap-3 text-xs">
+        <div className="text-left md:text-right md:ml-4 md:min-w-[190px] border-t pt-3 md:border-t-0 md:pt-0 border-gray-100 flex flex-col md:block gap-1 shrink-0">
+          <div>
+            <p className="text-xs text-gray-500">Unit Price</p>
+            <p className="text-sm font-semibold text-gray-900">
+              {formatCurrency(parseFloat(item.unit_price || '0'), { full: true })} / {getPriceUnitLabel(item.pricing_unit, item.unit)}
+            </p>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center md:justify-end gap-x-3 gap-y-1 text-xs">
             <span className="text-gray-600">
               GST: <span className="font-semibold text-gray-900">{formatCurrency(parseFloat(item.gst_amount || '0'), { full: true })}</span>
             </span>
@@ -185,12 +216,12 @@ export function EditableOrderItemCard({
               Subtotal: <span className="font-semibold text-gray-900">{formatCurrency(parseFloat(item.subtotal || '0'), { full: true })}</span>
             </span>
           </div>
-          <p className="mt-1 text-lg font-bold text-primary-700">{formatCurrency(parseFloat(item.total_price || '0'), { full: true })}</p>
+          <p className="mt-1 text-lg font-bold text-blue-600 md:text-primary-700">{formatCurrency(parseFloat(item.total_price || '0'), { full: true })}</p>
         </div>
       </div>
 
       {/* Quantity Section */}
-      <div className="flex items-center justify-between pt-3 border-t">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t">
         {isEditingQty ? (
           <div className="flex items-center gap-2 flex-1">
             <Input
@@ -204,13 +235,14 @@ export function EditableOrderItemCard({
               min="1"
               max="99999"
               step="1"
-              className="w-24"
+              className="w-24 h-8"
               disabled={isSaving}
               autoFocus
             />
             <span className="text-sm text-gray-600">{item.unit}</span>
             <Button
               size="sm"
+              className="h-8 w-8 p-0"
               onClick={handleSaveQuantity}
               disabled={isSaving || !isValidQuantity()}
             >
@@ -219,6 +251,7 @@ export function EditableOrderItemCard({
             <Button
               size="sm"
               variant="outline"
+              className="h-8 w-8 p-0"
               onClick={handleCancelEdit}
               disabled={isSaving}
             >
@@ -226,34 +259,35 @@ export function EditableOrderItemCard({
             </Button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 flex-wrap flex-1">
             <span className="text-sm font-medium">Quantity: {Number(item.quantity).toFixed(2)} {item.unit}</span>
             {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && orderStatus?.toLowerCase() !== 'cancelled' && onUpdateQuantity && (
               <Button
                 size="sm"
                 variant="ghost"
+                className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700"
                 onClick={handleStartEdit}
                 title="Edit quantity"
               >
-                <Edit className="w-3 h-3" />
+                <Edit className="w-3.5 h-3.5" />
               </Button>
             )}
             {orderStatus !== 'dispatched' && orderStatus !== 'delivered' && orderStatus?.toLowerCase() !== 'cancelled' && onDeleteItem && (
               <Button
                 size="sm"
                 variant="ghost"
+                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                 onClick={() => onDeleteItem(item.id, item.product_name)}
                 title="Remove item from order"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="w-3.5 h-3.5" />
               </Button>
             )}
             {/* Show reservation status for raw materials */}
             {item.product_type === 'raw_material' && (
               <Badge
                 variant="outline"
-                className={`text-xs ml-auto ${
+                className={`text-xs sm:ml-auto ${
                   orderStatus === 'dispatched' || orderStatus === 'delivered'
                     ? 'bg-orange-50 text-orange-700 border-orange-300'
                     : orderStatus === 'accepted'
@@ -273,82 +307,144 @@ export function EditableOrderItemCard({
 
         {/* Individual Product Selection - only when order is accepted */}
         {item.product_type === 'product' && orderStatus === 'accepted' && onSelectIndividualProducts && (
-          <>
+          <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
             <Button
               size="sm"
               variant={needsIndividualProductSelection ? 'default' : 'outline'}
               onClick={() => {
                 console.log('🔵 Select Products clicked for item:', item);
-                console.log('🔵 Item product_id:', item.product_id);
-                console.log('🔵 Item product_name:', item.product_name);
                 onSelectIndividualProducts(item);
               }}
-              className={`h-7 text-xs px-2 ${needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+              className={`h-8 text-xs px-2.5 ${needsIndividualProductSelection ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
             >
-              <QrCode className="w-3 h-3 mr-1" />
-              <span className="truncate max-w-[120px]">
+              <QrCode className="w-3.5 h-3.5 mr-1.5" />
+              <span>
                 {item.selected_individual_products && item.selected_individual_products.length > 0
-                  ? `${item.selected_individual_products.length}/${item.quantity}`
-                  : 'Select'}
+                  ? `Selected: ${item.selected_individual_products.length}/${item.quantity}`
+                  : 'Select Rolls/Pcs'}
               </span>
             </Button>
             {item.selected_individual_products && item.selected_individual_products.length > 0 && item.selected_individual_products.length < item.quantity && (
-              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300">
+              <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 px-2 py-0.5">
                 {item.quantity - item.selected_individual_products.length} more needed
               </Badge>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      {/* Individual Products Selected - Table View */}
+      {/* Individual Products Selected */}
       {item.selected_individual_products && item.selected_individual_products.length > 0 && (
         <div className="mt-3 pt-3 border-t">
-          <div className="text-sm font-medium text-gray-900 mb-3">
-            Individual Products Selected: {item.selected_individual_products.length}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reserved Rolls</span>
+            <span className="text-xs font-bold text-gray-900 bg-gray-100 rounded-full px-2 py-0.5">{item.selected_individual_products.length}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-gray-200">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="border border-gray-200 p-2 text-left text-xs font-medium">#</th>
-                  <th className="border border-gray-200 p-2 text-left text-xs font-medium">Product ID</th>
-                  <th className="border border-gray-200 p-2 text-left text-xs font-medium">QR Code</th>
-                  <th className="border border-gray-200 p-2 text-left text-xs font-medium">Serial Number</th>
-                  <th className="border border-gray-200 p-2 text-left text-xs font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {item.selected_individual_products.map((ip: any, idx: number) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="border border-gray-200 p-2 text-xs text-gray-600">{idx + 1}</td>
-                    <td className="border border-gray-200 p-2 font-mono text-xs text-gray-900">
-                      {ip.individual_product_id || ip.id || '—'}
-                    </td>
-                    <td className="border border-gray-200 p-2 font-mono text-xs text-gray-900">
-                      {ip.qr_code || ip.qrCode || '—'}
-                    </td>
-                    <td className="border border-gray-200 p-2 text-xs text-gray-900">
-                      {ip.serial_number || ip.serialNumber || '—'}
-                    </td>
-                    <td className="border border-gray-200 p-2">
-                      <Badge
-                        variant="outline"
-                        className={`text-xs ${
-                          orderStatus === 'dispatched' || orderStatus === 'delivered'
-                            ? 'bg-orange-50 text-orange-700 border-orange-300'
-                            : 'bg-green-50 text-green-700 border-green-300'
-                        }`}
-                      >
-                        {orderStatus === 'dispatched' || orderStatus === 'delivered' ? 'Shipped' : 'Reserved'}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="grid grid-cols-2 gap-2">
+            {fullIndividualProducts.map((ip: any, idx: number) => {
+              const rawRoll = ip.roll_number || ip.rollNumber || '';
+              // Old format: "PRO-040626-001-ROLL-TIMESTAMP-SEQ" → extract last segment
+              // New format: "06-26-132" → show as-is
+              const rollNo = rawRoll
+                ? (rawRoll.includes('ROLL-') ? rawRoll.split('-').pop() : rawRoll)
+                : null;
+              const qrCode = ip.qr_code || ip.qrCode;
+              const isDispatched = orderStatus === 'dispatched';
+              const isSold = orderStatus === 'delivered';
+              const sizeStr = ip.length && ip.width
+                ? `${ip.length}${ip.length_unit || 'm'} × ${ip.width}${ip.width_unit || 'm'}`
+                : null;
+              const gsmStr = ip.weight ? `${ip.weight} GSM` : null;
+              return (
+                <div
+                  key={idx}
+                  className="bg-gray-50 rounded-xl p-3 flex flex-col gap-1.5"
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-xs font-bold text-gray-900 leading-tight">
+                      {rollNo ? `#${rollNo}` : `#${idx + 1}`}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${isSold ? 'bg-red-100 text-red-700' : isDispatched ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
+                      {isSold ? 'Sold' : isDispatched ? 'Shipped' : 'Reserved'}
+                    </span>
+                  </div>
+                  {sizeStr && <p className="text-[11px] text-gray-500 leading-tight">{sizeStr}</p>}
+                  {gsmStr && <p className="text-[11px] text-gray-400">{gsmStr}</p>}
+                  {qrCode && (
+                    <button
+                      onClick={() => setQrProduct(ip)}
+                      className="mt-0.5 flex items-center gap-1 text-[11px] text-blue-600 font-medium"
+                    >
+                      <QrCode className="w-3 h-3" />
+                      View QR
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
+      )}
+
+      {/* QR bottom sheet */}
+      {qrProduct && (
+        <>
+          <div className="fixed inset-0 z-[200] bg-black/40" onClick={() => setQrProduct(null)} />
+          <div className="fixed bottom-0 left-0 right-0 z-[201] bg-white rounded-t-3xl shadow-2xl">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            <div className="px-5 pt-2 pb-2 flex items-center justify-between">
+              <p className="text-lg font-bold text-gray-900">Roll Info</p>
+              <button onClick={() => setQrProduct(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            <div className="px-5 pb-10 space-y-4">
+              <div className="flex justify-center">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrProduct.qr_code || qrProduct.qrCode)}`}
+                  alt="QR Code"
+                  className="w-44 h-44 rounded-2xl border border-gray-200"
+                />
+              </div>
+              <div className="bg-gray-50 rounded-2xl px-4 py-3 space-y-2">
+                {(qrProduct.roll_number || qrProduct.rollNumber) && (() => {
+                  const raw = qrProduct.roll_number || qrProduct.rollNumber || '';
+                  const display = raw.includes('ROLL-') ? raw.split('-').pop() : raw;
+                  return (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Roll No</span>
+                      <span className="font-bold text-gray-900">#{display}</span>
+                    </div>
+                  );
+                })()}
+                {(qrProduct.length && qrProduct.width) && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Size</span>
+                    <span className="font-semibold text-gray-900">{qrProduct.length}{qrProduct.length_unit || 'm'} × {qrProduct.width}{qrProduct.width_unit || 'm'}</span>
+                  </div>
+                )}
+                {qrProduct.weight && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">GSM</span>
+                    <span className="font-semibold text-gray-900">{qrProduct.weight}</span>
+                  </div>
+                )}
+                {(qrProduct.added_date || qrProduct.production_date || qrProduct.created_at) && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Date</span>
+                    <span className="font-semibold text-gray-900">{new Date(qrProduct.added_date || qrProduct.production_date || qrProduct.created_at).toLocaleDateString('en-IN')}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Status</span>
+                  <span className="font-semibold text-green-600">Reserved</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Warning if individual products not selected or partially selected */}

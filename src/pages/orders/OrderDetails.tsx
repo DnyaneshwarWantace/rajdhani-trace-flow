@@ -29,7 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
-import { formatIndianDate, formatIndianDateTime } from '@/utils/formatHelpers';
+import { formatIndianDate, formatIndianDateTime, formatCurrency } from '@/utils/formatHelpers';
 import { getApiUrl } from '@/utils/apiConfig';
 import { OrderStatusCard } from '@/components/orders/OrderStatusCard';
 import { EditableOrderItemCard } from '@/components/orders/EditableOrderItemCard';
@@ -125,6 +125,16 @@ export default function OrderDetails() {
   const [savingDates, setSavingDates] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const latestOrderRef = useRef<{ id: string; orderNumber: string; status: string } | null>(null);
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handlePrint = useReactToPrint({
     contentRef: invoiceRef,
@@ -682,30 +692,35 @@ export default function OrderDetails() {
       <div className="w-full max-w-full space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-3 w-full">
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/orders')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Orders
-            </Button>
-            <Badge className={`${getStatusColor(order.status)} flex items-center gap-2 px-3 py-2 border`}>
-              {getStatusIcon(order.status)}
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-            </Badge>
-          </div>
-          <div className="flex gap-2">
+        {/* Single row: back + actions + status badge */}
+        <div className="flex items-center gap-2 w-full">
+          {/* Back — icon only on mobile */}
+          <Button variant="outline" size="sm" onClick={() => navigate('/orders')} className="shrink-0 px-2 lg:px-3">
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden lg:inline ml-1.5">Back</span>
+          </Button>
+
+          <Badge className={`${getStatusColor(order.status)} hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 border text-xs shrink-0`}>
+            {getStatusIcon(order.status)}
+            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+          </Badge>
+
+          <div className="flex-1" />
+
+          {/* Action buttons — icons only on mobile for secondary, text for primary */}
+          <div className="flex items-center gap-2">
             {order.status === 'pending' && (
               <>
-                <Button variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50">
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cancel Order
+                <Button size="sm" variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50 px-2 lg:px-3">
+                  <XCircle className="w-4 h-4" />
+                  <span className="hidden lg:inline ml-1.5">Cancel</span>
                 </Button>
-                <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
-                  <Download className="w-4 h-4 mr-2" />
-                  Generate Bill
+                <Button size="sm" variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300 px-2 lg:px-3">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden lg:inline ml-1.5">Bill</span>
                 </Button>
-                <Button onClick={handleAcceptOrder} className="bg-blue-600 hover:bg-blue-700">
-                  <CheckCircle className="w-4 h-4 mr-2" />
+                <Button size="sm" onClick={handleAcceptOrder} className="bg-blue-600 hover:bg-blue-700">
+                  <CheckCircle className="w-4 h-4 mr-1.5" />
                   Accept
                 </Button>
               </>
@@ -722,23 +737,22 @@ export default function OrderDetails() {
                 return requiredQty > 0 && selectedCount < requiredQty;
               });
               const allProductsSelected = incompleteItems.length === 0;
-
               return (
                 <>
-                  <Button variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50">
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Cancel Order
+                  <Button size="sm" variant="outline" onClick={handleCancelOrder} className="text-red-600 border-red-300 hover:bg-red-50 px-2 lg:px-3">
+                    <XCircle className="w-4 h-4" />
+                    <span className="hidden lg:inline ml-1.5">Cancel</span>
                   </Button>
                   {allProductsSelected && (
-                    <Button onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
-                      <Package className="w-4 h-4 mr-2" />
-                      Ship
+                    <Button size="sm" variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300 px-2 lg:px-3">
+                      <Download className="w-4 h-4" />
+                      <span className="hidden lg:inline ml-1.5">Bill</span>
                     </Button>
                   )}
                   {allProductsSelected && (
-                    <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
-                      <Download className="w-4 h-4 mr-2" />
-                      Generate Bill
+                    <Button size="sm" onClick={handleDispatchOrder} className="bg-orange-600 hover:bg-orange-700 text-white">
+                      <Package className="w-4 h-4 mr-1.5" />
+                      Ship
                     </Button>
                   )}
                 </>
@@ -746,20 +760,20 @@ export default function OrderDetails() {
             })()}
             {order.status === 'dispatched' && (
               <>
-                <Button onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700 text-white">
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Mark as Delivered
+                <Button size="sm" variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300 px-2 lg:px-3">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden lg:inline ml-1.5">Bill</span>
                 </Button>
-                <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
-                  <Download className="w-4 h-4 mr-2" />
-                  Generate Bill
+                <Button size="sm" onClick={handleDeliverOrder} className="bg-green-600 hover:bg-green-700 text-white">
+                  <CheckCircle className="w-4 h-4 mr-1.5" />
+                  Delivered
                 </Button>
               </>
             )}
             {order.status === 'delivered' && (
-              <Button variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300">
-                <Download className="w-4 h-4 mr-2" />
-                Generate Bill
+              <Button size="sm" variant="outline" onClick={() => setShowInvoiceDialog(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-300 px-2 lg:px-3">
+                <Download className="w-4 h-4" />
+                <span className="hidden lg:inline ml-1.5">Bill</span>
               </Button>
             )}
           </div>
@@ -794,118 +808,288 @@ export default function OrderDetails() {
           );
         })()}
         </div>
+        {isMobile ? (
+          <div className="space-y-6 w-full max-w-full">
+            {/* 1. Order Status Card */}
+            <OrderStatusCard
+              orderNumber={order.orderNumber}
+              customerName={order.customerName}
+              status={order.status}
+              workflowStep={order.workflowStep}
+            />
 
-        {/* Order Status Card */}
-        <OrderStatusCard
-          orderNumber={order.orderNumber}
-          customerName={order.customerName}
-          status={order.status}
-          workflowStep={order.workflowStep}
-        />
-
-        <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full">
-          {/* Main Content - Left Side (2/3 width) */}
-          <div className="lg:col-span-2 space-y-6 w-full">
-            {/* Order Items */}
-            <Card className="w-full">
-              <CardHeader>
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    Order Items ({orderItems.length})
-                  </CardTitle>
-                  {(order.status === 'pending' || order.status === 'accepted') && !isCancelled && (
-                    <Button size="sm" variant="outline" onClick={() => setShowAddItemPanel(v => !v)} className="gap-1">
-                      <Plus className="w-4 h-4" />
-                      Add Item
-                    </Button>
+            {/* 2. Order Summary Card (Total amount & dates banner like RN app) */}
+            <Card className="w-full border border-gray-200 shadow-sm">
+              <CardContent className="p-4 flex flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="text-2xl font-black text-gray-900 leading-none tracking-tight">
+                    {formatCurrency(
+                      (() => {
+                        const itemsTotal = orderItems.reduce((sum, item) => sum + parseFloat(item.total_price || '0'), 0);
+                        const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                        return Math.round(itemsTotal - discount);
+                      })(),
+                      { full: true }
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Order date: {formatIndianDate(order.orderDate)}
+                  </p>
+                  {order.expectedDelivery && (
+                    <p className="text-xs text-gray-500">
+                      Expected Delivery: {formatIndianDate(order.expectedDelivery)}
+                    </p>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="w-full">
-                <div className="space-y-4">
-                  {orderItems.map((item, index) => (
-                    <EditableOrderItemCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      orderStatus={String(order.status || '').toLowerCase()}
-                      onUpdateQuantity={isCancelled ? undefined : handleUpdateQuantity}
-                      onSelectIndividualProducts={isCancelled ? undefined : handleSelectIndividualProducts}
-                      onDeleteItem={isCancelled ? undefined : handleDeleteItem}
-                    />
-                  ))}
-                  {showAddItemPanel && (order.status === 'pending' || order.status === 'accepted') && (
-                    <AddItemInlineForm
-                      onSave={handleAddItemToOrder}
-                      onCancel={() => setShowAddItemPanel(false)}
-                    />
+                <div className="flex flex-col items-end gap-1.5">
+                  {(() => {
+                    const itemsTotal = orderItems.reduce((sum, item) => sum + parseFloat(item.total_price || '0'), 0);
+                    const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                    const finalTotal = Math.round(itemsTotal - discount);
+                    const outstanding = finalTotal - parseFloat(order.paidAmount.toString());
+                    return outstanding > 0 && !isCancelled ? (
+                      <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 font-bold text-xs py-1 px-2">
+                        Due {formatCurrency(outstanding, { full: true })}
+                      </Badge>
+                    ) : null;
+                  })()}
+                  {(order as any).pi_number && (
+                    <span className="text-xs text-gray-500 font-medium bg-gray-100 px-2 py-0.5 rounded">
+                      PI: {(order as any).pi_number}
+                    </span>
                   )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Shipping/Delivery Information */}
-            {(order.status === 'dispatched' || order.status === 'delivered') && (
-              <Card className={order.status === 'dispatched' ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'}>
-                <CardHeader>
-                  <CardTitle className={`flex items-center gap-2 ${order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'
-                    }`}>
-                    <Package className="w-5 h-5" />
-                    {order.status === 'dispatched' ? 'Shipping Information' : 'Delivery Information'}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {order.status === 'dispatched' && (
-                      <>
-                        <div className="text-orange-700">
-                          <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? formatIndianDateTime(order.dispatchedAt) : 'N/A'}
-                        </div>
-                        {(order as any).transport_type && (
-                          <div className="text-orange-700">
-                            <span className="font-medium">Transport:</span>{' '}
-                            {(order as any).transport_type === 'own' ? 'Own Transport' : 'Outside Transport'}
-                          </div>
-                        )}
-                        {(order as any).transport_vehicle_no && (
-                          <div className="text-orange-700">
-                            <span className="font-medium">Vehicle No:</span> {(order as any).transport_vehicle_no}
-                          </div>
-                        )}
-                        {(order as any).transport_remark && (
-                          <div className="text-orange-700">
-                            <span className="font-medium">Remark:</span> {(order as any).transport_remark}
-                          </div>
-                        )}
-                        <div className="text-orange-700">
-                          <span className="font-medium">Status:</span> Ready for Delivery
-                        </div>
-                      </>
+            {/* 3. Customer Details Card */}
+            <Card className="w-full border border-gray-200 shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm text-gray-700 font-semibold uppercase tracking-wider">
+                  <User className="w-4 h-4 text-gray-400" />
+                  Customer details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-base">
+                    {order.customerName?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-base text-gray-900 truncate">{order.customerName}</p>
+                    {order.customerPhone && (
+                      <div className="flex items-center gap-1.5 text-sm text-gray-500 mt-1">
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{order.customerPhone}</span>
+                      </div>
                     )}
-
-                    {order.status === 'delivered' && (
-                      <>
-                        <div className="text-green-700">
-                          <span className="font-medium">Delivered on:</span> {order.deliveredAt ? formatIndianDateTime(order.deliveredAt) : 'N/A'}
-                        </div>
-                        <div className="text-green-700">
-                          <span className="font-medium">Status:</span> Successfully Delivered
-                        </div>
-                        <div className="text-green-700">
-                          <span className="font-medium">Stock:</span> Deducted and confirmed
-                        </div>
-                        <div className="text-green-700">
-                          <span className="font-medium">Order Complete:</span> All items delivered to customer
-                        </div>
-                      </>
+                    {order.customerEmail && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-0.5 truncate">
+                        <Mail className="w-3.5 h-3.5" />
+                        <span>{order.customerEmail}</span>
+                      </div>
                     )}
                   </div>
-                </CardContent>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 4. Order Items Card */}
+            <Card className="w-full border border-gray-200 shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2 text-sm text-gray-700 font-semibold uppercase tracking-wider">
+                    <Package className="w-4 h-4 text-gray-400" />
+                    Order Items ({orderItems.length})
+                  </CardTitle>
+                  {(order.status === 'pending' || order.status === 'accepted') && !isCancelled && (
+                    <Button size="sm" variant="outline" onClick={() => setShowAddItemPanel(v => !v)} className="h-7 px-2 text-xs gap-1">
+                      <Plus className="w-3 h-3" />
+                      Add Item
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-3 space-y-3">
+                {orderItems.map((item, index) => (
+                  <EditableOrderItemCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    orderStatus={String(order.status || '').toLowerCase()}
+                    onUpdateQuantity={isCancelled ? undefined : handleUpdateQuantity}
+                    onSelectIndividualProducts={isCancelled ? undefined : handleSelectIndividualProducts}
+                    onDeleteItem={isCancelled ? undefined : handleDeleteItem}
+                  />
+                ))}
+                {showAddItemPanel && (order.status === 'pending' || order.status === 'accepted') && (
+                  <AddItemInlineForm
+                    onSave={handleAddItemToOrder}
+                    onCancel={() => setShowAddItemPanel(false)}
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 5. Shipping/Delivery Information */}
+            {(order.status === 'dispatched' || order.status === 'delivered') && (
+              <Card className={`border shadow-sm p-4 ${order.status === 'dispatched' ? 'border-orange-200 bg-orange-50/50' : 'border-green-200 bg-green-50/50'}`}>
+                <h3 className={`font-semibold text-sm flex items-center gap-2 ${order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'}`}>
+                  <Package className="w-4 h-4" />
+                  {order.status === 'dispatched' ? 'Shipping Information' : 'Delivery Information'}
+                </h3>
+                <div className="space-y-2 mt-3 text-sm">
+                  {order.status === 'dispatched' && (
+                    <>
+                      <div className="text-orange-700">
+                        <span className="font-semibold">Shipped on:</span> {order.dispatchedAt ? formatIndianDateTime(order.dispatchedAt) : 'N/A'}
+                      </div>
+                      {(order as any).transport_type && (
+                        <div className="text-orange-700">
+                          <span className="font-semibold">Transport:</span> {(order as any).transport_type === 'own' ? 'Own Transport' : 'Outside Transport'}
+                        </div>
+                      )}
+                      {(order as any).transport_vehicle_no && (
+                        <div className="text-orange-700">
+                          <span className="font-semibold">Vehicle No:</span> {(order as any).transport_vehicle_no}
+                        </div>
+                      )}
+                      {(order as any).transport_remark && (
+                        <div className="text-orange-700">
+                          <span className="font-semibold">Remark:</span> {(order as any).transport_remark}
+                        </div>
+                      )}
+                      <div className="text-orange-700 font-medium">
+                        Status: Ready for Delivery
+                      </div>
+                    </>
+                  )}
+                  {order.status === 'delivered' && (
+                    <>
+                      <div className="text-green-700">
+                        <span className="font-semibold">Delivered on:</span> {order.deliveredAt ? formatIndianDateTime(order.deliveredAt) : 'N/A'}
+                      </div>
+                      <div className="text-green-700 font-medium">
+                        Status: Successfully Delivered
+                      </div>
+                      <div className="text-green-700">
+                        Stock: Deducted and confirmed
+                      </div>
+                    </>
+                  )}
+                </div>
               </Card>
             )}
 
-            {/* Order Timeline - Show at all stages */}
+            {/* 6. Payment Summary */}
+            <EditablePaymentCard
+              readOnly={isCancelled}
+              subtotal={(() => {
+                if (order.subtotal && parseFloat(order.subtotal.toString()) > 0) return order.subtotal;
+                return orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || '0'), 0).toString();
+              })()}
+              gstAmount={(() => {
+                if (order.gstAmount && parseFloat(order.gstAmount.toString()) > 0) return order.gstAmount;
+                return orderItems.reduce((sum, item) => sum + parseFloat(item.gst_amount || '0'), 0).toString();
+              })()}
+              discountAmount={order.discountAmount}
+              totalAmount={(() => {
+                const itemsTotal = orderItems.reduce((sum, item) => sum + parseFloat(item.total_price || '0'), 0);
+                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                return Math.round(itemsTotal - discount);
+              })()}
+              paidAmount={parseFloat(order.paidAmount.toString())}
+              outstandingAmount={(() => {
+                const itemsTotal = orderItems.reduce((sum, item) => sum + parseFloat(item.total_price || '0'), 0);
+                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                const finalTotal = Math.round(itemsTotal - discount);
+                return finalTotal - parseFloat(order.paidAmount.toString());
+              })()}
+              paymentHistory={(order as any).payment_history}
+              onUpdatePayment={handleUpdatePayment}
+            />
+
+            {/* 7. Important Dates */}
+            <Card className="w-full border border-gray-200 shadow-sm">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="flex items-center justify-between text-sm text-gray-700 font-semibold uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-400" />
+                    Important Dates
+                  </div>
+                  {!editingDates && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-gray-500" onClick={() => {
+                      setEditOrderDate(order.orderDate ? order.orderDate.split('T')[0] : '');
+                      setEditExpectedDelivery(order.expectedDelivery ? order.expectedDelivery.split('T')[0] : '');
+                      setEditingDates(true);
+                    }}>
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 space-y-3 text-sm">
+                {editingDates ? (
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label className="text-xs text-gray-600">Order Date</Label>
+                      <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="mt-1 h-8 text-sm" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-600">Expected Delivery</Label>
+                      <Input type="date" value={editExpectedDelivery} onChange={e => setEditExpectedDelivery(e.target.value)} className="mt-1 h-8 text-sm" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleSaveDates} disabled={savingDates} className="flex-1 h-8 text-xs">
+                        {savingDates ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingDates(false)} className="flex-1 h-8 text-xs">Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between border-b pb-2">
+                      <span className="text-gray-500">Order Date</span>
+                      <span className="font-semibold">{formatIndianDate(order.orderDate)}</span>
+                    </div>
+                    {order.expectedDelivery && (() => {
+                      const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      expectedDate.setHours(0, 0, 0, 0);
+                      const isOverdue = order.status !== 'delivered' && expectedDate < today;
+                      return (
+                        <div className="flex justify-between border-b pb-2">
+                          <span className="text-gray-500">Expected Delivery</span>
+                          <span className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</span>
+                        </div>
+                      );
+                    })()}
+                    {order.acceptedAt && (
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-gray-500">Accepted On</span>
+                        <span className="font-semibold text-blue-600">{formatIndianDate(order.acceptedAt)}</span>
+                      </div>
+                    )}
+                    {order.dispatchedAt && (
+                      <div className="flex justify-between border-b pb-2">
+                        <span className="text-gray-500">Shipped On</span>
+                        <span className="font-semibold text-orange-600">{formatIndianDate(order.dispatchedAt)}</span>
+                      </div>
+                    )}
+                    {order.deliveredAt && (
+                      <div className="flex justify-between pb-1">
+                        <span className="text-gray-500">Delivered On</span>
+                        <span className="font-semibold text-green-600">{formatIndianDate(order.deliveredAt)}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 8. Order Timeline Card */}
             <OrderTimelineCard
               orderDate={order.orderDate}
               createdAt={order.createdAt}
@@ -916,227 +1100,17 @@ export default function OrderDetails() {
               currentStatus={order.status}
             />
 
-            {/* Production Information - moved to main flow below timeline */}
-            <OrderProductionInfo order={order} />
-
-            {/* PI Number */}
-            {(order as any).pi_number && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    PI Number
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-lg font-semibold text-gray-900">{(order as any).pi_number}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Special Instructions */}
-            {order.special_instructions && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Order Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{order.special_instructions}</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Sidebar - Right Side (1/3 width) */}
-          <div className="space-y-6 w-full">
-            {/* Customer Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <User className="w-5 h-5" />
-                  Customer Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <div className="font-semibold text-lg">{order.customerName}</div>
-                </div>
-                {order.customerEmail && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Mail className="w-4 h-4" />
-                    <span>{order.customerEmail}</span>
-                  </div>
-                )}
-                {order.customerPhone && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Phone className="w-4 h-4" />
-                    <span>{order.customerPhone}</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Payment Summary - no edit when order is cancelled */}
-            <EditablePaymentCard
-              readOnly={isCancelled}
-              subtotal={(() => {
-                // Calculate subtotal from items if not set
-                if (order.subtotal && parseFloat(order.subtotal.toString()) > 0) {
-                  return order.subtotal;
-                }
-                // Calculate from items
-                const itemsSubtotal = orderItems.reduce((sum, item) => {
-                  return sum + parseFloat(item.subtotal || '0');
-                }, 0);
-                return itemsSubtotal.toString();
-              })()}
-              gstAmount={(() => {
-                // Calculate GST from items if order.gstAmount is not set
-                if (order.gstAmount && parseFloat(order.gstAmount.toString()) > 0) {
-                  return order.gstAmount;
-                }
-                // Calculate from items
-                const itemsGst = orderItems.reduce((sum, item) => {
-                  return sum + parseFloat(item.gst_amount || '0');
-                }, 0);
-                return itemsGst.toString();
-              })()}
-              discountAmount={order.discountAmount}
-              totalAmount={(() => {
-                const itemsTotal = orderItems.reduce((sum, item) => {
-                  return sum + parseFloat(item.total_price || '0');
-                }, 0);
-                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
-                return Math.round(itemsTotal - discount);
-              })()}
-              paidAmount={parseFloat(order.paidAmount.toString())}
-              outstandingAmount={(() => {
-                const itemsTotal = orderItems.reduce((sum, item) => {
-                  return sum + parseFloat(item.total_price || '0');
-                }, 0);
-                const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
-                const finalTotal = Math.round(itemsTotal - discount);
-                return finalTotal - parseFloat(order.paidAmount.toString());
-              })()}
-              paymentHistory={(order as any).payment_history}
-              onUpdatePayment={handleUpdatePayment}
-            />
-
-            {/* Activity Log Timeline */}
-            {(order as any).activity_logs && (order as any).activity_logs.length > 0 && (
-              <ActivityLogTimeline logs={(order as any).activity_logs} />
-            )}
-
-            {/* Important Dates */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5" />
-                    Important Dates
-                  </div>
-                  {!editingDates && order.status !== 'delivered' && order.status !== 'cancelled' && (
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" onClick={() => {
-                      setEditOrderDate(order.orderDate ? order.orderDate.split('T')[0] : '');
-                      setEditExpectedDelivery(order.expectedDelivery ? order.expectedDelivery.split('T')[0] : '');
-                      setEditingDates(true);
-                    }} title="Edit dates">
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {editingDates ? (
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm text-gray-600">Order Date</Label>
-                      <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="mt-1" />
-                    </div>
-                    <div>
-                      <Label className="text-sm text-gray-600">Expected Delivery</Label>
-                      <Input type="date" value={editExpectedDelivery} onChange={e => setEditExpectedDelivery(e.target.value)} className="mt-1" />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={handleSaveDates} disabled={savingDates} className="flex-1">
-                        {savingDates ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                        Save
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingDates(false)} className="flex-1">Cancel</Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <p className="text-sm text-gray-600">Order Date</p>
-                      <p className="font-semibold">{formatIndianDate(order.orderDate)}</p>
-                    </div>
-                    {order.expectedDelivery && (() => {
-                      const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
-                      expectedDate.setHours(0, 0, 0, 0);
-                      const notDelivered = order.status !== 'delivered';
-                      const isOverdue = notDelivered && expectedDate < today;
-                      return (
-                        <div>
-                          <p className="text-sm text-gray-600">Expected Delivery</p>
-                          <p className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</p>
-                        </div>
-                      );
-                    })()}
-                    {/* Date change history */}
-                    {(order as any).date_history && (order as any).date_history.length > 0 && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium mb-1">Date Changes</p>
-                        <div className="space-y-1">
-                          {(order as any).date_history.map((h: any, i: number) => (
-                            <div key={i} className="text-xs text-gray-500">
-                              <span className="font-medium">{h.field === 'order_date' ? 'Order Date' : 'Delivery Date'}:</span>{' '}
-                              {formatIndianDate(h.previous_date)} → {formatIndianDate(h.new_date)}
-                              <span className="text-gray-400 ml-1">by {h.changed_by}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-                {order.acceptedAt && (
-                  <div>
-                    <p className="text-sm text-gray-600">Accepted On</p>
-                    <p className="font-semibold text-blue-600">{formatIndianDate(order.acceptedAt)}</p>
-                  </div>
-                )}
-                {order.dispatchedAt && (
-                  <div>
-                    <p className="text-sm text-gray-600">Shipped On</p>
-                    <p className="font-semibold text-orange-600">{formatIndianDate(order.dispatchedAt)}</p>
-                  </div>
-                )}
-                {order.deliveredAt && (
-                  <div>
-                    <p className="text-sm text-gray-600">Delivered On</p>
-                    <p className="font-semibold text-green-600">{formatIndianDate(order.deliveredAt)}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Delivery Address */}
+            {/* 9. Delivery Address Card */}
             {deliveryAddress && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <MapPin className="w-5 h-5" />
+              <Card className="w-full border border-gray-200 shadow-sm">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm text-gray-700 font-semibold uppercase tracking-wider">
+                    <MapPin className="w-4 h-4 text-gray-400" />
                     Delivery Address
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm leading-relaxed">
+                <CardContent className="p-4 pt-0 text-sm leading-relaxed">
+                  <p>
                     {deliveryAddress.address}
                     {deliveryAddress.city && <><br />{deliveryAddress.city}</>}
                     {deliveryAddress.state && `, ${deliveryAddress.state}`}
@@ -1145,8 +1119,372 @@ export default function OrderDetails() {
                 </CardContent>
               </Card>
             )}
+
+            {/* 10. Order Notes Card */}
+            {order.special_instructions && (
+              <Card className="w-full border border-gray-200 shadow-sm">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="flex items-center gap-2 text-sm text-gray-700 font-semibold uppercase tracking-wider">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    Order Notes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 text-sm text-gray-600 whitespace-pre-wrap">
+                  {order.special_instructions}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 11. Production Info Card */}
+            <OrderProductionInfo order={order} />
+
+            {/* 12. Activity Log Timeline */}
+            {(order as any).activity_logs && (order as any).activity_logs.length > 0 && (
+              <ActivityLogTimeline logs={(order as any).activity_logs} />
+            )}
           </div>
-        </div>
+        ) : (
+          /* Desktop Layout (original, completely untouched grid) */
+          <div className="grid gap-6 lg:grid-cols-3 w-full max-w-full">
+            {/* Main Content - Left Side (2/3 width) */}
+            <div className="lg:col-span-2 space-y-6 w-full">
+              {/* Order Items */}
+              <Card className="w-full">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="w-5 h-5" />
+                      Order Items ({orderItems.length})
+                    </CardTitle>
+                    {(order.status === 'pending' || order.status === 'accepted') && !isCancelled && (
+                      <Button size="sm" variant="outline" onClick={() => setShowAddItemPanel(v => !v)} className="gap-1">
+                        <Plus className="w-4 h-4" />
+                        Add Item
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="w-full">
+                  <div className="space-y-4">
+                    {orderItems.map((item, index) => (
+                      <EditableOrderItemCard
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        orderStatus={String(order.status || '').toLowerCase()}
+                        onUpdateQuantity={isCancelled ? undefined : handleUpdateQuantity}
+                        onSelectIndividualProducts={isCancelled ? undefined : handleSelectIndividualProducts}
+                        onDeleteItem={isCancelled ? undefined : handleDeleteItem}
+                      />
+                    ))}
+                    {showAddItemPanel && (order.status === 'pending' || order.status === 'accepted') && (
+                      <AddItemInlineForm
+                        onSave={handleAddItemToOrder}
+                        onCancel={() => setShowAddItemPanel(false)}
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shipping/Delivery Information */}
+              {(order.status === 'dispatched' || order.status === 'delivered') && (
+                <Card className={order.status === 'dispatched' ? 'border-orange-200 bg-orange-50' : 'border-green-200 bg-green-50'}>
+                  <CardHeader>
+                    <CardTitle className={`flex items-center gap-2 ${order.status === 'dispatched' ? 'text-orange-800' : 'text-green-800'
+                      }`}>
+                      <Package className="w-5 h-5" />
+                      {order.status === 'dispatched' ? 'Shipping Information' : 'Delivery Information'}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {order.status === 'dispatched' && (
+                        <>
+                          <div className="text-orange-700">
+                            <span className="font-medium">Shipped on:</span> {order.dispatchedAt ? formatIndianDateTime(order.dispatchedAt) : 'N/A'}
+                          </div>
+                          {(order as any).transport_type && (
+                            <div className="text-orange-700">
+                              <span className="font-medium">Transport:</span>{' '}
+                              {(order as any).transport_type === 'own' ? 'Own Transport' : 'Outside Transport'}
+                            </div>
+                          )}
+                          {(order as any).transport_vehicle_no && (
+                            <div className="text-orange-700">
+                              <span className="font-medium">Vehicle No:</span> {(order as any).transport_vehicle_no}
+                            </div>
+                          )}
+                          {(order as any).transport_remark && (
+                            <div className="text-orange-700">
+                              <span className="font-medium">Remark:</span> {(order as any).transport_remark}
+                            </div>
+                          )}
+                          <div className="text-orange-700">
+                            <span className="font-medium">Status:</span> Ready for Delivery
+                          </div>
+                        </>
+                      )}
+
+                      {order.status === 'delivered' && (
+                        <>
+                          <div className="text-green-700">
+                            <span className="font-medium">Delivered on:</span> {order.deliveredAt ? formatIndianDateTime(order.deliveredAt) : 'N/A'}
+                          </div>
+                          <div className="text-green-700">
+                            <span className="font-medium">Status:</span> Successfully Delivered
+                          </div>
+                          <div className="text-green-700">
+                            <span className="font-medium">Stock:</span> Deducted and confirmed
+                          </div>
+                          <div className="text-green-700">
+                            <span className="font-medium">Order Complete:</span> All items delivered to customer
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Order Timeline - Show at all stages */}
+              <OrderTimelineCard
+                orderDate={order.orderDate}
+                createdAt={order.createdAt}
+                acceptedAt={order.acceptedAt}
+                dispatchedAt={order.dispatchedAt}
+                deliveredAt={order.deliveredAt}
+                activityLogs={(order as any).activity_logs || []}
+                currentStatus={order.status}
+              />
+
+              {/* Production Information - moved to main flow below timeline */}
+              <OrderProductionInfo order={order} />
+
+              {/* PI Number */}
+              {(order as any).pi_number && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      PI Number
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-lg font-semibold text-gray-900">{(order as any).pi_number}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Special Instructions */}
+              {order.special_instructions && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Order Notes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground whitespace-pre-wrap">{order.special_instructions}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Sidebar - Right Side (1/3 width) */}
+            <div className="space-y-6 w-full">
+              {/* Customer Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <User className="w-5 h-5" />
+                    Customer Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <div className="font-semibold text-lg">{order.customerName}</div>
+                  </div>
+                  {order.customerEmail && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mail className="w-4 h-4" />
+                      <span>{order.customerEmail}</span>
+                    </div>
+                  )}
+                  {order.customerPhone && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Phone className="w-4 h-4" />
+                      <span>{order.customerPhone}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Payment Summary */}
+              <EditablePaymentCard
+                readOnly={isCancelled}
+                subtotal={(() => {
+                  if (order.subtotal && parseFloat(order.subtotal.toString()) > 0) {
+                    return order.subtotal;
+                  }
+                  const itemsSubtotal = orderItems.reduce((sum, item) => {
+                    return sum + parseFloat(item.subtotal || '0');
+                  }, 0);
+                  return itemsSubtotal.toString();
+                })()}
+                gstAmount={(() => {
+                  if (order.gstAmount && parseFloat(order.gstAmount.toString()) > 0) {
+                    return order.gstAmount;
+                  }
+                  const itemsGst = orderItems.reduce((sum, item) => {
+                    return sum + parseFloat(item.gst_amount || '0');
+                  }, 0);
+                  return itemsGst.toString();
+                })()}
+                discountAmount={order.discountAmount}
+                totalAmount={(() => {
+                  const itemsTotal = orderItems.reduce((sum, item) => {
+                    return sum + parseFloat(item.total_price || '0');
+                  }, 0);
+                  const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                  return Math.round(itemsTotal - discount);
+                })()}
+                paidAmount={parseFloat(order.paidAmount.toString())}
+                outstandingAmount={(() => {
+                  const itemsTotal = orderItems.reduce((sum, item) => {
+                    return sum + parseFloat(item.total_price || '0');
+                  }, 0);
+                  const discount = order.discountAmount ? parseFloat(order.discountAmount.toString()) : 0;
+                  const finalTotal = Math.round(itemsTotal - discount);
+                  return finalTotal - parseFloat(order.paidAmount.toString());
+                })()}
+                paymentHistory={(order as any).payment_history}
+                onUpdatePayment={handleUpdatePayment}
+              />
+
+              {/* Activity Log Timeline */}
+              {(order as any).activity_logs && (order as any).activity_logs.length > 0 && (
+                <ActivityLogTimeline logs={(order as any).activity_logs} />
+              )}
+
+              {/* Important Dates */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between text-base">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5" />
+                      Important Dates
+                    </div>
+                    {!editingDates && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-500 hover:text-gray-700" onClick={() => {
+                        setEditOrderDate(order.orderDate ? order.orderDate.split('T')[0] : '');
+                        setEditExpectedDelivery(order.expectedDelivery ? order.expectedDelivery.split('T')[0] : '');
+                        setEditingDates(true);
+                      }} title="Edit dates">
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {editingDates ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-sm text-gray-600">Order Date</Label>
+                        <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="mt-1" />
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-600">Expected Delivery</Label>
+                        <Input type="date" value={editExpectedDelivery} onChange={e => setEditExpectedDelivery(e.target.value)} className="mt-1" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={handleSaveDates} disabled={savingDates} className="flex-1">
+                          {savingDates ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingDates(false)} className="flex-1">Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-sm text-gray-600">Order Date</p>
+                        <p className="font-semibold">{formatIndianDate(order.orderDate)}</p>
+                      </div>
+                      {order.expectedDelivery && (() => {
+                        const expectedDate = new Date(order.expectedDelivery.split('T')[0]);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        expectedDate.setHours(0, 0, 0, 0);
+                        const notDelivered = order.status !== 'delivered';
+                        const isOverdue = notDelivered && expectedDate < today;
+                        return (
+                          <div>
+                            <p className="text-sm text-gray-600">Expected Delivery</p>
+                            <p className={`font-semibold ${isOverdue ? 'text-red-600' : ''}`}>{formatIndianDate(order.expectedDelivery)}</p>
+                          </div>
+                        );
+                      })()}
+                      {(order as any).date_history && (order as any).date_history.length > 0 && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs text-gray-500 font-medium mb-1">Date Changes</p>
+                          <div className="space-y-1">
+                            {(order as any).date_history.map((h: any, i: number) => (
+                              <div key={i} className="text-xs text-gray-500">
+                                <span className="font-medium">{h.field === 'order_date' ? 'Order Date' : 'Delivery Date'}:</span>{' '}
+                                {formatIndianDate(h.previous_date)} → {formatIndianDate(h.new_date)}
+                                <span className="text-gray-400 ml-1">by {h.changed_by}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {order.acceptedAt && (
+                    <div>
+                      <p className="text-sm text-gray-600">Accepted On</p>
+                      <p className="font-semibold text-blue-600">{formatIndianDate(order.acceptedAt)}</p>
+                    </div>
+                  )}
+                  {order.dispatchedAt && (
+                    <div>
+                      <p className="text-sm text-gray-600">Shipped On</p>
+                      <p className="font-semibold text-orange-600">{formatIndianDate(order.dispatchedAt)}</p>
+                    </div>
+                  )}
+                  {order.deliveredAt && (
+                    <div>
+                      <p className="text-sm text-gray-600">Delivered On</p>
+                      <p className="font-semibold text-green-600">{formatIndianDate(order.deliveredAt)}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Delivery Address */}
+              {deliveryAddress && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <MapPin className="w-5 h-5" />
+                      Delivery Address
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed">
+                      {deliveryAddress.address}
+                      {deliveryAddress.city && <><br />{deliveryAddress.city}</>}
+                      {deliveryAddress.state && `, ${deliveryAddress.state}`}
+                      {deliveryAddress.pincode && ` - ${deliveryAddress.pincode}`}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Individual Product Selection Dialog */}
         <IndividualProductSelectionDialog
@@ -1161,15 +1499,15 @@ export default function OrderDetails() {
 
         {/* Invoice Bill Dialog */}
         <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
-          <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">Invoice / Bill</DialogTitle>
+          <DialogContent className="max-w-5xl w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto p-0 sm:p-6 rounded-none sm:rounded-lg">
+            <DialogHeader className="px-4 pt-4 sm:px-0 sm:pt-0">
+              <DialogTitle className="text-lg sm:text-2xl font-bold">Invoice / Bill</DialogTitle>
               <DialogDescription>
                 Preview and print the invoice for Order #{order?.orderNumber}
               </DialogDescription>
             </DialogHeader>
 
-            <div className="mt-4">
+            <div className="mt-2">
               {order && (
                 <InvoiceBill
                   ref={invoiceRef}
@@ -1179,7 +1517,7 @@ export default function OrderDetails() {
               )}
             </div>
 
-            <div className="flex gap-3 justify-end mt-6 pt-4 border-t">
+            <div className="flex gap-3 justify-end px-4 pb-4 pt-3 border-t sm:px-0 sm:pb-0">
               <Button variant="outline" onClick={() => setShowInvoiceDialog(false)}>
                 Close
               </Button>

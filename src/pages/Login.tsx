@@ -24,13 +24,14 @@ const CSS = `
   .login-root {
     /* Inherit main app font (Tailwind body font) */
     font-family: inherit;
-    min-height: 100vh;
+    min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f9fafb;
     position: relative;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   /* ── BACKGROUND ── */
@@ -40,6 +41,7 @@ const CSS = `
     background: radial-gradient(circle at 0% 0%, rgba(0, 102, 255, 0.05) 0%, transparent 40%),
                 radial-gradient(circle at 100% 100%, rgba(0, 102, 255, 0.05) 0%, transparent 40%);
     z-index: 1;
+    pointer-events: none;
   }
   .login-decor-orb {
     position: absolute;
@@ -49,6 +51,7 @@ const CSS = `
     top: -200px; left: -200px;
     animation: float 10s infinite ease-in-out;
     z-index: 1;
+    pointer-events: none;
   }
 
   /* ── CONTAINER ── */
@@ -276,9 +279,10 @@ const CSS = `
   .login-footer a { color: #0066ff; text-decoration: none; font-weight: 500; }
 
   @media (max-width: 900px) {
-    .login-container { flex-direction: column; margin: 0; border-radius: 0; height: 100vh; }
+    .login-container { flex-direction: column; margin: 0; border-radius: 0; min-height: 100dvh; height: auto; }
+    .login-root { align-items: flex-start; min-height: 100dvh; overflow-y: auto; }
     .login-left { display: none; }
-    .login-right { padding: 40px 24px; }
+    .login-right { padding: 40px 24px 60px; flex: none; }
   }
 `;
 

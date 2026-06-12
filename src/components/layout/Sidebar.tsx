@@ -271,23 +271,16 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Overlay - Only show on mobile when open */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Sidebar - Hidden on mobile when closed, always visible on desktop */}
+      {/* Sidebar - Desktop only, hidden on mobile (mobile uses bottom nav) */}
       <aside
         className={`
           fixed top-16 left-0 z-50 h-[calc(100vh-4rem)]
           bg-white border-r border-gray-200 shadow-lg
           transition-all duration-300 ease-in-out
+          hidden lg:block
           ${isOpen
             ? 'w-56 translate-x-0 overflow-y-auto overflow-x-hidden'
-            : 'hidden lg:block lg:translate-x-0 lg:w-16 overflow-y-auto overflow-x-visible'}
+            : 'w-16 translate-x-0 overflow-y-auto overflow-x-visible'}
         `}
       >
         <div className={`flex flex-col h-full p-3 ${isOpen ? 'min-w-[14rem]' : 'lg:min-w-[4rem]'}`}>

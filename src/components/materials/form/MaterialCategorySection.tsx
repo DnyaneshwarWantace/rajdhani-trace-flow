@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MobileOptionSheet, MobileSelectTrigger } from '@/components/ui/MobileOptionSheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,12 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
   const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
     setSelectOpen(false); setTogglingOption(opt);
+  };
+  const handleInstantToggle = async (opt: DropdownOption) => {
+    try {
+      await DropdownService.toggleActive(opt.id || opt._id);
+      onCategoriesReload();
+    } catch { toast({ title: 'Error', description: 'Failed to toggle', variant: 'destructive' }); }
   };
   const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
@@ -163,10 +170,59 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
     }
   };
 
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const hasFieldError = hasError || (touchedFields.has('category') && !category.trim());
+
   return (
     <div>
       <Label htmlFor="category">Category *</Label>
       <div className="space-y-2">
+
+        {/* Mobile: bottom sheet */}
+        <div className="lg:hidden">
+          <MobileSelectTrigger
+            value={category}
+            placeholder="Select category"
+            hasError={hasFieldError}
+            onClick={() => setMobileSheetOpen(true)}
+          />
+          <MobileOptionSheet
+            open={mobileSheetOpen}
+            onClose={() => { setMobileSheetOpen(false); markFieldTouched('category'); }}
+            title="Category"
+            options={(fullOptions && fullOptions.length > 0 ? fullOptions : categories.map(c => ({ value: c }))).map(o => {
+              const fo = fullOptions?.find(f => f.value === (typeof o === 'string' ? o : o.value));
+              const val = typeof o === 'string' ? o : o.value;
+              return { value: val, label: val, isActive: fo ? fo.is_active !== false : true, id: fo?.id || fo?._id, isUsed: isUsed(val) };
+            })}
+            selected={category}
+            onSelect={(val) => { onCategoryChange(val); markFieldTouched('category'); }}
+            onAddNew={() => setShowAddCategory(true)}
+            onToggleActive={(opt) => {
+              const fo = fullOptions?.find(f => f.value === opt.value);
+              if (fo) handleInstantToggle(fo);
+            }}
+            onDelete={(opt) => {
+              const fo = fullOptions?.find(f => f.value === opt.value);
+              if (fo) { const e = { stopPropagation: () => {}, preventDefault: () => {} } as any; handleDeleteClick(e, fo); }
+            }}
+          />
+          {showAddCategory && (
+            <div className="mt-2 space-y-2 p-3 bg-gray-50 rounded-xl border border-gray-200">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input value={newCategoryName} onChange={(e) => handleCategoryNameChange(e.target.value)} placeholder="New category name" className="h-10 rounded-xl" />
+                  <p className="text-xs text-gray-400 mt-1">{wordCount}/5 words • Max 20 chars per word</p>
+                </div>
+                <Button type="button" size="sm" onClick={handleAddCategory}>Add</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}>✕</Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop: Radix Select */}
+        <div className="hidden lg:block">
         <Select
           open={selectOpen}
           onOpenChange={(open) => {
@@ -187,13 +243,21 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
             <SelectValue placeholder="Select category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.length > 0 ? (
-              categories.filter((cat) => cat && cat.trim() !== '').map((cat) => {
-                const fullOpt = findFullOption(cat);
+            {(fullOptions && fullOptions.length > 0 ? fullOptions : categories.filter((cat) => cat && cat.trim() !== '').map((cat) => ({ value: cat, is_active: true } as DropdownOption))).length > 0 ? (
+              (fullOptions && fullOptions.length > 0 ? fullOptions : categories.filter((cat) => cat && cat.trim() !== '').map((cat) => ({ value: cat, is_active: true } as DropdownOption))).map((opt) => {
+                const cat = opt.value;
+                const isInactive = opt.is_active === false;
+                const fullOpt = isInactive ? opt : (findFullOption(cat) ?? opt);
                 const used = isUsed(cat);
                 return (
                   <div key={cat} className="relative flex items-center group">
-                    <SelectItem value={cat} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>{cat}</SelectItem>
+                    <SelectItem
+                      value={cat}
+                      disabled={isInactive}
+                      className={`flex-1 ${hasManagement ? 'pr-14' : ''} ${isInactive ? 'text-gray-400' : ''}`}
+                    >
+                      {isInactive ? `${cat} (Inactive)` : cat}
+                    </SelectItem>
                     {hasManagement && fullOpt && (
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
                         <button type="button" title={fullOpt.is_active ? 'Deactivate' : 'Activate'} className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
@@ -218,39 +282,25 @@ const MaterialCategorySection = forwardRef<HTMLButtonElement, MaterialCategorySe
           </SelectContent>
         </Select>
         {touchedFields.has('category') && !category.trim() && (
-          <p className="text-xs text-red-500 mt-1">
-            Category is required
-          </p>
+          <p className="text-xs text-red-500 mt-1">Category is required</p>
         )}
         {showAddCategory && (
           <div className="space-y-2">
             <div className="flex gap-2">
               <div className="flex-1">
-                <Input
-                  value={newCategoryName}
-                  onChange={(e) => handleCategoryNameChange(e.target.value)}
-                  placeholder="Enter new category"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {wordCount}/5 words • Max 20 characters per word
-                </p>
+                <Input value={newCategoryName} onChange={(e) => handleCategoryNameChange(e.target.value)} placeholder="Enter new category" />
+                <p className="text-xs text-muted-foreground mt-1">{wordCount}/5 words • Max 20 characters per word</p>
               </div>
-              <Button type="button" size="sm" onClick={handleAddCategory}>
-                Add
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setShowAddCategory(false);
-                  setNewCategoryName('');
-                }}
-              >
-                Cancel
-              </Button>
+              <Button type="button" size="sm" onClick={handleAddCategory}>Add</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}>Cancel</Button>
             </div>
           </div>
+        )}
+        </div>{/* end hidden lg:block */}
+
+        {/* Shared error for both mobile/desktop */}
+        {touchedFields.has('category') && !category.trim() && (
+          <p className="text-xs text-red-500 mt-1 lg:hidden">Category is required</p>
         )}
       </div>
 

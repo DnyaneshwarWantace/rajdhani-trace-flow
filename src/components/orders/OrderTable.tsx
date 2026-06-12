@@ -44,6 +44,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
   const [batchesByOrder, setBatchesByOrder] = useState<Record<string, any[]>>({});
   const [productionInfoOrder, setProductionInfoOrder] = useState<Order | null>(null);
   const [rawMaterialStatusByOrder, setRawMaterialStatusByOrder] = useState<Record<string, any[]>>({});
+  const [productionStateLoading, setProductionStateLoading] = useState(true);
 
   const getAttachedOrderNumbers = (notes?: string): string[] => {
     if (!notes) return [];
@@ -72,6 +73,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
     let cancelled = false;
     (async () => {
       try {
+        setProductionStateLoading(true);
         const activeOrderIds = orders
           .filter((o) => o.status === 'pending' || o.status === 'accepted')
           .map((o) => o.id);
@@ -122,6 +124,19 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
             });
           progressMap[order.id] = productNeeds;
           allOrderBatchMap[order.id] = [];
+        });
+
+        activeOrderIds.forEach((orderId, index) => {
+          const taskResponse = taskRequests[index] as Awaited<ReturnType<typeof ProductionService.getTasks>> | undefined;
+          const tasks = taskResponse?.data || [];
+          const progressForOrder = progressMap[orderId] || {};
+          tasks
+            .filter((t) => t.status !== 'cancelled')
+            .forEach((t) => {
+              const finalProductId = t.final_product_id;
+              if (!finalProductId || !progressForOrder[finalProductId]) return;
+              progressForOrder[finalProductId].produced += Number(t.planned_quantity || 0);
+            });
         });
 
         allBatches.forEach((batch) => {
@@ -197,6 +212,8 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
           setOrderProductProgress({});
           setBatchesByOrder({});
         }
+      } finally {
+        if (!cancelled) setProductionStateLoading(false);
       }
     })();
 
@@ -280,7 +297,7 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
               const canShowProduceButton =
                 (order.status === 'pending' || order.status === 'accepted') &&
                 !!firstProductItem?.productId &&
-                canProduceMore;
+                (productionStateLoading || canProduceMore);
               const producibleItems = (order.items || []).filter((item) => {
                 if (!(item.productType === 'product' && item.productId)) return false;
                 const itemProgress = orderProductProgress[order.id]?.[item.productId || ''];
@@ -417,12 +434,12 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
                       {canShowProduceButton && (
                         <Button size="sm"
                           onClick={(e) => { if (producibleItems.length > 1) { e.stopPropagation(); setPickProductionOrder(order); return; } handleSendToProduction(e, order, producibleItems[0]); }}
-                          disabled={!!orderResponsibleUsers[order.id]}
+                          disabled={productionStateLoading || !!orderResponsibleUsers[order.id] || producibleItems.length === 0}
                           className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-2"
-                          title={orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
+                          title={productionStateLoading ? 'Checking production assignment' : orderResponsibleUsers[order.id] ? `Handled by ${orderResponsibleUsers[order.id]}` : 'Send to Production'}
                         >
                           <Factory className="w-3 h-3 mr-1" />
-                          {producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
+                          {productionStateLoading ? 'Checking...' : producibleItems.length > 1 ? `Produce (${producibleItems.length})` : producibleItems.length === 0 ? 'Fully Assigned' : 'Produce'}
                         </Button>
                       )}
                       {/* 3. Production info */}
@@ -652,5 +669,3 @@ export default function OrderTable({ orders, onStatusUpdate, onViewDetails, onCr
     </>
   );
 }
-
-

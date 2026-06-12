@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,9 +18,11 @@ interface CustomerFormProps {
   onCustomerCreated: (customer: Customer) => void;
   onCancel: () => void;
   showCard?: boolean;
+  hideActions?: boolean;
+  onSubmitRef?: React.MutableRefObject<(() => void) | null>;
 }
 
-export default function CustomerForm({ onCustomerCreated, onCancel, showCard = true }: CustomerFormProps) {
+export default function CustomerForm({ onCustomerCreated, onCancel, showCard = true, hideActions = false, onSubmitRef }: CustomerFormProps) {
   const { toast } = useToast();
   const [isFetchingGST, setIsFetchingGST] = useState(false);
   const [gstAutoFilled, setGstAutoFilled] = useState(false);
@@ -40,6 +42,11 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
     setEmailError(null);
     onCancel();
   };
+
+  // Expose handleSubmit via ref so parent can trigger it from a footer button
+  useEffect(() => {
+    if (onSubmitRef) onSubmitRef.current = handleSubmit;
+  });
 
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -695,24 +702,26 @@ export default function CustomerForm({ onCustomerCreated, onCancel, showCard = t
           )}
         </div>
 
-        <div className="flex gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={handleCancel} className="flex-1">
-            <X className="w-4 h-4 mr-2" />
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={Boolean(
-              !newCustomer.name.trim() ||
-              !newCustomer.phone.trim() ||
-              newCustomer.phone.trim() === '+91' ||
-              (newCustomer.phone.trim() && !isValidPhoneNumber(newCustomer.phone))
-            )}
-            className="flex-1"
-          >
-            <Save className="w-4 h-4 mr-2" />Save &amp; Continue
-          </Button>
-        </div>
+        {!hideActions && (
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleCancel} className="flex-1">
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={Boolean(
+                !newCustomer.name.trim() ||
+                !newCustomer.phone.trim() ||
+                newCustomer.phone.trim() === '+91' ||
+                (newCustomer.phone.trim() && !isValidPhoneNumber(newCustomer.phone))
+              )}
+              className="flex-1"
+            >
+              <Save className="w-4 h-4 mr-2" />Save &amp; Continue
+            </Button>
+          </div>
+        )}
     </div>
   );
 

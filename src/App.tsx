@@ -28,6 +28,7 @@ import CustomerList from '@/pages/customers/CustomerList';
 import CustomerDetail from '@/pages/customers/CustomerDetail';
 import SupplierList from '@/pages/suppliers/SupplierList';
 import SupplierDetail from '@/pages/suppliers/SupplierDetail';
+import MorePage from '@/pages/more/MorePage';
 import ProductionList from '@/pages/production/ProductionList';
 import ProductionDetail from '@/pages/production/ProductionDetail';
 import ProductionCreate from '@/pages/production/ProductionCreate';
@@ -510,6 +511,7 @@ function AppRoutes() {
             </PrivateRoute>
           }
         />
+        <Route path="/more" element={<PrivateRoute><MorePage /></PrivateRoute>} />
         <Route path="/" element={<HomeRedirect />} />
         {/* Catch-all route for 404 */}
         <Route path="*" element={<NotFound />} />
@@ -520,7 +522,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/v2">
       <AuthProvider>
         <NotificationProvider>
           <AppRoutes />

@@ -4,6 +4,7 @@ import { formatCurrency, formatIndianNumberWithDecimals } from '@/utils/formatHe
 import { ShoppingCart, Edit, Droplets } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ImageViewDialog from '@/components/ui/ImageViewDialog';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +34,7 @@ export default function MaterialCard({
   onClick,
 }: MaterialCardProps) {
   const [imageViewOpen, setImageViewOpen] = useState(false);
+  const { colorCodeMap } = useDropdownVisualMaps();
   
   // Calculate available stock for raw materials
   // For raw materials in recipe selector, always show available stock (not total current_stock)
@@ -57,6 +59,7 @@ export default function MaterialCard({
   };
   
   const availableStock = getAvailableStock();
+  const inProduction = material.in_production ?? 0;
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -130,6 +133,11 @@ export default function MaterialCard({
       )}
 
       <div className="p-3">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[9px] font-mono text-gray-400">
+            #{String(material.id || material._id || '').substring(0, 8)}
+          </span>
+        </div>
         <TooltipProvider delayDuration={300}>
         {/* Header Section */}
         <div className="mb-2">
@@ -166,6 +174,14 @@ export default function MaterialCard({
               {formatIndianNumberWithDecimals(Number(availableStock), 2)} {material.unit}
             </span>
           </div>
+          {inProduction > 0 && (
+            <div className="flex justify-between gap-2 text-amber-600">
+              <span className="flex-shrink-0">In Production:</span>
+              <span className="font-medium truncate">
+                {formatIndianNumberWithDecimals(Number(inProduction), 2)} {material.unit}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between items-start gap-2 min-w-0">
             <span className="text-gray-600 flex-shrink-0">Category:</span>
             <Tooltip>
@@ -186,7 +202,12 @@ export default function MaterialCard({
           {material.color && material.color.trim() !== '' && material.color !== 'N/A' && (
             <div className="flex justify-between items-start gap-2 min-w-0">
               <span className="text-gray-600 flex-shrink-0">Color:</span>
-              <span className="text-gray-900 min-w-0 flex-1 text-right break-words line-clamp-1">{material.color}</span>
+              <span className="font-medium text-gray-900 truncate min-w-0 flex items-center gap-1 justify-end" title={material.color}>
+                {colorCodeMap[material.color.toLowerCase()] && (
+                  <span className="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[material.color.toLowerCase()] }} />
+                )}
+                {material.color}
+              </span>
             </div>
           )}
           {material.supplier_name && (

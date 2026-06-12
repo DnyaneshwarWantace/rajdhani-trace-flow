@@ -2,13 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Plus, ShoppingCart, List, Grid3x3, Loader2 } from 'lucide-react';
+import { Plus, ShoppingCart, List, Grid3x3, Loader2, SlidersHorizontal, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { OrderService, type Order } from '@/services/orderService';
 import OrderTable from '@/components/orders/OrderTable';
 import OrderCard from '@/components/orders/OrderCard';
 import OrderFilters from '@/components/orders/OrderFilters';
 import OrderStatsBoxes from '@/components/orders/OrderStatsBoxes';
+import MobileOrderCard from '@/components/orders/MobileOrderCard';
+import MobileOrderFilters from '@/components/orders/MobileOrderFilters';
 import Pagination from '@/components/ui/pagination';
 import { canView, canCreate } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
@@ -48,6 +50,7 @@ export default function OrderList() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState<false | 'sort' | 'filter'>(false);
   const [filters, setFilters] = useState({
     search: '',
     status: [] as string[],
@@ -259,21 +262,20 @@ export default function OrderList() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Page Header */}
+      {/* ─── DESKTOP layout ─────────────────────────────────────────────── */}
+      <div className="hidden lg:block space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Orders</h1>
             <p className="text-gray-600 mt-1">Manage customer orders and track fulfillment</p>
           </div>
           <div className="flex items-center gap-3">
-            {/* View Mode Toggle - same icons as Customers/Suppliers/Materials (List = table, Grid3x3 = grid) */}
             <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-1">
               <Button
                 variant={viewMode === 'table' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('table')}
-                className={`hidden lg:inline-flex ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
+                className={viewMode === 'table' ? 'bg-primary-600 text-white' : ''}
                 title="Table View"
               >
                 <List className="w-4 h-4" />
@@ -288,8 +290,6 @@ export default function OrderList() {
                 <Grid3x3 className="w-4 h-4" />
               </Button>
             </div>
-
-            {/* New Order Button */}
             {canCreate('orders') && (
               <Button onClick={() => navigate('/orders/new')} className="bg-primary-600 hover:bg-primary-700 text-white">
                 <Plus className="w-4 h-4 mr-2" />
@@ -299,7 +299,6 @@ export default function OrderList() {
           </div>
         </div>
 
-        {/* Draft resume banner */}
         {draft && (
           <div className="flex items-center justify-between gap-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
             <div className="flex items-center gap-3">
@@ -315,39 +314,24 @@ export default function OrderList() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={discard}
-                className="text-xs text-amber-600 hover:text-amber-800 font-medium px-3 py-1.5 rounded-md hover:bg-amber-100 transition-colors"
-              >
-                Discard
-              </button>
-              <Button
-                onClick={() => navigate('/orders/new')}
-                className="h-8 px-4 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                Resume draft →
-              </Button>
+              <button onClick={discard} className="text-xs text-amber-600 hover:text-amber-800 font-medium px-3 py-1.5 rounded-md hover:bg-amber-100 transition-colors">Discard</button>
+              <Button onClick={() => navigate('/orders/new')} className="h-8 px-4 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white">Resume draft →</Button>
             </div>
           </div>
         )}
 
-        {/* Stats Boxes */}
         <OrderStatsBoxes stats={stats} loading={statsLoading} />
 
-        {/* Filters */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <OrderFilters
             filters={filters}
             onSearchChange={(value) => handleFilterChange('search', value)}
             onStatusChange={(values) => handleFilterChange('status', values)}
             onCustomerChange={(values) => handleFilterChange('customer_id', values)}
-            onSortChange={(sortBy, sortOrder) => {
-              setFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }));
-            }}
+            onSortChange={(sortBy, sortOrder) => setFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }))}
           />
         </div>
 
-        {/* Orders List */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
@@ -362,67 +346,188 @@ export default function OrderList() {
                 : 'Get started by creating your first order'}
             </p>
             {(!filters.search && filters.status.length === 0 && filters.customer_id.length === 0) && (
-              <Button onClick={() => navigate('/orders/new')}>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Order
-              </Button>
+              <Button onClick={() => navigate('/orders/new')}><Plus className="w-4 h-4 mr-2" />Create Order</Button>
             )}
           </div>
         ) : (
           <>
-            {/* Desktop View - Table or Grid */}
-            <div className="hidden lg:block">
-              {viewMode === 'table' ? (
-                <OrderTable
-                  orders={orders}
-                  onStatusUpdate={handleStatusUpdate}
-                  onViewDetails={handleViewDetails}
-                  onCreateMaterialTask={handleCreateMaterialTask}
-                  onCancel={setCancelTarget}
-                />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
-                  {orders.map((order) => (
-                    <div key={order.id}>
-                      <OrderCard
-                        order={order}
-                        onStatusUpdate={handleStatusUpdate}
-                        onViewDetails={handleViewDetails}
-                        onCreateMaterialTask={handleCreateMaterialTask}
-                        onCancel={setCancelTarget}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Mobile View - Always Grid */}
-            <div className="lg:hidden">
-              <div className="grid grid-cols-1 gap-4">
+            {viewMode === 'table' ? (
+              <OrderTable orders={orders} onStatusUpdate={handleStatusUpdate} onViewDetails={handleViewDetails} onCreateMaterialTask={handleCreateMaterialTask} onCancel={setCancelTarget} />
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                 {orders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onStatusUpdate={handleStatusUpdate}
-                    onViewDetails={handleViewDetails}
-                    onCreateMaterialTask={handleCreateMaterialTask}
-                  />
+                  <OrderCard key={order.id} order={order} onStatusUpdate={handleStatusUpdate} onViewDetails={handleViewDetails} onCreateMaterialTask={handleCreateMaterialTask} onCancel={setCancelTarget} />
                 ))}
               </div>
-            </div>
-
-            {/* Pagination */}
+            )}
             {totalOrders > filters.limit && (
-              <Pagination
-                currentPage={filters.page}
-                totalPages={Math.ceil(totalOrders / filters.limit)}
-                onPageChange={handlePageChange}
-              />
+              <Pagination currentPage={filters.page} totalPages={Math.ceil(totalOrders / filters.limit)} onPageChange={handlePageChange} />
             )}
           </>
         )}
       </div>
+
+      {/* ─── MOBILE layout ──────────────────────────────────────────────── */}
+      <div className="lg:hidden -m-2 sm:-m-3 flex flex-col min-h-screen bg-gray-50">
+
+        {/* White header block — matches app */}
+        <div className="bg-white border-b border-gray-200 px-4 pt-3 pb-3">
+          {/* Title row */}
+          <div className="flex items-center justify-between mb-0.5">
+            <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+            {canCreate('orders') && (
+              <button
+                onClick={() => navigate('/orders/new')}
+                className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center"
+              >
+                <Plus className="w-5 h-5 text-white" />
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 mb-2">{totalOrders} orders</p>
+
+          {/* Stats strip — single bordered row like the app */}
+          <div className="flex border border-gray-200 rounded-xl overflow-hidden">
+            {[
+              { label: 'Total',     value: stats.total,     color: 'text-gray-900' },
+              { label: 'Pending',   value: stats.pending,   color: 'text-yellow-500' },
+              { label: 'Accepted',  value: stats.accepted,  color: 'text-blue-600' },
+              { label: 'Shipped',   value: stats.dispatched,color: 'text-purple-600' },
+              { label: 'Delivered', value: stats.delivered, color: 'text-green-600' },
+            ].map((s, i) => (
+              <button
+                key={s.label}
+                onClick={() => handleFilterChange('status', s.label === 'Total' ? [] : [s.label === 'Shipped' ? 'dispatched' : s.label.toLowerCase()])}
+                className={`flex-1 flex flex-col items-center py-1.5 ${i > 0 ? 'border-l border-gray-200' : ''}`}
+              >
+                <span className={`text-sm font-extrabold tracking-tight ${s.color}`}>{statsLoading ? '…' : s.value}</span>
+                <span className="text-[9px] text-gray-400 font-medium mt-0.5">{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="px-4 pt-2 pb-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={filters.search}
+              onChange={e => handleFilterChange('search', e.target.value)}
+              placeholder="Search order # or customer…"
+              className="w-full pl-9 pr-4 h-[46px] rounded-[10px] border border-gray-200 bg-white text-[15px] outline-none focus:border-blue-400 shadow-sm"
+            />
+          </div>
+        </div>
+
+        {/* Active filter chips */}
+        {filters.status.length > 0 && (
+          <div className="flex gap-2 flex-wrap px-4 pb-1">
+            {filters.status.map(s => (
+              <button
+                key={s}
+                onClick={() => handleFilterChange('status', filters.status.filter(v => v !== s))}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold"
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+                <span className="ml-0.5">×</span>
+              </button>
+            ))}
+            <button
+              onClick={() => handleFilterChange('status', [])}
+              className="px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-500 text-xs font-semibold"
+            >Clear</button>
+          </div>
+        )}
+
+        {/* Draft banner */}
+        {draft && (
+          <div className="mx-4 mt-1 flex items-center justify-between gap-3 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-xs text-amber-800 font-medium">
+              Draft: {draft.customerName || 'Unnamed'} · {draft.itemCount || 0} items
+            </p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={discard} className="text-xs text-amber-600 font-medium">Discard</button>
+              <button onClick={() => navigate('/orders/new')} className="text-xs text-white font-semibold bg-amber-600 px-2.5 py-1 rounded-lg">Resume</button>
+            </div>
+          </div>
+        )}
+
+        {/* Orders list */}
+        <div className="flex-1 px-4 pt-1 pb-32">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="text-5xl mb-3">🛒</div>
+              <p className="text-base font-bold text-gray-900 mb-1">No orders found</p>
+              <p className="text-sm text-gray-400">Try different filters or create a new order</p>
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              {orders.map(order => (
+                <MobileOrderCard
+                  key={order.id}
+                  order={order}
+                  onStatusUpdate={handleStatusUpdate}
+                  onCreateMaterialTask={handleCreateMaterialTask}
+                  onCancel={setCancelTarget}
+                />
+              ))}
+              {totalOrders > filters.limit && (
+                <Pagination currentPage={filters.page} totalPages={Math.ceil(totalOrders / filters.limit)} onPageChange={handlePageChange} />
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* FAB — New Order */}
+        {canCreate('orders') && (
+          <button
+            onClick={() => navigate('/orders/new')}
+            className="fixed right-4 bottom-20 w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg z-30"
+            style={{ boxShadow: '0 4px 16px rgba(37,99,235,0.4)' }}
+          >
+            <Plus className="w-6 h-6 text-white" />
+          </button>
+        )}
+
+        {/* Bottom SORT / FILTER bar — fixed, like the app */}
+        <div className="fixed bottom-16 left-0 right-0 flex bg-white border-t border-gray-200 z-20 lg:hidden">
+          <button
+            onClick={() => setMobileFiltersOpen('sort')}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 border-r border-gray-200"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-gray-700" />
+            <span className="text-sm font-semibold text-gray-900 tracking-wide">SORT</span>
+          </button>
+          <button
+            onClick={() => setMobileFiltersOpen('filter')}
+            className="flex-1 flex items-center justify-center gap-2 py-3.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke={filters.status.length > 0 ? '#2563EB' : 'currentColor'} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            <span className={`text-sm font-semibold tracking-wide ${filters.status.length > 0 ? 'text-blue-600' : 'text-gray-900'}`}>
+              FILTER{filters.status.length > 0 ? ` (${filters.status.length})` : ''}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <MobileOrderFilters
+        isOpen={!!mobileFiltersOpen}
+        mode={mobileFiltersOpen === 'sort' ? 'sort' : 'filter'}
+        onClose={() => setMobileFiltersOpen(false)}
+        filters={filters}
+        onStatusChange={vals => handleFilterChange('status', vals)}
+        onCustomerChange={vals => handleFilterChange('customer_id', vals)}
+        onSortChange={(sortBy, sortOrder) => setFilters(prev => ({ ...prev, sortBy, sortOrder, page: 1 }))}
+        onReset={() => setFilters(prev => ({ ...prev, status: [], customer_id: [], page: 1 }))}
+      />
 
       <ConfirmDialog
         isOpen={!!cancelTarget}

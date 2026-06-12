@@ -7,9 +7,10 @@ interface ImageUploadSectionProps {
   imagePreview: string;
   onImageUpload: (file: File) => void;
   onImageRemove: () => void;
+  mobileCompact?: boolean;
 }
 
-export default function ImageUploadSection({ imagePreview, onImageUpload, onImageRemove }: ImageUploadSectionProps) {
+export default function ImageUploadSection({ imagePreview, onImageUpload, onImageRemove, mobileCompact }: ImageUploadSectionProps) {
   const [isImageViewOpen, setIsImageViewOpen] = useState(false);
   const { toast } = useToast();
 
@@ -51,6 +52,37 @@ export default function ImageUploadSection({ imagePreview, onImageUpload, onImag
       onImageUpload(file);
     }
   };
+
+  // Mobile compact: full-width tap-to-add-photo area
+  if (mobileCompact) {
+    return (
+      <>
+        <div
+          className="relative w-full h-40 flex flex-col items-center justify-center cursor-pointer"
+          onClick={() => document.getElementById('product-image-mobile')?.click()}
+        >
+          {imagePreview ? (
+            <>
+              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onImageRemove(); }}
+                className="absolute top-2 right-2 w-7 h-7 bg-black/50 text-white rounded-full flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-5xl mb-2">🖼️</span>
+              <p className="text-sm text-gray-400">tap to add photo</p>
+            </>
+          )}
+          <input id="product-image-mobile" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

@@ -808,7 +808,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             <div>
         {/* Page Header - only show Export, Add to Inventory, Grid/Table on Inventory tab */}
         <MaterialHeader
-          title={pageTitle}
+          title={pageTitle || 'Materials'}
           subtitle={pageSubtitle}
           onImportCSV={activeTab === 'inventory' && canCreate('materials') ? handleImportCSV : undefined}
           onExport={activeTab === 'inventory' ? handleExport : undefined}
@@ -817,6 +817,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           onAddMaterial={canCreate('materials') ? handleCreate : undefined}
           viewMode={viewMode}
           onViewModeChange={activeTab === 'inventory' ? setViewMode : undefined}
+          mobileSubtitle={materialStats.totalMaterials > 0 ? `${materialStats.totalMaterials.toLocaleString()} raw materials` : undefined}
         />
 
         {/* Stats Boxes – when categoryFilter (e.g. Ink), stats are for that category only */}
@@ -851,19 +852,21 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           </div>
         ) : null)}
 
-        {/* Filters - Only show on inventory tab (or always when Ink Management) */}
+        {/* Filters - Desktop only; mobile filters are built into MaterialInventoryTab */}
         {(activeTab === 'inventory' || categoryFilter) && (
-          <MaterialFilters
-            filters={filters}
-            onSearchChange={handleSearch}
-            onCategoryChange={categoryFilter ? undefined : handleCategoryFilter}
-            onStatusChange={handleStatusFilter}
-            onTypeChange={handleTypeFilter}
-            onColorChange={handleColorFilter}
-            onSupplierChange={handleSupplierFilter}
-            onSortChange={handleSortChange}
-            excludeCategories={categoryFilter ? undefined : ['Ink']}
-          />
+          <div className="hidden lg:block">
+            <MaterialFilters
+              filters={filters}
+              onSearchChange={handleSearch}
+              onCategoryChange={categoryFilter ? undefined : handleCategoryFilter}
+              onStatusChange={handleStatusFilter}
+              onTypeChange={handleTypeFilter}
+              onColorChange={handleColorFilter}
+              onSupplierChange={handleSupplierFilter}
+              onSortChange={handleSortChange}
+              excludeCategories={categoryFilter ? undefined : ['Ink']}
+            />
+          </div>
         )}
 
         {/* Inventory Tab Content */}
@@ -878,6 +881,10 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onSearchChange={handleSearch}
             onCategoryChange={handleCategoryFilter}
             onStatusChange={handleStatusFilter}
+            onTypeChange={handleTypeFilter}
+            onColorChange={handleColorFilter}
+            onSupplierChange={handleSupplierFilter}
+            onSortChange={handleSortChange}
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}
@@ -885,6 +892,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onEdit={handleEdit}
             onOrder={handleOrder}
             onRecordUsage={handleRecordUsage}
+            excludeCategories={categoryFilter ? undefined : ['Ink']}
           />
         )}
 
@@ -1017,202 +1025,189 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         />
       )}
 
-      {/* Restock Dialog */}
+      {/* Restock Dialog — mobile full-screen bottom sheet, desktop centered modal */}
       {isRestockDialogOpen && selectedRestockMaterial && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50" onClick={() => setIsRestockDialogOpen(false)}>
+          <div className="absolute inset-0" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} />
+
+          {/* Mobile: bottom sheet */}
+          <div
+            className="lg:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl flex flex-col"
+            style={{ maxHeight: '92vh' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle */}
+            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mt-3 mb-1 flex-shrink-0" />
+
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                  <Package className="w-5 h-5" />
-                  Restock{' '}
-                  <TruncatedText text={selectedRestockMaterial.name} maxLength={40} as="span" />
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Stock will be updated immediately</p>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                {selectedRestockMaterial.image_url && (
+                  <img src={selectedRestockMaterial.image_url} alt="" className="w-10 h-10 rounded-xl object-cover border border-gray-100 flex-shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">{selectedRestockMaterial.name}</p>
+                  <p className="text-xs text-gray-400">Stock: <span className="font-semibold text-gray-600">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>{selectedRestockMaterial.cost_per_unit > 0 && <span className="ml-2">· ₹{selectedRestockMaterial.cost_per_unit}/{selectedRestockMaterial.unit}</span>}</p>
+                </div>
               </div>
-              <button
-                onClick={() => setIsRestockDialogOpen(false)}
-                type="button"
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={() => setIsRestockDialogOpen(false)} className="p-1.5 text-gray-400 flex-shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
-              {/* Material Info */}
-              <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex items-center gap-3">
-                {selectedRestockMaterial.image_url && (
-                  <img
-                    src={selectedRestockMaterial.image_url}
-                    alt={selectedRestockMaterial.name}
-                    className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0"
-                  />
-                )}
-                <div>
-                  <div className="font-medium text-gray-900">
-                    <TruncatedText text={selectedRestockMaterial.name} maxLength={50} as="span" />
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    Current stock: <span className="font-medium text-gray-700">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>
-                    {selectedRestockMaterial.cost_per_unit != null && selectedRestockMaterial.cost_per_unit > 0 && (
-                      <span className="ml-3">Last price: <span className="font-medium text-gray-700">₹{selectedRestockMaterial.cost_per_unit}</span></span>
-                    )}
-                  </div>
-                  <ProductAttributePreview
-                    color={selectedRestockMaterial.color}
-                    showPattern={false}
-                    compact
-                    className="mt-1.5"
-                  />
-                </div>
-              </div>
-
+            {/* Scrollable form */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
               {/* Supplier */}
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1 block">
-                  Supplier
-                  {selectedRestockMaterial.supplier_name && (
-                    <span className="text-xs text-gray-400 font-normal ml-1">(auto-selected, change if needed)</span>
-                  )}
-                </Label>
-                <Select
-                  value={restockForm.supplier}
-                  onValueChange={(val) => setRestockForm({ ...restockForm, supplier: val })}
-                >
-                  <SelectTrigger className="bg-white">
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Supplier</p>
+                <Select value={restockForm.supplier} onValueChange={(val) => setRestockForm({ ...restockForm, supplier: val })}>
+                  <SelectTrigger className="bg-white h-11 rounded-xl border-gray-200">
                     <SelectValue placeholder="Select supplier" />
                   </SelectTrigger>
                   <SelectContent className="bg-white max-h-[260px]">
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.name} className="hover:bg-gray-100">
-                        {s.name}
-                      </SelectItem>
-                    ))}
+                    {suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
-              {/* Quantity + Price */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Qty + Price row */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="restockQuantity" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Quantity *
-                  </Label>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">Quantity ({selectedRestockMaterial.unit}) *</p>
                   <Input
-                    id="restockQuantity"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                    type="number" min="0.01" step="0.01"
                     value={restockForm.quantity}
                     onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/[^0-9.]/g, '');
-                      setRestockForm({ ...restockForm, quantity: v });
-                    }}
-                    onBlur={(e) => {
-                      if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
-                        setRestockForm({ ...restockForm, quantity: '' });
-                    }}
-                    placeholder={`Min 0.01 ${selectedRestockMaterial.unit}`}
-                    required
+                    onChange={(e) => setRestockForm({ ...restockForm, quantity: e.target.value.replace(/[^0-9.]/g, '') })}
+                    placeholder="0.00"
+                    className="h-11 rounded-xl border-gray-200"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Unit: {selectedRestockMaterial.unit}</p>
                 </div>
                 <div>
-                  <Label htmlFor="restockCostPerUnit" className="text-sm font-medium text-gray-700 mb-1 block">
-                    Price per {selectedRestockMaterial.unit} (₹) *
-                  </Label>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">Price / {selectedRestockMaterial.unit} (₹) *</p>
                   <Input
-                    id="restockCostPerUnit"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
+                    type="number" min="0.01" step="0.01"
                     value={restockForm.costPerUnit}
                     onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/[^0-9.]/g, '');
-                      setRestockForm({ ...restockForm, costPerUnit: v });
-                    }}
-                    onBlur={(e) => {
-                      if (isNaN(parseFloat(e.target.value)) || parseFloat(e.target.value) <= 0)
-                        setRestockForm({ ...restockForm, costPerUnit: '' });
-                    }}
-                    placeholder="Enter price"
-                    required
+                    onChange={(e) => setRestockForm({ ...restockForm, costPerUnit: e.target.value.replace(/[^0-9.]/g, '') })}
+                    placeholder="0.00"
+                    className="h-11 rounded-xl border-gray-200"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Becomes new current price</p>
                 </div>
               </div>
 
-              {/* Invoice Number */}
+              {/* Invoice */}
               <div>
-                <Label htmlFor="restockInvoice" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Invoice Number *
-                </Label>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Invoice Number *</p>
                 <Input
-                  id="restockInvoice"
                   value={restockForm.invoiceNumber}
                   onChange={(e) => setRestockForm({ ...restockForm, invoiceNumber: e.target.value.replace(/[^a-zA-Z0-9\-\/]/g, '') })}
-                  placeholder="Enter invoice / bill number"
-                  required
+                  placeholder="e.g. INV-2026-001"
+                  className="h-11 rounded-xl border-gray-200"
                 />
               </div>
 
               {/* Notes */}
               <div>
-                <Label htmlFor="restockNotes" className="text-sm font-medium text-gray-700 mb-1 block">
-                  Notes <span className="text-gray-400 font-normal">(optional)</span>
-                </Label>
+                <p className="text-xs font-semibold text-gray-500 mb-1.5">Notes <span className="text-gray-300 font-normal">(optional)</span></p>
                 <Textarea
-                  id="restockNotes"
                   value={restockForm.notes}
                   onChange={(e) => setRestockForm({ ...restockForm, notes: e.target.value })}
-                  placeholder="Any additional notes"
+                  placeholder="Any additional notes…"
                   rows={2}
-                  className="resize-none"
+                  className="resize-none rounded-xl border-gray-200"
                 />
               </div>
 
-              {/* Total Cost */}
+              {/* Total cost preview */}
               {restockForm.quantity && restockForm.costPerUnit &&
                 parseFloat(restockForm.quantity) > 0 && parseFloat(restockForm.costPerUnit) > 0 && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="text-sm font-semibold text-green-900">
-                    Total: ₹{(parseFloat(restockForm.quantity) * parseFloat(restockForm.costPerUnit)).toFixed(2)}
-                  </div>
-                  <div className="text-xs text-green-700 mt-0.5">
-                    {restockForm.quantity} {selectedRestockMaterial.unit} × ₹{restockForm.costPerUnit}
-                  </div>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl">
+                  <p className="text-sm font-bold text-green-900">Total: ₹{(parseFloat(restockForm.quantity) * parseFloat(restockForm.costPerUnit)).toFixed(2)}</p>
+                  <p className="text-xs text-green-700 mt-0.5">{restockForm.quantity} {selectedRestockMaterial.unit} × ₹{restockForm.costPerUnit}</p>
                 </div>
               )}
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0">
-              <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)} disabled={submitting}>
+            {/* Sticky footer */}
+            <div className="px-4 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+              <button onClick={() => setIsRestockDialogOpen(false)} className="flex-1 h-12 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700">
                 Cancel
-              </Button>
-              <Button
-                onClick={(e) => { e.preventDefault(); handleRestockSubmit(e); }}
-                className="bg-primary-600 hover:bg-primary-700 text-white"
-                disabled={
-                  submitting ||
-                  !restockForm.quantity ||
-                  !restockForm.costPerUnit ||
-                  !restockForm.invoiceNumber ||
-                  parseFloat(restockForm.quantity || '0') <= 0 ||
-                  parseFloat(restockForm.costPerUnit || '0') <= 0
-                }
+              </button>
+              <button
+                onClick={(e) => { e.preventDefault(); handleRestockSubmit(e as any); }}
+                disabled={submitting || !restockForm.quantity || !restockForm.costPerUnit || !restockForm.invoiceNumber || parseFloat(restockForm.quantity || '0') <= 0 || parseFloat(restockForm.costPerUnit || '0') <= 0}
+                className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{ backgroundColor: '#2563eb' }}
               >
-                {submitting ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Restocking...</>
-                ) : (
-                  'Restock Now'
+                {submitting ? <><Loader2 className="w-4 h-4 animate-spin" />Restocking…</> : 'Restock Now'}
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: centered modal */}
+          <div
+            className="hidden lg:flex absolute inset-0 items-center justify-center p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-xl">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Restock <TruncatedText text={selectedRestockMaterial.name} maxLength={40} as="span" />
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">Stock will be updated immediately</p>
+                </div>
+                <button onClick={() => setIsRestockDialogOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-5 min-h-0">
+                <div className="p-3 border border-gray-200 rounded-lg bg-gray-50 flex items-center gap-3">
+                  {selectedRestockMaterial.image_url && <img src={selectedRestockMaterial.image_url} alt={selectedRestockMaterial.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200 flex-shrink-0" />}
+                  <div>
+                    <div className="font-medium text-gray-900"><TruncatedText text={selectedRestockMaterial.name} maxLength={50} as="span" /></div>
+                    <div className="text-sm text-gray-500">Current stock: <span className="font-medium text-gray-700">{selectedRestockMaterial.current_stock} {selectedRestockMaterial.unit}</span>{selectedRestockMaterial.cost_per_unit > 0 && <span className="ml-3">Last price: <span className="font-medium text-gray-700">₹{selectedRestockMaterial.cost_per_unit}</span></span>}</div>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Supplier</Label>
+                  <Select value={restockForm.supplier} onValueChange={(val) => setRestockForm({ ...restockForm, supplier: val })}>
+                    <SelectTrigger className="bg-white"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectContent className="bg-white max-h-[260px]">{suppliers.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="restockQuantityD" className="text-sm font-medium text-gray-700 mb-1 block">Quantity *</Label>
+                    <Input id="restockQuantityD" type="number" min="0.01" step="0.01" value={restockForm.quantity} onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()} onChange={(e) => setRestockForm({ ...restockForm, quantity: e.target.value.replace(/[^0-9.]/g, '') })} placeholder={`Min 0.01 ${selectedRestockMaterial.unit}`} />
+                    <p className="text-xs text-gray-500 mt-1">Unit: {selectedRestockMaterial.unit}</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="restockCostD" className="text-sm font-medium text-gray-700 mb-1 block">Price per {selectedRestockMaterial.unit} (₹) *</Label>
+                    <Input id="restockCostD" type="number" min="0.01" step="0.01" value={restockForm.costPerUnit} onKeyDown={(e) => ['-', '+', 'e', 'E'].includes(e.key) && e.preventDefault()} onChange={(e) => setRestockForm({ ...restockForm, costPerUnit: e.target.value.replace(/[^0-9.]/g, '') })} placeholder="Enter price" />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="restockInvoiceD" className="text-sm font-medium text-gray-700 mb-1 block">Invoice Number *</Label>
+                  <Input id="restockInvoiceD" value={restockForm.invoiceNumber} onChange={(e) => setRestockForm({ ...restockForm, invoiceNumber: e.target.value.replace(/[^a-zA-Z0-9\-\/]/g, '') })} placeholder="Enter invoice / bill number" />
+                </div>
+                <div>
+                  <Label htmlFor="restockNotesD" className="text-sm font-medium text-gray-700 mb-1 block">Notes <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Textarea id="restockNotesD" value={restockForm.notes} onChange={(e) => setRestockForm({ ...restockForm, notes: e.target.value })} placeholder="Any additional notes" rows={2} className="resize-none" />
+                </div>
+                {restockForm.quantity && restockForm.costPerUnit && parseFloat(restockForm.quantity) > 0 && parseFloat(restockForm.costPerUnit) > 0 && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-sm font-semibold text-green-900">Total: ₹{(parseFloat(restockForm.quantity) * parseFloat(restockForm.costPerUnit)).toFixed(2)}</div>
+                    <div className="text-xs text-green-700 mt-0.5">{restockForm.quantity} {selectedRestockMaterial.unit} × ₹{restockForm.costPerUnit}</div>
+                  </div>
                 )}
-              </Button>
+              </div>
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0">
+                <Button variant="outline" onClick={() => setIsRestockDialogOpen(false)} disabled={submitting}>Cancel</Button>
+                <Button onClick={(e) => { e.preventDefault(); handleRestockSubmit(e); }} className="bg-primary-600 hover:bg-primary-700 text-white" disabled={submitting || !restockForm.quantity || !restockForm.costPerUnit || !restockForm.invoiceNumber || parseFloat(restockForm.quantity || '0') <= 0 || parseFloat(restockForm.costPerUnit || '0') <= 0}>
+                  {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Restocking...</> : 'Restock Now'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

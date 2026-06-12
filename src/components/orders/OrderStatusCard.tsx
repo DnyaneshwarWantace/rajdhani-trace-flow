@@ -39,7 +39,7 @@ export function OrderStatusCard({ orderNumber, customerName, status, workflowSte
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold">#{orderNumber}</h2>
+            <h2 className="text-lg font-bold">#{orderNumber}</h2>
             <p className="text-muted-foreground mt-1">{customerName}</p>
           </div>
           <div className="text-right">

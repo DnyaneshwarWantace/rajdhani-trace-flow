@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, AlertTriangle, Loader2, ArrowRight, User } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2, ArrowRight, User, Search, ChevronRight, X, Package, RefreshCw, Calendar, Clock, ShoppingCart, Lock, ChevronLeft } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ProductionService, type CreateProductionBatchData, type ProductionBatch } from '@/services/productionService';
 import { useToast } from '@/hooks/use-toast';
+import { formatIndianDate } from '@/utils/formatHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Product } from '@/types/product';
 import ProductionCreateHeader from '@/components/production/create/ProductionCreateHeader';
@@ -17,6 +18,7 @@ import BatchDetailsForm from '@/components/production/create/BatchDetailsForm';
 import { ProductService } from '@/services/productService';
 import { OrderService, type Order } from '@/services/orderService';
 import { RecipeService } from '@/services/recipeService';
+import MobileProductionCreate from '@/components/production/mobile/MobileProductionCreate';
 
 export default function ProductionCreate() {
   const navigate = useNavigate();
@@ -43,6 +45,8 @@ export default function ProductionCreate() {
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [quantityAutoReason, setQuantityAutoReason] = useState<string>('');
   const [minimumRequiredQuantity, setMinimumRequiredQuantity] = useState<number>(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [orderPickerOpen, setOrderPickerOpen] = useState(false);
   const [formData, setFormData] = useState<CreateProductionBatchData>({
     product_id: '',
     planned_quantity: 0,
@@ -534,7 +538,7 @@ export default function ProductionCreate() {
           await ProductionService.updateTaskStatus(state.taskId, 'planning');
         }
         toast({ title: 'Success', description: 'Production batch created successfully' });
-        navigate(`/production/planning?batchId=${data.id}`);
+        navigate(`/production/planning?batchId=${data.id}`, { replace: true });
       }
     } catch (error) {
       console.error('Error creating batch:', error);
@@ -547,214 +551,220 @@ export default function ProductionCreate() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        <ProductionCreateHeader onBack={handleBack} />
+        {/* ─── DESKTOP VIEW ─── */}
+        <div className="hidden lg:block">
+          <ProductionCreateHeader onBack={handleBack} />
 
-        <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left Column - Product Selection */}
-              <div className="space-y-4">
-                <ProductSearchSection
-                  onSelect={handleProductSelect}
-                  selectedProductId={selectedProduct?.id || null}
-                />
+          <div className="px-2 sm:px-3 lg:px-4 py-6 space-y-6">
+            <form onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column - Product Selection */}
+                <div className="space-y-4">
+                  <ProductSearchSection
+                    onSelect={handleProductSelect}
+                    selectedProductId={selectedProduct?.id || null}
+                  />
 
-                {selectedProduct && (
-                  <SelectedProductCard product={selectedProduct} onClear={handleProductClear} />
-                )}
+                  {selectedProduct && (
+                    <SelectedProductCard product={selectedProduct} onClear={handleProductClear} />
+                  )}
 
-              </div>
+                </div>
 
-              {/* Right Column - Batch Details */}
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Batch Details</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <BatchDetailsForm
-                      formData={formData}
-                      onChange={handleFormChange}
-                      selectedProduct={selectedProduct}
-                      orderDeliveryDate={selectedOrderDeliveryDate}
-                      orderOptions={orderOptions}
-                      selectedOrderIds={selectedOrderIds}
-                      onToggleOrder={toggleOrderSelection}
-                      lockedOrderId={lockedOrderId}
-                      ordersLoading={loadingAllPendingOrders || filteringOrderOptions}
-                    />
-                    {quantityAutoReason && (
-                      <p className={`mt-2 text-xs ${minimumRequiredQuantity > 0 && Number(formData.planned_quantity) < minimumRequiredQuantity ? 'text-red-700' : 'text-blue-700'}`}>
-                        {quantityAutoReason}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* Right Column - Batch Details */}
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Batch Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <BatchDetailsForm
+                        formData={formData}
+                        onChange={handleFormChange}
+                        selectedProduct={selectedProduct}
+                        orderDeliveryDate={selectedOrderDeliveryDate}
+                        orderOptions={orderOptions}
+                        selectedOrderIds={selectedOrderIds}
+                        onToggleOrder={toggleOrderSelection}
+                        lockedOrderId={lockedOrderId}
+                        ordersLoading={loadingAllPendingOrders || filteringOrderOptions}
+                      />
+                      {quantityAutoReason && (
+                        <p className={`mt-2 text-xs ${minimumRequiredQuantity > 0 && Number(formData.planned_quantity) < minimumRequiredQuantity ? 'text-red-700' : 'text-blue-700'}`}>
+                          {quantityAutoReason}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                {selectedProduct && (() => {
-                  const activeBatches = (productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0);
-                  const hasDuplicate = !loadingProductBatches && activeBatches > 0;
-                  const cardClass = hasDuplicate
-                    ? 'border border-red-300 bg-red-50'
-                    : 'border border-blue-200 bg-blue-50';
-                  const titleClass = hasDuplicate ? 'text-red-900' : 'text-blue-900';
-                  const textClass = hasDuplicate ? 'text-red-900/80' : 'text-blue-900/80';
+                  {selectedProduct && (() => {
+                    const activeBatches = (productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0);
+                    const hasDuplicate = !loadingProductBatches && activeBatches > 0;
+                    const cardClass = hasDuplicate
+                      ? 'border border-red-300 bg-red-50'
+                      : 'border border-blue-200 bg-blue-50';
+                    const titleClass = hasDuplicate ? 'text-red-900' : 'text-blue-900';
+                    const textClass = hasDuplicate ? 'text-red-900/80' : 'text-blue-900/80';
 
-                  return (
-                    <Card className={cardClass}>
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center gap-2">
-                          {hasDuplicate
-                            ? <AlertTriangle className="w-4 h-4 text-red-500" />
-                            : <AlertCircle className="w-4 h-4 text-blue-500" />}
-                          <CardTitle className={`text-sm font-semibold ${titleClass}`}>
+                    return (
+                      <Card className={cardClass}>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center gap-2">
                             {hasDuplicate
-                              ? `Warning: ${activeBatches} active production${activeBatches > 1 ? 's' : ''} already exist for this product`
-                              : 'Current production for this product'}
-                          </CardTitle>
-                        </div>
-                        {hasDuplicate && (
-                          <p className="text-xs text-red-700 mt-1">
-                            Creating another production will consume raw materials a second time. Check if one of the batches below is already being worked on before proceeding.
-                          </p>
-                        )}
-                      </CardHeader>
-                      <CardContent className="pt-0 space-y-3">
-                        {loadingProductBatches && (
-                          <p className={`text-xs ${textClass}`}>Checking ongoing and past batches…</p>
-                        )}
-                        {!loadingProductBatches && !productBatchSummary && (
-                          <p className={`text-xs ${textClass}`}>
-                            No previous production batches found for this product.
-                          </p>
-                        )}
-                        {!loadingProductBatches && productBatchSummary && (
-                          <div className={`space-y-2 text-xs ${textClass}`}>
-                            <p>
-                              Total: <strong>{productBatchSummary.total}</strong> · Planned:{' '}
-                              <strong className={productBatchSummary.planned > 0 ? 'text-orange-700' : ''}>{productBatchSummary.planned}</strong> · Ongoing:{' '}
-                              <strong className={productBatchSummary.active > 0 ? 'text-red-700' : ''}>{productBatchSummary.active}</strong> · Completed:{' '}
-                              <strong>{productBatchSummary.completed}</strong> · Cancelled:{' '}
-                              <strong>{productBatchSummary.cancelled}</strong>
+                              ? <AlertTriangle className="w-4 h-4 text-red-500" />
+                              : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                            <CardTitle className={`text-sm font-semibold ${titleClass}`}>
+                              {hasDuplicate
+                                ? `Warning: ${activeBatches} active production${activeBatches > 1 ? 's' : ''} already exist for this product`
+                                : 'Current production for this product'}
+                            </CardTitle>
+                          </div>
+                          {hasDuplicate && (
+                            <p className="text-xs text-red-700 mt-1">
+                              Creating another production will consume raw materials a second time. Check if one of the batches below is already being worked on before proceeding.
                             </p>
-                            {productBatchSummary.latest.length > 0 && (
-                              <div className="space-y-2">
-                                <p className={`font-medium text-[11px] ${hasDuplicate ? 'text-red-900' : 'text-blue-900'}`}>
-                                  Latest batches:
-                                </p>
+                          )}
+                        </CardHeader>
+                        <CardContent className="pt-0 space-y-3">
+                          {loadingProductBatches && (
+                            <p className={`text-xs ${textClass}`}>Checking ongoing and past batches…</p>
+                          )}
+                          {!loadingProductBatches && !productBatchSummary && (
+                            <p className={`text-xs ${textClass}`}>
+                              No previous production batches found for this product.
+                            </p>
+                          )}
+                          {!loadingProductBatches && productBatchSummary && (
+                            <div className={`space-y-2 text-xs ${textClass}`}>
+                              <p>
+                                Total: <strong>{productBatchSummary.total}</strong> · Planned:{' '}
+                                <strong className={productBatchSummary.planned > 0 ? 'text-orange-700' : ''}>{productBatchSummary.planned}</strong> · Ongoing:{' '}
+                                <strong className={productBatchSummary.active > 0 ? 'text-red-700' : ''}>{productBatchSummary.active}</strong> · Completed:{' '}
+                                <strong>{productBatchSummary.completed}</strong> · Cancelled:{' '}
+                                <strong>{productBatchSummary.cancelled}</strong>
+                              </p>
+                              {productBatchSummary.latest.length > 0 && (
                                 <div className="space-y-2">
-                                  {productBatchSummary.latest.map((b) => {
-                                    const isActive = b.status === 'in_progress' || b.status === 'in_production' || b.status === 'planned';
-                                    const assignedName = b.current_stage_assigned_to_name || b.assigned_to_name;
-                                    const getBatchLink = () => {
-                                      if (b.status === 'planned') return `/production/planning?batchId=${b.id}`;
-                                      if (b.status === 'in_progress' || b.status === 'in_production') return `/production/${b.id}/machine`;
-                                      return `/production/${b.id}`;
-                                    };
-                                    const getBatchLabel = () => {
-                                      if (b.status === 'planned') return 'Go to Planning';
-                                      if (b.status === 'in_progress' || b.status === 'in_production') return 'Go to Machine Stage';
-                                      return 'View Batch';
-                                    };
-                                    return (
-                                      <div
-                                        key={b.id}
-                                        className={`rounded-md border p-2 text-[11px] flex items-center justify-between gap-2 ${isActive ? 'border-red-300 bg-red-100/60' : 'border-gray-200 bg-white/60'}`}
-                                      >
-                                        <div className="min-w-0">
-                                          <div className={`font-semibold truncate ${isActive ? 'text-red-900' : textClass}`}>
-                                            #{b.batch_number} <span className="uppercase tracking-wide text-[10px] font-normal">{b.status}</span>
-                                          </div>
-                                          <div className="text-gray-500 mt-0.5">Qty: {b.planned_quantity}</div>
-                                          {assignedName && (
-                                            <div className="flex items-center gap-1 text-gray-500 mt-0.5">
-                                              <User className="w-3 h-3" />
-                                              <span>{assignedName}</span>
+                                  <p className={`font-medium text-[11px] ${hasDuplicate ? 'text-red-900' : 'text-blue-900'}`}>
+                                    Latest batches:
+                                  </p>
+                                  <div className="space-y-2">
+                                    {productBatchSummary.latest.map((b) => {
+                                      const isActive = b.status === 'in_progress' || b.status === 'in_production' || b.status === 'planned';
+                                      const assignedName = b.current_stage_assigned_to_name || b.assigned_to_name;
+                                      const getBatchLink = () => {
+                                        if (b.status === 'planned') return `/production/planning?batchId=${b.id}`;
+                                        if (b.status === 'in_progress' || b.status === 'in_production') return `/production/${b.id}/machine`;
+                                        return `/production/${b.id}`;
+                                      };
+                                      const getBatchLabel = () => {
+                                        if (b.status === 'planned') return 'Go to Planning';
+                                        if (b.status === 'in_progress' || b.status === 'in_production') return 'Go to Machine Stage';
+                                        return 'View Batch';
+                                      };
+                                      return (
+                                        <div
+                                          key={b.id}
+                                          className={`rounded-md border p-2 text-[11px] flex items-center justify-between gap-2 ${isActive ? 'border-red-300 bg-red-100/60' : 'border-gray-200 bg-white/60'}`}
+                                        >
+                                          <div className="min-w-0">
+                                            <div className={`font-semibold truncate ${isActive ? 'text-red-900' : textClass}`}>
+                                              #{b.batch_number} <span className="uppercase tracking-wide text-[10px] font-normal">{b.status}</span>
                                             </div>
+                                            <div className="text-gray-500 mt-0.5">Qty: {b.planned_quantity}</div>
+                                            {assignedName && (
+                                              <div className="flex items-center gap-1 text-gray-500 mt-0.5">
+                                                <User className="w-3 h-3" />
+                                                <span>{assignedName}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                          {isActive && (
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              className="shrink-0 h-7 text-[11px] bg-red-700 hover:bg-red-800 text-white"
+                                              onClick={() => navigate(getBatchLink())}
+                                            >
+                                              <ArrowRight className="w-3 h-3 mr-1" />
+                                              {getBatchLabel()}
+                                            </Button>
                                           )}
                                         </div>
-                                        {isActive && (
-                                          <Button
-                                            type="button"
-                                            size="sm"
-                                            className="shrink-0 h-7 text-[11px] bg-red-700 hover:bg-red-800 text-white"
-                                            onClick={() => navigate(getBatchLink())}
-                                          >
-                                            <ArrowRight className="w-3 h-3 mr-1" />
-                                            {getBatchLabel()}
-                                          </Button>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </div>
                                 </div>
+                              )}
+                              <div className="pt-1">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate(`/production/product/${selectedProduct.id}`)}
+                                >
+                                  View full production history
+                                </Button>
                               </div>
-                            )}
-                            <div className="pt-1">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => navigate(`/production/product/${selectedProduct.id}`)}
-                              >
-                                View full production history
-                              </Button>
                             </div>
-                          </div>
-                        )}
+                          )}
 
-                        {hasDuplicate && (
-                          <div className="flex items-start gap-2 pt-1 border-t border-red-200">
-                            <Checkbox
-                              id="duplicate-ack"
-                              checked={duplicateAcknowledged}
-                              onCheckedChange={(v) => setDuplicateAcknowledged(!!v)}
-                            />
-                            <Label htmlFor="duplicate-ack" className="text-xs text-red-800 leading-snug cursor-pointer">
-                              I have checked the existing productions above and confirm I need to create a new one. I understand raw materials will be consumed again.
-                            </Label>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })()}
+                          {hasDuplicate && (
+                            <div className="flex items-start gap-2 pt-1 border-t border-red-200">
+                              <Checkbox
+                                id="duplicate-ack"
+                                checked={duplicateAcknowledged}
+                                onCheckedChange={(v) => setDuplicateAcknowledged(!!v)}
+                              />
+                              <Label htmlFor="duplicate-ack" className="text-xs text-red-800 leading-snug cursor-pointer">
+                                I have checked the existing productions above and confirm I need to create a new one. I understand raw materials will be consumed again.
+                              </Label>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
 
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleBack}
-                    className="flex-1"
-                    disabled={submitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
-                    disabled={
-                      submitting ||
-                      !formData.product_id ||
-                      formData.planned_quantity <= 0 ||
-                      !formData.completion_date ||
-                      (!duplicateAcknowledged && !loadingProductBatches && ((productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0)) > 0)
-                    }
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      'Create Batch'
-                    )}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleBack}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 bg-primary-600 hover:bg-primary-700 text-white"
+                      disabled={
+                        submitting ||
+                        !formData.product_id ||
+                        formData.planned_quantity <= 0 ||
+                        !formData.completion_date ||
+                        (!duplicateAcknowledged && !loadingProductBatches && ((productBatchSummary?.active ?? 0) + (productBatchSummary?.planned ?? 0)) > 0)
+                      }
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Create Batch'
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
+
+        {/* ─── MOBILE VIEW ─── */}
+        <MobileProductionCreate />
       </div>
     </Layout>
   );

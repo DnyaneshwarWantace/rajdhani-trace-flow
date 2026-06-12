@@ -47,7 +47,7 @@ export default function SimpleCategoryCard({
               <DropdownOptionChip
                 key={option._id}
                 option={option}
-                isUsed={usageMap[`${option.category}:${option.value}`] ?? false}
+                isUsed={!!(usageMap[`${option.category}:${option.value}`] || usageMap[`${option.category}:${option.value.toLowerCase()}`])}
                 onDelete={onDelete}
                 onToggleActive={onToggleActive}
                 variant="value"

@@ -113,7 +113,35 @@ export function OrderTimelineCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        {/* Mobile Vertical Timeline */}
+        <div className="md:hidden p-4 space-y-0">
+          {timelineData.map((item, index) => {
+            const colors = getColorClasses(item.color);
+            return (
+              <div key={index} className="flex gap-4 items-start relative pb-6 last:pb-0">
+                {/* Connector Line */}
+                {index < timelineData.length - 1 && (
+                  <div className="absolute left-[5px] top-[18px] bottom-0 w-0.5 bg-gray-200"></div>
+                )}
+                {/* Dot */}
+                <div className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${colors.dot}`}></div>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <span className={`font-semibold text-sm block ${colors.text}`}>
+                    {item.stage}
+                  </span>
+                  <p className="text-xs text-gray-500 mt-1">{item.date}</p>
+                  {item.performedBy && (
+                    <p className="text-xs text-gray-600 font-medium mt-0.5">By {item.performedBy}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -157,3 +185,4 @@ export function OrderTimelineCard({
     </Card>
   );
 }
+

@@ -197,7 +197,7 @@ export default function WastageStageHeader({
                 onDoneAfterComplete?.();
               }}
             >
-              No, I'm done
+              No, Skip
             </Button>
             <Button
               onClick={async () => {
@@ -209,7 +209,7 @@ export default function WastageStageHeader({
                   setShowAssignModal(true);
                 }
               }}
-              disabled={(batch.order_id || '').startsWith('SUB-') ? false : selectedTasks.length === 0}
+              disabled={(batch.order_id || '').startsWith('SUB-') ? false : (nextStageTasks.length === 0 || selectedTasks.length === 0)}
               className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
             >
               <UserPlus className="w-4 h-4" />

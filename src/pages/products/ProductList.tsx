@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ProductFormModal from '@/components/products/ProductFormModal';
+import MobileProductForm from '@/components/products/mobile/MobileProductForm';
 import BulkProductUploadDialog from '@/components/products/BulkProductUploadDialog';
 import InventoryStatsBoxes from '@/components/products/InventoryStatsBoxes';
 import ProductTabs from '@/components/products/ProductTabs';
 import InventoryTab from '@/components/products/InventoryTab';
+import InventoryFilters from '@/components/products/InventoryFilters';
+import MobileFilterSheet from '@/components/products/MobileFilterSheet';
 import AnalyticsTab, { prefetchProductAnalytics } from '@/components/products/AnalyticsTab';
 import NotificationsTab from '@/components/products/NotificationsTab';
 import ProductWastageTab from '@/components/products/ProductWastageTab';
@@ -19,7 +22,7 @@ import { canCreate, canEdit, canDelete, canView } from '@/utils/permissions';
 import PermissionDenied from '@/components/ui/PermissionDenied';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers, Upload } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2, List, Grid3x3, Layers, Upload, SlidersHorizontal, AlignJustify, X } from 'lucide-react';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 
 type TabValue = 'inventory' | 'analytics' | 'notifications' | 'wastage';
@@ -30,10 +33,13 @@ export default function ProductList() {
   const [activeTab, setActiveTab] = useState<TabValue>('inventory');
   const [exporting, setExporting] = useState<'csv' | 'excel' | null>(null);
   const [exportPopoverOpen, setExportPopoverOpen] = useState(false);
+  const [showMobileExport, setShowMobileExport] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table' | 'grouped'>('table');
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [showMobileSort, setShowMobileSort] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
@@ -310,21 +316,44 @@ export default function ProductList() {
     setExportPopoverOpen(false);
     setExporting(format);
     try {
-      const { products: toExport } = await ProductService.getProducts({
+      toast({ title: 'Export Started', description: 'Generating product catalog file, please wait...' });
+      
+      const firstRes = await ProductService.getProducts({
         ...filters,
-        limit: 10000,
+        limit: 100,
         page: 1,
       });
-      if (!toExport?.length) {
+      
+      let allProducts = [...(firstRes.products || [])];
+      const total = firstRes.total || 0;
+      
+      if (total > 100) {
+        const pages = Math.ceil(total / 100);
+        const restPromises = Array.from({ length: pages - 1 }, (_, i) =>
+          ProductService.getProducts({
+            ...filters,
+            limit: 100,
+            page: i + 2,
+          })
+        );
+        const restResults = await Promise.all(restPromises);
+        restResults.forEach(res => {
+          if (res.products) {
+            allProducts.push(...res.products);
+          }
+        });
+      }
+
+      if (!allProducts.length) {
         toast({ title: 'No Data', description: 'No products to export', variant: 'destructive' });
         return;
       }
       if (format === 'csv') {
-        exportProductsToCSV(toExport);
-        toast({ title: 'Export Successful', description: `Exported ${toExport.length} products to CSV` });
+        exportProductsToCSV(allProducts);
+        toast({ title: 'Export Successful', description: `Exported ${allProducts.length} products to CSV` });
       } else {
-        exportProductsToExcel(toExport);
-        toast({ title: 'Export Successful', description: `Exported ${toExport.length} products to Excel` });
+        exportProductsToExcel(allProducts);
+        toast({ title: 'Export Successful', description: `Exported ${allProducts.length} products to Excel` });
       }
     } catch (err) {
       console.error('Export failed:', err);
@@ -347,8 +376,39 @@ export default function ProductList() {
   return (
     <Layout>
       <div>
-        {/* Page Header */}
-        <div className="mb-6">
+        {/* ─── MOBILE header ───────────────────────────────────────────── */}
+        <div className="lg:hidden flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+            <p className="text-sm text-gray-400 mt-0.5">{inventoryStats.totalProducts.toLocaleString()} finished goods</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {canCreate('products') && (
+              <button onClick={() => setIsBulkUploadOpen(true)} className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white">
+                <Upload className="w-4 h-4 text-gray-600" />
+              </button>
+            )}
+            <button
+              onClick={() => !exporting && setShowMobileExport(true)}
+              disabled={!!exporting}
+              className={`w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 bg-white transition-opacity ${exporting ? 'opacity-55 cursor-not-allowed' : 'active:bg-gray-50'}`}
+            >
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : (
+                <Download className="w-4 h-4 text-gray-600" />
+              )}
+            </button>
+            {canCreate('products') && (
+              <button onClick={handleCreate} className="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ─── DESKTOP Page Header ─────────────────────────────────────── */}
+        <div className="hidden lg:block mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Products</h1>
@@ -511,14 +571,141 @@ export default function ProductList() {
         {/* Wastage Tab Content */}
         {activeTab === 'wastage' && <ProductWastageTab />}
 
-        {/* Modals */}
-        <ProductFormModal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          onSuccess={loadProducts}
-          product={selectedProduct}
-          mode={formMode}
-        />
+        {/* Mobile bottom SORT | FILTER bar */}
+        {activeTab === 'inventory' && (
+          <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex border-t border-gray-200 bg-white">
+            <button
+              onClick={() => { setShowMobileSort(true); setShowMobileFilters(false); }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-gray-700 border-r border-gray-200"
+            >
+              <AlignJustify className="w-4 h-4" />
+              SORT
+            </button>
+            <button
+              onClick={() => { setShowMobileFilters(true); setShowMobileSort(false); }}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-gray-700"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              FILTER
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Filter Sheet — two-panel like the app */}
+        {showMobileFilters && (
+          <MobileFilterSheet
+            filters={filters}
+            onApply={(newFilters) => {
+              setFilters({ ...filters, ...newFilters, page: 1 });
+              setShowMobileFilters(false);
+            }}
+            onClose={() => setShowMobileFilters(false)}
+          />
+        )}
+
+        {/* Mobile Sort Sheet */}
+        {showMobileSort && (
+          <>
+            <div className="lg:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowMobileSort(false)} />
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl" style={{ zIndex: 51 }}>
+              <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
+                <p className="text-base font-bold text-gray-900">Sort By</p>
+                <button onClick={() => setShowMobileSort(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                  <X className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+              <div className="px-5 py-3 pb-10 space-y-1">
+                {[
+                  { value: 'name', label: 'Name' },
+                  { value: 'stock', label: 'Stock' },
+                  { value: 'category', label: 'Category' },
+                  { value: 'recent', label: 'Recently Added' },
+                ].map((opt) => (
+                  <div key={opt.value}>
+                    <button
+                      onClick={() => { handleSortChange(opt.value, filters.sortOrder || 'asc'); setShowMobileSort(false); }}
+                      className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium ${filters.sortBy === opt.value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'}`}
+                    >
+                      {opt.label}
+                    </button>
+                    <div className="h-px bg-gray-100 mx-1" />
+                  </div>
+                ))}
+                <div className="pt-2">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Order</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { handleSortChange(filters.sortBy || 'name', 'asc'); setShowMobileSort(false); }} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${filters.sortOrder === 'asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}>Ascending</button>
+                    <button onClick={() => { handleSortChange(filters.sortBy || 'name', 'desc'); setShowMobileSort(false); }} className={`flex-1 py-2.5 rounded-xl text-sm font-semibold ${filters.sortOrder === 'desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}>Descending</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        {/* Mobile Export Sheet */}
+        {showMobileExport && (
+          <>
+            <div className="lg:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowMobileExport(false)} />
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl p-5 pb-9" style={{ zIndex: 51 }}>
+              <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-5">
+                <div>
+                  <p className="text-base font-bold text-gray-900">Export Catalog</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Export {totalProducts} products to your device</p>
+                </div>
+                <button onClick={() => setShowMobileExport(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                  <X className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <button
+                  onClick={() => { handleExport('csv'); setShowMobileExport(false); }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                    <FileText className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-900">Export as CSV</p>
+                    <p className="text-xs text-gray-400">Plain text format, good for simple imports</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleExport('excel'); setShowMobileExport(false); }}
+                  className="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3.5 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+                    <FileSpreadsheet className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-900">Export as Excel</p>
+                    <p className="text-xs text-gray-400">Formatted spreadsheet, preserves headers</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Modals — desktop uses centered dialog, mobile uses full-screen native form */}
+        <div className="hidden lg:block">
+          <ProductFormModal
+            isOpen={isFormOpen}
+            onClose={() => setIsFormOpen(false)}
+            onSuccess={loadProducts}
+            product={selectedProduct}
+            mode={formMode}
+          />
+        </div>
+        <div className="lg:hidden">
+          <MobileProductForm
+            isOpen={isFormOpen}
+            onClose={() => setIsFormOpen(false)}
+            onSuccess={loadProducts}
+            product={selectedProduct}
+            mode={formMode}
+          />
+        </div>
 
         <BulkProductUploadDialog
           open={isBulkUploadOpen}

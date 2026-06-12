@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, FileText, Upload, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { FileSpreadsheet, FileText, Upload, Loader2, AlertTriangle, CheckCircle2, X, Download } from 'lucide-react';
 import { ProductService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import type { ProductFormData } from '@/types/product';
@@ -299,100 +299,159 @@ export default function BulkProductUploadDialog({
     } finally {
       setImporting(false);
     }
-  };
+  };  if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Bulk Upload Products</DialogTitle>
-          <DialogDescription>
-            Upload products using CSV or Excel file. Download example format before import.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {/* ── Mobile Layout (Full Screen) ── */}
+      <div className="lg:hidden fixed inset-0 z-50 bg-gray-50 flex flex-col" style={{ height: '100dvh' }}>
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 pt-5 pb-3 border-b border-gray-100 shrink-0 bg-white shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleOpenChange(false)}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 shrink-0 active:bg-gray-200"
+            disabled={importing}
+          >
+            <X className="w-4 h-4 text-gray-700" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-gray-900">Bulk Upload Products</p>
+            <p className="text-xs text-gray-400">Import CSV or Excel catalog</p>
+          </div>
+        </div>
 
-        <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-            <p className="text-sm font-medium text-gray-900">Download Example Format</p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={downloadTemplateCsv} className="gap-2">
-                <FileText className="w-4 h-4" />
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28">
+          {/* Card 1: Templates Download */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3 shadow-sm">
+            <p className="text-sm font-bold text-gray-900">Download Template</p>
+            <p className="text-xs text-gray-400">Get the layout example format before importing your spreadsheet.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={downloadTemplateCsv}
+                className="flex items-center justify-center gap-2 h-11 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+              >
+                <FileText className="w-4 h-4 text-gray-500" />
                 CSV Template
-              </Button>
-              <Button type="button" variant="outline" onClick={downloadTemplateExcel} className="gap-2">
-                <FileSpreadsheet className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={downloadTemplateExcel}
+                className="flex items-center justify-center gap-2 h-11 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
                 Excel Template
-              </Button>
+              </button>
             </div>
-            <p className="text-xs text-gray-500">
-              Template headers include <span className="font-medium">(required)</span> or <span className="font-medium">(optional)</span>. You can upload with only required fields filled.
+          </div>
+
+          {/* Card 2: Field Rules */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3 shadow-sm">
+            <p className="text-sm font-bold text-gray-900">Required Columns</p>
+            <p className="text-xs text-gray-400">Your spreadsheet must have these headers populated:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {FIELD_META.filter((f) => f.required).map((f) => (
+                <span
+                  key={f.key}
+                  className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200"
+                >
+                  {f.key}
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400 pt-1">
+              All other fields like color, pattern, notes, and stock thresholds are optional.
             </p>
-            <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
-              <p className="text-xs font-medium text-gray-700 mb-2">Required fields:</p>
-              <div className="flex flex-wrap gap-2">
-                {FIELD_META.filter((f) => f.required).map((f) => (
-                  <Badge key={f.key} variant="outline" className="text-xs">
-                    {f.key}
-                  </Badge>
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-2">All other fields are optional and can be left blank.</p>
-            </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-            <p className="text-sm font-medium text-gray-900">Upload File</p>
-            <Input
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              disabled={importing}
-            />
-            {file && (
-              <p className="text-xs text-gray-600">
-                Selected: <span className="font-medium">{file.name}</span>
-              </p>
-            )}
-            <Button
-              type="button"
-              onClick={handleImport}
-              disabled={!file || importing}
-              className="bg-primary-600 hover:bg-primary-700 text-white gap-2"
+          {/* Card 3: File Input Upload */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-4 shadow-sm">
+            <p className="text-sm font-bold text-gray-900">Upload Spreadsheet</p>
+            
+            <div
+              onClick={() => !importing && document.getElementById('bulk-upload-file-mobile')?.click()}
+              className="border-2 border-dashed border-gray-200 hover:border-blue-400 rounded-2xl p-7 text-center bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors"
             >
-              {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {importing ? 'Importing...' : 'Start Import'}
-            </Button>
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2 text-blue-600">
+                <Upload className="w-6 h-6" />
+              </div>
+              <p className="text-sm font-bold text-gray-700">Choose CSV or Excel File</p>
+              <p className="text-xs text-gray-400 mt-1">Tap to browse your device files</p>
+              <input
+                id="bulk-upload-file-mobile"
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                disabled={importing}
+              />
+            </div>
+
+            {file && (
+              <div className="flex items-center justify-between p-3.5 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FileSpreadsheet className="w-5 h-5 text-blue-600 shrink-0" />
+                  <p className="text-sm font-semibold text-gray-800 truncate">{file.name}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  disabled={importing}
+                  className="p-1 rounded-full hover:bg-blue-100 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
+          {/* Card 4: Results */}
           {hasResults && (
-            <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Total: {summary.total}</Badge>
-                <Badge className="bg-green-100 text-green-700 border border-green-300">✓ Imported: {summary.success}</Badge>
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 space-y-3.5 shadow-sm">
+              <p className="text-sm font-bold text-gray-900">Import Summary</p>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100 text-center">
+                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Rows</p>
+                  <p className="text-lg font-black text-gray-800 mt-1">{summary.total}</p>
+                </div>
+                <div className="bg-green-50 rounded-xl p-3 border border-green-100 text-center">
+                  <p className="text-xs text-green-600 font-semibold uppercase tracking-wider">Success</p>
+                  <p className="text-lg font-black text-green-700 mt-1">{summary.success}</p>
+                </div>
                 {summary.skipped > 0 && (
-                  <Badge className="bg-yellow-100 text-yellow-700 border border-yellow-300">⟳ Skipped (duplicate): {summary.skipped}</Badge>
+                  <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-100 text-center">
+                    <p className="text-xs text-yellow-600 font-semibold uppercase tracking-wider">Skipped</p>
+                    <p className="text-lg font-black text-yellow-700 mt-1">{summary.skipped}</p>
+                  </div>
                 )}
                 {summary.failed > 0 && (
-                  <Badge className="bg-red-100 text-red-700 border border-red-300">✕ Failed: {summary.failed}</Badge>
+                  <div className="bg-red-50 rounded-xl p-3 border border-red-100 text-center">
+                    <p className="text-xs text-red-650 font-semibold uppercase tracking-wider">Failed</p>
+                    <p className="text-lg font-black text-red-700 mt-1">{summary.failed}</p>
+                  </div>
                 )}
               </div>
 
               {skippedResults.length > 0 && (
-                <div className="text-xs rounded-md border border-yellow-200 bg-yellow-50 p-2 text-yellow-800 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-                  {skippedResults.length} product(s) already exist and were skipped. The rest were imported successfully.
+                <div className="text-xs rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-yellow-800 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                  <span>{skippedResults.length} product(s) already exist and were skipped.</span>
                 </div>
               )}
 
               {failedResults.length > 0 && (
-                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  <p className="text-xs font-bold text-red-600 px-1 uppercase tracking-wider">Failure Details</p>
                   {failedResults.map((result) => (
-                    <div key={`${result.row}-${result.name}`} className="text-xs rounded-md border border-red-200 bg-red-50 p-2">
+                    <div key={`${result.row}-${result.name}`} className="text-xs rounded-xl border border-red-150 bg-red-50/50 p-3">
                       <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-red-650 mt-0.5 shrink-0" />
                         <div>
-                          <p className="font-medium text-red-700">Row {result.row} - {result.name}</p>
-                          <p className="text-red-600">{result.message}</p>
+                          <p className="font-bold text-red-800">Row {result.row} - {result.name}</p>
+                          <p className="text-red-700 mt-0.5 font-medium leading-relaxed">{result.message}</p>
                         </div>
                       </div>
                     </div>
@@ -401,16 +460,142 @@ export default function BulkProductUploadDialog({
               )}
 
               {summary.success > 0 && (
-                <div className="text-xs rounded-md border border-green-200 bg-green-50 p-2 text-green-700 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Imported {summary.success} product(s) successfully.
+                <div className="text-xs rounded-xl border border-green-200 bg-green-50 p-3 text-green-700 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600" />
+                  <span>Imported {summary.success} product(s) successfully.</span>
                 </div>
               )}
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Footer Fixed */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-gray-150 bg-white flex gap-3 z-50">
+          <Button
+            type="button"
+            onClick={handleImport}
+            disabled={!file || importing}
+            className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm shadow-md"
+          >
+            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {importing ? 'Importing Products...' : 'Start Import'}
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Desktop Layout (Centered Dialog) ── */}
+      <div className="hidden lg:block">
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+          <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Bulk Upload Products</DialogTitle>
+              <DialogDescription>
+                Upload products using CSV or Excel file. Download example format before import.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-900">Download Example Format</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={downloadTemplateCsv} className="gap-2">
+                    <FileText className="w-4 h-4" />
+                    CSV Template
+                  </Button>
+                  <Button type="button" variant="outline" onClick={downloadTemplateExcel} className="gap-2">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Excel Template
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Template headers include <span className="font-medium">(required)</span> or <span className="font-medium">(optional)</span>. You can upload with only required fields filled.
+                </p>
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <p className="text-xs font-medium text-gray-700 mb-2">Required fields:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {FIELD_META.filter((f) => f.required).map((f) => (
+                      <Badge key={f.key} variant="outline" className="text-xs">
+                        {f.key}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">All other fields are optional and can be left blank.</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                <p className="text-sm font-medium text-gray-900">Upload File</p>
+                <Input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  disabled={importing}
+                />
+                {file && (
+                  <p className="text-xs text-gray-600">
+                    Selected: <span className="font-medium">{file.name}</span>
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  onClick={handleImport}
+                  disabled={!file || importing}
+                  className="bg-primary-600 hover:bg-primary-700 text-white gap-2"
+                >
+                  {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {importing ? 'Importing...' : 'Start Import'}
+                </Button>
+              </div>
+
+              {hasResults && (
+                <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Total: {summary.total}</Badge>
+                    <Badge className="bg-green-100 text-green-700 border border-green-300">✓ Imported: {summary.success}</Badge>
+                    {summary.skipped > 0 && (
+                      <Badge className="bg-yellow-100 text-yellow-700 border border-yellow-300">⟳ Skipped (duplicate): {summary.skipped}</Badge>
+                    )}
+                    {summary.failed > 0 && (
+                      <Badge className="bg-red-100 text-red-700 border border-red-300">✕ Failed: {summary.failed}</Badge>
+                    )}
+                  </div>
+
+                  {skippedResults.length > 0 && (
+                    <div className="text-xs rounded-md border border-yellow-200 bg-yellow-50 p-2 text-yellow-800 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                      {skippedResults.length} product(s) already exist and were skipped. The rest were imported successfully.
+                    </div>
+                  )}
+
+                  {failedResults.length > 0 && (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {failedResults.map((result) => (
+                        <div key={`${result.row}-${result.name}`} className="text-xs rounded-md border border-red-200 bg-red-50 p-2">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5" />
+                            <div>
+                              <p className="font-medium text-red-700">Row {result.row} - {result.name}</p>
+                              <p className="text-red-600">{result.message}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {summary.success > 0 && (
+                    <div className="text-xs rounded-md border border-green-200 bg-green-50 p-2 text-green-700 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      Imported {summary.success} product(s) successfully.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </>
   );
 }
 

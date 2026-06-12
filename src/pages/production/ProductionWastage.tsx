@@ -1,7 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, CheckCircle, XCircle, Plus, Minus } from 'lucide-react';
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  Plus,
+  Minus,
+  ArrowLeft,
+  Trash2,
+  RefreshCw,
+  AlertTriangle,
+  Info,
+  ChevronUp,
+  ChevronDown,
+  Package,
+  Layers,
+  Save,
+  UserPlus
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ProductionService, type ProductionBatch } from '@/services/productionService';
@@ -22,6 +39,14 @@ import ProductionOverviewStats from '@/components/production/planning/Production
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Product } from '@/types/product';
+import AssignUserModal from '@/components/production/AssignUserModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 export default function ProductionWastage() {
   const { id } = useParams<{ id: string }>();
@@ -51,10 +76,78 @@ export default function ProductionWastage() {
   const [savingExcess, setSavingExcess] = useState<string | null>(null);
   const excessSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  // Mobile UI States
+  const [expandedMaterialId, setExpandedMaterialId] = useState<string | null>(null);
+  const [wasteTypes, setWasteTypes] = useState<string[]>([]);
+  const [showMobileWasteTypesDialog, setShowMobileWasteTypesDialog] = useState(false);
+  const [mobileWasteTypesDialogMaterialId, setMobileWasteTypesDialogMaterialId] = useState<string | null>(null);
+  const [mobileFormData, setMobileFormData] = useState<Record<string, {
+    quantity: string;
+    waste_type: string;
+    waste_category: string;
+    notes: string;
+    noWastage?: boolean;
+  }>>({});
+  const [mobileShowForwardDialog, setMobileShowForwardDialog] = useState(false);
+  const [mobileShowAssignModal, setMobileShowAssignModal] = useState(false);
+  const [mobileSelectedTaskKeys, setMobileSelectedTaskKeys] = useState<Set<string>>(new Set());
+  const [savingMobileWasteId, setSavingMobileWasteId] = useState<string | null>(null);
+
+  // Mobile Raw Material Dialog States
+  const [showMobileAddWasteDialog, setShowMobileAddWasteDialog] = useState(false);
+  const [showMobileAddExcessDialog, setShowMobileAddExcessDialog] = useState(false);
+  const [showMobileMaterialPicker, setShowMobileMaterialPicker] = useState(false);
+  const [materialPickerTarget, setMaterialPickerTarget] = useState<'waste' | 'excess'>('waste');
+  
+  const [mobileAddWasteForm, setMobileAddWasteForm] = useState({
+    material_id: '',
+    material_name: '',
+    material_type: 'raw_material',
+    quantity: '',
+    unit: '',
+    waste_type: '',
+    waste_category: 'disposable',
+    notes: '',
+  });
+
+  const [mobileAddExcessForm, setMobileAddExcessForm] = useState({
+    material_id: '',
+    material_name: '',
+    material_type: 'raw_material',
+    quantity: '',
+    unit: '',
+  });
+
+  const loadWasteTypes = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL_BASE = getApiUrl();
+      const res = await fetch(`${API_URL_BASE}/dropdowns/category/waste_type`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result.success && Array.isArray(result.data)) {
+          const types = result.data
+            .filter((opt: any) => opt.is_active !== false)
+            .map((opt: any) => opt.value)
+            .filter((val: string) => val && typeof val === 'string');
+          setWasteTypes(types);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading waste types:', error);
+    }
+  };
+
   useEffect(() => {
     if (id) {
       console.log('Loading wastage stage data for batch:', id);
       loadData();
+      loadWasteTypes();
     }
   }, [id, refreshKey]);
 
@@ -643,6 +736,346 @@ export default function ProductionWastage() {
     }
   };
 
+  const handleAssignAfterComplete = async (
+    userId: string,
+    userName: string,
+    selectedTasks: Array<{
+      orderId: string;
+      orderNumber: string;
+      customerName: string;
+      productId: string;
+      productName: string;
+      requiredQuantity: number;
+    }>
+  ) => {
+    if (!selectedTasks || selectedTasks.length === 0) {
+      throw new Error('No next-stage order tasks found to assign');
+    }
+
+    // Sub-production batch: mark the linked task as completed to notify parent batch owner
+    if ((batch!.order_id || '').startsWith('SUB-')) {
+      const { data: allTasks } = await ProductionService.getTasks({ limit: 200 });
+      const linkedTask = (allTasks || []).find(
+        (t) =>
+          t.stage_product_id === batch!.product_id &&
+          (t.order_id === batch!.order_id || t.order_number === batch!.order_number) &&
+          t.parent_batch_id
+      );
+      if (linkedTask) {
+        await ProductionService.updateTaskStatus(linkedTask.id, 'completed');
+        await NotificationService.createNotification({
+          type: 'success',
+          title: 'Sub-Product Ready',
+          message: `${batch!.product_name || 'Sub-product'} has been completed. You can now continue planning for the parent batch.`,
+          priority: 'high',
+          status: 'unread',
+          module: 'production',
+          related_id: linkedTask.parent_batch_id || linkedTask.id,
+          related_data: {
+            task_id: linkedTask.id,
+            parent_batch_id: linkedTask.parent_batch_id,
+            batch_number: batch!.batch_number,
+            product_name: batch!.product_name,
+          },
+        });
+      }
+      navigate('/notifications');
+      return;
+    }
+
+    const createResults = await Promise.all(
+      selectedTasks.map((task) =>
+        ProductionService.createTask({
+          order_id: task.orderId,
+          order_number: task.orderNumber,
+          customer_name: task.customerName,
+          stage_product_id: task.productId,
+          stage_product_name: task.productName,
+          final_product_id: task.productId,
+          final_product_name: task.productName,
+          planned_quantity: task.requiredQuantity,
+          assigned_to_id: userId,
+          assigned_to_name: userName,
+          notes: `Next-stage task from completed batch ${batch!.batch_number}`,
+        })
+      )
+    );
+    const failed = createResults.find((r) => r.error);
+    if (failed?.error) throw new Error(failed.error);
+    const effectiveUsers = Array.from(
+      new Set(
+        createResults
+          .map((r) => r.data?.assigned_to_name)
+          .filter((name): name is string => !!name && name.trim().length > 0)
+      )
+    );
+    toast({
+      title: 'Forwarded',
+      description:
+        effectiveUsers.length > 0
+          ? `${selectedTasks.length} next-stage item(s) forwarded to ${effectiveUsers.join(', ')}`
+          : `${selectedTasks.length} next-stage item(s) forwarded to ${userName}`,
+    });
+  };
+
+  const handleCompleteProductionMobile = async () => {
+    try {
+      await handleCompleteProduction();
+      const keys = new Set(nextStageTasks.map((t) => `${t.orderId}::${t.productId}`));
+      setMobileSelectedTaskKeys(keys);
+      setMobileShowForwardDialog(true);
+    } catch (error) {
+      console.error('Error completing production mobile:', error);
+    }
+  };
+
+  const handleAssignForwardMobile = async (userId: string, userName: string) => {
+    const selected = nextStageTasks.filter((task) => mobileSelectedTaskKeys.has(`${task.orderId}::${task.productId}`));
+    try {
+      await handleAssignAfterComplete(userId, userName, selected);
+      setMobileShowAssignModal(false);
+      setMobileShowForwardDialog(false);
+      navigate('/production', { state: { section: location.state?.section || 'assigned' } });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to forward tasks',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSaveMaterialWasteMobile = async (material: any) => {
+    const materialId = material.material_id;
+    const data = mobileFormData[materialId] || { quantity: '', waste_type: '', waste_category: 'disposable', notes: '', noWastage: false };
+    
+    if (data.noWastage) {
+      handleMarkNoWastage(materialId);
+      setExpandedMaterialId(null);
+      return;
+    }
+
+    const qty = parseFloat(data.quantity);
+    if (!data.quantity || isNaN(qty) || qty <= 0) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid waste quantity', variant: 'destructive' });
+      return;
+    }
+
+    if (!data.waste_type) {
+      toast({ title: 'Validation Error', description: 'Please select a waste type', variant: 'destructive' });
+      return;
+    }
+
+    setSavingMobileWasteId(materialId);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL_BASE = getApiUrl();
+      const wasteData = {
+        production_batch_id: id,
+        batch_id: id,
+        product_id: batch?.product_id || '',
+        product_name: batch?.product_name || 'Unknown Product',
+        material_id: material.material_id,
+        material_name: material.material_name,
+        material_type: material.material_type,
+        waste_type: data.waste_type,
+        quantity: qty,
+        unit: material.unit,
+        waste_category: data.waste_category,
+        can_be_reused: data.waste_category === 'reusable',
+        notes: data.notes,
+        status: 'generated',
+        reason: data.notes || 'Waste generated during production',
+        generation_date: new Date().toISOString(),
+      };
+
+      const res = await fetch(`${API_URL_BASE}/production/waste`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(wasteData),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to record waste');
+      }
+
+      toast({ title: 'Success', description: 'Waste item created successfully' });
+      
+      // Clear form
+      setMobileFormData(prev => ({
+        ...prev,
+        [materialId]: { quantity: '', waste_type: '', waste_category: 'disposable', notes: '', noWastage: false }
+      }));
+      setExpandedMaterialId(null);
+
+      // Remove from noWastageMaterials since actual waste is now recorded
+      setNoWastageMaterials(prev => {
+        const next = new Set(prev);
+        next.delete(materialId);
+        return next;
+      });
+      
+      // Refresh
+      handleRefresh();
+      handleWasteUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create waste item',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingMobileWasteId(null);
+    }
+  };
+
+  const handleSaveMobileAddWaste = async () => {
+    if (!mobileAddWasteForm.material_id) {
+      toast({ title: 'Validation Error', description: 'Please select a material', variant: 'destructive' });
+      return;
+    }
+    const qty = parseFloat(mobileAddWasteForm.quantity);
+    if (!mobileAddWasteForm.quantity || isNaN(qty) || qty <= 0) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid quantity', variant: 'destructive' });
+      return;
+    }
+    if (!mobileAddWasteForm.waste_type) {
+      toast({ title: 'Validation Error', description: 'Please select a waste type', variant: 'destructive' });
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL_BASE = getApiUrl();
+      const res = await fetch(`${API_URL_BASE}/production/waste`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          production_batch_id: id,
+          batch_id: id,
+          product_id: batch?.product_id || '',
+          product_name: batch?.product_name || 'Unknown Product',
+          material_id: mobileAddWasteForm.material_id,
+          material_name: mobileAddWasteForm.material_name,
+          material_type: mobileAddWasteForm.material_type,
+          waste_type: mobileAddWasteForm.waste_type,
+          quantity: qty,
+          unit: mobileAddWasteForm.unit,
+          waste_category: mobileAddWasteForm.waste_category,
+          can_be_reused: mobileAddWasteForm.waste_category === 'reusable',
+          notes: mobileAddWasteForm.notes,
+          status: 'generated',
+          reason: mobileAddWasteForm.notes || 'Waste generated during production',
+          generation_date: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to record waste');
+      }
+
+      toast({
+        title: 'Success',
+        description: `Successfully logged ${qty} ${mobileAddWasteForm.unit} waste for ${mobileAddWasteForm.material_name}`,
+      });
+
+      setShowMobileAddWasteDialog(false);
+      setMobileAddWasteForm({
+        material_id: '',
+        material_name: '',
+        material_type: 'raw_material',
+        quantity: '',
+        unit: '',
+        waste_type: '',
+        waste_category: 'disposable',
+        notes: '',
+      });
+      handleRefresh();
+      handleWasteUpdated();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save waste',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleSaveMobileAddExcess = async () => {
+    if (!mobileAddExcessForm.material_id) {
+      toast({ title: 'Validation Error', description: 'Please select a material', variant: 'destructive' });
+      return;
+    }
+    const qty = parseFloat(mobileAddExcessForm.quantity);
+    if (!mobileAddExcessForm.quantity || isNaN(qty) || qty <= 0) {
+      toast({ title: 'Validation Error', description: 'Please enter a valid quantity', variant: 'destructive' });
+      return;
+    }
+
+    setUpdatingStatus(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const API_URL_BASE = getApiUrl();
+      const res = await fetch(`${API_URL_BASE}/material-consumption`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          production_batch_id: id,
+          material_id: mobileAddExcessForm.material_id,
+          material_name: mobileAddExcessForm.material_name,
+          material_type: mobileAddExcessForm.material_type,
+          quantity_used: qty,
+          actual_consumed_quantity: qty,
+          unit: mobileAddExcessForm.unit,
+          deduct_now: true,
+          notes: `Excess usage: ${qty} ${mobileAddExcessForm.unit} more than planned`,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save excess');
+      }
+
+      toast({
+        title: 'Success',
+        description: `Successfully recorded ${qty} ${mobileAddExcessForm.unit} extra used for ${mobileAddExcessForm.material_name}`,
+      });
+
+      setShowMobileAddExcessDialog(false);
+      setMobileAddExcessForm({
+        material_id: '',
+        material_name: '',
+        material_type: 'raw_material',
+        quantity: '',
+        unit: '',
+      });
+      handleRefresh();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save excess',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -663,85 +1096,27 @@ export default function ProductionWastage() {
     );
   }
 
+  const productMaterials: any[] = consumedMaterials.filter(
+    (m) => m.material_type === 'product' || (m.material_id && m.material_id.startsWith('PRO-'))
+  );
+  const rawMaterials: any[] = consumedMaterials.filter(
+    (m) => !(m.material_type === 'product' || (m.material_id && m.material_id.startsWith('PRO-')))
+  );
+  const plannedQty = batch?.planned_quantity || 0;
+  const totalWasteQty = wasteItems.reduce((sum, w) => sum + Number(w.quantity || 0), 0);
+  const reusableQty = wasteItems.reduce((sum, w) => sum + (w.waste_category === 'reusable' ? Number(w.quantity || 0) : 0), 0);
+
   return (
     <Layout>
-      <div className="space-y-6 min-h-0 pb-8">
+      {/* Desktop View */}
+      <div className="hidden lg:block space-y-6 min-h-0 pb-8">
         <WastageStageHeader
           batch={batch}
           onBack={() => {
             navigate('/production', { state: { section: location.state?.section || 'assigned' } });
           }}
           onCompleteProduction={handleCompleteProduction}
-          onAssignAfterComplete={async (userId, userName, selectedTasks) => {
-            if (!selectedTasks || selectedTasks.length === 0) {
-              throw new Error('No next-stage order tasks found to assign');
-            }
-
-            // Sub-production batch: mark the linked task as completed to notify parent batch owner
-            if ((batch.order_id || '').startsWith('SUB-')) {
-              const { data: allTasks } = await ProductionService.getTasks({ limit: 200 });
-              const linkedTask = (allTasks || []).find(
-                (t) =>
-                  t.stage_product_id === batch.product_id &&
-                  (t.order_id === batch.order_id || t.order_number === batch.order_number) &&
-                  t.parent_batch_id
-              );
-              if (linkedTask) {
-                await ProductionService.updateTaskStatus(linkedTask.id, 'completed');
-                await NotificationService.createNotification({
-                  type: 'success',
-                  title: 'Sub-Product Ready',
-                  message: `${batch.product_name || 'Sub-product'} has been completed. You can now continue planning for the parent batch.`,
-                  priority: 'high',
-                  status: 'unread',
-                  module: 'production',
-                  related_id: linkedTask.parent_batch_id || linkedTask.id,
-                  related_data: {
-                    task_id: linkedTask.id,
-                    parent_batch_id: linkedTask.parent_batch_id,
-                    batch_number: batch.batch_number,
-                    product_name: batch.product_name,
-                  },
-                });
-              }
-              navigate('/notifications');
-              return;
-            }
-
-            const createResults = await Promise.all(
-              selectedTasks.map((task) =>
-                ProductionService.createTask({
-                  order_id: task.orderId,
-                  order_number: task.orderNumber,
-                  customer_name: task.customerName,
-                  stage_product_id: task.productId,
-                  stage_product_name: task.productName,
-                  final_product_id: task.productId,
-                  final_product_name: task.productName,
-                  planned_quantity: task.requiredQuantity,
-                  assigned_to_id: userId,
-                  assigned_to_name: userName,
-                  notes: `Next-stage task from completed batch ${batch.batch_number}`,
-                })
-              )
-            );
-            const failed = createResults.find((r) => r.error);
-            if (failed?.error) throw new Error(failed.error);
-            const effectiveUsers = Array.from(
-              new Set(
-                createResults
-                  .map((r) => r.data?.assigned_to_name)
-                  .filter((name): name is string => !!name && name.trim().length > 0)
-              )
-            );
-            toast({
-              title: 'Forwarded',
-              description:
-                effectiveUsers.length > 0
-                  ? `${selectedTasks.length} next-stage item(s) forwarded to ${effectiveUsers.join(', ')}`
-                  : `${selectedTasks.length} next-stage item(s) forwarded to ${userName}`,
-            });
-          }}
+          onAssignAfterComplete={handleAssignAfterComplete}
           onDoneAfterComplete={() => navigate('/production', { state: { section: location.state?.section || 'assigned' } })}
           nextStageTasks={nextStageTasks.map((t) => ({
             orderId: t.orderId,
@@ -806,7 +1181,7 @@ export default function ProductionWastage() {
                   <div key={m.material_id} className="flex items-center gap-4 p-3 border rounded-lg bg-orange-50 border-orange-100">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{m.material_name}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-550">
                         Planned: {m.required_quantity || m.quantity_used || 0} {m.unit}
                         {m.actual_consumed_quantity && m.actual_consumed_quantity !== m.required_quantity
                           ? ` · Previously extra: ${Math.max(0, m.actual_consumed_quantity - (m.required_quantity || 0))} ${m.unit}`
@@ -824,7 +1199,7 @@ export default function ProductionWastage() {
                         onChange={e => handleExcessQtyChange(m.material_id, e.target.value)}
                         className="w-32 h-8 text-sm"
                       />
-                      <span className="text-xs text-gray-500 w-8">{m.unit}</span>
+                      <span className="text-xs text-gray-550 w-8">{m.unit}</span>
                       {savingExcess === m.material_id && (
                         <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
                       )}
@@ -930,9 +1305,998 @@ export default function ProductionWastage() {
             </Card>
           );
         })()}
-
       </div>
 
+      {/* Mobile View */}
+      <div className="lg:hidden space-y-4 pb-28 bg-gray-50 min-h-screen -mx-4 -my-6 p-4">
+        {/* Mobile Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm -mx-4 -mt-4 mb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/production', { state: { section: location.state?.section || 'assigned' } })}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900 leading-tight">
+                {batch?.batch_number || 'Wastage Stage'}
+              </h1>
+              <p className="text-[10px] text-gray-500 font-semibold truncate max-w-[150px]">
+                {product?.name || batch?.product_name || '—'}
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full uppercase shrink-0">
+            Wastage
+          </span>
+        </div>
+
+        {/* Stepper Progress */}
+        <div className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs text-gray-550 font-medium">Stage Progress</span>
+            <span className="text-xs text-amber-700 font-bold bg-amber-50 px-2.5 py-0.5 rounded-full">
+              4. Wastage Stage
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="bg-amber-500 rounded-full" />
+            <div className="bg-amber-500 rounded-full" />
+            <div className="bg-amber-500 rounded-full" />
+            <div className="bg-amber-500 rounded-full animate-pulse" />
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-400 mt-2 font-semibold">
+            <span className="text-amber-600 font-medium">Planning</span>
+            <span className="text-amber-600 font-medium">Machine</span>
+            <span className="text-amber-600 font-medium">Details</span>
+            <span className="text-amber-700 font-bold">Wastage</span>
+          </div>
+        </div>
+
+        {/* Product Info Strip */}
+        {(product || batch) && (
+          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-750 font-bold shadow-sm cursor-pointer">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0">
+              <Package className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-blue-900 truncate text-xs font-extrabold leading-tight">
+                {product?.name || batch?.product_name || '—'}
+              </h4>
+              <p className="text-[10px] text-blue-600 font-semibold mt-1 flex flex-wrap gap-x-1.5 items-center">
+                {product?.weight && <span>GSM: {product.weight}</span>}
+                {product?.width && <span>· W: {product.width} {product.width_unit || 'ft'}</span>}
+                {product?.length && <span>· L: {product.length} {product.length_unit || 'ft'}</span>}
+                {product?.color && <span>· Color: {product.color}</span>}
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xs font-extrabold text-blue-900 leading-tight">{plannedQty}</p>
+              <p className="text-[9px] text-blue-500 font-bold uppercase mt-0.5">Planned</p>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Row */}
+        {wasteItems.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 bg-white rounded-xl border border-gray-150 p-3 shadow-sm">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1">
+                <Trash2 className="w-3.5 h-3.5 text-orange-500" />
+                <p className="text-sm font-extrabold text-gray-800 leading-tight">
+                  {totalWasteQty.toFixed(2)}
+                </p>
+              </div>
+              <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Total Waste</p>
+            </div>
+            <div className="text-center border-l border-gray-100">
+              <div className="flex items-center justify-center gap-1">
+                <RefreshCw className="w-3.5 h-3.5 text-green-600" />
+                <p className="text-sm font-extrabold text-green-600 leading-tight">
+                  {reusableQty.toFixed(2)}
+                </p>
+              </div>
+              <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Reusable</p>
+            </div>
+            <div className="text-center border-l border-gray-100">
+              <div className="flex items-center justify-center gap-1">
+                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                <p className="text-sm font-extrabold text-red-600 leading-tight">
+                  {(totalWasteQty - reusableQty).toFixed(2)}
+                </p>
+              </div>
+              <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Disposable</p>
+            </div>
+          </div>
+        )}
+
+        {/* Product Materials (Leftover suggests) */}
+        {productMaterials.length > 0 && (
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2 px-0.5">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Product Materials</span>
+              <span className="text-[9px] font-extrabold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full uppercase">
+                AUTO-SUGGEST
+              </span>
+            </div>
+
+            {productMaterials.map((material: any, idx: number) => {
+              const materialId = material.material_id;
+              const expanded = expandedMaterialId === materialId;
+              const existingWaste = wasteItems.filter(w => w.material_id === materialId);
+              const hasWaste = existingWaste.length > 0;
+              const consumed = Number(material.actual_consumed_quantity ?? material.quantity_used ?? 0);
+              const required = Number(material.required_quantity ?? consumed);
+              const excess = consumed - required;
+              const leftover = Math.max(0, Math.ceil(consumed) - consumed);
+
+              const formData = mobileFormData[materialId] || { quantity: leftover > 0 ? leftover.toFixed(2) : '', waste_type: '', waste_category: 'disposable', notes: '', noWastage: false };
+
+              return (
+                <div key={materialId || idx} className={`bg-white border rounded-xl p-3.5 space-y-3.5 shadow-sm border-gray-150`}>
+                  {/* Card Header clickable */}
+                  <div
+                    onClick={() => setExpandedMaterialId(expanded ? null : materialId)}
+                    className="flex items-center justify-between gap-2 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
+                        <Package className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-gray-800 truncate max-w-[170px]">{material.material_name}</h4>
+                        <p className="text-[10px] text-gray-400 font-semibold mt-0.5 flex flex-wrap gap-x-2">
+                          <span>Consumed: <span className="text-gray-700 font-bold">{consumed.toFixed(2)} {material.unit}</span></span>
+                          {required > 0 && required !== consumed && (
+                            <span>Planned: <span className="text-gray-500 font-semibold">{required.toFixed(2)}</span></span>
+                          )}
+                          {excess > 0.001 && <span className="text-red-600 font-bold">+{excess.toFixed(2)} excess</span>}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {hasWaste && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-green-50 text-green-700 border border-green-200">
+                          Recorded
+                        </span>
+                      )}
+                      {hasNoWastageSelected(materialId) && (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                          No Waste
+                        </span>
+                      )}
+                      {expanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                    </div>
+                  </div>
+
+                  {/* Leftover Tip */}
+                  {leftover > 0 && (
+                    <div className="bg-purple-50/50 border border-purple-150 rounded-lg px-2.5 py-1.5 text-[10px] text-purple-700 font-bold flex items-center gap-1">
+                      <Info className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Fractional leftover suggestion: {leftover.toFixed(2)} {material.unit}</span>
+                    </div>
+                  )}
+
+                  {/* Existing Waste Logs */}
+                  {hasWaste && (
+                    <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                      {existingWaste.map((w, i) => (
+                        <div key={w.id || i} className="flex items-center justify-between bg-gray-50 border border-gray-150 rounded-lg px-2.5 py-2 text-xs">
+                          <div>
+                            <p className="font-bold text-gray-800">{Number(w.quantity).toFixed(2)} {w.unit}</p>
+                            <p className="text-[10px] text-gray-500 font-semibold capitalize mt-0.5">{w.waste_type.replace(/_/g, ' ')}</p>
+                          </div>
+                          <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${w.waste_category === 'reusable' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                            {w.waste_category === 'reusable' ? 'Reusable' : 'Disposable'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Collapsible Form */}
+                  {expanded && (
+                    <div className="border-t border-gray-100 pt-3 space-y-3">
+                      {/* No wastage toggle */}
+                      <button
+                        onClick={() => {
+                          const updated = !formData.noWastage;
+                          setMobileFormData(prev => ({
+                            ...prev,
+                            [materialId]: { ...formData, noWastage: updated }
+                          }));
+                          if (!updated) {
+                            setNoWastageMaterials(prev => {
+                              const next = new Set(prev);
+                              next.delete(materialId);
+                              return next;
+                            });
+                          }
+                        }}
+                        className={`w-full flex items-center gap-2.5 rounded-xl p-3 border text-xs font-bold transition-all ${
+                          formData.noWastage
+                            ? 'bg-green-50 border-green-300 text-green-800'
+                            : 'bg-gray-50 border-gray-200 text-gray-700'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${formData.noWastage ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-gray-300'}`}>
+                          {formData.noWastage && <CheckCircle className="w-3 h-3 text-white" />}
+                        </div>
+                        <span>No wastage for this material</span>
+                      </button>
+
+                      {!formData.noWastage && (
+                        <>
+                          {/* Qty Input with auto-fill suggestion */}
+                          <div className="space-y-1.5">
+                            <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Waste Qty ({material.unit})</span>
+                            <div className="flex gap-2">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder={`0.00 ${material.unit}`}
+                                value={formData.quantity}
+                                onChange={(e) => setMobileFormData(prev => ({
+                                  ...prev,
+                                  [materialId]: { ...formData, quantity: e.target.value }
+                                }))}
+                                className="h-10 text-sm flex-1 font-bold"
+                              />
+                              {leftover > 0 && (
+                                <button
+                                  onClick={() => setMobileFormData(prev => ({
+                                    ...prev,
+                                    [materialId]: { ...formData, quantity: leftover.toFixed(2) }
+                                  }))}
+                                  className="px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs rounded-xl transition-colors"
+                                >
+                                  Auto-fill Leftover
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Waste Type Picker */}
+                          <div className="space-y-1.5">
+                            <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Waste Type *</span>
+                            <div className="flex flex-wrap gap-2 py-1">
+                              {wasteTypes.length === 0 ? (
+                                <p className="text-[10px] text-gray-400 italic">No waste types configured</p>
+                              ) : (
+                                wasteTypes.map((type) => {
+                                  const isSelected = formData.waste_type === type;
+                                  return (
+                                    <button
+                                      key={type}
+                                      onClick={() => setMobileFormData(prev => ({
+                                        ...prev,
+                                        [materialId]: { ...formData, waste_type: type }
+                                      }))}
+                                      type="button"
+                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                        isSelected
+                                          ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                      }`}
+                                    >
+                                      {type.replace(/_/g, ' ')}
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Waste Category Switch */}
+                          <div className="space-y-1.5">
+                            <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Category</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { value: 'reusable', label: 'Reusable', activeClass: 'bg-green-50 border-green-300 text-green-700', inactiveClass: 'bg-white border-gray-200 text-gray-500' },
+                                { value: 'disposable', label: 'Disposable', activeClass: 'bg-red-50 border-red-200 text-red-700', inactiveClass: 'bg-white border-gray-200 text-gray-500' }
+                              ].map(cat => {
+                                const active = formData.waste_category === cat.value;
+                                return (
+                                  <button
+                                    key={cat.value}
+                                    onClick={() => setMobileFormData(prev => ({
+                                      ...prev,
+                                      [materialId]: { ...formData, waste_category: cat.value }
+                                    }))}
+                                    className={`py-2 border text-xs font-extrabold rounded-xl transition-all ${active ? cat.activeClass : cat.inactiveClass}`}
+                                  >
+                                    {cat.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          <div className="space-y-1.5">
+                            <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Notes (optional)</span>
+                            <Input
+                              placeholder="Reason or log notes..."
+                              value={formData.notes}
+                              onChange={(e) => setMobileFormData(prev => ({
+                                ...prev,
+                                [materialId]: { ...formData, notes: e.target.value }
+                              }))}
+                              className="h-10 text-xs"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {/* Save Button */}
+                      <Button
+                        onClick={() => handleSaveMaterialWasteMobile(material)}
+                        disabled={savingMobileWasteId === materialId}
+                        className={`w-full py-4 text-xs font-bold text-white rounded-xl shadow flex items-center justify-center gap-1.5 ${
+                          formData.noWastage ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
+                        }`}
+                      >
+                        {savingMobileWasteId === materialId ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-3.5 h-3.5" />
+                            <span>{formData.noWastage ? 'Confirm No Wastage' : 'Save Wastage Record'}</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Raw Materials Section */}
+        {rawMaterials.length > 0 && (() => {
+          const groupedRawMaterials: any[] = rawMaterials.reduce((acc: any[], current: any) => {
+            const existing = acc.find(item => item.material_id === current.material_id);
+            const consumedQty = Number(current.actual_consumed_quantity ?? current.quantity_used ?? 0);
+            const requiredQty = Number(current.required_quantity ?? consumedQty);
+
+            if (existing) {
+              existing.actual_consumed_quantity += consumedQty;
+              existing.required_quantity += requiredQty;
+            } else {
+              acc.push({
+                ...current,
+                actual_consumed_quantity: consumedQty,
+                required_quantity: requiredQty,
+              });
+            }
+            return acc;
+          }, []);
+
+          return (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Raw Materials Consumed</span>
+                <span className="text-[9px] font-extrabold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full uppercase">
+                  GIVEN IN BATCH
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {groupedRawMaterials.map((material: any, idx: number) => {
+                  const materialId = material.material_id;
+                  const existingWaste = wasteItems.filter(w => w.material_id === materialId);
+                  const hasWaste = existingWaste.length > 0;
+                  const consumed = Number(material.actual_consumed_quantity);
+                  const required = Number(material.required_quantity);
+                  const excess = consumed - required;
+
+                  return (
+                    <div key={materialId || idx} className="bg-white border border-gray-150 rounded-xl p-3.5 space-y-3 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-sm font-bold text-gray-800 truncate max-w-[170px]">{material.material_name}</h4>
+                            <p className="text-[10px] text-gray-400 font-semibold mt-0.5 flex flex-wrap gap-x-2">
+                              <span>Consumed: <span className="text-gray-700 font-bold">{consumed.toFixed(2)} {material.unit}</span></span>
+                              {required > 0 && required !== consumed && (
+                                <span>Planned: <span className="text-gray-500 font-semibold">{required.toFixed(2)}</span></span>
+                              )}
+                              {excess > 0.001 && (
+                                <span className="text-red-600 font-bold">+{excess.toFixed(2)} excess</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        {hasWaste && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-green-50 text-green-700 border border-green-200 shrink-0">
+                            Recorded
+                          </span>
+                        )}
+                      </div>
+
+                      {hasWaste && (
+                        <div className="border-t border-gray-100 pt-2 space-y-1.5">
+                          <p className="text-[9px] font-extrabold text-gray-450 uppercase">Logged Waste:</p>
+                          {existingWaste.map((w, i) => (
+                            <div key={w.id || i} className="flex items-center justify-between bg-gray-50 border border-gray-150 rounded-lg px-2.5 py-1.5 text-[11px]">
+                              <div>
+                                <p className="font-bold text-gray-800">{Number(w.quantity).toFixed(2)} {w.unit}</p>
+                                <p className="text-[9px] text-gray-500 font-semibold capitalize">{w.waste_type.replace(/_/g, ' ')}</p>
+                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${w.waste_category === 'reusable' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                                {w.waste_category === 'reusable' ? 'Reusable' : 'Disposable'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <Button
+                          onClick={() => {
+                            setMobileAddWasteForm({
+                              material_id: material.material_id,
+                              material_name: material.material_name,
+                              material_type: 'raw_material',
+                              quantity: '',
+                              unit: material.unit || '',
+                              waste_type: '',
+                              waste_category: 'disposable',
+                              notes: '',
+                            });
+                            setShowMobileAddWasteDialog(true);
+                          }}
+                          variant="outline"
+                          className="h-9 border-orange-200 bg-orange-50/30 text-orange-700 hover:bg-orange-50 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-orange-600" />
+                          Log Waste
+                        </Button>
+
+                        <Button
+                          onClick={() => {
+                            setMobileAddExcessForm({
+                              material_id: material.material_id,
+                              material_name: material.material_name,
+                              material_type: 'raw_material',
+                              quantity: '',
+                              unit: material.unit || '',
+                            });
+                            setShowMobileAddExcessDialog(true);
+                          }}
+                          variant="outline"
+                          className="h-9 border-amber-200 bg-amber-50/30 text-amber-700 hover:bg-amber-100 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-amber-600" />
+                          Record Extra
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <Button
+                  onClick={() => {
+                    setMobileAddWasteForm({
+                      material_id: '',
+                      material_name: '',
+                      material_type: 'raw_material',
+                      quantity: '',
+                      unit: '',
+                      waste_type: '',
+                      waste_category: 'disposable',
+                      notes: '',
+                    });
+                    setShowMobileAddWasteDialog(true);
+                  }}
+                  variant="outline"
+                  className="w-full py-5 border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50/30 text-gray-500 hover:text-blue-600 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  Log Waste for Other Material
+                </Button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* All Wastage Records Summary */}
+        {wasteItems.length > 0 && (
+          <div className="space-y-2.5">
+            <span className="block text-xs font-bold text-gray-500 uppercase tracking-wider px-0.5">
+              All Wastage Records ({wasteItems.length})
+            </span>
+            <div className="bg-white border border-gray-150 rounded-xl overflow-hidden divide-y divide-gray-100 shadow-sm">
+              {wasteItems.map((w, i) => (
+                <div key={w.id || i} className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-150 flex items-center justify-center text-gray-400 shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h5 className="text-xs font-bold text-gray-800 truncate max-w-[170px]">{w.material_name}</h5>
+                      <p className="text-[10px] text-gray-500 font-semibold mt-0.5">
+                        {Number(w.quantity).toFixed(2)} {w.unit} · <span className="capitalize">{w.waste_type.replace(/_/g, ' ')}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase shrink-0 ${w.waste_category === 'reusable' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                    {w.waste_category === 'reusable' ? 'Reusable' : 'Disposable'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Sticky Bottom Complete Button Footer */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 p-3 z-20 shadow-lg flex flex-col gap-2">
+          {!canNavigate && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-[10px] font-bold">
+              <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 shrink-0" />
+              <span>Please select wastage or mark "No Wastage" for all product materials.</span>
+            </div>
+          )}
+          <Button
+            onClick={handleCompleteProductionMobile}
+            disabled={!canNavigate || updatingStatus}
+            className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 font-bold py-5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-md"
+          >
+            {updatingStatus ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-white" />
+                <span>Completing...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="w-4 h-4 text-white" />
+                <span>Complete Production</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+
+
+      {/* Mobile Forward Dialog */}
+      <Dialog open={mobileShowForwardDialog} onOpenChange={setMobileShowForwardDialog}>
+        <DialogContent className="fixed bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-w-full lg:left-[50%] lg:top-[50%] lg:translate-x-[-50%] lg:translate-y-[-50%] lg:max-w-sm rounded-t-3xl lg:rounded-2xl border-t border-x-0 border-b-0 lg:border border-gray-200 bg-white shadow-2xl duration-300 animate-in slide-in-from-bottom">
+          <div className="flex justify-center -mt-2 mb-2 shrink-0 lg:hidden">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Production Completed!
+            </DialogTitle>
+          </DialogHeader>
+          {(batch.order_id || '').startsWith('SUB-') ? (
+            <>
+              <p className="text-sm text-gray-600">
+                This is a sub-production batch. Notify the parent batch owner that <strong>{batch.product_name || 'Sub-product'}</strong> is ready so they can continue their production.
+              </p>
+              <div className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2 text-xs text-green-800">
+                <span className="font-semibold">{batch.product_name || 'Sub-product'}</span> completed. Click "Notify Parent" to let the main batch owner know they can continue.
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-gray-600">
+                Do you want to assign next-stage work for attached orders to another user?
+              </p>
+              <div className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2 text-xs text-green-800">
+                Current stage <span className="font-semibold">{batch.product_name || 'This product'}</span> is completed. Select remaining next-stage items to assign.
+              </div>
+              {nextStageTasks.length > 0 && (
+                <div className="max-h-44 overflow-y-auto border rounded-xl p-2 bg-gray-50 text-xs text-gray-700 space-y-1">
+                  {nextStageTasks.map((task, index) => {
+                    const key = `${task.orderId}::${task.productId}`;
+                    const checked = mobileSelectedTaskKeys.has(key);
+                    return (
+                      <label
+                        key={`${task.orderId}-${task.productId}-${index}`}
+                        className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 cursor-pointer ${
+                          checked ? 'bg-blue-50 border-blue-200 text-blue-900 font-bold' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 text-blue-600 rounded"
+                          checked={checked}
+                          onChange={(e) => {
+                            setMobileSelectedTaskKeys((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(key);
+                              else next.delete(key);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span>
+                          <span className="font-bold">{task.orderNumber}</span> · {task.customerName} · {task.productName} · Qty: {task.requiredQuantity}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+          <DialogFooter className="flex flex-row gap-2 mt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setMobileShowForwardDialog(false);
+                navigate('/production', { state: { section: location.state?.section || 'assigned' } });
+              }}
+            >
+              No, Skip
+            </Button>
+            <Button
+              onClick={async () => {
+                setMobileShowForwardDialog(false);
+                if ((batch.order_id || '').startsWith('SUB-')) {
+                  await handleAssignForwardMobile('system', 'system');
+                } else {
+                  setMobileShowAssignModal(true);
+                }
+              }}
+              disabled={(batch.order_id || '').startsWith('SUB-') ? false : (nextStageTasks.length === 0 || mobileSelectedTaskKeys.size === 0)}
+              className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              {(batch.order_id || '').startsWith('SUB-') ? 'Notify Parent' : 'Yes, Forward'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Assign User Modal */}
+      <AssignUserModal
+        open={mobileShowAssignModal}
+        onClose={() => setMobileShowAssignModal(false)}
+        onAssign={handleAssignForwardMobile}
+        title="Assign Next-Stage Tasks"
+        description="Select user who will handle the next stage tasks for attached orders."
+        confirmLabel="Assign Tasks"
+        extraContent={
+          nextStageTasks.length > 0 ? (
+            <div className="rounded-xl border border-blue-150 bg-blue-50 p-3 text-xs text-blue-900 max-h-40 overflow-y-auto space-y-1">
+              {nextStageTasks
+                .filter((task) => mobileSelectedTaskKeys.has(`${task.orderId}::${task.productId}`))
+                .map((task, index) => (
+                  <div key={`${task.orderId}-${task.productId}-${index}`} className="font-bold">
+                    {task.orderNumber} · {task.productName} · Qty {task.requiredQuantity}
+                  </div>
+                ))}
+            </div>
+          ) : undefined
+        }
+      />
+
+      {/* Mobile Raw Material Selector Sheet */}
+      <Dialog open={showMobileMaterialPicker} onOpenChange={setShowMobileMaterialPicker}>
+        <DialogContent className="fixed bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-w-full lg:left-[50%] lg:top-[50%] lg:translate-x-[-50%] lg:translate-y-[-50%] lg:max-w-sm rounded-t-3xl lg:rounded-2xl border-t border-x-0 border-b-0 lg:border border-gray-200 bg-white shadow-2xl duration-300 animate-in slide-in-from-bottom">
+          <div className="flex justify-center -mt-2 mb-2 shrink-0 lg:hidden">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-gray-900">Select Raw Material</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 max-h-60 overflow-y-auto">
+            {rawMaterials.length === 0 ? (
+              <p className="text-gray-400 text-center text-sm py-6 font-semibold">No raw materials consumed</p>
+            ) : (
+              rawMaterials.map((mat) => {
+                const isSelected = materialPickerTarget === 'waste'
+                  ? mobileAddWasteForm.material_id === mat.material_id
+                  : mobileAddExcessForm.material_id === mat.material_id;
+                return (
+                  <button
+                    key={mat.material_id}
+                    onClick={() => {
+                      if (materialPickerTarget === 'waste') {
+                        setMobileAddWasteForm(prev => ({
+                          ...prev,
+                          material_id: mat.material_id,
+                          material_name: mat.material_name,
+                          unit: mat.unit,
+                        }));
+                      } else {
+                        setMobileAddExcessForm(prev => ({
+                          ...prev,
+                          material_id: mat.material_id,
+                          material_name: mat.material_name,
+                          unit: mat.unit,
+                        }));
+                      }
+                      setShowMobileMaterialPicker(false);
+                    }}
+                    type="button"
+                    className={`w-full text-left px-4 py-3 text-xs font-bold rounded-xl border transition-all flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-orange-50 text-orange-700 border-orange-300 shadow-sm'
+                        : 'bg-white hover:bg-gray-50 border-gray-150 text-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-3.5 h-3.5 text-gray-450" />
+                      <span>{mat.material_name}</span>
+                    </div>
+                    {isSelected && (
+                      <CheckCircle className="w-4 h-4 text-orange-600 shrink-0" />
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="w-full h-10 text-xs font-bold rounded-xl" onClick={() => setShowMobileMaterialPicker(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Log Raw Material Waste Dialog */}
+      <Dialog open={showMobileAddWasteDialog} onOpenChange={setShowMobileAddWasteDialog}>
+        <DialogContent className="fixed bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-w-full lg:left-[50%] lg:top-[50%] lg:translate-x-[-50%] lg:translate-y-[-50%] lg:max-w-sm rounded-t-3xl lg:rounded-2xl border-t border-x-0 border-b-0 lg:border border-gray-200 bg-white shadow-2xl duration-300 animate-in slide-in-from-bottom">
+          <div className="flex justify-center -mt-2 mb-2 shrink-0 lg:hidden">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-gray-900">Log Raw Material Waste</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3.5 py-2">
+            {/* Select Material */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Material *</span>
+              {mobileAddWasteForm.material_id ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-orange-950 font-bold text-xs">
+                  <Layers className="w-4 h-4 text-orange-600" />
+                  <span>{mobileAddWasteForm.material_name}</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMaterialPickerTarget('waste');
+                    setShowMobileMaterialPicker(true);
+                  }}
+                  type="button"
+                  className="w-full h-10 px-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between text-xs font-semibold hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-gray-400 font-medium">Select material...</span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
+
+            {/* Waste Quantity */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">
+                Waste Qty {mobileAddWasteForm.unit ? `(${mobileAddWasteForm.unit})` : ''} *
+              </span>
+              <div className="relative flex items-center">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={mobileAddWasteForm.quantity}
+                  onChange={(e) => setMobileAddWasteForm(prev => ({ ...prev, quantity: e.target.value }))}
+                  className="h-11 text-sm font-bold pr-12 rounded-xl focus-visible:ring-orange-500 border-gray-200"
+                />
+                {mobileAddWasteForm.unit && (
+                  <span className="absolute right-3 text-xs font-bold text-gray-400 bg-gray-105 px-2 py-0.5 rounded-md">
+                    {mobileAddWasteForm.unit}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Waste Type */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Waste Type *</span>
+              <div className="flex flex-wrap gap-2 py-1">
+                {wasteTypes.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 italic">No waste types configured</p>
+                ) : (
+                  wasteTypes.map((type) => {
+                    const isSelected = mobileAddWasteForm.waste_type === type;
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => setMobileAddWasteForm(prev => ({ ...prev, waste_type: type }))}
+                        type="button"
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                          isSelected
+                            ? 'bg-orange-600 border-orange-600 text-white shadow-sm'
+                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        {type.replace(/_/g, ' ')}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Waste Category Switch */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5 font-sans">Category</span>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'reusable', label: 'Reusable', activeClass: 'bg-green-600 border-green-600 text-white shadow-sm', inactiveClass: 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100' },
+                  { value: 'disposable', label: 'Disposable', activeClass: 'bg-red-600 border-red-600 text-white shadow-sm', inactiveClass: 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100' }
+                ].map(cat => {
+                  const active = mobileAddWasteForm.waste_category === cat.value;
+                  return (
+                    <button
+                      key={cat.value}
+                      onClick={() => setMobileAddWasteForm(prev => ({ ...prev, waste_category: cat.value }))}
+                      type="button"
+                      className={`py-2 border text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 ${active ? cat.activeClass : cat.inactiveClass}`}
+                    >
+                      {cat.value === 'reusable' ? (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      {cat.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Notes (optional)</span>
+              <Input
+                placeholder="Reason or log notes..."
+                value={mobileAddWasteForm.notes}
+                onChange={(e) => setMobileAddWasteForm(prev => ({ ...prev, notes: e.target.value }))}
+                className="h-10 text-xs rounded-xl focus-visible:ring-orange-500 border-gray-200"
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex flex-row gap-2.5 mt-4 pt-2 border-t border-gray-100">
+            <Button variant="outline" className="flex-1 h-10 text-xs font-bold rounded-xl" onClick={() => {
+              setShowMobileAddWasteDialog(false);
+              setMobileAddWasteForm({
+                material_id: '',
+                material_name: '',
+                material_type: 'raw_material',
+                quantity: '',
+                unit: '',
+                waste_type: '',
+                waste_category: 'disposable',
+                notes: '',
+              });
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMobileAddWaste}
+              disabled={updatingStatus}
+              className="flex-1 h-10 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
+            >
+              {updatingStatus ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Waste</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Record Extra Material Used Dialog */}
+      <Dialog open={showMobileAddExcessDialog} onOpenChange={setShowMobileAddExcessDialog}>
+        <DialogContent className="fixed bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-w-full lg:left-[50%] lg:top-[50%] lg:translate-x-[-50%] lg:translate-y-[-50%] lg:max-w-sm rounded-t-3xl lg:rounded-2xl border-t border-x-0 border-b-0 lg:border border-gray-200 bg-white shadow-2xl duration-300 animate-in slide-in-from-bottom">
+          <div className="flex justify-center -mt-2 mb-2 shrink-0 lg:hidden">
+            <div className="w-10 h-1 rounded-full bg-gray-200" />
+          </div>
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-gray-900">Record Extra Material Used</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3.5 py-2">
+            {/* Select Material */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">Material *</span>
+              {mobileAddExcessForm.material_id ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl text-amber-950 font-bold text-xs">
+                  <Layers className="w-4 h-4 text-amber-600" />
+                  <span>{mobileAddExcessForm.material_name}</span>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMaterialPickerTarget('excess');
+                    setShowMobileMaterialPicker(true);
+                  }}
+                  type="button"
+                  className="w-full h-10 px-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between text-xs font-semibold hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-gray-400 font-medium">Select material...</span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
+
+            {/* Extra Quantity */}
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-extrabold text-gray-500 uppercase px-0.5">
+                Extra Qty {mobileAddExcessForm.unit ? `(${mobileAddExcessForm.unit})` : ''} *
+              </span>
+              <div className="relative flex items-center">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={mobileAddExcessForm.quantity}
+                  onChange={(e) => setMobileAddExcessForm(prev => ({ ...prev, quantity: e.target.value }))}
+                  className="h-11 text-sm font-bold pr-12 rounded-xl focus-visible:ring-amber-500 border-gray-200"
+                />
+                {mobileAddExcessForm.unit && (
+                  <span className="absolute right-3 text-xs font-bold text-gray-400 bg-gray-105 px-2 py-0.5 rounded-md">
+                    {mobileAddExcessForm.unit}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex flex-row gap-2.5 mt-4 pt-2 border-t border-gray-100">
+            <Button variant="outline" className="flex-1 h-10 text-xs font-bold rounded-xl" onClick={() => {
+              setShowMobileAddExcessDialog(false);
+              setMobileAddExcessForm({
+                material_id: '',
+                material_name: '',
+                material_type: 'raw_material',
+                quantity: '',
+                unit: '',
+              });
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveMobileAddExcess}
+              disabled={updatingStatus}
+              className="flex-1 h-10 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
+            >
+              {updatingStatus ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Recording...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Record Extra</span>
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

@@ -132,14 +132,16 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
       // Load individual products count for this batch (match batch.id or batch.batch_number)
       try {
         const { IndividualProductService } = await import('@/services/individualProductService');
-        const { products: individualProducts } = await IndividualProductService.getIndividualProducts({
-          product_id: batch.product_id,
+        const [resById, resByNum] = await Promise.all([
+          IndividualProductService.getIndividualProducts({ batch_number: batch.id, limit: 1000 }),
+          IndividualProductService.getIndividualProducts({ batch_number: batch.batch_number, limit: 1000 })
+        ]);
+        const merged = [...(resById.products || []), ...(resByNum.products || [])];
+        const uniqueMap = new Map();
+        merged.forEach((p: any) => {
+          if (p.id) uniqueMap.set(p.id, p);
         });
-        // Products are stored with batch_number = batch.id (the id field, e.g. "BATCH-260514-007").
-        // Also check batch.batch_number for legacy data.
-        const batchProducts = individualProducts.filter(
-          (p: any) => p.batch_number === batch.id || p.batch_number === batch.batch_number
-        );
+        const batchProducts = Array.from(uniqueMap.values());
         setIndividualProductsCount(batchProducts.length);
         console.log('📦 Individual products count loaded:', batchProducts.length, '(batch.id:', batch.id, 'batch.batch_number:', batch.batch_number, ')');
       } catch (error) {
@@ -457,7 +459,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">#</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Product ID</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">QR Code</th>
-                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Serial Number</th>
+                                        <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Roll Number</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Size (L × W)</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">GSM</th>
                                         <th className="border border-blue-300 px-2 py-2 text-left font-semibold text-blue-900">Color</th>
@@ -477,7 +479,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                             <td className="border border-gray-200 px-2 py-2 text-gray-600">{idx + 1}</td>
                                             <td className="border border-gray-200 px-2 py-2 font-medium text-gray-900">{product.id || '—'}</td>
                                             <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.qr_code || '—'}</td>
-                                            <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.serial_number || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.roll_number || '—'}</td>
                                             <td className="border border-gray-200 px-2 py-2 text-gray-900">
                                               {product.length && product.width ? (
                                                 <>
@@ -889,7 +891,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">#</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Product ID</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">QR Code</th>
-                                          <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Serial Number</th>
+                                          <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Roll Number</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Size (L × W)</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">GSM</th>
                                           <th className="border border-red-300 px-2 py-2 text-left font-semibold text-red-900">Color</th>
@@ -902,7 +904,7 @@ export default function ProductionStagesDetailed({ batch }: ProductionStagesDeta
                                             <td className="border border-gray-200 px-2 py-2 text-gray-600">{idx + 1}</td>
                                             <td className="border border-gray-200 px-2 py-2 font-medium text-gray-900">{product.id || '—'}</td>
                                             <td className="border border-gray-200 px-2 py-2 text-gray-900">{product.qr_code || '—'}</td>
-                                            <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.serial_number || '—'}</td>
+                                            <td className="border border-gray-200 px-2 py-2 text-gray-900 text-[10px] break-all max-w-[200px]">{product.roll_number || '—'}</td>
                                             <td className="border border-gray-200 px-2 py-2 text-gray-900">
                                               {product.length && product.width ? (
                                                 <>

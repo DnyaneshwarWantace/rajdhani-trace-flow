@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +18,7 @@ import MaterialUnitSection from './form/MaterialUnitSection';
 import MaterialStockSection from './form/MaterialStockSection';
 import MaterialCostSection from './form/MaterialCostSection';
 import MaterialImageUpload from './form/MaterialImageUpload';
+import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from '@/utils/numberValidation';
 
 interface AddToInventoryDialogProps {
   isOpen: boolean;
@@ -524,55 +526,56 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 overflow-hidden"
-      onWheel={(e) => e.stopPropagation()}
-      onTouchMove={(e) => e.preventDefault()}
-      style={{ touchAction: 'none' }}
-      onClick={(e) => {
-        // Do not close on backdrop click - only close via X or Cancel (same as Add Material)
-        if (e.target !== e.currentTarget) return;
-        e.stopPropagation();
-      }}
+  const submitBtn = (
+    <Button 
+      type="submit" 
+      onClick={handleSubmit}
+      disabled={loading}
+      className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
     >
+      {loading ? (
+        <>
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+          Adding...
+        </>
+      ) : (
+        'Add to Inventory'
+      )}
+    </Button>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-50">
+      {/* Mobile: full-screen page */}
       <div
-        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto"
+        className="lg:hidden absolute inset-0 flex flex-col"
+        style={{ backgroundColor: '#F4F5F7' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Add Material to Inventory</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Add a new material directly to your inventory with stock quantity
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            type="button"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
+        {/* Header — white bar with back arrow */}
+        <div className="flex items-center gap-2 bg-white border-b border-gray-200 px-2 py-3 flex-shrink-0">
+          <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center text-gray-800">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
+          <span className="text-[17px] font-bold text-gray-900">Add to Inventory</span>
         </div>
 
-        {/* Scrollable Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-          <MaterialImageUpload
-            imagePreview={imagePreview}
-            onImageChange={handleImageChange}
-            onRemove={handleRemoveImage}
-          />
+        {/* Scrollable form */}
+        <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+          <div className="px-4 py-4 space-y-4">
+            <MaterialImageUpload
+              imagePreview={imagePreview}
+              onImageChange={handleImageChange}
+              onRemove={handleRemoveImage}
+            />
 
-          <MaterialBasicInfo
-            name={formData.name}
-            onNameChange={(value) => setFormData({ ...formData, name: value })}
-            touchedFields={touchedFields}
-            markFieldTouched={markFieldTouched}
-          />
+            <MaterialBasicInfo
+              name={formData.name}
+              onNameChange={(value) => setFormData({ ...formData, name: value })}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
+            />
 
-          <div className="grid grid-cols-2 gap-4">
             <MaterialSupplierSection
               supplier={formData.supplier}
               suppliers={suppliers}
@@ -580,10 +583,11 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
+
             {fixedCategory ? (
               <div>
-                <Label htmlFor="category-fixed">Category</Label>
-                <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
+                <Label htmlFor="category-fixed-m">Category</Label>
+                <p id="category-fixed-m" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-white rounded-xl border border-gray-200">
                   {fixedCategory}
                 </p>
               </div>
@@ -597,10 +601,8 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
                 markFieldTouched={markFieldTouched}
               />
             )}
-          </div>
 
-          {/* Material Type and Unit on same line */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* Type + Color info */}
             <MaterialTypeSection
               type={formData.type}
               color={formData.color}
@@ -610,7 +612,7 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
                 setFormData({
                   ...formData,
                   type: value,
-                  color: value !== 'color' ? '' : formData.color, // Keep color if type is 'color', otherwise clear
+                  color: value !== 'color' ? '' : formData.color,
                 })
               }
               onColorChange={(value) => setFormData({ ...formData, color: value })}
@@ -625,72 +627,298 @@ export default function AddToInventoryDialog({ isOpen, onClose, onSuccess, fixed
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
-          </div>
 
-          <MaterialStockSection
-            currentStock={formData.currentStock}
-            minThreshold={formData.minThreshold}
-            maxCapacity={formData.maxCapacity}
-            showCurrentStock={true}
-            isCurrentStockEditable={true}
-            onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
-            onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
-            onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
-            touchedFields={touchedFields}
-            markFieldTouched={markFieldTouched}
-          />
+            {/* Stock Levels */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Stock Levels</p>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="currentStockM">Current Stock *</Label>
+                <Input
+                  id="currentStockM"
+                  type="number"
+                  value={formData.currentStock}
+                  onChange={(e) => {
+                    const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
+                    setFormData({ ...formData, currentStock: validation.value });
+                  }}
+                  onKeyDown={(e) => preventInvalidNumberKeys(e)}
+                  onBlur={() => markFieldTouched('currentStock')}
+                  min="0"
+                  max="99999.99"
+                  step="0.01"
+                  className={`h-[46px] rounded-xl ${
+                    touchedFields.has('currentStock') && 
+                    (!formData.currentStock || formData.currentStock.trim() === '' || parseFloat(formData.currentStock) < 0 || isNaN(parseFloat(formData.currentStock)))
+                      ? 'border-red-500'
+                      : ''
+                  }`}
+                  placeholder="0"
+                />
+                {touchedFields.has('currentStock') && 
+                  (!formData.currentStock || formData.currentStock.trim() === '' || parseFloat(formData.currentStock) < 0 || isNaN(parseFloat(formData.currentStock))) && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Current stock is required and must be {">= 0"}
+                  </p>
+                )}
+              </div>
 
-          {/* Reorder Point and Cost/Unit on same line */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="reorderPoint">Reorder Point</Label>
-              <Input
-                id="reorderPoint"
-                type="text"
-                value={formData.reorderPoint}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  const value = e.target.value;
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    setFormData({ ...formData, reorderPoint: value });
-                  }
-                }}
-                placeholder="50 (auto-set if empty)"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed (default: 50)</p>
+              <div>
+                <Label htmlFor="minThresholdM">Min Threshold</Label>
+                <Input
+                  id="minThresholdM"
+                  type="number"
+                  value={formData.minThreshold}
+                  onChange={(e) => {
+                    const validation = validateNumberInput(e.target.value, ValidationPresets.STOCK_LEVEL);
+                    setFormData({ ...formData, minThreshold: validation.value });
+                  }}
+                  onKeyDown={(e) => preventInvalidNumberKeys(e)}
+                  min="0"
+                  max="99999"
+                  step="1"
+                  className="h-[46px] rounded-xl"
+                  placeholder="10"
+                />
+              </div>
             </div>
 
-            <MaterialCostSection
-              costPerUnit={formData.costPerUnit}
-              onCostPerUnitChange={(value: string) => setFormData({ ...formData, costPerUnit: value })}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="maxCapacityM">Max Capacity</Label>
+                <Input
+                  id="maxCapacityM"
+                  type="number"
+                  value={formData.maxCapacity}
+                  onChange={(e) => {
+                    const validation = validateNumberInput(e.target.value, ValidationPresets.MATERIAL_QUANTITY);
+                    setFormData({ ...formData, maxCapacity: validation.value });
+                  }}
+                  onKeyDown={(e) => preventInvalidNumberKeys(e)}
+                  min="0"
+                  max="99999.99"
+                  step="0.01"
+                  className="h-[46px] rounded-xl"
+                  placeholder="1000"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="reorderPointM">Reorder Point</Label>
+                <Input
+                  id="reorderPointM"
+                  type="text"
+                  value={formData.reorderPoint}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setFormData({ ...formData, reorderPoint: value });
+                    }
+                  }}
+                  className="h-[46px] rounded-xl"
+                  placeholder="50"
+                />
+              </div>
+            </div>
+
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Pricing</p>
+            <div>
+              <Label htmlFor="costPerUnitM">Cost / Unit (₹) *</Label>
+              <Input
+                id="costPerUnitM"
+                type="number"
+                value={formData.costPerUnit}
+                onChange={(e) => {
+                  const validation = validateNumberInput(e.target.value, ValidationPresets.PRICE);
+                  setFormData({ ...formData, costPerUnit: validation.value });
+                }}
+                onKeyDown={(e) => preventInvalidNumberKeys(e)}
+                onBlur={() => markFieldTouched('costPerUnit')}
+                min="0"
+                max="999999.99"
+                step="0.01"
+                className={`h-[46px] rounded-xl ${
+                  touchedFields.has('costPerUnit') && 
+                  (!formData.costPerUnit || formData.costPerUnit.trim() === '' || parseFloat(formData.costPerUnit) < 0 || isNaN(parseFloat(formData.costPerUnit)))
+                    ? 'border-red-500'
+                    : ''
+                }`}
+                placeholder="0.00"
+              />
+              {touchedFields.has('costPerUnit') && 
+                (!formData.costPerUnit || formData.costPerUnit.trim() === '' || parseFloat(formData.costPerUnit) < 0 || isNaN(parseFloat(formData.costPerUnit))) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Cost per unit is required and must be {">= 0"}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Sticky footer */}
+        <div className="px-4 py-4 bg-white border-t border-gray-200 flex gap-3 flex-shrink-0">
+          <button onClick={handleClose} className="flex-1 h-12 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 bg-white">
+            Cancel
+          </button>
+          {submitBtn}
+        </div>
+      </div>
+
+      {/* Desktop: centered modal with backdrop */}
+      <div
+        className="hidden lg:block absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={handleClose}
+      />
+      <div
+        className="hidden lg:flex absolute inset-0 items-center justify-center p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-xl">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Add Material to Inventory</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Add a new material directly to your inventory with stock quantity
+              </p>
+            </div>
+            <button onClick={handleClose} type="button" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+            <MaterialImageUpload
+              imagePreview={imagePreview}
+              onImageChange={handleImageChange}
+              onRemove={handleRemoveImage}
+            />
+
+            <MaterialBasicInfo
+              name={formData.name}
+              onNameChange={(value) => setFormData({ ...formData, name: value })}
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
-          </div>
-        </form>
 
-        {/* Fixed Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button 
-            type="submit" 
-            onClick={handleSubmit}
-            disabled={loading}
-            className="bg-primary-600 text-white hover:bg-primary-700"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Adding to Inventory...
-              </>
-            ) : (
-              'Add to Inventory'
-            )}
-          </Button>
+            <div className="grid grid-cols-2 gap-4">
+              <MaterialSupplierSection
+                supplier={formData.supplier}
+                suppliers={suppliers}
+                onSupplierChange={(value) => setFormData({ ...formData, supplier: value })}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
+              />
+              {fixedCategory ? (
+                <div>
+                  <Label htmlFor="category-fixed">Category</Label>
+                  <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
+                    {fixedCategory}
+                  </p>
+                </div>
+              ) : (
+                <MaterialCategorySection
+                  category={formData.category}
+                  categories={categories}
+                  onCategoryChange={(value) => setFormData({ ...formData, category: value })}
+                  onCategoriesReload={loadDropdowns}
+                  touchedFields={touchedFields}
+                  markFieldTouched={markFieldTouched}
+                />
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <MaterialTypeSection
+                type={formData.type}
+                color={formData.color}
+                types={types}
+                colors={colors}
+                onTypeChange={(value: string) =>
+                  setFormData({
+                    ...formData,
+                    type: value,
+                    color: value !== 'color' ? '' : formData.color,
+                  })
+                }
+                onColorChange={(value) => setFormData({ ...formData, color: value })}
+                onTypesReload={loadDropdowns}
+              />
+
+              <MaterialUnitSection
+                unit={formData.unit}
+                units={units}
+                onUnitChange={(value) => setFormData({ ...formData, unit: value })}
+                onUnitsReload={loadDropdowns}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
+              />
+            </div>
+
+            <MaterialStockSection
+              currentStock={formData.currentStock}
+              minThreshold={formData.minThreshold}
+              maxCapacity={formData.maxCapacity}
+              showCurrentStock={true}
+              isCurrentStockEditable={true}
+              onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
+              onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
+              onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
+              touchedFields={touchedFields}
+              markFieldTouched={markFieldTouched}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="reorderPoint">Reorder Point</Label>
+                <Input
+                  id="reorderPoint"
+                  type="text"
+                  value={formData.reorderPoint}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setFormData({ ...formData, reorderPoint: value });
+                    }
+                  }}
+                  placeholder="50 (auto-set if empty)"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed (default: 50)</p>
+              </div>
+
+              <MaterialCostSection
+                costPerUnit={formData.costPerUnit}
+                onCostPerUnitChange={(value: string) => setFormData({ ...formData, costPerUnit: value })}
+                touchedFields={touchedFields}
+                markFieldTouched={markFieldTouched}
+              />
+            </div>
+          </form>
+
+          <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-primary-600 text-white hover:bg-primary-700 font-bold"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Adding to Inventory...
+                </>
+              ) : (
+                'Add to Inventory'
+              )}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

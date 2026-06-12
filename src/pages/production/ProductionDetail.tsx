@@ -279,7 +279,7 @@ export default function ProductionDetail() {
         <ProductionStagesDetailed batch={batch} />
 
         {/* Individual Products Created in This Batch */}
-        {batch.status === 'completed' && (
+        {batch.status !== 'planned' && (
           <ProductionIndividualProducts batch={batch} />
         )}
 

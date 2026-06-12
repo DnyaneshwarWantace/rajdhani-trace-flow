@@ -26,6 +26,16 @@ import {
   CheckCircle,
   Info,
   Trash2,
+  Factory,
+  Package,
+  ShoppingCart,
+  Users,
+  Building2,
+  ChefHat,
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  ListFilter,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,6 +89,7 @@ export default function Notifications() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -645,10 +656,10 @@ export default function Notifications() {
       setDeleting(false);
     }
   }, [selectedIds, toast]);
-
   return (
     <Layout>
-      <div>
+      {/* ─── DESKTOP VIEW ────────────────────────────────────────────── */}
+      <div className="hidden lg:block">
         {/* Header */}
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -746,7 +757,7 @@ export default function Notifications() {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Total</p>
+                    <p className="text-sm text-gray-605">Total</p>
                     <p className="text-2xl font-bold text-gray-700">{totalNotifications}</p>
                   </div>
                   <Info className="w-8 h-8 text-gray-600 opacity-50" />
@@ -891,7 +902,7 @@ export default function Notifications() {
           <Card>
             <CardContent className="p-12 text-center">
               <Bell className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600 text-lg">No notifications found</p>
+              <p className="text-gray-600 text-lg">No notifications found</p>
               <p className="text-gray-500 text-sm mt-2">Try adjusting your filters</p>
             </CardContent>
           </Card>
@@ -937,15 +948,14 @@ export default function Notifications() {
                       onClick={() => {
                         if (currentPage > 1) setPage(currentPage - 1);
                       }}
-                      className={`${
-                        currentPage === 1
+                      className={`${currentPage === 1
                           ? 'pointer-events-none opacity-50'
                           : 'cursor-pointer'
-                      } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                        } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
                     />
                   </PaginationItem>
 
-                  {/* Page Numbers - same responsive behaviour as ProductPagination */}
+                  {/* Page Numbers */}
                   {pages.map((p, index) => (
                     <PaginationItem
                       key={index}
@@ -957,13 +967,12 @@ export default function Notifications() {
                         <PaginationLink
                           isActive={p === currentPage}
                           onClick={() => setPage(p as number)}
-                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
-                            Math.abs((p as number) - currentPage) > 1 &&
-                            (p as number) !== 1 &&
-                            (p as number) !== totalPages
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${Math.abs((p as number) - currentPage) > 1 &&
+                              (p as number) !== 1 &&
+                              (p as number) !== totalPages
                               ? 'hidden sm:flex'
                               : ''
-                          }`}
+                            }`}
                         >
                           {p}
                         </PaginationLink>
@@ -976,11 +985,10 @@ export default function Notifications() {
                       onClick={() => {
                         if (currentPage < totalPages) setPage(currentPage + 1);
                       }}
-                      className={`${
-                        currentPage >= totalPages
+                      className={`${currentPage >= totalPages
                           ? 'pointer-events-none opacity-50'
                           : 'cursor-pointer'
-                      } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
+                        } h-8 w-8 sm:h-10 sm:w-auto text-xs sm:text-sm`}
                     />
                   </PaginationItem>
                 </PaginationContent>
@@ -993,7 +1001,7 @@ export default function Notifications() {
                   {isActivityTab ? 'logs' : 'notifications'}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                  <span className="text-xs sm:text-sm text-gray-605 whitespace-nowrap">
                     Per page:
                   </span>
                   <Select
@@ -1052,7 +1060,7 @@ export default function Notifications() {
                     />
                   </PaginationItem>
 
-                  {/* Page Numbers - same responsive behaviour as ProductPagination */}
+                  {/* Page Numbers */}
                   {pages.map((p, index) => (
                     <PaginationItem
                       key={index}
@@ -1064,13 +1072,12 @@ export default function Notifications() {
                         <PaginationLink
                           isActive={p === currentPage}
                           onClick={() => setPage(p as number)}
-                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${
-                            Math.abs((p as number) - currentPage) > 1 &&
-                            (p as number) !== 1 &&
-                            (p as number) !== totalPages
+                          className={`cursor-pointer h-8 w-8 sm:h-10 sm:w-10 text-xs sm:text-sm p-0 ${Math.abs((p as number) - currentPage) > 1 &&
+                              (p as number) !== 1 &&
+                              (p as number) !== totalPages
                               ? 'hidden sm:flex'
                               : ''
-                          }`}
+                            }`}
                         >
                           {p}
                         </PaginationLink>
@@ -1119,30 +1126,432 @@ export default function Notifications() {
                 </div>
               </div>
             </div>
-
           </div>
         )}
       </div>
 
-        {/* Delete confirmation (admin only) */}
-        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Delete selected notifications?</DialogTitle>
-              <DialogDescription>
-                This will permanently delete {selectedIds.size} notification(s) or log(s). This action cannot be undone. Only admins can delete notifications.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
-                Cancel
-              </Button>
-              <Button variant="destructive" onClick={confirmDeleteSelected} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
-                {deleting ? 'Deleting...' : 'Delete permanently'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {/* ─── MOBILE VIEW ─────────────────────────────────────────────── */}
+      <div className="lg:hidden -m-2 sm:-m-3 flex flex-col bg-[#F3F4F6] min-h-screen pb-24">
+        {/* Mobile Header */}
+        <div className="bg-white border-b border-gray-200 px-4 pt-3.5 pb-3.5 shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none">
+                {activeTab === 'activity_logs' ? 'Activity Logs' : 'Notifications'}
+              </h1>
+              <p className="text-[11px] text-gray-500 mt-1.5">
+                {activeTab === 'activity_logs'
+                  ? `System action logs • Total: ${totalActivityLogs}`
+                  : `Your system notifications • Total: ${totalNotifications}`}
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {activeTab === 'all' && unreadCount > 0 && (
+                <button
+                  onClick={handleMarkAllAsRead}
+                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-white bg-blue-600 active:bg-blue-700 transition-all shadow-sm select-none"
+                >
+                  Mark All Read
+                </button>
+              )}
+              {hasMore && (
+                <button
+                  onClick={handleLoadAll}
+                  disabled={loadingMore}
+                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-gray-200 text-gray-700 bg-white active:bg-gray-50 transition-all select-none"
+                >
+                  {loadingMore ? 'Loading...' : 'Load All'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* High-Level Tab Bar (Notifications vs Activity Logs) */}
+        <div className="bg-white border-b border-gray-200 px-2 py-2 flex gap-1 w-full justify-between shrink-0 select-none">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 min-w-0 px-1.5 py-2 text-[11px] font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'all'
+                ? 'bg-blue-50 text-[#0066FF] shadow-sm'
+                : 'text-gray-500 active:bg-gray-100'
+              }`}
+          >
+            <Bell className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Notifications</span>
+            {allUnreadCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-red-500 text-white rounded-full leading-none flex items-center justify-center min-w-[15px] h-[15px]">
+                {allUnreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('activity_logs')}
+            className={`flex-1 min-w-0 px-1.5 py-2 text-[11px] font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'activity_logs'
+                ? 'bg-blue-50 text-[#0066FF] shadow-sm'
+                : 'text-gray-500 active:bg-gray-100'
+              }`}
+          >
+            <Activity className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Activity Logs</span>
+          </button>
+        </div>
+
+        {/* Category Tabs - horizontally scrollable bar */}
+        <div className="bg-white border-b border-gray-100 px-3 py-2.5 shrink-0 overflow-x-auto scrollbar-none flex gap-2 select-none">
+          {(activeTab === 'all' ? [
+            { id: 'all', label: 'All Notifications', icon: Bell },
+            { id: 'material', label: 'Material', icon: Factory },
+            { id: 'product', label: 'Product', icon: Package },
+            { id: 'order', label: 'Order', icon: ShoppingCart },
+            { id: 'customer', label: 'Customer', icon: Users },
+            { id: 'supplier', label: 'Supplier', icon: Building2 },
+            { id: 'production', label: 'Production', icon: ChefHat },
+          ] : [
+            { id: 'all', label: 'All Logs', icon: Activity },
+            { id: 'material', label: 'Material', icon: Factory },
+            { id: 'product', label: 'Product', icon: Package },
+            { id: 'order', label: 'Order', icon: ShoppingCart },
+            { id: 'customer', label: 'Customer', icon: Users },
+            { id: 'supplier', label: 'Supplier', icon: Building2 },
+            { id: 'production', label: 'Production', icon: ChefHat },
+          ]).map((category) => {
+            const Icon = category.icon;
+            const count = activeTab === 'all'
+              ? notificationCategoryCounts[category.id] || 0
+              : categoryCounts[category.id] || 0;
+            const isActive = activeTab === 'all'
+              ? activeNotificationCategory === category.id
+              : activeLogCategory === category.id;
+
+            return (
+              <button
+                key={category.id}
+                onClick={() => {
+                  if (activeTab === 'all') {
+                    setActiveNotificationCategory(category.id);
+                  } else {
+                    setActiveLogCategory(category.id);
+                  }
+                }}
+                className={`flex-shrink-0 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 ${isActive
+                    ? 'bg-blue-50 text-[#0066FF] border border-blue-100'
+                    : 'bg-gray-100 text-gray-500 active:bg-gray-200'
+                  }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span>{category.label.split(' ')[0]}</span>
+                {count > 0 && (
+                  <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-extrabold leading-none ${isActive ? 'bg-[#0066FF] text-white' : 'bg-gray-200 text-gray-600'
+                    }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Mobile Stats (only for notifications tab) */}
+        {activeTab === 'all' && (
+          <div className="grid grid-cols-3 gap-2.5 px-3 py-3 shrink-0">
+            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unread</span>
+              <span className="text-lg font-black text-blue-600 mt-0.5">{globalUnread}</span>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Read</span>
+              <span className="text-lg font-black text-gray-550 mt-0.5">{globalRead}</span>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
+              <span className="text-lg font-black text-gray-700 mt-0.5">{totalNotifications}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsible Filter Section button */}
+        {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
+          <div className="px-3 py-1.5 shrink-0">
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="w-full h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-between px-3.5 text-xs font-bold text-gray-750 active:bg-gray-50 shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <ListFilter className="w-4 h-4 text-gray-400" />
+                <span>Filters & Sorting</span>
+                {(monthFilter !== 'all' || filterTypes.length > 0 || filterStatuses.length > 0) && (
+                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                )}
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        )}
+
+        {/* Collapsible filters content */}
+        {showMobileFilters && (activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
+          <div className="px-3 mt-1.5 shrink-0 animate-in slide-in-from-top-2 duration-200">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3.5">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Month</label>
+                <Select value={monthFilter} onValueChange={setMonthFilter}>
+                  <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
+                    <SelectValue placeholder="All time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="font-semibold text-xs">
+                      All time
+                    </SelectItem>
+                    {monthOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Type</label>
+                <MultiSelect
+                  options={[
+                    { label: 'Low Stock', value: 'low_stock' },
+                    { label: 'Restock Request', value: 'restock_request' },
+                    { label: 'Out of Stock', value: 'out_of_stock' },
+                    { label: 'Production Request', value: 'production_request' },
+                    { label: 'Order Alert', value: 'order_alert' },
+                    { label: 'Warning', value: 'warning' },
+                    { label: 'Activity Log', value: 'activity_log' },
+                    { label: 'Info', value: 'info' },
+                    { label: 'Success', value: 'success' },
+                    { label: 'Error', value: 'error' },
+                  ]}
+                  selected={filterTypes}
+                  onChange={setFilterTypes}
+                  placeholder="All Types"
+                  className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Status</label>
+                <MultiSelect
+                  options={[
+                    { label: 'Unread', value: 'unread' },
+                    { label: 'Read', value: 'read' },
+                    { label: 'Dismissed', value: 'dismissed' },
+                  ]}
+                  selected={filterStatuses}
+                  onChange={setFilterStatuses}
+                  placeholder="All Status"
+                  className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Sort by</label>
+                  <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status') => setSortBy(v)}>
+                    <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date" className="text-xs">Date</SelectItem>
+                      <SelectItem value="type" className="text-xs">Type</SelectItem>
+                      <SelectItem value="status" className="text-xs">Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Order</label>
+                  <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
+                    <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc" className="text-xs">Descending</SelectItem>
+                      <SelectItem value="asc" className="text-xs">Ascending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Category-specific filters for Activity Logs on Mobile */}
+        {activeTab === 'activity_logs' && activeLogCategory === 'material' && (
+          <div className="px-3 mt-1.5 shrink-0">
+            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm">
+              <MaterialLogFilters
+                filterAction={materialFilterAction}
+                filterStatus={materialFilterStatus}
+                onActionChange={setMaterialFilterAction}
+                onStatusChange={setMaterialFilterStatus}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Admin select/delete toolbar */}
+        {isAdmin && sortedNotifications.length > 0 && (
+          <div className="px-3 mt-2 shrink-0">
+            <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
+              <div className="flex gap-1.5">
+                <button
+                  onClick={selectAllOnPage}
+                  className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={deselectAll}
+                  className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50"
+                >
+                  Deselect
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold text-gray-500">
+                  {selectedIds.size} selected
+                </span>
+                {selectedIds.size > 0 && (
+                  <button
+                    onClick={handleDeleteSelected}
+                    className="px-2.5 py-1.5 rounded-lg bg-red-650 text-white font-bold text-[10px] active:bg-red-700 flex items-center gap-1 shadow-sm"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Delete ({selectedIds.size})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile List Content */}
+        <div className="flex-1 p-3 overflow-y-auto space-y-3 mt-1.5">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : sortedNotifications.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
+              <Bell className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-700 font-extrabold text-base">No notifications found</p>
+              <p className="text-gray-400 text-xs mt-1">Try adjusting your filters</p>
+            </div>
+          ) : activeTab === 'activity_logs' ? (
+            <div className="space-y-2.5">
+              {pagedNotifications.map((notification) => (
+                <div key={notification.id} id={`notification-mob-${notification.id}`}>
+                  <ActivityNotificationCard
+                    notification={notification}
+                    onClick={() => handleNotificationClick(notification)}
+                    expandedId={expandedNotificationId}
+                    onExpand={handleExpand}
+                    onMarkAsRead={handleMarkAsRead}
+                    selectable={isAdmin}
+                    selected={selectedIds.has(notification.id)}
+                    onToggleSelect={toggleSelect}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {categorizeNotifications(sortedNotifications, sortBy, sortOrder).map((section) => (
+                <div key={section.category} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                  <NotificationSectionComponent
+                    section={section}
+                    onNotificationClick={handleNotificationClick}
+                    compact={false}
+                    expandedId={expandedNotificationId}
+                    onExpand={handleExpand}
+                    onMarkAsRead={handleMarkAsRead}
+                    selectable={isAdmin}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Compact pagination for mobile */}
+          {!loading && sortedNotifications.length > 0 && (
+            <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => {
+                    if (currentPage > 1) setPage(currentPage - 1);
+                  }}
+                  disabled={currentPage === 1}
+                  className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white disabled:opacity-50 active:bg-gray-50 flex items-center gap-1 select-none"
+                >
+                  &larr; Prev
+                </button>
+                <span className="text-xs font-bold text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => {
+                    if (currentPage < totalPages) setPage(currentPage + 1);
+                  }}
+                  disabled={currentPage >= totalPages}
+                  className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white disabled:opacity-50 active:bg-gray-50 flex items-center gap-1 select-none"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px] text-gray-500">
+                <span>
+                  Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                  {Math.min(currentPage * pageSize, totalItemsForTab)} of {totalItemsForTab}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span>Show:</span>
+                  <select
+                    value={pageSize.toString()}
+                    onChange={(e) => {
+                      const newSize = parseInt(e.target.value);
+                      setPageSize(newSize);
+                      setPage(1);
+                    }}
+                    className="h-7 border border-gray-200 rounded-lg text-xs font-semibold px-1.5 bg-white focus:outline-none"
+                  >
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+
+      {/* Delete confirmation (admin only) */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete selected notifications?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete {selectedIds.size} notification(s) or log(s). This action cannot be undone. Only admins can delete notifications.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteSelected} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? 'Deleting...' : 'Delete permanently'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

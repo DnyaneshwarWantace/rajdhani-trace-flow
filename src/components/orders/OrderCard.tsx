@@ -10,6 +10,7 @@ import SendToProductionModal from '@/components/production/SendToProductionModal
 import AssignMaterialTaskModal from '@/components/orders/AssignMaterialTaskModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
+import { ProductionService } from '@/services/productionService';
 
 interface OrderCardProps {
   order: Order;
@@ -39,6 +40,8 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
   const [materialTaskOpen, setMaterialTaskOpen] = useState(false);
   const [pickRawOpen, setPickRawOpen] = useState(false);
   const [selectedRawMaterialId, setSelectedRawMaterialId] = useState<string | null>(null);
+  const [productionLoading, setProductionLoading] = useState(true);
+  const [producedByProduct, setProducedByProduct] = useState<Record<string, number>>({});
 
   // Check if order needs individual product selection (for products, not raw materials)
   const needsIndividualProductSelection = (order: Order) => {
@@ -68,7 +71,12 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
     onStatusUpdate(order.id, 'delivered');
   };
 
-  const producibleItems = (order.items || []).filter((item) => item.productType === 'product' && item.productId);
+  const productItems = (order.items || []).filter((item) => item.productType === 'product' && item.productId);
+  const producibleItems = productItems.filter((item) => {
+    const required = Number(item.quantity || 0);
+    const allocated = Number(producedByProduct[item.productId || ''] || 0);
+    return required > 0 ? allocated < required : true;
+  });
   const rawItems = (order.items || []).filter((item) => item.productType === 'raw_material');
   const rawStatusByKey = new Map<string, any>();
   rawStatuses.forEach((s) => {
@@ -109,6 +117,47 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
       }
       const result = await OrderService.getOrderRawMaterialStatus(order.id);
       if (!cancelled) setRawStatuses(result.data || []);
+    })();
+    return () => { cancelled = true; };
+  }, [order.id, order.status, order.items]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!(order.status === 'pending' || order.status === 'accepted') || productItems.length === 0) {
+        if (!cancelled) {
+          setProducedByProduct({});
+          setProductionLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setProductionLoading(true);
+        const [batchesResult, tasksResult] = await Promise.all([
+          ProductionService.getBatches({ order_id: order.id, limit: 100 }),
+          ProductionService.getTasks({ order_id: order.id, limit: 100 }),
+        ]);
+        if (cancelled) return;
+        const next: Record<string, number> = {};
+        (batchesResult.data || [])
+          .filter((b) => b.status !== 'cancelled')
+          .forEach((b) => {
+            if (!b.product_id) return;
+            next[b.product_id] = (next[b.product_id] || 0) + Number(b.planned_quantity || 0);
+          });
+        (tasksResult.data || [])
+          .filter((t) => t.status !== 'cancelled')
+          .forEach((t) => {
+            if (!t.final_product_id) return;
+            next[t.final_product_id] = (next[t.final_product_id] || 0) + Number(t.planned_quantity || 0);
+          });
+        setProducedByProduct(next);
+      } catch {
+        if (!cancelled) setProducedByProduct({});
+      } finally {
+        if (!cancelled) setProductionLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, [order.id, order.status, order.items]);
@@ -402,17 +451,18 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {producibleItems.length > 0 && (
+              {(productionLoading || producibleItems.length > 0) && (
                 <Button
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  disabled={productionLoading || producibleItems.length === 0}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (producibleItems.length === 1) setSendToProductionItem(producibleItems[0]);
                     else setPickProductOpen(true);
                   }}
                 >
-                  Produce{producibleItems.length > 1 ? ` (${producibleItems.length})` : ''}
+                  {productionLoading ? 'Checking production…' : producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
                 </Button>
               )}
               {rawItems.length > 0 && (
@@ -502,17 +552,18 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
               </>
             )}
             <div className="grid grid-cols-2 gap-2 mt-2">
-              {producibleItems.length > 0 && (
+              {(productionLoading || producibleItems.length > 0) && (
                 <Button
                   size="sm"
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  disabled={productionLoading || producibleItems.length === 0}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (producibleItems.length === 1) setSendToProductionItem(producibleItems[0]);
                     else setPickProductOpen(true);
                   }}
                 >
-                  Produce{producibleItems.length > 1 ? ` (${producibleItems.length})` : ''}
+                  {productionLoading ? 'Checking production…' : producibleItems.length > 1 ? `Produce (${producibleItems.length})` : 'Produce'}
                 </Button>
               )}
               {rawItems.length > 0 && (
@@ -672,5 +723,3 @@ export default function OrderCard({ order, onStatusUpdate, onViewDetails, onCrea
     </div>
   );
 }
-
-

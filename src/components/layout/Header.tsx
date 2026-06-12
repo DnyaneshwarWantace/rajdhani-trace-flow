@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import NotificationDropdown from './NotificationDropdown';
@@ -12,6 +12,7 @@ interface HeaderProps {
 export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
   const { unreadCount, refreshCount } = useNotifications();
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,34 +38,20 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
       <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8 w-full max-w-full">
         {/* Left Section - Logo & Menu */}
         <div className="flex items-center gap-3">
-          {/* Hamburger Menu Button - Mobile Only */}
+          {/* Hamburger Menu Button - Desktop only */}
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 transition-colors"
             aria-label="Toggle menu"
           >
             <svg
-              className={`w-6 h-6 text-gray-600 transition-transform duration-200 ${
-                isSidebarOpen ? 'rotate-90' : ''
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              className={`w-6 h-6 text-gray-600 transition-transform duration-200 ${isSidebarOpen ? 'rotate-90' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
             >
               {isSidebarOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               )}
             </svg>
           </button>
@@ -88,9 +75,14 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           <div className="relative" ref={notificationRef}>
             <button
               onClick={() => {
-                setIsNotificationOpen(!isNotificationOpen);
-                if (!isNotificationOpen) {
-                  refreshCount();
+                const isMobile = window.innerWidth < 1024;
+                if (isMobile) {
+                  navigate('/notifications');
+                } else {
+                  setIsNotificationOpen(!isNotificationOpen);
+                  if (!isNotificationOpen) {
+                    refreshCount();
+                  }
                 }
               }}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
@@ -110,13 +102,15 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
                 </span>
               )}
             </button>
-            <NotificationDropdown
-              isOpen={isNotificationOpen}
-              onClose={() => {
-                setIsNotificationOpen(false);
-                refreshCount();
-              }}
-            />
+            {isNotificationOpen && (
+              <NotificationDropdown
+                isOpen={isNotificationOpen}
+                onClose={() => {
+                  setIsNotificationOpen(false);
+                  refreshCount();
+                }}
+              />
+            )}
           </div>
 
           {/* User Dropdown */}

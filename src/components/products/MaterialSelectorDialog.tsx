@@ -27,15 +27,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination-primitives';
-import { Search, Package, Factory, CheckCircle, X, ArrowRight, Plus } from 'lucide-react';
+import { Search, Package, Factory, CheckCircle, X, ArrowRight, Plus, AlertCircle, Check, Settings, Layers } from 'lucide-react';
 import type { Product } from '@/types/product';
 import type { RawMaterial, MaterialFilters } from '@/types/material';
 import type { ProductFilters } from '@/types/product';
 import { ProductService } from '@/services/productService';
 import { MaterialService } from '@/services/materialService';
-import ProductCard from './ProductCard';
-import MaterialCard from '@/components/materials/MaterialCard';
 import { calculateProductRatio } from '@/utils/productRatioCalculator';
+import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 
 interface SelectedMaterial {
   materialId: string;
@@ -61,9 +60,6 @@ interface MaterialSelectorDialogProps {
   };
 }
 
-type SelectionStep = 'type' | 'filter';
-type MaterialType = 'product' | 'material' | null;
-
 export default function MaterialSelectorDialog({
   isOpen,
   onClose,
@@ -71,8 +67,8 @@ export default function MaterialSelectorDialog({
   onSelect: _onSelect,
   targetProduct,
 }: MaterialSelectorDialogProps) {
-  const [selectionStep, setSelectionStep] = useState<SelectionStep>('type');
-  const [chosenType, setChosenType] = useState<MaterialType>(null);
+  const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
+  const [chosenType, setChosenType] = useState<'material' | 'product'>('material');
   const [materialSearchTerm, setMaterialSearchTerm] = useState('');
 
   // Shared / material filters (multi-select where it makes sense)
@@ -121,8 +117,7 @@ export default function MaterialSelectorDialog({
 
   // Helper to fully reset local state when dialog closes
   const resetState = () => {
-    setSelectionStep('type');
-    setChosenType(null);
+    setChosenType('material');
     setMaterialSearchTerm('');
     setSelectedCategory([]);
     setSelectedSupplier([]);
@@ -259,7 +254,7 @@ export default function MaterialSelectorDialog({
 
   // Load initial counts when dialog opens
   useEffect(() => {
-    if (isOpen && chosenType === null) {
+    if (isOpen) {
       // Load total counts for both products and materials
       const loadInitialCounts = async () => {
         try {
@@ -480,512 +475,644 @@ export default function MaterialSelectorDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col bg-white">
-        <DialogHeader className="border-b border-gray-200 pb-4">
-          <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
-            <Search className="w-5 h-5 text-primary-600" />
-            Select Material or Product
-          </DialogTitle>
-          <DialogDescription className="text-sm text-gray-600 mt-2">
-            {selectionStep === 'type'
-              ? 'First, choose whether you want to add a Product or Raw Material to your recipe'
-              : `Now filter and select from available ${chosenType === 'product' ? 'Products' : 'Raw Materials'}`}
-          </DialogDescription>
+      <DialogContent customLayout className="max-w-5xl h-[90vh] max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden bg-white">
+        {/* Header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between animate-fade-in">
+            <div>
+              <DialogTitle className="text-xl font-extrabold text-gray-900 tracking-tight flex items-center gap-2">
+                <Search className="w-5 h-5 text-primary-600" />
+                Select Material or Product
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 mt-1">
+                Filter and select ingredients to build your product recipe
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 bg-white">
-          {/* Step 1: Choose Type */}
-          {selectionStep === 'type' && (
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Product Option */}
-                <div
-                  className="p-6 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-all shadow-sm bg-white"
-                  onClick={() => {
-                    setChosenType('product');
-                    setSelectionStep('filter');
-                  }}
-                >
-                  <div className="text-center">
-                    <div className="w-14 h-14 mx-auto mb-3 bg-primary-100 rounded-lg flex items-center justify-center">
-                      <Package className="w-7 h-7 text-primary-600" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Product</h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Select from existing products in your inventory
-                    </p>
-                    <div className="text-xs text-gray-500 font-medium">
-                      Available: {productsTotal} product{productsTotal !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
+        {/* Tabs */}
+        <div className="px-6 pt-2 flex-shrink-0">
+          <div className="flex border-b border-gray-200 bg-white shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setChosenType('material');
+                setMaterialsPage(1);
+              }}
+              className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                chosenType === 'material'
+                  ? 'border-primary-600 text-primary-600 bg-primary-50/20'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/55'
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              Raw Materials ({materialsTotal})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setChosenType('product');
+                setProductsPage(1);
+              }}
+              className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                chosenType === 'product'
+                  ? 'border-primary-600 text-primary-600 bg-primary-50/20'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50/55'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              Products ({productsTotal})
+            </button>
+          </div>
+        </div>
 
-                {/* Material Option */}
-                <div
-                  className="p-6 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all shadow-sm bg-white"
-                  onClick={() => {
-                    setChosenType('material');
-                    setSelectionStep('filter');
+        {/* Search, Sort and Filters Area - Scrollable but within bounds */}
+        <div className="px-6 py-4 flex-shrink-0 space-y-3 bg-gray-50/40 border-b border-gray-150">
+          {/* Search + Sort */}
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-405 w-5 h-5" />
+              <Input
+                placeholder={`Search ${chosenType === 'product' ? 'products' : 'materials'} by name or category...`}
+                value={materialSearchTerm}
+                onChange={(e) => setMaterialSearchTerm(e.target.value)}
+                className="pl-10 h-10 border-gray-300 focus:border-primary-500 focus:ring-primary-500 bg-white text-sm"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">Sort by:</span>
+              <Select
+                value={chosenType === 'material' ? materialSortBy : productSortBy}
+                onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => {
+                  if (chosenType === 'material') {
+                    setMaterialSortBy(value);
+                    setMaterialsPage(1);
+                  } else {
+                    setProductSortBy(value);
+                    setProductsPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[140px] h-9 text-xs bg-white border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="stock">Stock</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="recent">Recently Added</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={chosenType === 'material' ? materialSortOrder : productSortOrder}
+                onValueChange={(value: 'asc' | 'desc') => {
+                  if (chosenType === 'material') {
+                    setMaterialSortOrder(value);
+                    setMaterialsPage(1);
+                  } else {
+                    setProductSortOrder(value);
+                    setProductsPage(1);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[90px] h-9 text-xs bg-white border-gray-300">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">Asc</SelectItem>
+                  <SelectItem value="desc">Desc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Type-specific Filters */}
+          {chosenType === 'material' && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 animate-fade-in">
+              {/* Category */}
+              <div>
+                <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</Label>
+                <MultiSelect
+                  options={getUniqueCategories()
+                    .filter((category) => category && category.trim() !== '')
+                    .map((category) => ({ label: category, value: category }))}
+                  selected={selectedCategory}
+                  onChange={(values) => {
+                    setSelectedCategory(values);
+                    setMaterialsPage(1);
                   }}
-                >
-                  <div className="text-center">
-                    <div className="w-14 h-14 mx-auto mb-3 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Factory className="w-7 h-7 text-green-600" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Raw Material</h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Select from raw materials in your inventory
-                    </p>
-                    <div className="text-xs text-gray-500 font-medium">
-                      Available: {materialsTotal} material{materialsTotal !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
+                  placeholder="All Categories"
+                />
+              </div>
+
+              {/* Type */}
+              <div>
+                <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Type</Label>
+                <MultiSelect
+                  options={getUniqueMaterialTypes()
+                    .filter((type) => type && type.trim() !== '')
+                    .map((type) => ({ label: type, value: type }))}
+                  selected={selectedMaterialTypes}
+                  onChange={(values) => {
+                    setSelectedMaterialTypes(values);
+                    setMaterialsPage(1);
+                  }}
+                  placeholder="All Types"
+                />
+              </div>
+
+              {/* Color */}
+              <div>
+                <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Color</Label>
+                <MultiSelect
+                  options={getUniqueMaterialColors()
+                    .filter((color) => color && color.trim() !== '')
+                    .map((color) => ({ label: color, value: color }))}
+                  selected={selectedMaterialColors}
+                  onChange={(values) => {
+                    setSelectedMaterialColors(values);
+                    setMaterialsPage(1);
+                  }}
+                  placeholder="All Colors"
+                />
+              </div>
+
+              {/* Supplier */}
+              <div>
+                <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Supplier</Label>
+                <MultiSelect
+                  options={getUniqueSuppliers()
+                    .filter((supplier) => supplier && supplier.trim() !== '')
+                    .map((supplier) => ({ label: supplier, value: supplier }))}
+                  selected={selectedSupplier}
+                  onChange={(values) => {
+                    setSelectedSupplier(values);
+                    setMaterialsPage(1);
+                  }}
+                  placeholder="All Suppliers"
+                />
               </div>
             </div>
           )}
 
-          {/* Step 2: Filter and Select */}
-          {selectionStep === 'filter' && (
-            <div className="space-y-4">
-              {/* Back Button */}
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    resetState();
-                  }}
-                >
-                  <ArrowRight className="w-4 h-4 mr-1 rotate-180" />
-                  Back to Type Selection
-                </Button>
-                <Badge variant="outline" className="ml-2">
-                  {chosenType === 'product' ? 'Products' : 'Raw Materials'}
-                </Badge>
-              </div>
-
-              {/* Search + Sort */}
-              <div className="flex flex-col md:flex-row md:items-center gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
-                    placeholder={`Search ${chosenType === 'product' ? 'products' : 'materials'} by name or category...`}
-                    value={materialSearchTerm}
-                    onChange={(e) => setMaterialSearchTerm(e.target.value)}
-                    className="pl-10 h-11 border-gray-300 focus:border-primary-500 focus:ring-primary-500"
+          {chosenType === 'product' && (
+            <div className="space-y-3 animate-fade-in">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Category</Label>
+                  <MultiSelect
+                    options={getUniqueProductCategories()
+                      .filter((category) => category && category.trim() !== '')
+                      .map((category) => ({ label: category, value: category }))}
+                    selected={selectedProductCategory}
+                    onChange={(values) => {
+                      setSelectedProductCategory(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Categories"
                   />
                 </div>
 
-                {chosenType && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
-                    <Select
-                      value={chosenType === 'material' ? materialSortBy : productSortBy}
-                      onValueChange={(value: 'name' | 'stock' | 'category' | 'recent') => {
-                        if (chosenType === 'material') {
-                          setMaterialSortBy(value);
-                          setMaterialsPage(1);
-                        } else {
-                          setProductSortBy(value);
-                          setProductsPage(1);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-[160px] h-10 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="stock">Stock</SelectItem>
-                        <SelectItem value="category">Category</SelectItem>
-                        <SelectItem value="recent">Recently Added</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={chosenType === 'material' ? materialSortOrder : productSortOrder}
-                      onValueChange={(value: 'asc' | 'desc') => {
-                        if (chosenType === 'material') {
-                          setMaterialSortOrder(value);
-                          setMaterialsPage(1);
-                        } else {
-                          setProductSortOrder(value);
-                          setProductsPage(1);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="w-[130px] h-10 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="asc">Ascending</SelectItem>
-                        <SelectItem value="desc">Descending</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Color</Label>
+                  <MultiSelect
+                    options={getUniqueProductColors()
+                      .filter((color) => color && color.trim() !== '')
+                      .map((color) => ({ label: color, value: color, colorCode: colorCodeMap[color.toLowerCase()] }))}
+                    selected={selectedColor}
+                    onChange={(values) => {
+                      setSelectedColor(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Colors"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Pattern</Label>
+                  <MultiSelect
+                    options={getUniqueProductPatterns()
+                      .filter((pattern) => pattern && pattern.trim() !== '')
+                      .map((pattern) => ({ label: pattern, value: pattern, imageUrl: patternImageMap[pattern] }))}
+                    selected={selectedPattern}
+                    onChange={(values) => {
+                      setSelectedPattern(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Patterns"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Subcategory</Label>
+                  <MultiSelect
+                    options={getUniqueProductSubcategories()
+                      .filter((subcategory) => subcategory && subcategory.trim() !== '')
+                      .map((subcategory) => ({ label: subcategory, value: subcategory }))}
+                    selected={selectedSubcategory}
+                    onChange={(values) => {
+                      setSelectedSubcategory(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Subcategories"
+                  />
+                </div>
               </div>
 
-              {/* Type-specific Filters */}
-              {chosenType === 'material' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Category - multi-select */}
-                  <div>
-                    <Label className="text-sm font-medium">Category</Label>
-                    <MultiSelect
-                      options={getUniqueCategories()
-                        .filter((category) => category && category.trim() !== '')
-                        .map((category) => ({ label: category, value: category }))}
-                      selected={selectedCategory}
-                      onChange={(values) => {
-                        setSelectedCategory(values);
-                        setMaterialsPage(1);
-                      }}
-                      placeholder="All Categories"
-                    />
-                  </div>
-
-                  {/* Type - multi-select */}
-                  <div>
-                    <Label className="text-sm font-medium">Type</Label>
-                    <MultiSelect
-                      options={getUniqueMaterialTypes()
-                        .filter((type) => type && type.trim() !== '')
-                        .map((type) => ({ label: type, value: type }))}
-                      selected={selectedMaterialTypes}
-                      onChange={(values) => {
-                        setSelectedMaterialTypes(values);
-                        setMaterialsPage(1);
-                      }}
-                      placeholder="All Types"
-                    />
-                  </div>
-
-                  {/* Color - multi-select */}
-                  <div>
-                    <Label className="text-sm font-medium">Color</Label>
-                    <MultiSelect
-                      options={getUniqueMaterialColors()
-                        .filter((color) => color && color.trim() !== '')
-                        .map((color) => ({ label: color, value: color }))}
-                      selected={selectedMaterialColors}
-                      onChange={(values) => {
-                        setSelectedMaterialColors(values);
-                        setMaterialsPage(1);
-                      }}
-                      placeholder="All Colors"
-                    />
-                  </div>
-
-                  {/* Supplier - multi-select */}
-                  <div className="md:col-span-3">
-                    <Label className="text-sm font-medium">Supplier</Label>
-                    <MultiSelect
-                      options={getUniqueSuppliers()
-                        .filter((supplier) => supplier && supplier.trim() !== '')
-                        .map((supplier) => ({ label: supplier, value: supplier }))}
-                      selected={selectedSupplier}
-                      onChange={(values) => {
-                        setSelectedSupplier(values);
-                        setMaterialsPage(1);
-                      }}
-                      placeholder="All Suppliers"
-                    />
-                  </div>
+              {/* Dimensions and GSM filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Length</Label>
+                  <MultiSelect
+                    options={getUniqueProductLengths()
+                      .filter((length) => length && length.trim() !== '')
+                      .map((length) => ({ label: length, value: length }))}
+                    selected={selectedLength}
+                    onChange={(values) => {
+                      setSelectedLength(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Lengths"
+                  />
                 </div>
-              )}
 
-              {chosenType === 'product' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium">Category</Label>
-                    <MultiSelect
-                      options={getUniqueProductCategories()
-                        .filter((category) => category && category.trim() !== '')
-                        .map((category) => ({ label: category, value: category }))}
-                      selected={selectedProductCategory}
-                      onChange={(values) => {
-                        setSelectedProductCategory(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Categories"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Color</Label>
-                    <MultiSelect
-                      options={getUniqueProductColors()
-                        .filter((color) => color && color.trim() !== '')
-                        .map((color) => ({ label: color, value: color, colorCode: productColorCodeMap[color] }))}
-                      selected={selectedColor}
-                      onChange={(values) => {
-                        setSelectedColor(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Colors"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Pattern</Label>
-                    <MultiSelect
-                      options={getUniqueProductPatterns()
-                        .filter((pattern) => pattern && pattern.trim() !== '')
-                        .map((pattern) => ({ label: pattern, value: pattern, imageUrl: productPatternImageMap[pattern] }))}
-                      selected={selectedPattern}
-                      onChange={(values) => {
-                        setSelectedPattern(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Patterns"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Subcategory</Label>
-                    <MultiSelect
-                      options={getUniqueProductSubcategories()
-                        .filter((subcategory) => subcategory && subcategory.trim() !== '')
-                        .map((subcategory) => ({ label: subcategory, value: subcategory }))}
-                      selected={selectedSubcategory}
-                      onChange={(values) => {
-                        setSelectedSubcategory(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Subcategories"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Length</Label>
-                    <MultiSelect
-                      options={getUniqueProductLengths()
-                        .filter((length) => length && length.trim() !== '')
-                        .map((length) => ({ label: length, value: length }))}
-                      selected={selectedLength}
-                      onChange={(values) => {
-                        setSelectedLength(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Lengths"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">Width</Label>
-                    <MultiSelect
-                      options={getUniqueProductWidths()
-                        .filter((width) => width && width.trim() !== '')
-                        .map((width) => ({ label: width, value: width }))}
-                      selected={selectedWidth}
-                      onChange={(values) => {
-                        setSelectedWidth(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All Widths"
-                    />
-                  </div>
-
-                  <div>
-                    <Label className="text-sm font-medium">GSM</Label>
-                    <MultiSelect
-                      options={getUniqueProductWeights()
-                        .filter((weight) => weight && weight.trim() !== '')
-                        .map((weight) => ({ label: weight, value: weight }))}
-                      selected={selectedWeight}
-                      onChange={(values) => {
-                        setSelectedWeight(values);
-                        setProductsPage(1);
-                      }}
-                      placeholder="All GSM"
-                    />
-                  </div>
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">Width</Label>
+                  <MultiSelect
+                    options={getUniqueProductWidths()
+                      .filter((width) => width && width.trim() !== '')
+                      .map((width) => ({ label: width, value: width }))}
+                    selected={selectedWidth}
+                    onChange={(values) => {
+                      setSelectedWidth(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All Widths"
+                  />
                 </div>
-              )}
 
-              {/* Selected Items — with inline quantity inputs */}
-              {selectedItems.length > 0 && (
-                <div className="p-4 bg-green-50 border-2 border-green-300 rounded-lg shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold text-green-900">
-                        Selected ({selectedItems.length}) — enter quantities below
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItems([]); }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Clear All
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-56 overflow-y-auto">
-                    {selectedItems.map((item) => (
-                      <div key={item.materialId} className="flex items-center gap-2 p-2 bg-white rounded border border-green-200">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-gray-900 truncate">
-                            {item.materialName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {item.materialType === 'product' ? 'Product' : 'Raw Material'}
-                          </div>
-                        </div>
-                        {/* Inline quantity input */}
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={item.quantity}
-                          onChange={(e) => handleQuantityChange(item.materialId, e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
-                          placeholder="Qty"
-                          className="w-20 h-8 text-sm border border-gray-300 rounded px-2 focus:outline-none focus:border-green-500"
-                        />
-                        <span className="text-xs text-gray-500 w-12 truncate" title={item.unit}>{item.unit}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveSelected(item.materialId); }}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-green-700 mt-2">
-                    Enter quantity per 1 SQM for each material, then click "Add to Recipe"
-                  </p>
+                <div>
+                  <Label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1 block">GSM</Label>
+                  <MultiSelect
+                    options={getUniqueProductWeights()
+                      .filter((weight) => weight && weight.trim() !== '')
+                      .map((weight) => ({ label: weight, value: weight }))}
+                    selected={selectedWeight}
+                    onChange={(values) => {
+                      setSelectedWeight(values);
+                      setProductsPage(1);
+                    }}
+                    placeholder="All GSM"
+                  />
                 </div>
-              )}
-
-              {/* Results */}
-              <div className="space-y-4">
-                {(chosenType === 'product' ? productsLoading : materialsLoading) ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
-                    <p>Loading {chosenType === 'product' ? 'products' : 'materials'}...</p>
-                  </div>
-                ) : (
-                  <>
-                    {chosenType === 'product' && filteredProducts.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {filteredProducts.map((product) => {
-                          // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
-                          const productId = product.id || product._id;
-                          const isSelected = isItemSelected(productId);
-                          return (
-                            <ProductCard
-                              key={productId}
-                              product={product}
-                              showActions={false}
-                              variant="compact"
-                              isSelected={isSelected}
-                              onClick={() => handleMaterialSelection(product, 'product')}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {chosenType === 'material' && rawMaterials.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {rawMaterials.map((material) => {
-                          // Use custom 'id' field first (backend expects this), fallback to _id if id doesn't exist
-                          const materialId = material.id || material._id;
-                          const isSelected = isItemSelected(materialId);
-                          return (
-                            <MaterialCard
-                              key={materialId}
-                              material={material}
-                              isSelected={isSelected}
-                              onClick={() => handleMaterialSelection(material, 'material')}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {((chosenType === 'product' && filteredProducts.length === 0 && !productsLoading) ||
-                      (chosenType === 'material' && rawMaterials.length === 0 && !materialsLoading)) && (
-                      <div className="p-8 text-center text-gray-500">
-                        <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p className="text-lg font-medium mb-2">
-                          No {chosenType === 'product' ? 'products' : 'materials'} found
-                        </p>
-                        <p className="text-sm">Try adjusting your search terms or filters</p>
-                      </div>
-                    )}
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                        <div className="text-sm text-gray-600">
-                          Showing {((currentPage - 1) * itemsPerPage) + 1} to{' '}
-                          {Math.min(currentPage * itemsPerPage, currentTotal)} of {currentTotal}{' '}
-                          {chosenType === 'product' ? 'products' : 'materials'}
-                        </div>
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                              />
-                            </PaginationItem>
-                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                              let pageNum;
-                              if (totalPages <= 5) {
-                                pageNum = i + 1;
-                              } else if (currentPage <= 3) {
-                                pageNum = i + 1;
-                              } else if (currentPage >= totalPages - 2) {
-                                pageNum = totalPages - 4 + i;
-                              } else {
-                                pageNum = currentPage - 2 + i;
-                              }
-                              return (
-                                <PaginationItem key={pageNum}>
-                                  <PaginationLink
-                                    onClick={() => handlePageChange(pageNum)}
-                                    isActive={currentPage === pageNum}
-                                    className="cursor-pointer"
-                                  >
-                                    {pageNum}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              );
-                            })}
-                            <PaginationItem>
-                              <PaginationNext
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      </div>
-                    )}
-                  </>
-                )}
               </div>
             </div>
           )}
         </div>
 
-        <DialogFooter className="border-t border-gray-200 pt-4 mt-4 flex gap-2">
+        {/* Selected Items — with inline quantity inputs */}
+        {selectedItems.length > 0 && (
+          <div className="px-6 py-3.5 bg-green-50/60 border-b border-green-200 flex-shrink-0 animate-slide-up">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <span className="font-bold text-green-900 text-sm">
+                  Selected ({selectedItems.length}) — Enter recipe quantity per 1 SQM
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItems([]); }}
+                className="text-red-650 hover:text-red-700 hover:bg-red-100/50 h-8 text-xs font-bold transition-colors"
+              >
+                Clear All
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pb-1">
+              {selectedItems.map((item) => (
+                <div key={item.materialId} className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-green-200 shadow-sm text-xs transition-all duration-200 hover:shadow">
+                  <span className="font-semibold text-gray-900 truncate max-w-[140px]" title={item.materialName}>
+                    {item.materialName}
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={item.quantity}
+                    onChange={(e) => handleQuantityChange(item.materialId, e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                    placeholder="Qty"
+                    className="w-18 h-7 text-xs border border-gray-300 rounded-lg px-2 focus:outline-none focus:border-green-500 font-bold bg-gray-50 focus:bg-white transition-all text-center"
+                  />
+                  <span className="text-[10px] text-gray-500 font-bold max-w-[50px] truncate" title={item.unit}>{item.unit}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemoveSelected(item.materialId); }}
+                    className="text-red-400 hover:text-red-655 p-0.5 rounded-full hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Grid Results Area - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6 min-h-0 bg-white">
+          {(chosenType === 'product' ? productsLoading : materialsLoading) ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mb-4"></div>
+              <p className="text-gray-500 text-sm font-semibold">Loading {chosenType === 'product' ? 'products' : 'materials'}...</p>
+            </div>
+          ) : (
+            <>
+              {chosenType === 'product' && filteredProducts.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProducts.map((product) => {
+                    const productId = product.id || product._id;
+                    const isSelected = isItemSelected(productId);
+
+                    // Compute dimensions & specs
+                    const len = product.length != null && String(product.length).trim() ? String(product.length).trim() : '';
+                    const wid = product.width != null && String(product.width).trim() ? String(product.width).trim() : '';
+                    const lenUnit = product.length_unit || 'M';
+                    const widUnit = product.width_unit || 'M';
+                    const dimStr = (len && wid) ? `${len}${lenUnit} × ${wid}${widUnit}` : '';
+                    const weightStr = product.weight ? `${product.weight} ${product.weight_unit || 'GSM'}` : '';
+
+                    const stockQty = Number(product.individual_product_stats?.available ?? product.current_stock ?? 0);
+                    const inProductionQty = Number(product.individual_product_stats?.in_production ?? 0);
+
+                    const stockColor = stockQty <= 0 ? 'text-red-600 bg-red-50 border-red-200' : stockQty < 10 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-green-600 bg-green-50 border-green-200';
+                    const dotColor = stockQty <= 0 ? 'bg-red-500' : stockQty < 10 ? 'bg-amber-500' : 'bg-green-500';
+
+                    return (
+                      <div
+                        key={productId}
+                        onClick={() => handleMaterialSelection(product, 'product')}
+                        className={`p-3.5 border rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md flex flex-col justify-between h-full bg-white relative select-none ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50/25 ring-2 ring-primary-200'
+                            : 'border-gray-200 hover:border-primary-350'
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          {/* Top Row: Monospace ID and Image Thumbnail */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                              #{String(productId).substring(0, 8)}
+                            </span>
+                            {product.image_url ? (
+                              <img src={product.image_url} alt={product.name} className="w-8 h-8 rounded-lg object-cover border border-gray-255 shadow-sm" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center border border-primary-100">
+                                <Package className="w-4 h-4 text-primary-500" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <h4 className="font-bold text-xs text-gray-900 line-clamp-2 leading-tight min-h-[2rem]" title={product.name}>
+                            {product.name}
+                          </h4>
+
+                          {/* Category */}
+                          <p className="text-[10px] text-gray-500 truncate font-medium">
+                            {product.category} {product.subcategory ? ` • ${product.subcategory}` : ''}
+                          </p>
+
+                          {/* Visual attributes (Color / Pattern) */}
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {product.color && product.color.trim() !== '' && product.color.toLowerCase() !== 'n/a' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-700 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-medium">
+                                {colorCodeMap[product.color.toLowerCase()] && (
+                                  <span className="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[product.color.toLowerCase()] }} />
+                                )}
+                                {product.color}
+                              </span>
+                            )}
+                            {product.pattern && product.pattern.trim() !== '' && product.pattern.toLowerCase() !== 'n/a' && (
+                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-700 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-medium">
+                                {patternImageMap[product.pattern] && (
+                                  <img src={patternImageMap[product.pattern]} alt={product.pattern} className="w-3.5 h-3.5 rounded-full object-cover border border-slate-300 shrink-0" />
+                                )}
+                                {product.pattern}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Specs */}
+                          {(dimStr || weightStr) && (
+                            <div className="text-[10px] text-gray-500 pt-2 border-t border-gray-100 space-y-1">
+                              {dimStr && <p className="truncate"><span className="text-gray-400 font-semibold">Dim:</span> <span className="text-gray-750 font-bold">{dimStr}</span></p>}
+                              {weightStr && <p className="truncate"><span className="text-gray-400 font-semibold">GSM:</span> <span className="text-gray-750 font-bold">{weightStr}</span></p>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Stock badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3.5 pt-2 border-t border-gray-100">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockColor}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                            Avail: {stockQty.toFixed(2)} {product.unit || 'pcs'}
+                          </span>
+                          {inProductionQty > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              In Prod: {inProductionQty.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Selected Indicator Checkmark */}
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-primary-600 text-white rounded-full p-0.5 shadow-sm border border-white">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {chosenType === 'material' && rawMaterials.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {rawMaterials.map((material) => {
+                    const materialId = material.id || material._id;
+                    const isSelected = isItemSelected(materialId);
+
+                    // Compute available stock
+                    const getAvailableStock = () => {
+                      if (material.available_stock !== undefined) return material.available_stock;
+                      const inProd = material.in_production ?? 0;
+                      const reserved = material.reserved ?? 0;
+                      const currentStock = material.current_stock ?? 0;
+                      if (inProd > 0 || reserved > 0) return Math.max(0, currentStock - inProd - reserved);
+                      return currentStock;
+                    };
+                    const stockQty = Number(getAvailableStock());
+                    const inProductionQty = Number(material.in_production ?? 0);
+
+                    const stockColor = stockQty <= 0 ? 'text-red-600 bg-red-50 border-red-200' : stockQty < 10 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-green-600 bg-green-50 border-green-200';
+                    const dotColor = stockQty <= 0 ? 'bg-red-500' : stockQty < 10 ? 'bg-amber-500' : 'bg-green-500';
+
+                    return (
+                      <div
+                        key={materialId}
+                        onClick={() => handleMaterialSelection(material, 'material')}
+                        className={`p-3.5 border rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md flex flex-col justify-between h-full bg-white relative select-none ${
+                          isSelected
+                            ? 'border-primary-500 bg-primary-50/25 ring-2 ring-primary-200'
+                            : 'border-gray-200 hover:border-primary-350'
+                        }`}
+                      >
+                        <div className="space-y-2.5">
+                          {/* Top Row: Monospace ID and Image Thumbnail */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                              #{String(materialId).substring(0, 8)}
+                            </span>
+                            {material.image_url ? (
+                              <img src={material.image_url} alt={material.name} className="w-8 h-8 rounded-lg object-cover border border-gray-255 shadow-sm" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center border border-green-105">
+                                <Factory className="w-4 h-4 text-green-500" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Title */}
+                          <h4 className="font-bold text-xs text-gray-900 line-clamp-2 leading-tight min-h-[2rem]" title={material.name}>
+                            {material.name}
+                          </h4>
+
+                          {/* Category / Type */}
+                          <p className="text-[10px] text-gray-500 truncate font-medium">
+                            {material.category} {material.type && material.type !== 'N/A' ? ` • ${material.type}` : ''}
+                          </p>
+
+                          {/* Color Swatch if exists */}
+                          {material.color && material.color.trim() !== '' && material.color.toLowerCase() !== 'n/a' && (
+                            <div className="pt-0.5">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-gray-700 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-full font-medium">
+                                {colorCodeMap[material.color.toLowerCase()] && (
+                                  <span className="w-2.5 h-2.5 rounded-full border border-gray-300 inline-block shrink-0" style={{ backgroundColor: colorCodeMap[material.color.toLowerCase()] }} />
+                                )}
+                                {material.color}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Supplier / Cost */}
+                          {(material.supplier_name || material.cost_per_unit) && (
+                            <div className="text-[10px] text-gray-500 pt-2 border-t border-gray-100 space-y-1">
+                              {material.supplier_name && <p className="truncate"><span className="text-gray-400 font-semibold">Supplier:</span> <span className="text-gray-750 font-bold">{material.supplier_name}</span></p>}
+                              {material.cost_per_unit && (
+                                <p className="truncate"><span className="text-gray-400 font-semibold">Cost:</span> <span className="text-gray-750 font-bold">₹{material.cost_per_unit}/{material.unit || 'kg'}</span></p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Stock badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-3.5 pt-2 border-t border-gray-100">
+                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${stockColor}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+                            Avail: {stockQty.toFixed(2)} {material.unit || 'kg'}
+                          </span>
+                          {inProductionQty > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              In Prod: {inProductionQty.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Selected Indicator Checkmark */}
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 bg-primary-600 text-white rounded-full p-0.5 shadow-sm border border-white">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {((chosenType === 'product' && filteredProducts.length === 0 && !productsLoading) ||
+                (chosenType === 'material' && rawMaterials.length === 0 && !materialsLoading)) && (
+                <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <Search className="w-12 h-12 text-gray-300 mb-4 animate-bounce" />
+                  <p className="text-gray-650 font-semibold mb-1 text-sm">No {chosenType === 'product' ? 'products' : 'materials'} found</p>
+                  <p className="text-xs text-gray-405">Adjust your search query or clear filters</p>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                  <div className="text-xs text-gray-500 font-medium">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to{' '}
+                    {Math.min(currentPage * itemsPerPage, currentTotal)} of {currentTotal}{' '}
+                    {chosenType === 'product' ? 'products' : 'materials'}
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <PaginationItem key={pageNum}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(pageNum)}
+                              isActive={currentPage === pageNum}
+                              className="cursor-pointer"
+                            >
+                              {pageNum}
+                            </PaginationLink>
+                          </PaginationItem>
+                        );
+                      })}
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <DialogFooter className="px-6 py-4 border-t border-gray-200 flex-shrink-0 flex items-center justify-end gap-2 bg-gray-50">
           <Button
             type="button"
             variant="outline"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleClose(); }}
-            className="border-gray-300"
+            className="border-gray-300 hover:bg-gray-100 bg-white"
           >
             Cancel
           </Button>
@@ -994,7 +1121,7 @@ export default function MaterialSelectorDialog({
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleConfirmSelection(); }}
               disabled={selectedItems.every(item => !item.quantity || parseFloat(item.quantity) <= 0)}
-              className="bg-primary-600 hover:bg-primary-700 text-white"
+              className="bg-primary-600 hover:bg-primary-700 text-white font-semibold shadow-sm"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add {selectedItems.length} to Recipe

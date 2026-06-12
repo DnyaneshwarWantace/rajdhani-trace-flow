@@ -101,14 +101,20 @@ export default function MaterialImageUpload({
               </Button>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+              onClick={() => document.getElementById('material-image-upload')?.click()}
+            >
               <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
               <p className="text-sm text-gray-500 mb-2">Click to upload image</p>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => document.getElementById('material-image-upload')?.click()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  document.getElementById('material-image-upload')?.click();
+                }}
               >
                 <Image className="w-4 h-4 mr-2" />
                 Upload Image

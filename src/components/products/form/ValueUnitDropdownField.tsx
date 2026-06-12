@@ -107,8 +107,39 @@ export default function ValueUnitDropdownField({
   const displayValue = value !== null && value !== undefined && value !== '' ? String(value) : '';
   const currentCombinedValue = displayValue && unit ? `${displayValue} ${unit}`.trim() : '';
 
+  // De-duplicated unit options by canonical form (m / Meter / metre → one "Meter" entry)
+  const dedupedUnitOptions = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const u of unitOptions) {
+      if (!u?.trim()) continue;
+      const key = normalizeUnit(u).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(normalizeUnit(u));
+    }
+    return out;
+  })();
+
+  const unitAlreadyExists = (unit: string) =>
+    dedupedUnitOptions.some((u) => normalizeUnit(u) === normalizeUnit(unit));
+
+  // De-duplicated combined values for display (5 m / 5 meter → one row)
+  const dedupedCombinedValues = (() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of combinedValues) {
+      if (!raw) continue;
+      const key = displayCombined(raw).trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(raw);
+    }
+    return out;
+  })();
+
   // Filter combined values based on search and remove N/A values for required fields
-  const filteredValues = combinedValues
+  const filteredValues = dedupedCombinedValues
     .filter((val) => {
       // Remove N/A values if field is required
       if (required) {
@@ -171,13 +202,12 @@ export default function ValueUnitDropdownField({
       const normalizedNewUnit = normalizeUnit(newUnitInput.trim());
       const combinedValue = `${newValueInput.trim()} ${normalizedNewUnit}`;
 
-      // If unit is new, add it to unit dropdown first
-      if (!unitOptions.includes(normalizedNewUnit)) {
+      // Register unit only when this canonical unit is not already in the list
+      if (!unitAlreadyExists(normalizedNewUnit)) {
         const unitCategory = category === 'length' ? 'length_units' : category === 'width' ? 'width_units' : 'weight_units';
         const result = await DropdownService.addOption(unitCategory, normalizedNewUnit);
 
         if (category === 'length' || category === 'width') {
-          // Also add to singular category for backend validation
           const singularCategory = category === 'length' ? 'length_unit' : 'width_unit';
           await DropdownService.addOption(singularCategory, normalizedNewUnit);
         }
@@ -236,6 +266,16 @@ export default function ValueUnitDropdownField({
 
     try {
       const normalizedName = normalizeUnit(newUnitName.trim());
+
+      if (unitAlreadyExists(normalizedName)) {
+        toast({
+          title: 'Already exists',
+          description: `"${displayUnit(normalizedName)}" is already available (${normalizedName}). Duplicate spellings like m / Meter / metre are not allowed.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const unitCategory = category === 'length' ? 'length_units' : category === 'width' ? 'width_units' : 'weight_units';
       const result = await DropdownService.addOption(unitCategory, normalizedName);
 
@@ -317,8 +357,8 @@ export default function ValueUnitDropdownField({
                       Add New Unit
                     </div>
                   </SelectItem>
-                  {unitOptions.length > 0 ? (
-                    unitOptions
+                  {dedupedUnitOptions.length > 0 ? (
+                    dedupedUnitOptions
                       .filter((opt) => opt && opt.trim() !== '')
                       .map((unitOption) => (
                         <SelectItem key={unitOption} value={unitOption}>
@@ -504,14 +544,26 @@ export default function ValueUnitDropdownField({
             </div>
           </SelectItem>
 
-          {filteredValues.length > 0 ? (
-            filteredValues.map((combinedValue) => {
-              const fullOpt = findFullOption(combinedValue);
+          {(() => {
+            const allOpts: { value: string; is_active?: boolean }[] = hasManagement
+              ? fullOptions!.filter((o) => o.value && (!searchTerm || displayCombined(o.value).toLowerCase().includes(searchTerm.toLowerCase())))
+              : filteredValues.map((v) => ({ value: v, is_active: true }));
+            if (allOpts.length === 0) {
+              return (
+                <div className="p-2 text-sm text-gray-500 text-center">
+                  {searchTerm ? `No ${label.toLowerCase()} found matching "${searchTerm}"` : `No ${label.toLowerCase()} available`}
+                </div>
+              );
+            }
+            return allOpts.map((opt) => {
+              const combinedValue = opt.value;
+              const isInactive = opt.is_active === false;
+              const fullOpt = isInactive ? (opt as DropdownOption) : (findFullOption(combinedValue) ?? (opt as DropdownOption));
               const used = isUsed(combinedValue);
               return (
                 <div key={combinedValue} className="relative flex items-center group">
-                  <SelectItem value={combinedValue} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>
-                    <span className="truncate block max-w-[200px] text-sm">{displayCombined(combinedValue)}</span>
+                  <SelectItem value={combinedValue} disabled={isInactive} className={`flex-1 ${hasManagement ? 'pr-14' : ''} ${isInactive ? 'text-gray-400' : ''}`}>
+                    <span className="truncate block max-w-[200px] text-sm">{isInactive ? `${displayCombined(combinedValue)} (Inactive)` : displayCombined(combinedValue)}</span>
                   </SelectItem>
                   {hasManagement && fullOpt && (
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
@@ -520,7 +572,7 @@ export default function ValueUnitDropdownField({
                         title={fullOpt.is_active ? 'Deactivate' : 'Activate'}
                         className="p-1 rounded hover:bg-gray-100"
                         onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => handleToggleClick(e, fullOpt)}
+                        onClick={(e) => handleToggleClick(e, fullOpt as DropdownOption)}
                       >
                         {fullOpt.is_active
                           ? <Check className="w-3 h-3 text-green-600" />
@@ -532,7 +584,7 @@ export default function ValueUnitDropdownField({
                           title="Delete"
                           className="p-1 rounded hover:bg-red-50"
                           onPointerDown={(e) => e.stopPropagation()}
-                          onClick={(e) => handleDeleteClick(e, fullOpt)}
+                          onClick={(e) => handleDeleteClick(e, fullOpt as DropdownOption)}
                         >
                           <Trash2 className="w-3 h-3 text-red-500" />
                         </button>
@@ -541,12 +593,8 @@ export default function ValueUnitDropdownField({
                   )}
                 </div>
               );
-            })
-          ) : (
-            <div className="p-2 text-sm text-gray-500 text-center">
-              {searchTerm ? `No ${label.toLowerCase()} found matching "${searchTerm}"` : `No ${label.toLowerCase()} available`}
-            </div>
-          )}
+            });
+          })()}
         </SelectContent>
       </Select>
 

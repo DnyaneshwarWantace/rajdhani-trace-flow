@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import MobileNav from './MobileNav';
 import { useActivityLogs } from '@/hooks/useActivityLogs';
 
 interface LayoutProps {
@@ -69,6 +70,7 @@ export default function Layout({ children }: LayoutProps) {
       <Header onMenuClick={toggleSidebar} isSidebarOpen={isSidebarOpen} />
 
       <div className="flex w-full overflow-x-hidden pt-16">
+        {/* Sidebar — desktop only */}
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={closeSidebar}
@@ -81,6 +83,7 @@ export default function Layout({ children }: LayoutProps) {
             flex-1 transition-all duration-300
             ${isSidebarOpen ? 'lg:ml-56' : 'lg:ml-16'}
             p-2 sm:p-3 lg:p-4
+            pb-20 lg:pb-4
             w-full
             min-w-0
             overflow-x-hidden
@@ -91,6 +94,9 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* Mobile bottom nav */}
+      <MobileNav />
     </div>
   );
 }

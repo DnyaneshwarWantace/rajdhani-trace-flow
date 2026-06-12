@@ -289,182 +289,320 @@ export default function UserManagement() {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Info Alert about Hierarchical Rules */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <h4 className="font-semibold text-blue-900 mb-2">User Management Rules</h4>
-              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                <li>Admins can edit, delete, or reset password for any non-admin user; for another admin, only if that admin is in their hierarchy</li>
-                <li>Non-admins can only manage users in their hierarchy (users they created, or users created by someone they created)</li>
-                <li>You cannot delete or modify your own account; non-admins cannot delete the user who created their account</li>
-              </ul>
+    <div>
+      {/* ─── DESKTOP Layout ────────────────────────────────────────────── */}
+      <div className="hidden lg:block space-y-6">
+        {/* Info Alert about Hierarchical Rules */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 mb-2">User Management Rules</h4>
+                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                  <li>Admins can edit, delete, or reset password for any non-admin user; for another admin, only if that admin is in their hierarchy</li>
+                  <li>Non-admins can only manage users in their hierarchy (users they created, or users created by someone they created)</li>
+                  <li>You cannot delete or modify your own account; non-admins cannot delete the user who created their account</li>
+                </ul>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage system users and their permissions</CardDescription>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage system users and their permissions</CardDescription>
+              </div>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add User
+              </Button>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add User
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Search */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search users by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          </CardHeader>
+          <CardContent>
+            {/* Search */}
+            <div className="mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="Search users by name or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Users Table */}
-          {isLoading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
-              <p className="text-sm text-gray-500 mt-2">Loading users...</p>
-            </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No users found</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell className="font-mono text-sm email-preserve-case">{user.email}</TableCell>
-                      <TableCell>
-                        <Badge className={getRoleBadgeColor(user.role)}>
-                          {user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusBadgeColor(user.status)}>
-                          {user.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.created_by_user ? (
-                          <div className="text-sm">
-                            <div className="font-medium">{user.created_by_user.full_name}</div>
-                            <div className="text-xs text-gray-500 font-mono email-preserve-case">{user.created_by_user.email}</div>
-                          </div>
-                        ) : user.created_by === 'system' ? (
-                          <span className="text-sm text-gray-500">System</span>
-                        ) : (
-                          <span className="text-sm text-gray-400">Unknown</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {formatIndianDate(user.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {canManageUser(user) && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditUser(user)}
-                                title="Edit user"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowResetPasswordDialog(true);
-                                }}
-                                title="Reset password"
-                              >
-                                <Key className="w-4 h-4" />
-                              </Button>
-                              {user.status === 'active' ? (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleUpdateStatus(user.id, 'inactive')}
-                                  title="Suspend user"
-                                >
-                                  <UserX className="w-4 h-4 text-orange-600" />
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleUpdateStatus(user.id, 'active')}
-                                  title="Activate user"
-                                >
-                                  <UserCheck className="w-4 h-4 text-green-600" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedUser(user);
-                                  setShowDeleteDialog(true);
-                                }}
-                                title="Delete user"
-                                className="hover:bg-red-50 hover:text-red-700"
-                              >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+            {/* Users Table */}
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading users...</p>
+              </div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No users found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created By</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredUsers.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell className="font-mono text-sm email-preserve-case">{user.email}</TableCell>
+                        <TableCell>
+                          <Badge className={getRoleBadgeColor(user.role)}>
+                            {user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getStatusBadgeColor(user.status)}>
+                            {user.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {user.created_by_user ? (
+                            <div className="text-sm">
+                              <div className="font-medium">{user.created_by_user.full_name}</div>
+                              <div className="text-xs text-gray-500 font-mono email-preserve-case">{user.created_by_user.email}</div>
+                            </div>
+                          ) : user.created_by === 'system' ? (
+                            <span className="text-sm text-gray-500">System</span>
+                          ) : (
+                            <span className="text-sm text-gray-400">Unknown</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formatIndianDate(user.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {canManageUser(user) && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditUser(user)}
+                                  title="Edit user"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowResetPasswordDialog(true);
+                                  }}
+                                  title="Reset password"
+                                >
+                                  <Key className="w-4 h-4" />
+                                </Button>
+                                {user.status === 'active' ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleUpdateStatus(user.id, 'inactive')}
+                                    title="Suspend user"
+                                  >
+                                    <UserX className="w-4 h-4 text-orange-600" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleUpdateStatus(user.id, 'active')}
+                                    title="Activate user"
+                                  >
+                                    <UserCheck className="w-4 h-4 text-green-600" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  title="Delete user"
+                                  className="hover:bg-red-50 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-600" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── MOBILE Layout ────────────────────────────────────────────── */}
+      <div className="lg:hidden space-y-4 px-4 pb-12">
+        {/* Info Alert about Hierarchical Rules */}
+        <div className="border border-blue-200 bg-blue-50 rounded-2xl p-4 flex gap-3">
+          <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h4 className="font-semibold text-blue-900 mb-1.5 text-sm">User Management Rules</h4>
+            <ul className="text-xs text-blue-800 space-y-1 list-disc list-inside">
+              <li>Admins can manage non-admins, or hierarchy admins</li>
+              <li>Non-admins can only manage users in their hierarchy</li>
+              <li>You cannot delete or modify your own account</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Search & Add row */}
+        <div className="flex flex-col gap-2">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 h-[44px] rounded-xl border border-gray-200 bg-white text-[14px] font-medium placeholder-gray-400 outline-none focus:border-blue-400 shadow-sm transition-colors"
+            />
+          </div>
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="w-full h-11 bg-[#0066FF] text-white rounded-xl flex items-center justify-center gap-2 font-bold text-sm shadow-sm active:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add New User
+          </button>
+        </div>
+
+        {/* Users Card List */}
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto"></div>
+            <p className="text-sm text-gray-500 mt-2">Loading users...</p>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-500 text-sm">No users found</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filteredUsers.map((user) => (
+              <div
+                key={user.id}
+                className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-extrabold text-gray-900 leading-tight truncate">{user.full_name}</h4>
+                    <p className="text-xs text-gray-500 font-mono mt-0.5 truncate email-preserve-case">{user.email}</p>
+                  </div>
+                  <div className="flex flex-col gap-1 items-end shrink-0 select-none">
+                    <Badge className={`text-[10px] font-extrabold ${getRoleBadgeColor(user.role)}`}>
+                      {user.role}
+                    </Badge>
+                    <Badge className={`text-[10px] font-extrabold ${getStatusBadgeColor(user.status)}`}>
+                      {user.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-gray-100">
+                  <div>
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Created By</span>
+                    <span className="font-medium text-gray-800 leading-normal">
+                      {user.created_by_user ? user.created_by_user.full_name : user.created_by === 'system' ? 'System' : 'Unknown'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 font-bold uppercase tracking-wider block text-[9px]">Created Date</span>
+                    <span className="font-medium text-gray-800 leading-normal">{formatIndianDate(user.created_at)}</span>
+                  </div>
+                </div>
+
+                {canManageUser(user) && (
+                  <div className="flex gap-1.5 border-t border-gray-100 pt-3 mt-1 select-none">
+                    <button
+                      onClick={() => handleEditUser(user)}
+                      className="flex-1 h-9 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white active:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Edit className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setShowResetPasswordDialog(true);
+                      }}
+                      className="flex-1 h-9 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white active:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+                    >
+                      <Key className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Reset</span>
+                    </button>
+                    {user.status === 'active' ? (
+                      <button
+                        onClick={() => handleUpdateStatus(user.id, 'inactive')}
+                        className="flex-1 h-9 rounded-xl border border-orange-200 text-xs font-bold text-orange-600 bg-white active:bg-orange-50 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        <span>Suspend</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUpdateStatus(user.id, 'active')}
+                        className="flex-1 h-9 rounded-xl border border-green-200 text-xs font-bold text-green-600 bg-white active:bg-green-50 transition-colors flex items-center justify-center gap-1"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Activate</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setShowDeleteDialog(true);
+                      }}
+                      className="w-9 h-9 shrink-0 rounded-xl border border-red-200 text-red-600 bg-[#FEF2F2] active:bg-[#FEE2E2] transition-colors flex items-center justify-center"
+                      title="Delete User"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Create User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
             <DialogDescription>
               Create a new user account. A temporary password will be shown after creation — share it with the user manually.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div>
               <Label htmlFor="create-email">Email *</Label>
               <Input
@@ -483,15 +621,10 @@ export default function UserManagement() {
                   setEmailError(error);
                 }}
                 placeholder="user@example.com"
-                className={emailError ? 'border-red-500' : ''}
+                className={emailError ? 'border-red-500 rounded-xl h-10' : 'rounded-xl h-10'}
               />
               {emailError && (
                 <p className="text-xs text-red-500 mt-1">{emailError}</p>
-              )}
-              {!emailError && createForm.email && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {createForm.email.length}/320 characters
-                </p>
               )}
             </div>
             <div>
@@ -501,6 +634,7 @@ export default function UserManagement() {
                 value={createForm.full_name}
                 onChange={(e) => setCreateForm({ ...createForm, full_name: e.target.value })}
                 placeholder="John Doe"
+                className="rounded-xl h-10"
               />
             </div>
             <div>
@@ -514,6 +648,7 @@ export default function UserManagement() {
                   setCreatePasswordError(null);
                 }}
                 placeholder="Leave blank to auto-generate a temporary password"
+                className="rounded-xl h-10"
               />
               <p className="text-xs text-muted-foreground mt-1">
                 If set, must be more than 8 characters.
@@ -530,6 +665,7 @@ export default function UserManagement() {
                   setCreatePasswordError(null);
                 }}
                 placeholder="Re-enter password if you set one"
+                className="rounded-xl h-10"
               />
               {createPasswordError && (
                 <p className="text-xs text-red-500 mt-1">{createPasswordError}</p>
@@ -541,7 +677,7 @@ export default function UserManagement() {
                 value={createForm.role}
                 onValueChange={(value) => setCreateForm({ ...createForm, role: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -563,6 +699,7 @@ export default function UserManagement() {
                 value={createForm.phone}
                 onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
                 placeholder="+91 98765 43210"
+                className="rounded-xl h-10"
               />
             </div>
             <div>
@@ -572,38 +709,39 @@ export default function UserManagement() {
                 value={createForm.department}
                 onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })}
                 placeholder="Department name"
+                className="rounded-xl h-10"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="rounded-xl" onClick={() => setShowCreateDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateUser}>Create User</Button>
+            <Button className="rounded-xl" onClick={handleCreateUser}>Create User</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit User Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>Update user information</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
             <div>
               <Label>Email</Label>
               {currentUser?.role === 'super-admin' ? (
                 <Input
                   value={editForm.email ?? selectedUser?.email ?? ''}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="mt-1"
+                  className="mt-1 rounded-xl h-10"
                   placeholder="Email address"
                 />
               ) : (
                 <>
-                  <Input value={selectedUser?.email || ''} disabled className="bg-gray-100" />
+                  <Input value={selectedUser?.email || ''} disabled className="bg-gray-100 mt-1 rounded-xl h-10" />
                   <p className="text-xs text-gray-500 mt-1">Only super admin can change email addresses</p>
                 </>
               )}
@@ -614,6 +752,7 @@ export default function UserManagement() {
                 id="edit-full_name"
                 value={editForm.full_name}
                 onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                className="rounded-xl h-10"
               />
             </div>
             <div>
@@ -622,7 +761,7 @@ export default function UserManagement() {
                 value={editForm.role}
                 onValueChange={(value) => setEditForm({ ...editForm, role: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -640,7 +779,7 @@ export default function UserManagement() {
                 value={editForm.status}
                 onValueChange={(value: any) => setEditForm({ ...editForm, status: value })}
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -656,6 +795,7 @@ export default function UserManagement() {
                 id="edit-phone"
                 value={editForm.phone}
                 onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                className="rounded-xl h-10"
               />
             </div>
             <div>
@@ -664,21 +804,22 @@ export default function UserManagement() {
                 id="edit-department"
                 value={editForm.department}
                 onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
+                className="rounded-xl h-10"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="rounded-xl" onClick={() => setShowEditDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateUser}>Save Changes</Button>
+            <Button className="rounded-xl" onClick={handleUpdateUser}>Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete User Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-2xl sm:rounded-lg">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold text-red-600">Delete User</DialogTitle>
             <DialogDescription className="text-base">
@@ -687,7 +828,7 @@ export default function UserManagement() {
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4 py-2">
-              <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 space-y-2">
+              <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 space-y-2">
                 <div className="space-y-1">
                   <p className="text-sm text-gray-600 font-medium">Name:</p>
                   <p className="font-semibold text-red-900 text-lg">{selectedUser.full_name}</p>
@@ -706,13 +847,13 @@ export default function UserManagement() {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteUser}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 hover:bg-red-700 rounded-xl"
             >
               Delete User
             </Button>
@@ -726,6 +867,7 @@ export default function UserManagement() {
         setShowResetPasswordDialog(open);
       }}>
         <DialogContent
+          className="rounded-2xl sm:rounded-lg"
           onInteractOutside={(e) => { if (tempPassword) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (tempPassword) e.preventDefault(); }}
         >
@@ -736,28 +878,28 @@ export default function UserManagement() {
             </DialogDescription>
           </DialogHeader>
           {tempPassword && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+            <div className="p-4 bg-green-50 border border-green-200 rounded-2xl space-y-3">
               <p className="text-sm font-medium text-green-800">Temporary Password:</p>
               <p className="text-lg font-mono font-bold text-green-900 select-all">{tempPassword}</p>
               <p className="text-xs text-green-700">
                 Copy this password and share it securely. Dialog stays open until you click Close.
               </p>
-              <Button type="button" size="sm" onClick={handleCopyResetPassword}>
+              <Button type="button" size="sm" className="rounded-xl" onClick={handleCopyResetPassword}>
                 Copy to clipboard
               </Button>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowResetPasswordDialog(false); setTempPassword(''); }}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="rounded-xl" onClick={() => { setShowResetPasswordDialog(false); setTempPassword(''); }}>
               {tempPassword ? 'Close' : 'Cancel'}
             </Button>
             {!tempPassword ? (
-              <Button onClick={handleResetPassword}>
+              <Button className="rounded-xl" onClick={handleResetPassword}>
                 <Key className="w-4 h-4 mr-2" />
                 Reset Password
               </Button>
             ) : (
-              <Button onClick={handleCopyResetPassword}>Copy to clipboard</Button>
+              <Button className="rounded-xl" onClick={handleCopyResetPassword}>Copy to clipboard</Button>
             )}
           </DialogFooter>
         </DialogContent>

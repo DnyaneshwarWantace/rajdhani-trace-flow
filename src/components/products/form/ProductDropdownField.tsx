@@ -386,14 +386,17 @@ export default function ProductDropdownField({
             </SelectItem>
           )}
 
-          {filteredOptions
-            .filter((opt) => opt && opt.trim() !== '' && opt !== 'NA' && opt !== 'N/A')
-            .map((option) => {
-              const fullOpt = findFullOption(option);
+          {(hasManagement
+            ? fullOptions!.filter((o) => o.value && o.value.trim() !== '' && o.value !== 'NA' && o.value !== 'N/A' && (!searchTerm || o.value.toLowerCase().includes(searchTerm.toLowerCase())))
+            : filteredOptions.filter((opt) => opt && opt.trim() !== '' && opt !== 'NA' && opt !== 'N/A').map((opt) => ({ value: opt, is_active: true } as DropdownOption))
+          ).map((opt) => {
+              const option = opt.value;
+              const isInactive = opt.is_active === false;
+              const fullOpt = isInactive ? opt : (findFullOption(option) ?? opt);
               const used = isUsed(option);
               return (
                 <div key={option} className="relative flex items-center group">
-                  <SelectItem value={option} className={`flex-1 ${hasManagement ? 'pr-14' : 'pr-8'}`}>
+                  <SelectItem value={option} disabled={isInactive} className={`flex-1 ${hasManagement ? 'pr-14' : 'pr-8'} ${isInactive ? 'text-gray-400' : ''}`}>
                     <div className="flex items-center gap-2">
                       {category.toLowerCase() === 'pattern' && optionImages[option] && (
                         <img src={optionImages[option]} alt={option} className="w-8 h-8 rounded-md object-cover border border-gray-300" />
@@ -401,7 +404,7 @@ export default function ProductDropdownField({
                       {category.toLowerCase() === 'color' && optionColors[option] && (
                         <ColorSwatch colorCode={optionColors[option]} />
                       )}
-                      <span className="truncate block max-w-[200px] text-sm">{option}</span>
+                      <span className="truncate block max-w-[200px] text-sm">{isInactive ? `${option} (Inactive)` : option}</span>
                     </div>
                   </SelectItem>
                   {hasManagement && fullOpt && (
@@ -434,7 +437,7 @@ export default function ProductDropdownField({
               );
             })}
 
-          {searchable && filteredOptions.filter(o => o && o.trim() !== '' && o !== 'NA' && o !== 'N/A').length === 0 && searchTerm && (
+          {searchable && (hasManagement ? fullOptions!.filter(o => o.value && o.value.trim() !== '' && o.value !== 'NA' && o.value !== 'N/A' && o.value.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 : filteredOptions.filter(o => o && o.trim() !== '' && o !== 'NA' && o !== 'N/A').length === 0) && searchTerm && (
             <div
               className="px-3 py-2 text-sm text-primary-600 font-medium cursor-pointer hover:bg-primary-50 flex items-center gap-1.5"
               onClick={() => { setNewInput(searchTerm); setShowAdd(true); setSearchTerm(''); setSelectOpen(false); }}

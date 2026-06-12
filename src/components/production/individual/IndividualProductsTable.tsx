@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -17,7 +18,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus, CheckCircle, Copy, ArrowDown, Layers, FileDown } from 'lucide-react';
+import {
+  Trash2,
+  Plus,
+  CheckCircle,
+  Copy,
+  ArrowDown,
+  Layers,
+  FileDown,
+  ArrowLeft,
+  Info,
+  RefreshCw,
+  Hash,
+  Save,
+  Grid,
+  Download,
+  X,
+  MapPin,
+  ChevronRight,
+  Clipboard,
+  Package,
+  Loader2,
+  Check,
+} from 'lucide-react';
 import { IndividualProductService } from '@/services/individualProductService';
 import { DropdownService } from '@/services/dropdownService';
 import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
@@ -25,6 +48,7 @@ import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import type { IndividualProduct } from '@/types/product';
+import { useNavigate } from 'react-router-dom';
 
 function weightKgFromRow(item: IndividualProduct): number | null {
   const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
@@ -67,6 +91,7 @@ interface IndividualProductsTableProps {
   onUpdate: () => void;
   product?: {
     name?: string;
+    category?: string;
     color?: string;
     pattern?: string;
     weight_unit?: string;
@@ -91,6 +116,8 @@ interface IndividualProductsTableProps {
   dbSavedCount?: number;
   /** Called when backend confirms stage is already completed (409 response) */
   onStageCompleted?: () => void;
+  mobileBatch?: any;
+  mobileConsumedMaterials?: any[];
 }
 
 export default function IndividualProductsTable({
@@ -108,10 +135,13 @@ export default function IndividualProductsTable({
   stageCompleted = false,
   dbSavedCount = 0,
   onStageCompleted,
+  mobileBatch,
+  mobileConsumedMaterials = [],
 }: IndividualProductsTableProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { patternImageMap } = useDropdownVisualMaps();
+  const { patternImageMap, colorCodeMap } = useDropdownVisualMaps();
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
@@ -145,8 +175,18 @@ export default function IndividualProductsTable({
   const [locationOptions, setLocationOptions] = useState<string[]>([]);
   const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [newLocationValue, setNewLocationValue] = useState('');
+  const [mobileLocationPicker, setMobileLocationPicker] = useState<{ index: number } | null>(null);
   const [creatingTempRowId, setCreatingTempRowId] = useState<string | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Mobile UI States
+  const [showGenModal, setShowGenModal] = useState(false);
+  const [genStartNo, setGenStartNo] = useState('');
+  const [showInfoSheet, setShowInfoSheet] = useState(false);
+  const [infoTab, setInfoTab] = useState<'product' | 'materials'>('product');
+  const [qrMode, setQrMode] = useState(false);
+  const [selectedQrIds, setSelectedQrIds] = useState<Set<string>>(new Set());
+  const [showQrSheet, setShowQrSheet] = useState(false);
 
   // Load storage locations from dropdown service
   useEffect(() => {
@@ -1328,6 +1368,24 @@ export default function IndividualProductsTable({
     });
   };
 
+  const getAutoStartNo = () => {
+    for (let i = localProducts.length - 1; i >= 0; i--) {
+      const num = localProducts[i].roll_number;
+      if (num && num.trim() !== '') {
+        const match = num.match(/^(.*?)(\d+)$/);
+        if (match) {
+          const prefix = match[1];
+          const serial = parseInt(match[2], 10);
+          const padLen = match[2].length;
+          return `${prefix}${String(serial + 1).padStart(padLen, '0')}`;
+        }
+        return num;
+      }
+    }
+    const prefix = getRollNumberDatePrefix(localProducts[0]?.production_date);
+    return `${prefix}01`;
+  };
+
   const handleGenerateRollNumbers = () => {
     const sourceIndex = localProducts.findIndex(
       (row) => row.roll_number && String(row.roll_number).trim() !== ''
@@ -1382,6 +1440,48 @@ export default function IndividualProductsTable({
       title: 'Roll numbers generated',
       description: `Generated sequential roll numbers from ${prefix}${startSerial} onward.`,
     });
+  };
+
+  const handleGenerateRollNumbersMobile = async () => {
+    const raw = genStartNo.trim();
+    if (!raw) {
+      toast({ title: 'Required', description: 'Enter a starting roll number, e.g. 70', variant: 'destructive' });
+      return;
+    }
+    const prefix = getRollNumberDatePrefix(localProducts[0]?.production_date);
+    const normalized = /^\d+$/.test(raw) ? `${prefix}${raw}` : raw;
+    const match = normalized.match(/^(.*?)(\d+)$/);
+    if (!match) {
+      toast({ title: 'Invalid', description: 'Must end with digits, e.g. 70 or 06-26-70', variant: 'destructive' });
+      return;
+    }
+    const rollPrefix = match[1];
+    const startSerial = parseInt(match[2], 10);
+    const padLen = match[2].length;
+    
+    const updated = localProducts.map((r, i) => ({
+      ...r,
+      roll_number: `${rollPrefix}${String(startSerial + i).padStart(padLen, '0')}`,
+    }));
+    
+    setLocalProductsSync(updated);
+    setShowGenModal(false);
+    setGenStartNo('');
+    
+    toast({ title: 'Success', description: 'Roll numbers generated. Auto-saving completed rows...' });
+    
+    // Save all completed rows
+    for (let i = 0; i < updated.length; i++) {
+      const tempProduct = updated[i];
+      if (isTempRowReady(tempProduct)) {
+        await createTempRowIfReady(i);
+      } else if (tempProduct.id && !tempProduct.id.startsWith('temp-')) {
+        await IndividualProductService.updateIndividualProduct(tempProduct.id, {
+          roll_number: tempProduct.roll_number,
+        });
+      }
+    }
+    onUpdate?.();
   };
 
   const hasOneRowFilled = localProducts.some(p =>
@@ -1446,216 +1546,862 @@ export default function IndividualProductsTable({
 
   return (
     <>
-    {stageCompleted && (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 font-medium">
-        This stage has been completed by another user. No more rows can be added.
-      </div>
-    )}
-    {!stageCompleted && plannedQuantity > 0 && liveCount > 0 && (
-      <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${liveCount > plannedQuantity ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>
-        <span className="font-semibold">{liveCount}</span> of <span className="font-semibold">{plannedQuantity}</span> planned rolls saved
-        {liveCount > plannedQuantity && (
-          <span className="ml-2 text-amber-700 font-semibold">— {liveCount - plannedQuantity} extra beyond target (final qty: {liveCount})</span>
-        )}
-        {liveCount === plannedQuantity && <span className="ml-2 text-green-700 font-semibold">— target reached! Final qty: {liveCount}</span>}
-      </div>
-    )}
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Individual Products ({localProducts.length})</CardTitle>
-            <p className="text-sm text-gray-600 mt-1">
-              Click on any cell to edit. Type numbers only - units are added automatically.
-            </p>
+      {/* Desktop View */}
+      <div className="hidden lg:block space-y-4">
+        {stageCompleted && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 font-medium">
+            This stage has been completed by another user. No more rows can be added.
           </div>
-          <div className="flex items-center gap-2">
-            {hasOneRowFilled && (
-              <Button
-                onClick={handleApplySameToAll}
-                size="sm"
-                variant="outline"
-                className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
-              >
-                <Layers className="w-4 h-4" />
-                Apply same details to all
-              </Button>
+        )}
+        {!stageCompleted && plannedQuantity > 0 && liveCount > 0 && (
+          <div className={`rounded-lg border px-4 py-3 text-sm font-medium ${liveCount > plannedQuantity ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`}>
+            <span className="font-semibold">{liveCount}</span> of <span className="font-semibold">{plannedQuantity}</span> planned rolls saved
+            {liveCount > plannedQuantity && (
+              <span className="ml-2 text-amber-700 font-semibold">— {liveCount - plannedQuantity} extra beyond target (final qty: {liveCount})</span>
             )}
-            <Button
-              onClick={handleGenerateRollNumbers}
-              size="sm"
-              variant="outline"
-              className="flex items-center gap-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50"
-            >
-              Generate Roll Nos
-            </Button>
-            <Button
-              onClick={handleAddRow}
-              size="sm"
-              disabled={stageCompleted}
-              className={`flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed ${localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
-              title={localProducts.length >= plannedQuantity && plannedQuantity > 0 ? `Add extra row beyond planned ${plannedQuantity}` : 'Add row'}
-            >
-              <Plus className="w-4 h-4" />
-              {localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'Add Extra Row' : 'Add Row'}
-            </Button>
-            <Button
-              onClick={handleBulkDownloadQrs}
-              size="sm"
-              variant="outline"
-              disabled={downloadingPdf}
-              className="flex items-center gap-2 border-blue-600 text-blue-700 hover:bg-blue-50"
-            >
-              {downloadingPdf
-                ? <><span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />Generating…</>
-                : <><FileDown className="w-4 h-4" />Download QR PDF</>
-              }
-            </Button>
-            {onComplete && (
-              <Button
-                onClick={() => {
-                  if (canComplete) {
-                    onComplete();
-                    return;
+            {liveCount === plannedQuantity && <span className="ml-2 text-green-700 font-semibold">— target reached! Final qty: {liveCount}</span>}
+          </div>
+        )}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Individual Products ({localProducts.length})</CardTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Click on any cell to edit. Type numbers only - units are added automatically.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasOneRowFilled && (
+                  <Button
+                    onClick={handleApplySameToAll}
+                    size="sm"
+                    variant="outline"
+                    className="flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50"
+                  >
+                    <Layers className="w-4 h-4" />
+                    Apply same details to all
+                  </Button>
+                )}
+                <Button
+                  onClick={handleGenerateRollNumbers}
+                  size="sm"
+                  variant="outline"
+                  className="flex items-center gap-2 border-indigo-600 text-indigo-700 hover:bg-indigo-50"
+                >
+                  Generate Roll Nos
+                </Button>
+                <Button
+                  onClick={handleAddRow}
+                  size="sm"
+                  disabled={stageCompleted}
+                  className={`flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed ${localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  title={localProducts.length >= plannedQuantity && plannedQuantity > 0 ? `Add extra row beyond planned ${plannedQuantity}` : 'Add row'}
+                >
+                  <Plus className="w-4 h-4" />
+                  {localProducts.length >= plannedQuantity && plannedQuantity > 0 ? 'Add Extra Row' : 'Add Row'}
+                </Button>
+                <Button
+                  onClick={handleBulkDownloadQrs}
+                  size="sm"
+                  variant="outline"
+                  disabled={downloadingPdf}
+                  className="flex items-center gap-2 border-blue-600 text-blue-700 hover:bg-blue-50"
+                >
+                  {downloadingPdf
+                    ? <><span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />Generating…</>
+                    : <><FileDown className="w-4 h-4" />Download QR PDF</>
                   }
-                  // Show exactly what's blocking completion
-                  const tempRows = localProducts.filter(p => p.id?.startsWith('temp-'));
-                  if (tempRows.length > 0) {
-                    toast({
-                      title: 'Unsaved rows',
-                      description: `${tempRows.length} row(s) are not saved yet. Fill in all required fields (Roll No, Weight, Width, Length, Location) to auto-save them first.`,
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-                  const requiredFields: { key: string; label: string }[] = [
-                    { key: 'roll_number', label: 'Roll Number' },
-                    { key: 'final_weight', label: 'Weight/GSM' },
-                    { key: 'final_width', label: 'Width' },
-                    { key: 'final_length', label: 'Length' },
-                    { key: 'location', label: 'Location' },
-                  ];
-                  const missingMap: Record<string, string[]> = {};
-                  localProducts.forEach((p, i) => {
-                    requiredFields.forEach(({ key, label }) => {
-                      const val = p[key as keyof IndividualProduct];
-                      if (!val || (typeof val === 'string' && val.trim() === '')) {
-                        if (!missingMap[`Row ${i + 1}`]) missingMap[`Row ${i + 1}`] = [];
-                        missingMap[`Row ${i + 1}`].push(label);
+                </Button>
+                {onComplete && (
+                  <Button
+                    onClick={() => {
+                      if (canComplete) {
+                        onComplete();
+                        return;
                       }
-                    });
-                  });
-                  const missing = Object.entries(missingMap).map(([row, fields]) => `${row}: ${fields.join(', ')}`).join(' | ');
-                  if (missing) {
-                    toast({
-                      title: 'Missing required fields',
-                      description: missing,
-                      variant: 'destructive',
-                    });
-                  } else if (localProducts.length === 0) {
-                    toast({
-                      title: 'No products added',
-                      description: 'Add at least one individual product before proceeding.',
-                      variant: 'destructive',
-                    });
-                  }
-                }}
-                size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />
-                {actionLabel}
-              </Button>
+                      // Show exactly what's blocking completion
+                      const tempRows = localProducts.filter(p => p.id?.startsWith('temp-'));
+                      if (tempRows.length > 0) {
+                        toast({
+                          title: 'Unsaved rows',
+                          description: `${tempRows.length} row(s) are not saved yet. Fill in all required fields (Roll No, Weight, Width, Length, Location) to auto-save them first.`,
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      const requiredFields: { key: string; label: string }[] = [
+                        { key: 'roll_number', label: 'Roll Number' },
+                        { key: 'final_weight', label: 'Weight/GSM' },
+                        { key: 'final_width', label: 'Width' },
+                        { key: 'final_length', label: 'Length' },
+                        { key: 'location', label: 'Location' },
+                      ];
+                      const missingMap: Record<string, string[]> = {};
+                      localProducts.forEach((p, i) => {
+                        requiredFields.forEach(({ key, label }) => {
+                          const val = p[key as keyof IndividualProduct];
+                          if (!val || (typeof val === 'string' && val.trim() === '')) {
+                            if (!missingMap[`Row ${i + 1}`]) missingMap[`Row ${i + 1}`] = [];
+                            missingMap[`Row ${i + 1}`].push(label);
+                          }
+                        });
+                      });
+                      const missing = Object.entries(missingMap).map(([row, fields]) => `${row}: ${fields.join(', ')}`).join(' | ');
+                      if (missing) {
+                        toast({
+                          title: 'Missing required fields',
+                          description: missing,
+                          variant: 'destructive',
+                        });
+                      } else if (localProducts.length === 0) {
+                        toast({
+                          title: 'No products added',
+                          description: 'Add at least one individual product before proceeding.',
+                          variant: 'destructive',
+                        });
+                      }
+                    }}
+                    size="sm"
+                    className="bg-orange-600 hover:bg-orange-700 text-white flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    {actionLabel}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Product Reference Details */}
+            {product && (product.length || product.width || product.weight) && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                  <span className="text-blue-600">📋</span>
+                  Product Reference Details
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                  {product.length && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Expected Length</p>
+                      <p className="text-gray-900 font-semibold">{product.length} {product.length_unit || ''}</p>
+                    </div>
+                  )}
+                  {product.width && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Expected Width</p>
+                      <p className="text-gray-900 font-semibold">{product.width} {product.width_unit || ''}</p>
+                    </div>
+                  )}
+                  {product.weight && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Expected GSM</p>
+                      <p className="text-gray-900 font-semibold">{product.weight.replace(/[^\d.]/g, '')} {product.weight_unit || 'GSM'}</p>
+                    </div>
+                  )}
+                  {(() => {
+                    const gsm = parseFloat((product.weight || '').replace(/[^\d.]/g, ''));
+                    let l = parseFloat((product.length || '').replace(/[^\d.]/g, ''));
+                    let w = parseFloat((product.width || '').replace(/[^\d.]/g, ''));
+                    if ((product.length || '').toLowerCase().includes('feet')) l *= 0.3048;
+                    if ((product.width || '').toLowerCase().includes('feet')) w *= 0.3048;
+                    if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) {
+                      return (
+                        <div>
+                          <p className="text-gray-600 font-medium mb-1">Expected Weight</p>
+                          <p className="text-gray-900 font-semibold">{((gsm * l * w) / 1000).toFixed(3)} kg/roll</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  {product.color && product.color !== 'N/A' && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Color</p>
+                      <p className="text-gray-900 font-semibold flex items-center gap-1.5">
+                        {colorCodeMap[product.color] && (
+                          <span className="w-4 h-4 rounded-full border border-black/10 shrink-0 inline-block" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                        )}
+                        {product.color}
+                      </p>
+                    </div>
+                  )}
+                  {product.pattern && product.pattern !== 'N/A' && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Pattern</p>
+                      <p className="text-gray-900 font-semibold flex items-center gap-1.5">
+                        {patternImageMap[product.pattern] && (
+                          <img src={patternImageMap[product.pattern]} alt="" className="w-6 h-6 rounded object-cover border border-black/10 shrink-0" />
+                        )}
+                        {product.pattern}
+                      </p>
+                    </div>
+                  )}
+                  {plannedQuantity > 0 && (
+                    <div>
+                      <p className="text-gray-600 font-medium mb-1">Planned Quantity</p>
+                      <p className="text-gray-900 font-semibold">{plannedQuantity} units</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium w-32 max-w-[140px]">
+                      Serial Number
+                    </th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Roll No</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final GSM</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
+                    <th className="border border-gray-200 p-2 text-left text-sm font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {localProducts.map((productItem, index) => (
+                    <tr key={productItem.id} className="hover:bg-gray-50">
+                      <td className="border border-gray-200 p-2 font-mono text-sm w-32 max-w-[140px] truncate">
+                        {productItem.serial_number || `#${index + 1}`}
+                      </td>
+                      <td className="border border-gray-200 p-2 font-mono text-sm">
+                        {productItem.qr_code || '-'}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        {editingCell?.row === index && editingCell?.col === 'roll_number' ? (
+                          <div>
+                            <Input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                              autoFocus
+                              placeholder={`${getRollNumberDatePrefix(productItem.production_date)}1`}
+                              disabled={saving === productItem.id}
+                            />
+                            <p className="mt-1 text-[11px] text-gray-500">
+                              Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (month-year + serial, enter serial like 101)
+                            </p>
+                          </div>
+                        ) : (
+                          <div
+                            className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
+                            onClick={() => handleCellClick(index, 'roll_number')}
+                          >
+                            {productItem.roll_number || <span className="text-gray-400">Enter roll no</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        {editingCell?.row === index && editingCell?.col === 'final_length' ? (
+                          <div>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={editValue}
+                              onChange={handleNumberInput}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                              autoFocus
+                              placeholder={`e.g., 2.74 (${product?.length_unit || 'm'} auto-added)`}
+                              disabled={saving === productItem.id}
+                              className={validationError && editingCell?.col === 'final_length' ? 'border-red-500 focus:border-red-500' : ''}
+                            />
+                            {validationError && editingCell?.col === 'final_length' && (
+                              <p className="text-xs text-red-650 mt-1">{validationError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
+                              onClick={() => handleCellClick(index, 'final_length')}
+                            >
+                              {productItem.final_length || <span className="text-gray-400">Click to edit</span>}
+                            </div>
+                            {productItem.final_length && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFillDownField(index, 'final_length');
+                                }}
+                                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                disabled={index === localProducts.length - 1}
+                                title="Fill down length"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        {editingCell?.row === index && editingCell?.col === 'final_width' ? (
+                          <div>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={editValue}
+                              onChange={handleNumberInput}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                              autoFocus
+                              placeholder={`e.g., 1.83 (${product?.width_unit || 'm'} auto-added)`}
+                              disabled={saving === productItem.id}
+                              className={validationError && editingCell?.col === 'final_width' ? 'border-red-500 focus:border-red-500' : ''}
+                            />
+                            {validationError && editingCell?.col === 'final_width' && (
+                              <p className="text-xs text-red-650 mt-1">{validationError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
+                              onClick={() => handleCellClick(index, 'final_width')}
+                            >
+                              {productItem.final_width || <span className="text-gray-400">Click to edit</span>}
+                            </div>
+                            {productItem.final_width && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFillDownField(index, 'final_width');
+                                }}
+                                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                disabled={index === localProducts.length - 1}
+                                title="Fill down width"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        {editingCell?.row === index && editingCell?.col === 'final_weight' ? (
+                          <div>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={editValue}
+                              onChange={handleNumberInput}
+                              onBlur={handleCellSave}
+                              onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                              autoFocus
+                              placeholder={`e.g., 350 (${product?.weight_unit || 'GSM'})`}
+                              disabled={saving === productItem.id}
+                              className={validationError && editingCell?.col === 'final_weight' ? 'border-red-500 focus:border-red-500' : ''}
+                            />
+                            {validationError && editingCell?.col === 'final_weight' && (
+                              <p className="text-xs text-red-650 mt-1">{validationError}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <div
+                              className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-start flex-col"
+                              onClick={() => handleCellClick(index, 'final_weight')}
+                            >
+                              {productItem.final_weight ? (
+                                <>
+                                  <span className="text-sm text-gray-900">{productItem.final_weight}</span>
+                                  {(() => {
+                                    const kg = weightKgFromRow(productItem);
+                                    return kg !== null ? (
+                                      <span className="text-xs text-gray-500 mt-0.5">{kg.toFixed(3)} kg</span>
+                                    ) : null;
+                                  })()}
+                                </>
+                              ) : (
+                                <span className="text-gray-400">Click to edit</span>
+                              )}
+                            </div>
+                            {productItem.final_weight && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFillDownField(index, 'final_weight');
+                                }}
+                                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                disabled={index === localProducts.length - 1}
+                                title="Fill down weight"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        <div className="flex items-center gap-1">
+                          <Select
+                            value={productItem.location || ''}
+                            onValueChange={(value) => {
+                              if (value === '__add_new__') {
+                                setIsAddingLocation(true);
+                              } else {
+                                handleSelectChange(index, 'location', value);
+                              }
+                            }}
+                            disabled={saving === productItem.id}
+                          >
+                            <SelectTrigger
+                              className={`w-40 max-w-[160px] truncate ${!productItem.location ? 'text-gray-400' : ''}`}
+                              title={productItem.location || ''}
+                            >
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {locationOptions.map((location) => (
+                                <SelectItem key={location} value={location}>
+                                  {location}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="__add_new__" className="text-blue-650 font-medium">
+                                <Plus className="w-3 h-3 inline mr-1" />
+                                Add New Location
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {productItem.location && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFillDownLocation(index);
+                                }}
+                                className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                                disabled={index === localProducts.length - 1}
+                                title="Fill down location"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApplyLocationToAll(index);
+                                }}
+                                className="h-6 px-2 text-blue-605 hover:text-blue-700 hover:bg-blue-50"
+                                title="Apply this location to all rows"
+                              >
+                                All
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        <Select
+                          value={productItem.status === 'used' || productItem.status === 'in_production' ? 'available' : (productItem.status || 'available')}
+                          onValueChange={(value) => handleSelectChange(index, 'status', value)}
+                          disabled={saving === productItem.id}
+                        >
+                          <SelectTrigger className="w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="available">Available</SelectItem>
+                            <SelectItem value="damaged">Damaged</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {(productItem.status === 'used' || productItem.status === 'in_production') && (
+                          <p className="text-xs text-gray-500 mt-1">Status: {productItem.status}</p>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        {editingCell?.row === index && editingCell?.col === 'notes' ? (
+                          <Input
+                            value={editValue}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+                              if (words.length > 10) {
+                                const allowed = words.slice(0, 10).join(' ');
+                                setEditValue(allowed);
+                                return;
+                              }
+                              const hasLongWord = words.some(w => w.length > 15);
+                              if (hasLongWord) {
+                                const trimmedWords = words.map(w => w.slice(0, 15));
+                                setEditValue(trimmedWords.join(' '));
+                                return;
+                              }
+                              setEditValue(value);
+                            }}
+                            onBlur={handleCellSave}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                            autoFocus
+                            placeholder="Max 10 words, 15 chars/word"
+                            disabled={saving === productItem.id}
+                          />
+                        ) : (
+                          <div
+                            className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
+                            onClick={() => handleCellClick(index, 'notes')}
+                          >
+                            {productItem.notes || <span className="text-gray-400">Click to edit</span>}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-200 p-2">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCopyRow(index)}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="Copy row values"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleFillDown(index)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            disabled={index === localProducts.length - 1}
+                            title="Fill down to rows below"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                          {copiedRowData && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePasteRow(index)}
+                              className="text-purple-650 hover:text-purple-700 hover:bg-purple-50"
+                              title="Paste copied values"
+                            >
+                              Paste
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveRow(index)}
+                            className="text-red-650 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={saving === productItem.id || localProducts.length <= 1}
+                            title={localProducts.length <= 1 ? 'At least one row must remain' : 'Delete row'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Mobile View */}
+      <div className="lg:hidden space-y-4 pb-24 bg-gray-50 min-h-screen -mx-4 -my-6 p-4">
+        {/* Mobile Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm -mx-4 -mt-4 mb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/production', { state: { section: 'assigned' } })}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900 leading-tight">
+                Individual Stage
+              </h1>
+              <p className="text-[10px] text-gray-500 font-semibold truncate max-w-[150px]">
+                {mobileBatch?.batch_number} · {product?.name || mobileBatch?.product_name || '—'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowInfoSheet(true)}
+              className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-750 rounded-xl transition-colors border border-gray-200"
+              title="Batch Information"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onUpdate}
+              className="p-2 bg-gray-50 hover:bg-gray-100 text-gray-770 rounded-xl transition-colors border border-gray-200"
+              title="Refresh"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        {/* Product Reference Details */}
-        {product && (product.length || product.width || product.weight) && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
-              <span className="text-blue-600">📋</span>
-              Product Reference Details
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-              {product.length && (
-                <div>
-                  <p className="text-gray-600 font-medium mb-1">Expected Length</p>
-                  <p className="text-gray-900 font-semibold">{product.length} {product.length_unit || ''}</p>
-                </div>
-              )}
-              {product.width && (
-                <div>
-                  <p className="text-gray-600 font-medium mb-1">Expected Width</p>
-                  <p className="text-gray-900 font-semibold">{product.width} {product.width_unit || ''}</p>
-                </div>
-              )}
-              {product.weight && (
-                <div>
-                  <p className="text-gray-600 font-medium mb-1">Expected GSM</p>
-                  <p className="text-gray-900 font-semibold">{product.weight} {product.weight_unit || ''}</p>
-                </div>
-              )}
-              {(() => {
-                const gsm = parseFloat((product.weight || '').replace(/[^\d.]/g, ''));
-                let l = parseFloat((product.length || '').replace(/[^\d.]/g, ''));
-                let w = parseFloat((product.width || '').replace(/[^\d.]/g, ''));
-                if ((product.length || '').toLowerCase().includes('feet')) l *= 0.3048;
-                if ((product.width || '').toLowerCase().includes('feet')) w *= 0.3048;
-                if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) {
-                  return (
-                    <div>
-                      <p className="text-gray-600 font-medium mb-1">Expected Weight</p>
-                      <p className="text-gray-900 font-semibold">{((gsm * l * w) / 1000).toFixed(3)} kg/roll</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-              {plannedQuantity > 0 && (
-                <div>
-                  <p className="text-gray-600 font-medium mb-1">Planned Quantity</p>
-                  <p className="text-gray-900 font-semibold">{plannedQuantity} units</p>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-blue-700 mt-3 italic">
-              Enter Final GSM directly in the Final GSM column.
+
+        {/* Stepper Progress */}
+        <div className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs text-gray-550 font-medium">Stage Progress</span>
+            <span className="text-xs text-purple-650 font-bold bg-purple-50 px-2.5 py-0.5 rounded-full">
+              3. Individual Products
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div className="bg-purple-500 rounded-full" />
+            <div className="bg-purple-500 rounded-full" />
+            <div className="bg-purple-500 rounded-full animate-pulse" />
+            <div className="bg-gray-200 rounded-full" />
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-400 mt-2 font-semibold">
+            <span className="text-purple-600 font-medium">Planning</span>
+            <span className="text-purple-600 font-medium">Machine</span>
+            <span className="text-purple-650 font-bold">Details</span>
+            <span>Wastage</span>
+          </div>
+        </div>
+
+        {/* Roll Progress Bar */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between items-center text-xs text-gray-650 font-semibold px-0.5">
+            <span>Rolls Progress</span>
+            <span>{localProducts.filter(r => !r.id.startsWith('temp-') && r.final_weight && r.final_width && r.final_length && r.location).length} / {localProducts.length} Complete</span>
+          </div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden border border-gray-150">
+            <div
+              className="h-full bg-green-500 transition-all duration-300 rounded-full"
+              style={{
+                width: `${localProducts.length > 0 
+                  ? (localProducts.filter(r => !r.id.startsWith('temp-') && r.final_weight && r.final_width && r.final_length && r.location).length / localProducts.length) * 100 
+                  : 0}%`
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Stats Strip */}
+        <div className="grid grid-cols-4 gap-2 bg-white rounded-xl border border-gray-150 p-3 shadow-sm">
+          <div className="text-center">
+            <p className="text-sm font-extrabold text-gray-800 leading-tight">{localProducts.length}</p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Total</p>
+          </div>
+          <div className="text-center border-l border-gray-100">
+            <p className="text-sm font-extrabold text-purple-650 leading-tight">{savedCount}</p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Saved</p>
+          </div>
+          <div className="text-center border-l border-gray-100">
+            <p className="text-sm font-extrabold text-green-600 leading-tight">
+              {localProducts.filter(r => !r.id.startsWith('temp-') && r.final_weight && r.final_width && r.final_length && r.location).length}
             </p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Done</p>
+          </div>
+          <div className="text-center border-l border-gray-100">
+            <p className="text-sm font-extrabold text-orange-600 leading-tight">{localProducts.length - savedCount}</p>
+            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Left</p>
+          </div>
+        </div>
+
+        {/* Product Info Strip */}
+        {product && (
+          <div
+            onClick={() => { setInfoTab('product'); setShowInfoSheet(true); }}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-xs text-sky-700 font-bold shadow-sm cursor-pointer animate-fadeIn"
+          >
+            <Package className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span className="text-sky-900 truncate max-w-[130px]">{product.name}</span>
+            {product.weight && <span>· GSM: {product.weight.replace(/[^\d.]/g, '')} {product.weight_unit || 'GSM'}</span>}
+            {product.width && <span>· W: {product.width.replace(/[^\d.]/g, '')} {product.width_unit || 'm'}</span>}
+            {product.length && <span>· L: {product.length.replace(/[^\d.]/g, '')} {product.length_unit || 'm'}</span>}
+            {product.color && product.color !== 'N/A' && (
+              <span className="flex items-center gap-1">
+                ·
+                {colorCodeMap[product.color] && (
+                  <span className="w-3 h-3 rounded-full border border-black/10 shrink-0 inline-block" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                )}
+                {product.color}
+              </span>
+            )}
+            {product.pattern && product.pattern !== 'N/A' && (
+              <span className="flex items-center gap-1">
+                ·
+                {patternImageMap[product.pattern] && (
+                  <img src={patternImageMap[product.pattern]} alt="" className="w-4 h-4 rounded object-cover border border-black/10 shrink-0 inline-block" />
+                )}
+                {product.pattern}
+              </span>
+            )}
+            <ChevronRight className="w-3.5 h-3.5 text-sky-600 ml-auto" />
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-200">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium w-32 max-w-[140px]">
-                  Serial Number
-                </th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Roll No</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Length</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Width</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final GSM</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Location</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Notes</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {localProducts.map((productItem, index) => (
-                <tr key={productItem.id} className="hover:bg-gray-50">
-                  <td className="border border-gray-200 p-2 font-mono text-sm w-32 max-w-[140px] truncate">
-                    {productItem.serial_number || `#${index + 1}`}
-                  </td>
-                  <td className="border border-gray-200 p-2 font-mono text-sm">
-                    {productItem.qr_code || '-'}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'roll_number' ? (
-                      <div>
+        {/* Toolbar */}
+        <div className="flex flex-wrap gap-2 py-1">
+          <button
+            onClick={() => { setGenStartNo(getAutoStartNo()); setShowGenModal(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 text-xs font-bold transition-colors shadow-sm"
+          >
+            <Hash className="w-3.5 h-3.5" />
+            Gen Roll Nos
+          </button>
+          
+          {hasOneRowFilled && (
+            <button
+              onClick={handleApplySameToAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-200 bg-green-50 text-green-700 text-xs font-bold transition-colors shadow-sm"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Apply to All
+            </button>
+          )}
+
+          <button
+            onClick={() => { setInfoTab('materials'); setShowInfoSheet(true); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold transition-colors shadow-sm"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Materials
+          </button>
+
+          {localProducts.some(r => isTempRowReady(r)) && (
+            <button
+              onClick={async () => {
+                const updated = [...localProductsRef.current];
+                for (let i = 0; i < updated.length; i++) {
+                  if (isTempRowReady(updated[i])) {
+                    await createTempRowIfReady(i);
+                  }
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-green-200 bg-green-50 text-green-700 text-xs font-bold transition-colors shadow-sm"
+            >
+              <Save className="w-3.5 h-3.5" />
+              Save All
+            </button>
+          )}
+
+          {localProducts.some(p => !p.id.startsWith('temp-')) && (
+            <button
+              onClick={() => { setQrMode(!qrMode); setSelectedQrIds(new Set()); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-colors shadow-sm ${
+                qrMode 
+                  ? 'border-purple-600 bg-purple-600 text-white' 
+                  : 'border-purple-250 bg-purple-50 text-purple-700'
+              }`}
+            >
+              <Grid className="w-3.5 h-3.5" />
+              QR Codes
+            </button>
+          )}
+
+          <button
+            disabled={stageCompleted}
+            onClick={handleAddRow}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-blue-600 bg-blue-600 text-white text-xs font-bold disabled:opacity-40 transition-colors shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Roll
+          </button>
+        </div>
+
+        {/* QR Mode Action Bar */}
+        {qrMode && (
+          <div className="flex items-center justify-between bg-purple-100 border border-purple-250 rounded-xl px-3 py-2 text-xs text-purple-800 shadow-sm animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={localProducts.filter(r => !r.id.startsWith('temp-')).every(r => selectedQrIds.has(r.id))}
+                onChange={() => {
+                  const savedIds = localProducts.filter(r => !r.id.startsWith('temp-')).map(r => r.id);
+                  const allSelected = savedIds.every(id => selectedQrIds.has(id));
+                  if (allSelected) setSelectedQrIds(new Set());
+                  else setSelectedQrIds(new Set(savedIds));
+                }}
+                className="w-4 h-4 rounded text-purple-650 focus:ring-purple-500 border-gray-300"
+              />
+              <span className="font-bold">Select All</span>
+            </div>
+            <span className="font-semibold">{selectedQrIds.size} selected</span>
+            {selectedQrIds.size > 0 && (
+              <button
+                onClick={() => setShowQrSheet(true)}
+                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                View QRs
+              </button>
+            )}
+            <button
+              onClick={() => { setQrMode(false); setSelectedQrIds(new Set()); }}
+              className="p-1 hover:bg-purple-200 rounded"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Roll Cards List */}
+        <div className="space-y-3.5">
+          {localProducts.length === 0 ? (
+            <p className="text-center text-xs text-gray-400 py-10 bg-white border border-gray-150 rounded-xl">No rolls yet. Click "Add Roll" to start.</p>
+          ) : (
+            localProducts.map((roll, index) => {
+              const saved = !roll.id.startsWith('temp-');
+              const requiredFields = ['final_weight', 'final_width', 'final_length', 'location', 'roll_number'];
+              const complete = requiredFields.every(field => {
+                const val = roll[field as keyof IndividualProduct];
+                return val && typeof val === 'string' && val.trim() !== '';
+              });
+
+              const borderColor = complete && saved 
+                ? 'border-green-200 bg-white' 
+                : saved 
+                ? 'border-blue-200 bg-white' 
+                : 'border-gray-200 bg-white';
+
+              const qrSelected = selectedQrIds.has(roll.id);
+              const highlightBorder = qrMode && saved && qrSelected 
+                ? 'border-purple-600 border-2 bg-purple-50/10' 
+                : '';
+
+              return (
+                <div key={roll.id} className={`border rounded-xl p-3.5 space-y-3 shadow-sm transition-all ${borderColor} ${highlightBorder}`}>
+                  {/* Card Header */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      {qrMode && saved && (
+                        <input
+                          type="checkbox"
+                          checked={qrSelected}
+                          onChange={() => {
+                            setSelectedQrIds(prev => {
+                              const next = new Set(prev);
+                              next.has(roll.id) ? next.delete(roll.id) : next.add(roll.id);
+                              return next;
+                            });
+                          }}
+                          className="w-4 h-4 rounded text-purple-650 focus:ring-purple-500 border-gray-300"
+                        />
+                      )}
+                      <span className={`px-2 py-0.5 rounded-lg text-xs font-extrabold ${saved ? (complete ? 'bg-green-100 text-green-800' : 'bg-blue-150 text-blue-800') : 'bg-amber-100 text-amber-800'}`}>
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+
+                      {/* Roll Number Field */}
+                      {editingCell?.row === index && editingCell?.col === 'roll_number' ? (
                         <Input
                           type="text"
                           value={editValue}
@@ -1663,385 +2409,714 @@ export default function IndividualProductsTable({
                           onBlur={handleCellSave}
                           onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                           autoFocus
-                          placeholder={`${getRollNumberDatePrefix(productItem.production_date)}1`}
-                          disabled={saving === productItem.id}
+                          className="h-8 py-0 px-2 text-xs w-36"
+                          placeholder={`${getRollNumberDatePrefix(roll.production_date)}001`}
                         />
-                        <p className="mt-1 text-[11px] text-gray-500">
-                          Prefix auto: <span className="font-mono">{getRollNumberDatePrefix(productItem.production_date)}</span> (month-year + serial, enter serial like 101)
-                        </p>
-                      </div>
-                    ) : (
-                      <div
-                        className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
-                        onClick={() => handleCellClick(index, 'roll_number')}
+                      ) : (
+                        <div
+                          onClick={() => handleCellClick(index, 'roll_number')}
+                          className="cursor-pointer font-bold text-gray-800 text-sm hover:bg-gray-50 px-2 py-1 rounded border border-dashed border-gray-200 min-w-[100px] text-center"
+                        >
+                          {roll.roll_number || <span className="text-gray-400 text-xs font-normal">Enter roll #</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OK / DMG status chip toggle */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const newStatus = roll.status === 'available' ? 'damaged' : 'available';
+                          handleSelectChange(index, 'status', newStatus);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase border ${
+                          roll.status === 'available' 
+                            ? 'bg-green-50 text-green-700 border-green-200' 
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}
                       >
-                        {productItem.roll_number || <span className="text-gray-400">Enter roll no</span>}
+                        {roll.status === 'available' ? 'OK' : 'DMG'}
+                      </button>
+
+                      {/* Spinner / Checkmark */}
+                      <div className="w-5 flex items-center justify-center">
+                        {saving === roll.id || creatingTempRowId === roll.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-650" />
+                        ) : saved ? (
+                          <CheckCircle className="w-4 h-4 text-green-600" />
+                        ) : null}
                       </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'final_length' ? (
-                      <div>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={editValue}
-                          onChange={handleNumberInput}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                          placeholder={`e.g., 2.74 (${product?.length_unit || 'm'} auto-added)`}
-                          disabled={saving === productItem.id}
-                          className={validationError && editingCell?.col === 'final_length' ? 'border-red-500 focus:border-red-500' : ''}
-                        />
-                        {validationError && editingCell?.col === 'final_length' && (
-                          <p className="text-xs text-red-600 mt-1">{validationError}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
-                          onClick={() => handleCellClick(index, 'final_length')}
-                        >
-                          {productItem.final_length || <span className="text-gray-400">Click to edit</span>}
-                        </div>
-                        {productItem.final_length && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFillDownField(index, 'final_length');
-                            }}
-                            className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            disabled={index === localProducts.length - 1}
-                            title="Fill down length"
+                    </div>
+                  </div>
+
+                  {/* Dimensions Inputs Row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* GSM Column */}
+                    <div className="space-y-1">
+                      <span className="block text-[9px] font-bold text-gray-400 uppercase text-center truncate">
+                        GSM {product?.weight_unit ? `(${product.weight_unit})` : ''}
+                      </span>
+                      <div className="flex flex-col gap-1 items-center">
+                        {editingCell?.row === index && editingCell?.col === 'final_weight' ? (
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={editValue}
+                            onChange={handleNumberInput}
+                            onBlur={handleCellSave}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                            autoFocus
+                            className="h-8 text-center text-xs py-0 px-1"
+                          />
+                        ) : (
+                          <div
+                            onClick={() => handleCellClick(index, 'final_weight')}
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
                           >
-                            <ArrowDown className="w-3 h-3" />
-                          </Button>
+                            {roll.final_weight ? (
+                              <span className="flex flex-col items-center">
+                                <span>{roll.final_weight.replace(/[a-zA-Z\s]/g, '')}</span>
+                                {weightKgFromRow(roll) !== null && (
+                                  <span className="text-[8px] text-gray-400 font-semibold">{weightKgFromRow(roll)?.toFixed(1)} kg</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 font-normal">—</span>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'final_width' ? (
-                      <div>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={editValue}
-                          onChange={handleNumberInput}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                          placeholder={`e.g., 1.83 (${product?.width_unit || 'm'} auto-added)`}
-                          disabled={saving === productItem.id}
-                          className={validationError && editingCell?.col === 'final_width' ? 'border-red-500 focus:border-red-500' : ''}
-                        />
-                        {validationError && editingCell?.col === 'final_width' && (
-                          <p className="text-xs text-red-600 mt-1">{validationError}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-center"
-                          onClick={() => handleCellClick(index, 'final_width')}
-                        >
-                          {productItem.final_width || <span className="text-gray-400">Click to edit</span>}
-                        </div>
-                        {productItem.final_width && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFillDownField(index, 'final_width');
-                            }}
-                            className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            disabled={index === localProducts.length - 1}
-                            title="Fill down width"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'final_weight' ? (
-                      <div>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={editValue}
-                          onChange={handleNumberInput}
-                          onBlur={handleCellSave}
-                          onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                          autoFocus
-                          placeholder={`e.g., 350 (${product?.weight_unit || 'GSM'})`}
-                          disabled={saving === productItem.id}
-                          className={validationError && editingCell?.col === 'final_weight' ? 'border-red-500 focus:border-red-500' : ''}
-                        />
-                        {validationError && editingCell?.col === 'final_weight' && (
-                          <p className="text-xs text-red-600 mt-1">{validationError}</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <div
-                          className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex-1 flex items-start flex-col"
-                          onClick={() => handleCellClick(index, 'final_weight')}
-                        >
-                          {productItem.final_weight ? (
-                            <>
-                              <span className="text-sm text-gray-900">{productItem.final_weight}</span>
-                              {(() => {
-                                const kg = weightKgFromRow(productItem);
-                                return kg !== null ? (
-                                  <span className="text-xs text-gray-500 mt-0.5">{kg.toFixed(3)} kg</span>
-                                ) : null;
-                              })()}
-                            </>
-                          ) : (
-                            <span className="text-gray-400">Click to edit</span>
-                          )}
-                        </div>
-                        {productItem.final_weight && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFillDownField(index, 'final_weight');
-                            }}
-                            className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            disabled={index === localProducts.length - 1}
-                            title="Fill down weight"
-                          >
-                            <ArrowDown className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                <td className="border border-gray-200 p-2">
-                  <div className="flex items-center gap-1">
-                    <Select
-                      value={productItem.location || ''}
-                      onValueChange={(value) => {
-                        if (value === '__add_new__') {
-                          setIsAddingLocation(true);
-                        } else {
-                          handleSelectChange(index, 'location', value);
-                        }
-                      }}
-                      disabled={saving === productItem.id}
-                    >
-                      <SelectTrigger
-                        className={`w-40 max-w-[160px] truncate ${!productItem.location ? 'text-gray-400' : ''}`}
-                        title={productItem.location || ''}
-                      >
-                        <SelectValue placeholder="Select location" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {locationOptions.map((location) => (
-                          <SelectItem key={location} value={location}>
-                            {location}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="__add_new__" className="text-blue-600 font-medium">
-                          <Plus className="w-3 h-3 inline mr-1" />
-                          Add New Location
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {productItem.location && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFillDownLocation(index);
-                          }}
-                          className="h-6 w-6 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        <button
                           disabled={index === localProducts.length - 1}
-                          title="Fill down location"
+                          onClick={() => handleFillDownField(index, 'final_weight')}
+                          className="p-1 bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 rounded"
                         >
-                          <ArrowDown className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApplyLocationToAll(index);
-                          }}
-                          className="h-6 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Apply this location to all rows"
+                          <ArrowDown className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Width Column */}
+                    <div className="space-y-1">
+                      <span className="block text-[9px] font-bold text-gray-400 uppercase text-center truncate">
+                        Width {product?.width_unit ? `(${product.width_unit})` : ''}
+                      </span>
+                      <div className="flex flex-col gap-1 items-center">
+                        {editingCell?.row === index && editingCell?.col === 'final_width' ? (
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={editValue}
+                            onChange={handleNumberInput}
+                            onBlur={handleCellSave}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                            autoFocus
+                            className="h-8 text-center text-xs py-0 px-1"
+                          />
+                        ) : (
+                          <div
+                            onClick={() => handleCellClick(index, 'final_width')}
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
+                          >
+                            {roll.final_width ? roll.final_width.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                          </div>
+                        )}
+                        <button
+                          disabled={index === localProducts.length - 1}
+                          onClick={() => handleFillDownField(index, 'final_width')}
+                          className="p-1 bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 rounded"
                         >
-                          All
-                        </Button>
-                      </>
+                          <ArrowDown className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Length Column */}
+                    <div className="space-y-1">
+                      <span className="block text-[9px] font-bold text-gray-400 uppercase text-center truncate">
+                        Length {product?.length_unit ? `(${product.length_unit})` : ''}
+                      </span>
+                      <div className="flex flex-col gap-1 items-center">
+                        {editingCell?.row === index && editingCell?.col === 'final_length' ? (
+                          <Input
+                            type="text"
+                            inputMode="decimal"
+                            value={editValue}
+                            onChange={handleNumberInput}
+                            onBlur={handleCellSave}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                            autoFocus
+                            className="h-8 text-center text-xs py-0 px-1"
+                          />
+                        ) : (
+                          <div
+                            onClick={() => handleCellClick(index, 'final_length')}
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
+                          >
+                            {roll.final_length ? roll.final_length.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                          </div>
+                        )}
+                        <button
+                          disabled={index === localProducts.length - 1}
+                          onClick={() => handleFillDownField(index, 'final_length')}
+                          className="p-1 bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 rounded"
+                        >
+                          <ArrowDown className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Row — mobile bottom sheet picker */}
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <button
+                      onClick={() => setMobileLocationPicker({ index })}
+                      disabled={saving === roll.id}
+                      className={`h-8 flex-1 flex items-center px-2.5 rounded-lg border text-xs text-left truncate transition-colors ${roll.location ? 'border-blue-200 bg-blue-50 text-blue-800 font-semibold' : 'border-gray-200 bg-gray-50 text-gray-400'}`}
+                    >
+                      <span className="truncate">{roll.location || 'Select location…'}</span>
+                    </button>
+                    {roll.location && (
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => handleApplyLocationToAll(index)}
+                          className="px-2 py-1 text-[9px] font-extrabold text-blue-650 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg"
+                        >
+                          ALL
+                        </button>
+                        <button
+                          disabled={index === localProducts.length - 1}
+                          onClick={() => handleFillDownLocation(index)}
+                          className="p-1 bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 rounded"
+                        >
+                          <ArrowDown className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
-                </td>
-                  <td className="border border-gray-200 p-2">
-                    <Select
-                      value={productItem.status === 'used' || productItem.status === 'in_production' ? 'available' : (productItem.status || 'available')}
-                      onValueChange={(value) => handleSelectChange(index, 'status', value)}
-                      disabled={saving === productItem.id}
+
+                  {/* Notes Field */}
+                  {editingCell?.row === index && editingCell?.col === 'notes' ? (
+                    <Input
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleCellSave}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
+                      autoFocus
+                      placeholder="Notes (optional)..."
+                      className="h-8 py-0 px-2 text-xs"
+                    />
+                  ) : (
+                    <div
+                      onClick={() => handleCellClick(index, 'notes')}
+                      className="cursor-pointer text-xs text-gray-500 bg-gray-50 border border-dashed border-gray-200 rounded-lg p-2 min-h-[30px] flex items-center"
                     >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="damaged">Damaged</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {/* Show actual status if it's "used" or "in_production" */}
-                    {(productItem.status === 'used' || productItem.status === 'in_production') && (
-                      <p className="text-xs text-gray-500 mt-1">Status: {productItem.status}</p>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    {editingCell?.row === index && editingCell?.col === 'notes' ? (
-                      <Input
-                        value={editValue}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+                      {roll.notes || <span className="text-gray-400">Notes (optional)...</span>}
+                    </div>
+                  )}
 
-                          // HARD LIMIT: 10 words max
-                          if (words.length > 10) {
-                            const allowed = words.slice(0, 10).join(' ');
-                            setEditValue(allowed);
-                            return;
-                          }
-
-                          // HARD LIMIT: 15 chars per word
-                          const hasLongWord = words.some(w => w.length > 15);
-                          if (hasLongWord) {
-                            const trimmedWords = words.map(w => w.slice(0, 15));
-                            setEditValue(trimmedWords.join(' '));
-                            return;
-                          }
-
-                          setEditValue(value);
-                        }}
-                        onBlur={handleCellSave}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
-                        autoFocus
-                        placeholder="Max 10 words, 15 chars/word"
-                        disabled={saving === productItem.id}
-                      />
-                    ) : (
-                      <div
-                        className="cursor-pointer p-1 hover:bg-blue-50 rounded min-h-[32px] flex items-center"
-                        onClick={() => handleCellClick(index, 'notes')}
-                      >
-                        {productItem.notes || <span className="text-gray-400">Click to edit</span>}
-                      </div>
-                    )}
-                  </td>
-                  <td className="border border-gray-200 p-2">
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
+                  {/* Actions Row */}
+                  <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <button
                         onClick={() => handleCopyRow(index)}
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        title="Copy row values"
+                        className="px-2.5 py-1.5 bg-gray-50 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-100 text-[10px] font-bold flex items-center gap-1 shadow-sm"
                       >
                         <Copy className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFillDown(index)}
-                        className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        disabled={index === localProducts.length - 1}
-                        title="Fill down to rows below"
-                      >
-                        <ArrowDown className="w-3 h-3" />
-                      </Button>
+                        Copy
+                      </button>
                       {copiedRowData && (
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        <button
                           onClick={() => handlePasteRow(index)}
-                          className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                          title="Paste copied values"
+                          className="px-2.5 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 text-[10px] font-bold flex items-center gap-1 shadow-sm"
                         >
+                          <Clipboard className="w-3 h-3" />
                           Paste
-                        </Button>
+                        </button>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRemoveRow(index)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={saving === productItem.id || localProducts.length <= 1}
-                        title={localProducts.length <= 1 ? 'At least one row must remain' : 'Delete row'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {saved && roll.qr_code && (
+                        <button
+                          onClick={() => {
+                            const text = `Roll: ${roll.roll_number}\nGSM: ${roll.final_weight} · W: ${roll.final_width} · L: ${roll.final_length}\nLocation: ${roll.location}\nQR: ${roll.qr_code}`;
+                            navigator.clipboard.writeText(text);
+                            toast({ title: 'Copied Roll', description: 'Roll details copied!' });
+                          }}
+                          className="px-2.5 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 text-[10px] font-bold flex items-center gap-1 shadow-sm"
+                        >
+                          <Grid className="w-3 h-3" />
+                          Share QR
+                        </button>
+                      )}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
-    </Card>
 
-    {/* Add New Location Dialog */}
-    <Dialog open={isAddingLocation} onOpenChange={setIsAddingLocation}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add New Storage Location</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="newLocation">Location Name</Label>
-            <Input
-              id="newLocation"
-              placeholder="e.g., First Floor - Zone A - Section 1"
-              value={newLocationValue}
-              onChange={(e) => setNewLocationValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAddLocation();
-                }
-              }}
-            />
-            <p className="text-xs text-gray-500">
-              Examples: First Floor - Zone A, Second Floor - Zone B - Section 1, Ground Floor - Zone C
-            </p>
-          </div>
+                    <button
+                      disabled={saving === roll.id || localProducts.length <= 1}
+                      onClick={() => handleRemoveRow(index)}
+                      className="p-1.5 border border-red-200 text-red-650 hover:bg-red-50 disabled:opacity-40 rounded-lg shadow-sm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
-        <DialogFooter>
-          <Button
-            variant="outline"
+
+        {/* Sticky Bottom Footer CTA — sits above bottom nav (h-16) */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-3 pb-4 z-20 shadow-lg space-y-1.5">
+          {!canComplete && localProducts.filter(p => !p.id?.startsWith('temp-')).length > 0 && (
+            <p className="text-center text-[11px] text-amber-600 font-semibold">
+              Fill all required fields on each roll to proceed
+            </p>
+          )}
+          <button
             onClick={() => {
-              setIsAddingLocation(false);
-              setNewLocationValue('');
+              if (canComplete) {
+                onComplete?.();
+                return;
+              }
+              const tempRows = localProducts.filter(p => p.id?.startsWith('temp-'));
+              if (tempRows.length > 0) {
+                toast({ title: 'Unsaved rows', description: `${tempRows.length} row(s) not saved yet. Fill all fields first.`, variant: 'destructive' });
+                return;
+              }
+              toast({ title: 'Incomplete rolls', description: 'Fill Roll No, GSM, Width, Length and Location on every row.', variant: 'destructive' });
             }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-[14px] font-bold text-white transition-colors"
+            style={{ backgroundColor: canComplete ? '#7C3AED' : '#9CA3AF' }}
           >
-            Cancel
-          </Button>
-          <Button onClick={handleAddLocation}>
-            <Plus className="w-4 h-4 mr-1" />
-            Add Location
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </>
+            <CheckCircle className="w-4 h-4" />
+            Proceed to Wastage Stage
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Serial Generation Modal */}
+      <Dialog open={showGenModal} onOpenChange={setShowGenModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate Roll Numbers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm text-gray-500">
+            <p className="leading-relaxed">
+              Type a starting roll number sequence (e.g. <strong className="text-gray-800">70</strong> or <strong className="text-gray-800">{getRollNumberDatePrefix(localProducts[0]?.production_date)}70</strong>).
+              <br />
+              This will sequentialize roll numbers from that value onward.
+            </p>
+            <Input
+              type="text"
+              value={genStartNo}
+              onChange={(e) => setGenStartNo(e.target.value)}
+              placeholder={`e.g., ${getRollNumberDatePrefix(localProducts[0]?.production_date)}70`}
+              autoFocus
+              className="font-bold text-base text-gray-900"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowGenModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleGenerateRollNumbersMobile} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Hash className="w-4 h-4 mr-1" />
+              Generate Serials
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code sharing — mobile bottom sheet */}
+      {createPortal(
+        showQrSheet ? (
+          <div className="lg:hidden fixed inset-0 z-[9999] flex flex-col justify-end"
+            style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowQrSheet(false); }}>
+            <div className="bg-white rounded-t-[22px] flex flex-col min-h-0" style={{ maxHeight: '90vh' }}
+              onClick={(e) => e.stopPropagation()}>
+              {/* Drag handle */}
+              <div className="flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="w-9 h-1 rounded-full bg-gray-300" />
+              </div>
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
+                <p className="text-[15px] font-extrabold text-gray-900">QR Codes ({selectedQrIds.size})</p>
+                <button onClick={() => setShowQrSheet(false)} className="p-1"><X className="w-4 h-4 text-gray-400" /></button>
+              </div>
+              {/* Scrollable list */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-5">
+                {localProducts.filter(r => selectedQrIds.has(r.id) && !r.id.startsWith('temp-')).map((roll) => {
+                  const qrData = roll.qr_code || roll.id;
+                  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(qrData)}`;
+                  return (
+                    <div key={roll.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+                      {/* QR Code */}
+                      <div className="flex justify-center bg-gray-50 p-5 border-b border-gray-100">
+                        <img src={qrUrl} alt="QR Code" className="w-52 h-52 object-contain" />
+                      </div>
+                      {/* Product info */}
+                      <div className="px-4 py-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[15px] font-extrabold text-gray-900">{roll.roll_number || '—'}</p>
+                          <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">Roll</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {roll.final_weight && (
+                            <div className="bg-gray-50 rounded-lg px-2.5 py-2 text-center">
+                              <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">GSM</p>
+                              <p className="text-[12px] font-bold text-gray-800">{roll.final_weight.replace(/[^\d.]/g, '')}</p>
+                            </div>
+                          )}
+                          {roll.final_width && (
+                            <div className="bg-gray-50 rounded-lg px-2.5 py-2 text-center">
+                              <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Width</p>
+                              <p className="text-[12px] font-bold text-gray-800">{roll.final_width.replace(/[^\d.]/g, '')} m</p>
+                            </div>
+                          )}
+                          {roll.final_length && (
+                            <div className="bg-gray-50 rounded-lg px-2.5 py-2 text-center">
+                              <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Length</p>
+                              <p className="text-[12px] font-bold text-gray-800">{roll.final_length.replace(/[^\d.]/g, '')} m</p>
+                            </div>
+                          )}
+                        </div>
+                        {roll.location && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            <span>{roll.location}</span>
+                          </div>
+                        )}
+                        <p className="font-mono text-[10px] text-gray-400 select-all break-all">{qrData}</p>
+                        <button
+                          onClick={() => {
+                            const text = `Roll: ${roll.roll_number}\nGSM: ${roll.final_weight} · W: ${roll.final_width} · L: ${roll.final_length}\nLocation: ${roll.location}\nQR: ${qrData}`;
+                            navigator.clipboard.writeText(text);
+                            toast({ title: 'Copied', description: `Details of ${roll.roll_number} copied.` });
+                          }}
+                          className="w-full py-2.5 rounded-xl border border-purple-200 text-[13px] font-bold text-purple-600 flex items-center justify-center gap-1.5 active:bg-purple-50"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          Copy Info
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Footer */}
+              <div className="px-4 pt-2 pb-8 border-t border-gray-100 shrink-0">
+                <button onClick={() => setShowQrSheet(false)}
+                  className="w-full py-3.5 rounded-xl border border-gray-200 text-[13.5px] font-bold text-gray-500">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null,
+        document.body
+      )}
+
+      {/* QR Code sharing — desktop dialog */}
+      <Dialog open={showQrSheet} onOpenChange={setShowQrSheet}>
+        <DialogContent className="hidden lg:block max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader className="border-b pb-2 flex flex-row items-center justify-between">
+            <DialogTitle>QR Codes ({selectedQrIds.size} rolls)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {localProducts.filter(r => selectedQrIds.has(r.id) && !r.id.startsWith('temp-')).map((roll) => {
+              const qrData = roll.qr_code || roll.id;
+              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(qrData)}`;
+              return (
+                <div key={roll.id} className="bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center shadow-sm">
+                  <img src={qrUrl} alt="QR Code" className="w-44 h-44 mb-3 object-contain" />
+                  <h4 className="font-extrabold text-sm text-gray-900 mb-1">{roll.roll_number}</h4>
+                  <p className="text-xs text-gray-500 mb-2">GSM: {(roll.final_weight || '').replace(/[^\d.]/g, '')} · W: {(roll.final_width || '').replace(/[^\d.]/g, '')} · L: {(roll.final_length || '').replace(/[^\d.]/g, '')}</p>
+                  {roll.location && <p className="text-xs text-gray-400 mb-2">{roll.location}</p>}
+                  <p className="font-mono text-[10px] text-gray-400 select-all mb-3">{qrData}</p>
+                  <Button variant="outline" size="sm"
+                    onClick={() => { navigator.clipboard.writeText(`Roll: ${roll.roll_number}\nQR: ${qrData}`); toast({ title: 'Copied' }); }}
+                    className="flex items-center gap-1.5 text-purple-600 border-purple-200 hover:bg-purple-50">
+                    <Copy className="w-3.5 h-3.5" />Copy Info
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="w-full" onClick={() => setShowQrSheet(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Info bottom sheet — mobile portal */}
+      {createPortal(
+        showInfoSheet ? (
+          <div className="lg:hidden fixed inset-0 z-[9999] flex flex-col justify-end"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setShowInfoSheet(false); }}>
+            <div className="bg-white rounded-t-[22px] flex flex-col" style={{ maxHeight: '85vh' }}
+              onClick={(e) => e.stopPropagation()}>
+              {/* Drag handle */}
+              <div className="flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="w-9 h-1 rounded-full bg-gray-300" />
+              </div>
+              {/* Tabs */}
+              <div className="flex border-b border-gray-200 shrink-0 px-4">
+                <button onClick={() => setInfoTab('product')}
+                  className={`flex-1 py-2.5 text-center text-[13.5px] font-bold border-b-2 transition-colors ${infoTab === 'product' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400'}`}>
+                  Product Info
+                </button>
+                <button onClick={() => setInfoTab('materials')}
+                  className={`flex-1 py-2.5 text-center text-[13.5px] font-bold border-b-2 transition-colors ${infoTab === 'materials' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400'}`}>
+                  Materials ({mobileConsumedMaterials.length})
+                </button>
+              </div>
+
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto px-4 py-2">
+                {infoTab === 'product' ? (
+                  <div className="divide-y divide-gray-100">
+                    {[
+                      { label: 'Product Name', value: product?.name || mobileBatch?.product_name },
+                      { label: 'Category', value: product?.category },
+                      { label: 'GSM', value: product?.weight ? `${product.weight.replace(/[^\d.]/g, '')} ${product.weight_unit || 'GSM'}` : undefined },
+                      { label: 'Width', value: product?.width ? `${product.width.replace(/[^\d.]/g, '')} ${product.width_unit || 'm'}` : undefined },
+                      { label: 'Length', value: product?.length ? `${product.length.replace(/[^\d.]/g, '')} ${product.length_unit || 'm'}` : undefined },
+                      { label: 'Planned Qty', value: mobileBatch?.planned_quantity ? `${mobileBatch.planned_quantity} rolls` : undefined },
+                    ].filter(r => r.value).map((r) => (
+                      <div key={r!.label} className="flex justify-between items-center py-3">
+                        <span className="text-[13px] text-gray-500">{r!.label}</span>
+                        <span className="text-[13.5px] font-bold text-gray-900">{r!.value}</span>
+                      </div>
+                    ))}
+                    {product?.color && product.color !== 'N/A' && (
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-[13px] text-gray-500">Color</span>
+                        <span className="flex items-center gap-2">
+                          {colorCodeMap[product.color] && (
+                            <span className="w-5 h-5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: colorCodeMap[product.color] }} />
+                          )}
+                          <span className="text-[13.5px] font-bold text-gray-900">{product.color}</span>
+                        </span>
+                      </div>
+                    )}
+                    {product?.pattern && product.pattern !== 'N/A' && (
+                      <div className="flex justify-between items-center py-3">
+                        <span className="text-[13px] text-gray-500">Pattern</span>
+                        <span className="flex items-center gap-2">
+                          {patternImageMap[product.pattern] && (
+                            <img src={patternImageMap[product.pattern]} alt="" className="w-8 h-8 rounded-lg object-cover border border-black/10 shrink-0" />
+                          )}
+                          <span className="text-[13.5px] font-bold text-gray-900">{product.pattern}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2 py-1">
+                    {mobileConsumedMaterials.length === 0 ? (
+                      <p className="text-gray-400 text-center py-8 text-sm">No materials consumed.</p>
+                    ) : (
+                      mobileConsumedMaterials.map((m, i) => {
+                        const isProduct = m.material_type === 'product';
+                        return (
+                          <div key={m.material_id || i} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="font-bold text-[13.5px] text-gray-900 truncate max-w-[200px]">{m.material_name}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isProduct ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {isProduct ? 'Product' : 'Raw'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="bg-white rounded-lg p-2 border border-gray-100">
+                                <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Required</p>
+                                <p className="text-[12px] font-bold text-gray-800">{Number(m.required_quantity || 0).toFixed(2)} <span className="text-gray-400 font-normal">{m.unit}</span></p>
+                              </div>
+                              <div className="bg-white rounded-lg p-2 border border-green-100">
+                                <p className="text-[9px] text-gray-400 font-semibold uppercase mb-0.5">Used</p>
+                                <p className="text-[12px] font-bold text-green-700">{Number(m.actual_consumed_quantity || m.quantity_used || 0).toFixed(2)} <span className="text-gray-400 font-normal">{m.unit}</span></p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 pt-2 pb-8 border-t border-gray-100 shrink-0">
+                <button onClick={() => setShowInfoSheet(false)}
+                  className="w-full py-3.5 rounded-xl border border-gray-200 text-[13.5px] font-bold text-gray-500">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null,
+        document.body
+      )}
+
+      {/* Info sheet — desktop dialog */}
+      <Dialog open={showInfoSheet && typeof window !== 'undefined' && window.innerWidth >= 1024} onOpenChange={setShowInfoSheet}>
+        <DialogContent className="max-w-md max-h-[75vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex border-b border-gray-200 w-full mb-2">
+              <button onClick={() => setInfoTab('product')}
+                className={`flex-1 py-2 text-center text-sm font-bold border-b-2 ${infoTab === 'product' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500'}`}>
+                Product Info
+              </button>
+              <button onClick={() => setInfoTab('materials')}
+                className={`flex-1 py-2 text-center text-sm font-bold border-b-2 ${infoTab === 'materials' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-500'}`}>
+                Materials ({mobileConsumedMaterials.length})
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="py-2">
+            {infoTab === 'product' ? (
+              <div className="divide-y divide-gray-100">
+                {[
+                  { label: 'Product Name', value: product?.name || mobileBatch?.product_name },
+                  { label: 'Category', value: product?.category },
+                  { label: 'GSM', value: product?.weight ? `${product.weight.replace(/[^\d.]/g, '')} ${product.weight_unit || 'GSM'}` : undefined },
+                  { label: 'Width', value: product?.width ? `${product.width.replace(/[^\d.]/g, '')} ${product.width_unit || 'm'}` : undefined },
+                  { label: 'Length', value: product?.length ? `${product.length.replace(/[^\d.]/g, '')} ${product.length_unit || 'm'}` : undefined },
+                  { label: 'Planned Qty', value: mobileBatch?.planned_quantity ? String(mobileBatch.planned_quantity) : undefined },
+                ].filter(r => r.value).map((r) => (
+                  <div key={r!.label} className="flex justify-between items-center py-2 text-sm">
+                    <span className="text-gray-500">{r!.label}</span>
+                    <span className="font-bold text-gray-800">{r!.value}</span>
+                  </div>
+                ))}
+                {product?.color && product.color !== 'N/A' && (
+                  <div className="flex justify-between items-center py-2 text-sm">
+                    <span className="text-gray-500">Color</span>
+                    <span className="flex items-center gap-1.5 font-bold text-gray-800">
+                      {colorCodeMap[product.color] && <span className="w-4 h-4 rounded-full border border-black/10" style={{ backgroundColor: colorCodeMap[product.color] }} />}
+                      {product.color}
+                    </span>
+                  </div>
+                )}
+                {product?.pattern && product.pattern !== 'N/A' && (
+                  <div className="flex justify-between items-center py-2 text-sm">
+                    <span className="text-gray-500">Pattern</span>
+                    <span className="flex items-center gap-1.5 font-bold text-gray-800">
+                      {patternImageMap[product.pattern] && <img src={patternImageMap[product.pattern]} alt="" className="w-6 h-6 rounded object-cover border border-black/10" />}
+                      {product.pattern}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {mobileConsumedMaterials.length === 0 ? (
+                  <p className="text-gray-400 text-center py-6 text-sm">No materials consumed.</p>
+                ) : mobileConsumedMaterials.map((m, i) => (
+                  <div key={m.material_id || i} className="py-2.5 border-b border-gray-100 last:border-b-0">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-800 text-sm truncate max-w-[200px]">{m.material_name}</span>
+                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold uppercase">{m.material_type === 'product' ? 'Product' : 'Raw'}</span>
+                    </div>
+                    <div className="flex gap-4 mt-1 text-xs text-gray-500">
+                      <span>Req: <strong className="text-gray-700">{Number(m.required_quantity || 0).toFixed(2)} {m.unit}</strong></span>
+                      <span>Used: <strong className="text-green-700">{Number(m.actual_consumed_quantity || m.quantity_used || 0).toFixed(2)} {m.unit}</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" className="w-full" onClick={() => setShowInfoSheet(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Location Dialog — desktop */}
+      <Dialog open={isAddingLocation} onOpenChange={setIsAddingLocation}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Storage Location</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newLocation">Location Name</Label>
+              <Input
+                id="newLocation"
+                placeholder="e.g., First Floor - Zone A - Section 1"
+                value={newLocationValue}
+                onChange={(e) => setNewLocationValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddLocation(); }}
+              />
+              <p className="text-xs text-gray-500">
+                Examples: First Floor - Zone A, Second Floor - Zone B - Section 1
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsAddingLocation(false); setNewLocationValue(''); }}>Cancel</Button>
+            <Button onClick={handleAddLocation}>
+              <Plus className="w-4 h-4 mr-1" />Add Location
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Location Picker Bottom Sheet */}
+      {createPortal(
+        mobileLocationPicker !== null ? (
+          <div className="lg:hidden fixed inset-0 z-[9999] flex flex-col justify-end"
+            style={{ backgroundColor: 'rgba(0,0,0,0.45)' }}
+            onClick={(e) => { if (e.target === e.currentTarget) setMobileLocationPicker(null); }}>
+            <div className="bg-white rounded-t-[22px] flex flex-col" style={{ maxHeight: '80vh' }}
+              onClick={(e) => e.stopPropagation()}>
+              {/* Drag handle */}
+              <div className="flex justify-center pt-2.5 pb-1 shrink-0">
+                <div className="w-9 h-1 rounded-full bg-gray-300" />
+              </div>
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
+                <p className="text-[15px] font-extrabold text-gray-900">Select Location</p>
+                <button onClick={() => setMobileLocationPicker(null)} className="p-1">
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+              {/* Location list */}
+              <div className="flex-1 overflow-y-auto py-1">
+                {locationOptions.map((loc) => {
+                  const isSelected = localProducts[mobileLocationPicker.index]?.location === loc;
+                  return (
+                    <button key={loc}
+                      onClick={() => {
+                        handleSelectChange(mobileLocationPicker.index, 'location', loc);
+                        setMobileLocationPicker(null);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-gray-100 text-left active:bg-gray-50">
+                      <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0"
+                        style={{ borderColor: isSelected ? '#2563EB' : '#D1D5DB', backgroundColor: isSelected ? '#2563EB' : 'transparent' }}>
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className={`text-[13.5px] flex-1 ${isSelected ? 'font-bold text-blue-700' : 'text-gray-800'}`}>{loc}</span>
+                    </button>
+                  );
+                })}
+                {/* Add new */}
+                <button
+                  onClick={() => { setMobileLocationPicker(null); setIsAddingLocation(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-blue-50">
+                  <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                    <Plus className="w-3 h-3 text-blue-600" />
+                  </div>
+                  <span className="text-[13.5px] font-bold text-blue-600">Add New Location</span>
+                </button>
+              </div>
+              {/* Safe area */}
+              <div className="h-6 shrink-0" />
+            </div>
+          </div>
+        ) : null,
+        document.body
+      )}
+    </>
   );
 }
-

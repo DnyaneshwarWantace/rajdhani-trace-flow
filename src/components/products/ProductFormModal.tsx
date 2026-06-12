@@ -649,193 +649,187 @@ export default function ProductFormModal({ isOpen, onClose, onSuccess, product, 
 
   if (!isOpen) return null;
 
-  const title = mode === 'create' ? 'Add Product' : mode === 'edit' ? 'Edit Product' : 'Duplicate Product';
+  const title = mode === 'create' ? 'New Product' : mode === 'edit' ? 'Edit Product' : 'Duplicate Product';
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-3xl w-full flex flex-col shadow-xl overflow-hidden" style={{ maxHeight: '90vh' }}>
+    <>
+      {/* Desktop dialog */}
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl max-w-3xl w-full flex flex-col shadow-xl overflow-hidden" style={{ maxHeight: '90vh' }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 h-14 border-b border-slate-200 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold text-slate-900">{title}</h2>
-          </div>
-          <WizardStepper current={wizardStep} />
-          <button onClick={onClose} type="button" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-5">
-            {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">{error}</div>}
-
-            {/* ── Step 0: Basic Info + Stock ── */}
-            {wizardStep === 0 && (
-              <div className="space-y-4">
-                <ProductBasicInfoSection
-                  formData={formData}
-                  categories={categories}
-                  subcategories={subcategories}
-                  colors={colors}
-                  colorCodeMap={colorCodeMap}
-                  patterns={patterns}
-                  patternImageMap={patternImageMap}
-                  onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                  reloadDropdowns={reloadDropdowns}
-                  touchedFields={touchedFields}
-                  markFieldTouched={markFieldTouched}
-                  categoryOptions={categoryOptions}
-                  subcategoryOptions={subcategoryOptions}
-                  colorOptions={colorOptions}
-                  patternOptions={patternOptions}
-                  usageMap={usageMap}
-                />
-                <ProductStockSection
-                  formData={formData}
-                  units={units}
-                  onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                  reloadDropdowns={reloadDropdowns}
-                  mode={mode}
-                  touchedFields={touchedFields}
-                  markFieldTouched={markFieldTouched}
-                  unitOptions={unitOptions}
-                  usageMap={usageMap}
-                />
-              </div>
-            )}
-
-            {/* ── Step 1: Dimensions + Image + Notes ── */}
-            {wizardStep === 1 && (
-              <div className="space-y-4">
-                <ProductDimensionsSection
-                  formData={formData}
-                  lengthUnits={lengthUnits}
-                  widthUnits={widthUnits}
-                  weightUnits={weightUnits}
-                  lengths={lengths}
-                  widths={widths}
-                  weights={weights}
-                  onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                  onReload={reloadDropdowns}
-                  touchedFields={touchedFields}
-                  markFieldTouched={markFieldTouched}
-                  lengthOptions={lengthOptions}
-                  widthOptions={widthOptions}
-                  weightOptions={weightOptions}
-                  usageMap={usageMap}
-                />
-                <ProductNotesSection
-                  formData={formData}
-                  onFormDataChange={(data) => setFormData({ ...formData, ...data })}
-                />
-                <ImageUploadSection
-                  imagePreview={imagePreview}
-                  onImageUpload={handleImageUpload}
-                  onImageRemove={removeImage}
-                />
-              </div>
-            )}
-
-            {/* ── Step 2: Recipe ── */}
-            {wizardStep === 2 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-700">Product Recipe <span className="font-normal text-slate-400">(optional)</span></h3>
-                  <span className="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">Based on 1 SQM</span>
-                </div>
-
-                {formData.length && formData.width && formData.length_unit && formData.width_unit && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-800">
-                    <Calculator className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                    <span>
-                      {formData.length} {formData.length_unit} × {formData.width} {formData.width_unit} = <strong>{(() => { const s = calculateSQM(formData.length, formData.width, formData.length_unit, formData.width_unit); return `${s.toFixed(3)} sqm`; })()}</strong>
-                    </span>
-                  </div>
-                )}
-
-                <RecipeMaterialForm
-                  newMaterial={newMaterial}
-                  onMaterialChange={setNewMaterial}
-                  onAdd={addProductMaterial}
-                  onAddMultiple={(materials) => {
-                    const existing = new Set(recipeMaterials.map(m => m.materialId));
-                    const toAdd = materials.filter(m => !existing.has(m.materialId));
-                    if (toAdd.length > 0) setRecipeMaterials([...recipeMaterials, ...toAdd]);
-                  }}
-                  targetProduct={{ length: formData.length, width: formData.width, length_unit: formData.length_unit, width_unit: formData.width_unit }}
-                />
-                <RecipeMaterialsList materials={recipeMaterials} onRemove={removeProductMaterial} />
-
-                {/* Summary */}
-                <div className="border border-slate-200 rounded-lg overflow-hidden mt-2">
-                  <div className="px-4 py-2 bg-slate-50 border-b border-slate-200">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Product summary</span>
-                  </div>
-                  <div className="grid grid-cols-2 divide-x divide-slate-100">
-                    <div className="px-4 py-3">
-                      <p className="text-xs text-slate-500 mb-0.5">Product name</p>
-                      <p className="text-sm font-semibold text-slate-800 truncate">{formData.name || '—'}</p>
-                    </div>
-                    <div className="px-4 py-3">
-                      <p className="text-xs text-slate-500 mb-0.5">Category</p>
-                      <p className="text-sm font-semibold text-slate-800">{[formData.category, formData.subcategory].filter(Boolean).join(' / ') || '—'}</p>
-                    </div>
-                    <div className="px-4 py-3">
-                      <p className="text-xs text-slate-500 mb-0.5">Dimensions</p>
-                      <p className="text-sm font-semibold text-slate-800">
-                        {formData.length && formData.width ? `${formData.length}${formData.length_unit} × ${formData.width}${formData.width_unit}` : '—'}
-                        {formData.weight ? ` · ${formData.weight} ${formData.weight_unit}` : ''}
-                      </p>
-                    </div>
-                    <div className="px-4 py-3">
-                      <p className="text-xs text-slate-500 mb-0.5">Stock</p>
-                      <p className="text-sm font-semibold text-slate-800">{formData.base_quantity || 0} {formData.unit || 'units'}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 flex-shrink-0 bg-white">
-            <button
-              type="button"
-              onClick={() => wizardStep === 0 ? onClose() : setWizardStep(s => s - 1)}
-              className="h-9 px-4 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              {wizardStep === 0 ? 'Cancel' : 'Back'}
+          {/* Desktop Header */}
+          <div className="flex items-center justify-between px-5 h-14 border-b border-slate-200 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold text-slate-900">{title}</h2>
+            </div>
+            <WizardStepper current={wizardStep} />
+            <button onClick={onClose} type="button" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-slate-500" />
             </button>
-
-            <span className="text-xs text-slate-400">Step {wizardStep + 1} of {WIZARD_STEPS.length}</span>
-
-            {wizardStep < WIZARD_STEPS.length - 1 ? (
-              <button
-                type="button"
-                onClick={handleWizardNext}
-                className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 text-sm font-semibold text-white flex items-center gap-2 transition-colors"
-              >
-                Next <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={loading || isSubmitting}
-                className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white flex items-center gap-2 transition-colors"
-                onClick={handleSubmit}
-              >
-                {loading
-                  ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />{mode === 'create' ? 'Creating…' : 'Saving…'}</>
-                  : <><Check className="w-4 h-4" />{mode === 'create' ? 'Create product' : 'Save changes'}</>
-                }
-              </button>
-            )}
           </div>
-        </form>
+
+          {/* Desktop Body */}
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-5">
+              {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">{error}</div>}
+
+              {wizardStep === 0 && (
+                <div className="space-y-4">
+                  <ProductBasicInfoSection
+                    formData={formData}
+                    categories={categories}
+                    subcategories={subcategories}
+                    colors={colors}
+                    colorCodeMap={colorCodeMap}
+                    patterns={patterns}
+                    patternImageMap={patternImageMap}
+                    onFormDataChange={(data) => setFormData({ ...formData, ...data })}
+                    reloadDropdowns={reloadDropdowns}
+                    touchedFields={touchedFields}
+                    markFieldTouched={markFieldTouched}
+                    categoryOptions={categoryOptions}
+                    subcategoryOptions={subcategoryOptions}
+                    colorOptions={colorOptions}
+                    patternOptions={patternOptions}
+                    usageMap={usageMap}
+                  />
+                  <ProductStockSection
+                    formData={formData}
+                    units={units}
+                    onFormDataChange={(data) => setFormData({ ...formData, ...data })}
+                    reloadDropdowns={reloadDropdowns}
+                    mode={mode}
+                    touchedFields={touchedFields}
+                    markFieldTouched={markFieldTouched}
+                    unitOptions={unitOptions}
+                    usageMap={usageMap}
+                  />
+                </div>
+              )}
+
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <ProductDimensionsSection
+                    formData={formData}
+                    lengthUnits={lengthUnits}
+                    widthUnits={widthUnits}
+                    weightUnits={weightUnits}
+                    lengths={lengths}
+                    widths={widths}
+                    weights={weights}
+                    onFormDataChange={(data) => setFormData({ ...formData, ...data })}
+                    onReload={reloadDropdowns}
+                    touchedFields={touchedFields}
+                    markFieldTouched={markFieldTouched}
+                    lengthOptions={lengthOptions}
+                    widthOptions={widthOptions}
+                    weightOptions={weightOptions}
+                    usageMap={usageMap}
+                  />
+                  <ProductNotesSection
+                    formData={formData}
+                    onFormDataChange={(data) => setFormData({ ...formData, ...data })}
+                  />
+                  <ImageUploadSection
+                    imagePreview={imagePreview}
+                    onImageUpload={handleImageUpload}
+                    onImageRemove={removeImage}
+                  />
+                </div>
+              )}
+
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">Product Recipe <span className="font-normal text-slate-400">(optional)</span></h3>
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">Based on 1 SQM</span>
+                  </div>
+                  {formData.length && formData.width && formData.length_unit && formData.width_unit && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-800">
+                      <Calculator className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <span>
+                        {formData.length} {formData.length_unit} × {formData.width} {formData.width_unit} = <strong>{(() => { const s = calculateSQM(formData.length, formData.width, formData.length_unit, formData.width_unit); return `${s.toFixed(3)} sqm`; })()}</strong>
+                      </span>
+                    </div>
+                  )}
+                  <RecipeMaterialForm
+                    newMaterial={newMaterial}
+                    onMaterialChange={setNewMaterial}
+                    onAdd={addProductMaterial}
+                    onAddMultiple={(materials) => {
+                      const existing = new Set(recipeMaterials.map(m => m.materialId));
+                      const toAdd = materials.filter(m => !existing.has(m.materialId));
+                      if (toAdd.length > 0) setRecipeMaterials([...recipeMaterials, ...toAdd]);
+                    }}
+                    targetProduct={{ length: formData.length, width: formData.width, length_unit: formData.length_unit, width_unit: formData.width_unit }}
+                  />
+                  <RecipeMaterialsList materials={recipeMaterials} onRemove={removeProductMaterial} />
+                  <div className="border border-slate-200 rounded-lg overflow-hidden mt-2">
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-200">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Product summary</span>
+                    </div>
+                    <div className="grid grid-cols-2 divide-x divide-slate-100">
+                      <div className="px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-0.5">Product name</p>
+                        <p className="text-sm font-semibold text-slate-800 truncate">{formData.name || '—'}</p>
+                      </div>
+                      <div className="px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-0.5">Category</p>
+                        <p className="text-sm font-semibold text-slate-800">{[formData.category, formData.subcategory].filter(Boolean).join(' / ') || '—'}</p>
+                      </div>
+                      <div className="px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-0.5">Dimensions</p>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {formData.length && formData.width ? `${formData.length}${formData.length_unit} × ${formData.width}${formData.width_unit}` : '—'}
+                          {formData.weight ? ` · ${formData.weight} ${formData.weight_unit}` : ''}
+                        </p>
+                      </div>
+                      <div className="px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-0.5">Stock</p>
+                        <p className="text-sm font-semibold text-slate-800">{formData.base_quantity || 0} {formData.unit || 'units'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Footer */}
+            <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-slate-200 flex-shrink-0 bg-white">
+              <button
+                type="button"
+                onClick={() => wizardStep === 0 ? onClose() : setWizardStep(s => s - 1)}
+                className="h-9 px-4 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                {wizardStep === 0 ? 'Cancel' : 'Back'}
+              </button>
+              <span className="text-xs text-slate-400">Step {wizardStep + 1} of {WIZARD_STEPS.length}</span>
+              {wizardStep < WIZARD_STEPS.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={handleWizardNext}
+                  className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 text-sm font-semibold text-white flex items-center gap-2 transition-colors"
+                >
+                  Next <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={loading || isSubmitting}
+                  className="h-9 px-5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold text-white flex items-center gap-2 transition-colors"
+                  onClick={handleSubmit}
+                >
+                  {loading
+                    ? <><div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />{mode === 'create' ? 'Creating…' : 'Saving…'}</>
+                    : <><Check className="w-4 h-4" />{mode === 'create' ? 'Create product' : 'Save changes'}</>
+                  }
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

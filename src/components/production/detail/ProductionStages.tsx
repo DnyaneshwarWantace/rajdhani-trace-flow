@@ -161,7 +161,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                               variant="outline"
                               className="font-mono text-xs"
                             >
-                              {product.serial_number || product.id}
+                              {product.roll_number || product.id}
                             </Badge>
                           ))}
                         </div>
@@ -408,7 +408,7 @@ export default function ProductionStages({ batchId }: ProductionStagesProps) {
                   <div key={product.id} className="border rounded-lg p-3">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h4 className="font-medium text-gray-900 font-mono text-sm">{product.serial_number}</h4>
+                        <h4 className="font-medium text-gray-900 font-mono text-sm">{product.roll_number || product.id}</h4>
                         <p className="text-xs text-gray-500">{product.qr_code}</p>
                       </div>
                       <Badge variant={product.status === 'available' ? 'default' : 'secondary'}>

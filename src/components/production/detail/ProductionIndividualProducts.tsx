@@ -122,22 +122,24 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
   };
 
   useEffect(() => {
-    if (batch?.product_id && batch?.batch_number) {
+    if (batch?.id || batch?.batch_number) {
       loadIndividualProducts();
     }
-  }, [batch?.product_id, batch?.batch_number]);
+  }, [batch?.id, batch?.batch_number]);
 
   const loadIndividualProducts = async () => {
     try {
       setLoading(true);
-      const { products } = await IndividualProductService.getIndividualProducts({
-        product_id: batch.product_id,
+      const [resById, resByNum] = await Promise.all([
+        IndividualProductService.getIndividualProducts({ batch_number: batch.id, limit: 1000 }),
+        IndividualProductService.getIndividualProducts({ batch_number: batch.batch_number, limit: 1000 })
+      ]);
+      const merged = [...(resById.products || []), ...(resByNum.products || [])];
+      const uniqueMap = new Map();
+      merged.forEach((p: any) => {
+        if (p.id) uniqueMap.set(p.id, p);
       });
-      // Products are stored with batch_number = batch.id (the route id field).
-      // Also check batch.batch_number for legacy data.
-      const batchProducts = (products || []).filter((p: any) =>
-        p.batch_number === batch.id || p.batch_number === batch.batch_number
-      );
+      const batchProducts = Array.from(uniqueMap.values());
       setIndividualProducts(batchProducts);
     } catch (error) {
       console.error('Error loading individual products:', error);
@@ -231,7 +233,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">#</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Product ID</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">QR Code</th>
-                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Serial Number</th>
+                <th className="border border-gray-200 p-2 text-left text-sm font-medium">Roll Number</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Dimensions</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Final Weight</th>
                 <th className="border border-gray-200 p-2 text-left text-sm font-medium">Status</th>
@@ -257,7 +259,7 @@ export default function ProductionIndividualProducts({ batch }: ProductionIndivi
                   <td className="border border-gray-200 p-2 text-gray-600">{index + 1}</td>
                   <td className="border border-gray-200 p-2 font-mono text-sm text-gray-900">{product.id}</td>
                   <td className="border border-gray-200 p-2 font-mono text-sm text-gray-900">{product.qr_code || '—'}</td>
-                  <td className="border border-gray-200 p-2 text-sm text-gray-900">{product.serial_number || '—'}</td>
+                  <td className="border border-gray-200 p-2 text-sm text-gray-900">{product.roll_number || '—'}</td>
                   <td className="border border-gray-200 p-2 text-sm text-gray-900">
                     {product.final_length && product.final_width
                       ? `${product.final_length} × ${product.final_width}`

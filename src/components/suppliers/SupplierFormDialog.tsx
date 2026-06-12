@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import type { Supplier, CreateSupplierData } from '@/services/supplierService';
 import { useState, useEffect } from 'react';
 import { GSTApiService } from '@/services/gstApiService';
@@ -41,6 +41,15 @@ export default function SupplierFormDialog({
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const [emailError, setEmailError] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const listener = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    setIsMobile(media.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, []);
 
   const markFieldTouched = (fieldName: string) => {
     setTouchedFields(prev => new Set(prev).add(fieldName));
@@ -274,6 +283,237 @@ export default function SupplierFormDialog({
       }
     }
   };
+  if (!isOpen) return null;
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col" style={{ height: '100dvh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-4 pt-5 pb-3 border-b border-gray-150 shrink-0 bg-white shadow-sm">
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-gray-900 leading-tight">
+              {selectedSupplier ? 'Edit Supplier' : 'Add Supplier'}
+            </h2>
+            <p className="text-xs text-gray-400">
+              {selectedSupplier ? 'Update supplier information' : 'Enter supplier details'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 shrink-0 active:bg-gray-200 ml-auto"
+            disabled={submitting}
+          >
+            <X className="w-4 h-4 text-gray-700" />
+          </button>
+        </div>
+
+        {/* Form Body Scrollable */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSubmitAttempted(true);
+            const phoneEmpty = !formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91' || /^\+\d{1,4}$/.test(formData.phone.trim());
+            const phoneInvalid = !phoneEmpty && !isValidPhoneNumber(formData.phone || '');
+            if (!formData.name.trim() || phoneEmpty || phoneInvalid) return;
+            onSubmit();
+          }}
+          className="flex-1 overflow-y-auto p-4 space-y-4 pb-28"
+        >
+          {/* Card 1: Supplier Name & Contact Person */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-150 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Supplier Name *</Label>
+              <Input
+                className="h-11 rounded-xl border-gray-250 mt-1.5"
+                value={formData.name}
+                onChange={(e) => handleNameChange(e.target.value, 'name')}
+                onBlur={() => markFieldTouched('name')}
+                placeholder="e.g. Goodvalue Chemicals"
+              />
+              {isTouched('name') && !formData.name.trim() ? (
+                <p className="text-xs text-red-500 mt-1">Supplier name is required</p>
+              ) : (
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {nameWordCount}/8 words • Max 20 characters per word
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Contact Person</Label>
+              <Input
+                className="h-11 rounded-xl border-gray-250 mt-1.5"
+                value={formData.contact_person || ''}
+                onChange={(e) => handleNameChange(e.target.value, 'contact_person')}
+                placeholder="e.g. John Doe"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                {contactWordCount}/5 words • Max 25 characters per word
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: Contact Details */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-150 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Phone *</Label>
+              <div className="mt-1.5" onBlur={() => markFieldTouched('phone')}>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={formData.phone || '+91'}
+                  onChange={handlePhoneChange}
+                  placeholder="Enter phone number"
+                />
+              </div>
+              {(() => {
+                const isJustCountryCode = formData.phone && /^\+\d{1,4}$/.test(formData.phone.trim());
+                const isEmpty = !formData.phone || formData.phone.trim() === '' || formData.phone.trim() === '+91';
+                const isValid = formData.phone && isValidPhoneNumber(formData.phone);
+                const showError = isTouched('phone') && (isEmpty || isJustCountryCode || !isValid);
+                
+                if (showError) {
+                  if (isEmpty || isJustCountryCode) {
+                    return <p className="text-xs text-red-500 mt-1">Phone number is required</p>;
+                  }
+                  if (!isValid) {
+                    return <p className="text-xs text-red-500 mt-1">Please enter a valid phone number</p>;
+                  }
+                }
+                return <p className="text-[10px] text-gray-400 mt-1">Select country and enter number</p>;
+              })()}
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Email</Label>
+              <Input
+                type="email"
+                className={`h-11 rounded-xl border-gray-250 mt-1.5 ${emailError ? 'border-red-500' : ''}`}
+                value={formData.email || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  onFormDataChange({ ...formData, email: value });
+                  setEmailError(validateEmail(value));
+                }}
+                onBlur={() => {
+                  setEmailError(validateEmail(formData.email));
+                  markFieldTouched('email');
+                }}
+                placeholder="email@example.com"
+              />
+              {emailError ? (
+                <p className="text-xs text-red-500 mt-1">{emailError}</p>
+              ) : formData.email ? (
+                <p className="text-[10px] text-gray-400 mt-1">{formData.email.length}/320 characters</p>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Card 3: Tax Details */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-150 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">GST Number</Label>
+              <div className="relative mt-1.5">
+                <Input
+                  className="h-11 rounded-xl border-gray-250 uppercase pr-10"
+                  value={formData.gst_number}
+                  onChange={(e) => handleGSTChange(e.target.value)}
+                  maxLength={15}
+                  placeholder="27AAPFU0939F1ZV"
+                />
+                {fetchingGST && (
+                  <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                )}
+              </div>
+              {formData.gst_number && formData.gst_number.length !== 15 && (
+                <p className="text-xs text-red-500 mt-1">GST must be exactly 15 characters ({formData.gst_number.length}/15)</p>
+              )}
+              {formData.gst_number && formData.gst_number.length === 15 && !fetchingGST && (
+                <p className="text-xs text-muted-foreground mt-1">{formData.gst_number.length}/15 characters</p>
+              )}
+            </div>
+          </div>
+
+          {/* Card 4: Address Details */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-150 space-y-4 shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
+            <h3 className="text-xs font-bold text-gray-900 border-b border-gray-100 pb-2 uppercase tracking-wider">Address Details</h3>
+            
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Address</Label>
+              <Input
+                className="h-11 rounded-xl border-gray-250 mt-1.5"
+                value={formData.address || ''}
+                onChange={(e) => handleAddressChange(e.target.value, 'address')}
+                placeholder="Building name, street address"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                {addressWordCount}/20 words • Max 20 characters per word
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Pincode</Label>
+                <div className="relative mt-1.5">
+                  <Input
+                    className="h-11 rounded-xl border-gray-250 pr-10"
+                    value={formData.pincode || ''}
+                    onChange={(e) => handlePincodeChange(e.target.value)}
+                    placeholder="e.g. 400001"
+                    maxLength={10}
+                  />
+                  {fetchingLocation && (
+                    <Loader2 className="w-4 h-4 animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">City</Label>
+                <Input
+                  className="h-11 rounded-xl border-gray-250 mt-1.5"
+                  value={formData.city || ''}
+                  onChange={(e) => handleAddressChange(e.target.value, 'city')}
+                  placeholder="e.g. Mumbai"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-bold text-gray-500 uppercase tracking-wide">State</Label>
+              <Input
+                className="h-11 rounded-xl border-gray-250 mt-1.5"
+                value={formData.state || ''}
+                onChange={(e) => handleAddressChange(e.target.value, 'state')}
+                placeholder="e.g. Maharashtra"
+              />
+            </div>
+          </div>
+
+          {/* Footer Action buttons */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 border-t border-gray-150 bg-white flex gap-3 z-50 shadow-lg">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={submitting}
+              className="flex-1 h-12 rounded-xl text-sm font-bold border-gray-350 bg-white text-gray-700"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm shadow-md"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {selectedSupplier ? 'Update' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -282,7 +522,9 @@ export default function SupplierFormDialog({
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{selectedSupplier ? 'Edit Supplier' : 'Add Supplier'}</DialogTitle>
+          <DialogTitle>
+            {selectedSupplier ? 'Edit Supplier' : 'Add Supplier'}
+          </DialogTitle>
           <DialogDescription>
             {selectedSupplier ? 'Update supplier information' : 'Enter supplier details'}
           </DialogDescription>

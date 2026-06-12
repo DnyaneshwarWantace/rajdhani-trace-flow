@@ -202,9 +202,14 @@ export default function BulkSupplierUploadDialog({ open, onOpenChange, onSuccess
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto max-sm:fixed max-sm:left-0 max-sm:right-0 max-sm:bottom-0 max-sm:top-auto max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-w-none max-sm:rounded-t-3xl max-sm:rounded-b-none max-sm:border-x-0 max-sm:border-b-0 max-sm:px-4">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Suppliers</DialogTitle>
+          <DialogTitle>
+            <div className="lg:hidden flex justify-center mb-2">
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            </div>
+            Bulk Upload Suppliers
+          </DialogTitle>
           <DialogDescription>Upload suppliers using CSV or Excel. Download sample format before import.</DialogDescription>
         </DialogHeader>
 

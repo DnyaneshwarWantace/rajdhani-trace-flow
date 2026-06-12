@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -100,14 +101,11 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   useEffect(() => {
     if (isOpen) {
-      setLoadingDropdowns(true);
       loadDropdowns();
       setTouchedFields(new Set());
       if (mode === 'create') {
         resetCreateForm();
       }
-    } else {
-      setLoadingDropdowns(false);
     }
   }, [isOpen, mode, fixedCategory]);
 
@@ -230,7 +228,8 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
       const allDropdowns = result.success && Array.isArray(result.data) ? result.data : (Array.isArray(result.data) ? result.data : []);
 
       // Filter by category (exclude e.g. Ink on Materials page so it only appears in Ink Management)
-      const categoryOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_category' && opt.is_active !== false);
+      const categoryAllOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_category');
+      const categoryOptions = categoryAllOptions.filter((opt: DropdownOption) => opt.is_active !== false);
       let categoryValues = categoryOptions
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
@@ -238,23 +237,25 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         categoryValues = categoryValues.filter((c: string) => !excludeCategories!.includes(c));
       }
       setCategories(categoryValues);
-      setCategoryFullOptions(categoryOptions.filter((opt: DropdownOption) => !excludeCategories?.includes(opt.value)));
+      setCategoryFullOptions(categoryAllOptions.filter((opt: DropdownOption) => !excludeCategories?.includes(opt.value)));
 
       // Filter units
-      const unitOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_unit' && opt.is_active !== false);
+      const unitAllOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_unit');
+      const unitOptions = unitAllOptions.filter((opt: DropdownOption) => opt.is_active !== false);
       const unitValues = unitOptions
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setUnits(unitValues);
-      setUnitFullOptions(unitOptions);
+      setUnitFullOptions(unitAllOptions);
 
       // Filter types
-      const typeOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_type' && opt.is_active !== false);
+      const typeAllOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_type');
+      const typeOptions = typeAllOptions.filter((opt: DropdownOption) => opt.is_active !== false);
       const typeValues = typeOptions
         .map((opt: DropdownOption) => opt.value)
         .filter((val: string) => val && typeof val === 'string' && val.trim() !== '');
       setTypes(typeValues);
-      setTypeFullOptions(typeOptions);
+      setTypeFullOptions(typeAllOptions);
 
       // Fetch usageMap
       const usageResponse = await fetch(`${API_URL}/dropdowns/usage`, {
@@ -266,7 +267,7 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
         if (usageResult.success && usageResult.data) setUsageMap(usageResult.data);
       }
       
-      // Filter colors (material_color category)
+      // Filter colors (material_color category) — active only for color picker display
       const colorOptions = allDropdowns.filter((opt: DropdownOption) => opt.category === 'material_color' && opt.is_active !== false);
       const colorValues = colorOptions
         .map((opt: DropdownOption) => opt.value)
@@ -796,317 +797,220 @@ export default function AddMaterialDialog({ isOpen, onClose, onSuccess, material
 
   if (!isOpen) return null;
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={(e) => {
-        // Do not close on backdrop click - only close via X button (like product page)
-        if (e.target !== e.currentTarget) return;
-        e.stopPropagation();
-      }}
+  const submitBtn = (
+    <button
+      type="button"
+      onClick={handleSubmit}
+      disabled={loading}
+      className="flex-1 h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+      style={{ backgroundColor: '#2563eb' }}
     >
+      {loading ? (
+        <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />{mode === 'edit' ? 'Updating…' : 'Creating…'}</>
+      ) : (
+        mode === 'edit' ? 'Save Changes' : 'Create Order'
+      )}
+    </button>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-50">
+      {/* Mobile: full-screen page */}
       <div
-        className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col"
+        className="lg:hidden absolute inset-0 flex flex-col"
+        style={{ backgroundColor: '#F4F5F7' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Fixed Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {mode === 'edit' ? 'Edit Material' : 'Create Material Procurement Order'}
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {mode === 'edit' 
-                ? 'Update material information' 
-                : 'Create a new material order that will be sent to Manage Stock for procurement'}
-            </p>
-          </div>
-          <button
-            onClick={handleClose}
-            type="button"
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
+        {/* Header — white bar with back arrow */}
+        <div className="flex items-center gap-2 bg-white border-b border-gray-200 px-2 py-3 flex-shrink-0">
+          <button onClick={handleClose} className="w-10 h-10 flex items-center justify-center text-gray-800">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
+          <span className="text-[17px] font-bold text-gray-900">{mode === 'edit' ? 'Edit Material' : 'Add Material'}</span>
         </div>
+        {/* Scrollable form */}
+        <div className="flex-1 overflow-y-auto min-h-0 pb-4">
+          <div className="px-4 py-4 space-y-4">
 
-        {/* Scrollable Content */}
-        {loadingDropdowns ? (
-          <div className="flex-1 flex items-center justify-center p-12">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"></div>
-              <p className="text-sm text-gray-500">Loading {mode === 'edit' ? 'material data' : 'form options'}...</p>
+            {/* Material Image */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200">
+              <MaterialImageUpload
+                imagePreview={imagePreview}
+                onImageChange={handleImageChange}
+                onRemove={handleRemoveImage}
+              />
             </div>
-          </div>
-        ) : (
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
-          <MaterialImageUpload
-            imagePreview={imagePreview}
-            onImageChange={handleImageChange}
-            onRemove={handleRemoveImage}
-          />
 
-          <MaterialBasicInfo
-            ref={nameRef}
-            name={formData.name}
-            onNameChange={(value) => {
-              setFormData({ ...formData, name: value });
-              setInvalidFields(prev => {
-                const next = new Set(prev);
-                next.delete('name');
-                return next;
-              });
-            }}
-            hasError={invalidFields.has('name')}
-            touchedFields={touchedFields}
-            markFieldTouched={markFieldTouched}
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <MaterialSupplierSection
-              ref={supplierRef}
-              supplier={formData.supplier}
-              suppliers={suppliers}
-              onSupplierChange={(value) => {
-                setFormData({ ...formData, supplier: value });
-                setInvalidFields(prev => {
-                  const next = new Set(prev);
-                  next.delete('supplier');
-                  return next;
-                });
-              }}
-              hasError={invalidFields.has('supplier')}
+            {/* Material Name */}
+            <MaterialBasicInfo
+              ref={nameRef}
+              name={formData.name}
+              onNameChange={(value) => { setFormData({ ...formData, name: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('name'); return next; }); }}
+              hasError={invalidFields.has('name')}
               touchedFields={touchedFields}
               markFieldTouched={markFieldTouched}
             />
+
+            {/* Category */}
             {fixedCategory && mode === 'create' ? (
               <div>
-                <Label htmlFor="category-fixed">Category</Label>
-                <p id="category-fixed" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">
-                  {fixedCategory}
-                </p>
+                <Label htmlFor="category-fixed-m">Category</Label>
+                <p id="category-fixed-m" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-white rounded-xl border border-gray-200">{fixedCategory}</p>
               </div>
             ) : (
-              <MaterialCategorySection
-                ref={categoryRef}
-                category={formData.category}
-                categories={categories}
-                onCategoryChange={(value: string) => {
-                  setFormData({ ...formData, category: value });
-                  setInvalidFields(prev => {
-                    const next = new Set(prev);
-                    next.delete('category');
-                    return next;
-                  });
-                }}
-                onCategoriesReload={loadDropdowns}
-                hasError={invalidFields.has('category')}
-                touchedFields={touchedFields}
-                markFieldTouched={markFieldTouched}
-                fullOptions={categoryFullOptions}
-                usageMap={usageMap}
-              />
+              <MaterialCategorySection ref={categoryRef} category={formData.category} categories={categories} onCategoryChange={(value) => { setFormData({ ...formData, category: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('category'); return next; }); }} onCategoriesReload={loadDropdowns} hasError={invalidFields.has('category')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} fullOptions={categoryFullOptions} usageMap={usageMap} />
             )}
-          </div>
 
-          {/* Material Type and Unit on same line */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <MaterialTypeSection
-                type={formData.type}
-                color={formData.color}
-                types={types}
-                colors={colors}
-                onTypeChange={(value: string) =>
-                  setFormData({
-                    ...formData,
-                    type: value,
-                    color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA'),
-                  })
-                }
-                onColorChange={(value) => setFormData({ ...formData, color: value })}
-                onTypesReload={loadDropdowns}
-                typeFullOptions={typeFullOptions}
-                usageMap={usageMap}
-              />
-            </div>
+            {/* Type + Color side by side (color only when type === 'color') */}
+            <MaterialTypeSection type={formData.type} color={formData.color} types={types} colors={colors} onTypeChange={(value) => setFormData({ ...formData, type: value, color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA') })} onColorChange={(value) => setFormData({ ...formData, color: value })} onTypesReload={loadDropdowns} typeFullOptions={typeFullOptions} usageMap={usageMap} />
 
-            <MaterialUnitSection
-              ref={unitRef}
-              unit={formData.unit}
-              units={units}
-              onUnitChange={(value) => {
-                setFormData({ ...formData, unit: value });
-                setInvalidFields(prev => {
-                  const next = new Set(prev);
-                  next.delete('unit');
-                  return next;
-                });
-              }}
-              onUnitsReload={loadDropdowns}
-              hasError={invalidFields.has('unit')}
-              touchedFields={touchedFields}
-              markFieldTouched={markFieldTouched}
-              fullOptions={unitFullOptions}
-              usageMap={usageMap}
-            />
-          </div>
+            {/* Unit */}
+            <MaterialUnitSection ref={unitRef} unit={formData.unit} units={units} onUnitChange={(value) => { setFormData({ ...formData, unit: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('unit'); return next; }); }} onUnitsReload={loadDropdowns} hasError={invalidFields.has('unit')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} fullOptions={unitFullOptions} usageMap={usageMap} />
 
-          {/* Quantity and Expected Delivery (only for create mode) */}
-          {mode === 'create' && (
-            <div className="grid grid-cols-2 gap-4">
+            {/* Supplier */}
+            <MaterialSupplierSection ref={supplierRef} supplier={formData.supplier} suppliers={suppliers} onSupplierChange={(value) => { setFormData({ ...formData, supplier: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('supplier'); return next; }); }} hasError={invalidFields.has('supplier')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} />
+
+            {/* Stock Levels */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Stock Levels</p>
+
+            {/* Row 1: Current Stock (edit only) + Min Threshold */}
+            <div className="grid grid-cols-2 gap-3">
+              {mode === 'edit' && (
+                <div>
+                  <Label htmlFor="currentStockM">Current Stock</Label>
+                  <Input id="currentStockM" type="number" value={formData.currentStock} disabled className="bg-gray-100 cursor-not-allowed h-[46px] rounded-xl" />
+                  <p className="text-xs text-orange-600 mt-1">⚠️ Contact admin to edit</p>
+                </div>
+              )}
               <div>
-                <Label htmlFor="quantity">Order Quantity *</Label>
-                <Input
-                  ref={quantityRef}
-                  id="quantity"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={formData.quantity}
-                  onChange={(e) => {
-                    // Allow empty string or numeric input (integers only, no decimals)
-                    let value = e.target.value;
-                    // Remove any non-numeric characters except empty string
-                    value = value.replace(/[^0-9]/g, '');
-                    // Allow empty value - don't force to '1'
-                    setFormData({ ...formData, quantity: value });
-                  }}
-                  onBlur={() => {
-                    // Only mark as touched and validate on blur
-                    markFieldTouched('quantity');
-                    // Ensure minimum value is 1 only if user entered something
-                    const numValue = parseInt(formData.quantity, 10);
-                    if (!isNaN(numValue) && numValue < 1 && formData.quantity !== '') {
-                      setFormData({ ...formData, quantity: '1' });
-                    }
-                  }}
-                  className={touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0')
-                    ? 'border-red-500 focus-visible:border-red-500'
-                    : ''
-                  }
-                  placeholder="Enter quantity"
-                  required
-                />
-                {touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0') && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Order quantity is required and must be greater than 0
-                  </p>
-                )}
-                {(!touchedFields.has('quantity') || (formData.quantity && formData.quantity !== '' && formData.quantity !== '0')) && (
-                  <p className="text-xs text-gray-500 mt-1">Quantity to order (numbers only)</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="expectedDelivery">Expected Delivery Date *</Label>
-                <Input
-                  ref={expectedDeliveryRef}
-                  id="expectedDelivery"
-                  type="date"
-                  value={formData.expectedDelivery}
-                  onChange={(e) => {
-                    setFormData({ ...formData, expectedDelivery: e.target.value });
-                    setInvalidFields(prev => {
-                      const next = new Set(prev);
-                      next.delete('expectedDelivery');
-                      return next;
-                    });
-                  }}
-                  onBlur={() => markFieldTouched('expectedDelivery')}
-                  min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                  className={(invalidFields.has('expectedDelivery') || (touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim()))
-                    ? 'border-red-500 focus-visible:border-red-500'
-                    : ''
-                  }
-                  required
-                />
-                {touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim() && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Expected delivery date is required
-                  </p>
-                )}
-                {(!touchedFields.has('expectedDelivery') || formData.expectedDelivery.trim()) && (
-                  <p className="text-xs text-gray-500 mt-1">Expected delivery date (must be a future date)</p>
-                )}
+                <Label htmlFor="minThresholdM">Min Threshold</Label>
+                <Input id="minThresholdM" type="number" value={formData.minThreshold} onChange={(e) => setFormData({ ...formData, minThreshold: e.target.value })} placeholder="0" min="0" className="h-[46px] rounded-xl" />
               </div>
             </div>
-          )}
 
-          <MaterialStockSection
-            currentStock={formData.currentStock}
-            minThreshold={formData.minThreshold}
-            maxCapacity={formData.maxCapacity}
-            showCurrentStock={mode === 'edit'}
-            isCurrentStockEditable={false}
-            onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })}
-            onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })}
-            onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })}
-          />
+            {/* Row 2: Max Capacity + Reorder Point */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="maxCapacityM">Max Capacity</Label>
+                <Input id="maxCapacityM" type="number" value={formData.maxCapacity} onChange={(e) => setFormData({ ...formData, maxCapacity: e.target.value })} placeholder="0" min="0" className="h-[46px] rounded-xl" />
+              </div>
+              <div>
+                <Label htmlFor="reorderPointM">Reorder Point</Label>
+                <Input id="reorderPointM" type="number" value={formData.reorderPoint} onChange={(e) => setFormData({ ...formData, reorderPoint: e.target.value })} placeholder="50" min="0" className="h-[46px] rounded-xl" />
+              </div>
+            </div>
 
-          {/* Reorder Point and Cost/Unit on same line */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* Pricing */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Pricing</p>
             <div>
-              <Label htmlFor="reorderPoint">Reorder Point</Label>
-              <Input
-                id="reorderPoint"
-                type="text"
-                value={formData.reorderPoint}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    setFormData({ ...formData, reorderPoint: value });
-                  }
-                }}
-                placeholder="50 (auto-set if empty)"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed (default: 50)</p>
+              <Label htmlFor="costPerUnitM">Cost / Unit (₹)</Label>
+              <Input ref={costPerUnitRef} id="costPerUnitM" type="number" value={formData.costPerUnit} onChange={(e) => { setFormData({ ...formData, costPerUnit: e.target.value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('costPerUnit'); return next; }); }} onBlur={() => markFieldTouched('costPerUnit')} placeholder="0.00" min="0" step="0.01" className={`h-[46px] rounded-xl ${invalidFields.has('costPerUnit') ? 'border-red-500' : ''}`} />
             </div>
 
-            <MaterialCostSection
-              touchedFields={touchedFields}
-              markFieldTouched={markFieldTouched}
-              ref={costPerUnitRef}
-              costPerUnit={formData.costPerUnit}
-              onCostPerUnitChange={(value: string) => {
-                setFormData({ ...formData, costPerUnit: value });
-                setInvalidFields(prev => {
-                  const next = new Set(prev);
-                  next.delete('costPerUnit');
-                  return next;
-                });
-              }}
-              hasError={invalidFields.has('costPerUnit')}
-            />
-          </div>
-
-        </form>
-        )}
-
-        {/* Fixed Footer — hidden while loading */}
-        {!loadingDropdowns && (
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
-          <Button type="button" variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={loading}
-            className="bg-primary-600 text-white hover:bg-primary-700"
-          >
-            {loading ? (
+            {/* Order Details (create only) */}
+            {mode === 'create' && (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                {mode === 'edit' ? 'Updating...' : 'Creating Order...'}
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Order Details</p>
+                <div>
+                  <Label htmlFor="quantityM">Order Quantity *</Label>
+                  <Input ref={quantityRef} id="quantityM" type="number" min="1" step="1" value={formData.quantity} onChange={(e) => { setFormData({ ...formData, quantity: e.target.value.replace(/[^0-9]/g, '') }); }} onBlur={() => { markFieldTouched('quantity'); const n = parseInt(formData.quantity, 10); if (!isNaN(n) && n < 1 && formData.quantity !== '') setFormData({ ...formData, quantity: '1' }); }} className={`h-[46px] rounded-xl ${touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '0') ? 'border-red-500' : ''}`} placeholder="Enter quantity" required />
+                  {touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '0') && <p className="text-xs text-red-500 mt-1">Order quantity is required</p>}
+                </div>
+                <div>
+                  <Label htmlFor="expectedDeliveryM">Expected Delivery Date *</Label>
+                  <Input ref={expectedDeliveryRef} id="expectedDeliveryM" type="date" value={formData.expectedDelivery} onChange={(e) => { setFormData({ ...formData, expectedDelivery: e.target.value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('expectedDelivery'); return next; }); }} onBlur={() => markFieldTouched('expectedDelivery')} min={new Date(Date.now() + 86400000).toISOString().split('T')[0]} className={`h-[46px] rounded-xl ${(invalidFields.has('expectedDelivery') || (touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim())) ? 'border-red-500' : ''}`} required />
+                  {touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim() && <p className="text-xs text-red-500 mt-1">Expected delivery date is required</p>}
+                </div>
               </>
-            ) : (
-              mode === 'edit' ? 'Update Material' : 'Create Order'
             )}
-          </Button>
+
+          </div>
         </div>
-        )}
+        {/* Sticky footer */}
+        <div className="px-4 py-4 bg-white border-t border-gray-200 flex gap-3 flex-shrink-0">
+          <button onClick={handleClose} className="flex-1 h-12 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 bg-white">
+            Cancel
+          </button>
+          {submitBtn}
+        </div>
       </div>
-    </div>
+
+      {/* Desktop: centered modal with backdrop */}
+      <div
+        className="hidden lg:block absolute inset-0"
+        style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+        onClick={handleClose}
+      />
+      <div
+        className="hidden lg:flex absolute inset-0 items-center justify-center p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-xl">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">
+                {mode === 'edit' ? 'Edit Material' : 'Create Material Procurement Order'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {mode === 'edit' ? 'Update material information' : 'Create a new material order for procurement'}
+              </p>
+            </div>
+            <button onClick={handleClose} type="button" className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Desktop form uses 2-col grid layout */}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
+              <MaterialImageUpload imagePreview={imagePreview} onImageChange={handleImageChange} onRemove={handleRemoveImage} />
+              <MaterialBasicInfo ref={nameRef} name={formData.name} onNameChange={(value) => { setFormData({ ...formData, name: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('name'); return next; }); }} hasError={invalidFields.has('name')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} />
+              <div className="grid grid-cols-2 gap-4">
+                <MaterialSupplierSection ref={supplierRef} supplier={formData.supplier} suppliers={suppliers} onSupplierChange={(value) => { setFormData({ ...formData, supplier: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('supplier'); return next; }); }} hasError={invalidFields.has('supplier')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} />
+                {fixedCategory && mode === 'create' ? (
+                  <div><Label htmlFor="category-fixed2">Category</Label><p id="category-fixed2" className="text-sm font-medium text-gray-700 mt-1 pt-2 pb-2 px-3 bg-gray-50 rounded-md border border-gray-200">{fixedCategory}</p></div>
+                ) : (
+                  <MaterialCategorySection ref={categoryRef} category={formData.category} categories={categories} onCategoryChange={(value: string) => { setFormData({ ...formData, category: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('category'); return next; }); }} onCategoriesReload={loadDropdowns} hasError={invalidFields.has('category')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} fullOptions={categoryFullOptions} usageMap={usageMap} />
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <MaterialTypeSection type={formData.type} color={formData.color} types={types} colors={colors} onTypeChange={(value: string) => setFormData({ ...formData, type: value, color: value !== 'color' ? 'NA' : (colors.length > 0 ? colors[0] : 'NA') })} onColorChange={(value) => setFormData({ ...formData, color: value })} onTypesReload={loadDropdowns} typeFullOptions={typeFullOptions} usageMap={usageMap} />
+                <MaterialUnitSection ref={unitRef} unit={formData.unit} units={units} onUnitChange={(value) => { setFormData({ ...formData, unit: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('unit'); return next; }); }} onUnitsReload={loadDropdowns} hasError={invalidFields.has('unit')} touchedFields={touchedFields} markFieldTouched={markFieldTouched} fullOptions={unitFullOptions} usageMap={usageMap} />
+              </div>
+              {mode === 'create' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="quantityD">Order Quantity *</Label>
+                    <Input ref={quantityRef} id="quantityD" type="number" min="1" step="1" value={formData.quantity} onChange={(e) => { const value = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quantity: value }); }} onBlur={() => { markFieldTouched('quantity'); const numValue = parseInt(formData.quantity, 10); if (!isNaN(numValue) && numValue < 1 && formData.quantity !== '') setFormData({ ...formData, quantity: '1' }); }} className={touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0') ? 'border-red-500 focus-visible:border-red-500' : ''} placeholder="Enter quantity" required />
+                    {touchedFields.has('quantity') && (!formData.quantity || formData.quantity === '' || formData.quantity === '0') && <p className="text-xs text-red-500 mt-1">Order quantity is required and must be greater than 0</p>}
+                    {(!touchedFields.has('quantity') || (formData.quantity && formData.quantity !== '' && formData.quantity !== '0')) && <p className="text-xs text-gray-500 mt-1">Quantity to order (numbers only)</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="expectedDeliveryD">Expected Delivery Date *</Label>
+                    <Input ref={expectedDeliveryRef} id="expectedDeliveryD" type="date" value={formData.expectedDelivery} onChange={(e) => { setFormData({ ...formData, expectedDelivery: e.target.value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('expectedDelivery'); return next; }); }} onBlur={() => markFieldTouched('expectedDelivery')} min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]} className={(invalidFields.has('expectedDelivery') || (touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim())) ? 'border-red-500 focus-visible:border-red-500' : ''} required />
+                    {touchedFields.has('expectedDelivery') && !formData.expectedDelivery.trim() && <p className="text-xs text-red-500 mt-1">Expected delivery date is required</p>}
+                    {(!touchedFields.has('expectedDelivery') || formData.expectedDelivery.trim()) && <p className="text-xs text-gray-500 mt-1">Expected delivery date (must be a future date)</p>}
+                  </div>
+                </div>
+              )}
+              <MaterialStockSection currentStock={formData.currentStock} minThreshold={formData.minThreshold} maxCapacity={formData.maxCapacity} showCurrentStock={mode === 'edit'} isCurrentStockEditable={false} onCurrentStockChange={(value: string) => setFormData({ ...formData, currentStock: value })} onMinThresholdChange={(value: string) => setFormData({ ...formData, minThreshold: value })} onMaxCapacityChange={(value: string) => setFormData({ ...formData, maxCapacity: value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="reorderPointD">Reorder Point</Label>
+                  <Input id="reorderPointD" type="text" value={formData.reorderPoint} onChange={(e) => { const value = e.target.value; if (value === '' || /^\d*\.?\d*$/.test(value)) setFormData({ ...formData, reorderPoint: value }); }} placeholder="50 (auto-set if empty)" />
+                  <p className="text-xs text-muted-foreground mt-1">Quantity at which a new order should be placed (default: 50)</p>
+                </div>
+                <MaterialCostSection touchedFields={touchedFields} markFieldTouched={markFieldTouched} ref={costPerUnitRef} costPerUnit={formData.costPerUnit} onCostPerUnitChange={(value: string) => { setFormData({ ...formData, costPerUnit: value }); setInvalidFields(prev => { const next = new Set(prev); next.delete('costPerUnit'); return next; }); }} hasError={invalidFields.has('costPerUnit')} />
+              </div>
+            </form>
+          <div className="flex justify-end gap-3 p-6 border-t border-gray-200 flex-shrink-0 bg-white">
+            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+            <Button type="submit" onClick={handleSubmit} disabled={loading} className="bg-primary-600 text-white hover:bg-primary-700">
+              {loading ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>{mode === 'edit' ? 'Updating...' : 'Creating Order...'}</>) : (mode === 'edit' ? 'Update Material' : 'Create Order')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

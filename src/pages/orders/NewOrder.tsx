@@ -18,6 +18,7 @@ import { validateNumberInput, ValidationPresets, preventInvalidNumberKeys } from
 import CustomerSelection from '@/components/orders/CustomerSelection';
 import CustomerForm from '@/components/orders/CustomerForm';
 import OrderItemsList from '@/components/orders/OrderItemsList';
+import MobileOrderItemForm from '@/components/orders/MobileOrderItemForm';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import DeliveryAddressDialog from '@/components/orders/DeliveryAddressDialog';
 
@@ -174,6 +175,8 @@ export default function NewOrder() {
   const [realProducts, setRealProducts] = useState<any[]>([]);
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
 
+  const [customerSearchQ, setCustomerSearchQ] = useState('');
+  const [mobileExpandedItemId, setMobileExpandedItemId] = useState<string | null>(null);
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [currentOrderItem, setCurrentOrderItem] = useState<ExtendedOrderItem | null>(null);
   const [productSearchTerm, setProductSearchTerm] = useState('');
@@ -195,6 +198,7 @@ export default function NewOrder() {
   const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{ address: string; city: string; state: string; pincode: string } | null>(null);
   const [showAddressEditor, setShowAddressEditor] = useState(false);
 
+  const customerFormSubmitRef = useRef<(() => void) | null>(null);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const saveDraft = useCallback(() => {
@@ -332,12 +336,14 @@ export default function NewOrder() {
   };
 
   const addOrderItem = () => {
+    const newId = generateUniqueId('ORDITEM');
     setOrderItems(prev => [...prev, {
-      id: generateUniqueId('ORDITEM'), product_id: '', product_name: '', product_type: 'product',
+      id: newId, product_id: '', product_name: '', product_type: 'product',
       quantity: 1, unit: '', unit_price: 0, gst_rate: 5, gst_included: true,
       subtotal: 0, gst_amount: 0, total_price: 0, pricing_unit: 'sqm',
       product_dimensions: { productType: 'carpet' }, isEditing: true, isValid: false,
     }]);
+    setMobileExpandedItemId(newId);
   };
 
   const updateOrderItem = (id: string, field: keyof ExtendedOrderItem, value: any) => {
@@ -473,8 +479,512 @@ export default function NewOrder() {
 
   return (
     <Layout>
-      {/* ── Wizard shell — fills the layout main area, centered on wide screens ── */}
-      <div className="flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-w-5xl mx-auto" style={{ height: 'calc(100dvh - 100px)' }}>
+      {/* ════════════════════════════════════════════════════════════
+          MOBILE WIZARD — full screen, app-style
+      ════════════════════════════════════════════════════════════ */}
+      <div className="lg:hidden fixed inset-0 z-20 bg-gray-50 flex flex-col" style={{ top: 64 }}>
+
+        {/* Mobile: white header with back + title + step circles */}
+        <div className="bg-white border-b border-gray-200 px-4 pt-3 pb-3 flex-shrink-0">
+          <div className="flex items-center gap-3 mb-3">
+            <button onClick={handleBack} className="flex items-center gap-1 text-gray-500">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm font-medium">{step === 0 ? 'Orders' : 'Back'}</span>
+            </button>
+            <span className="text-base font-bold text-gray-900 flex-1">New Order</span>
+            {draftSavedAt && <span className="text-[10px] text-gray-400">Saved</span>}
+          </div>
+          {/* Step bar — circles + lines like the RN app */}
+          <div className="flex items-center">
+            {['Customer','Items','Details','Review'].map((label, i) => {
+              const done = i < step;
+              const active = i === step;
+              return (
+                <div key={label} className="flex items-center flex-1 last:flex-none">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 ${done ? 'bg-green-500 border-green-500' : active ? 'bg-blue-600 border-blue-600' : 'bg-gray-50 border-gray-300'}`}>
+                      {done
+                        ? <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>
+                        : <span className={`text-[11px] font-bold ${active ? 'text-white' : 'text-gray-400'}`}>{i+1}</span>
+                      }
+                    </div>
+                    <span className={`text-[9px] mt-1 font-${active ? '700' : '500'} ${active ? 'text-blue-600' : done ? 'text-green-600' : 'text-gray-400'}`}>{label}</span>
+                  </div>
+                  {i < 3 && <div className={`h-0.5 flex-1 mb-4 mx-1 ${i < step ? 'bg-green-500' : 'bg-gray-200'}`} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {showDraftBanner && <DraftBanner step={step} onDismiss={() => setShowDraftBanner(false)} />}
+
+        {/* MOBILE STEP CONTENT */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+
+          {/* Step 0 — Customer */}
+          {step === 0 && (
+            <div className="flex flex-col min-h-full">
+              {!showNewCustomerForm && (
+                <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">Select Customer</p>
+                  <button
+                    onClick={() => setShowNewCustomerForm(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold"
+                  >
+                    <span className="text-base leading-none">+</span> New Customer
+                  </button>
+                </div>
+              )}
+              {!showNewCustomerForm ? (
+                <>
+                  <div className="px-4 pb-2">
+                    <div className="relative">
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                      <input
+                        className="w-full pl-9 pr-4 h-[46px] rounded-[10px] border border-gray-200 bg-white text-[15px] outline-none focus:border-blue-400 shadow-sm"
+                        placeholder="Search by name, phone, email…"
+                        value={customerSearchQ}
+                        onChange={e => setCustomerSearchQ(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 px-4 pb-44 space-y-2 pt-1">
+                    {customersLoading ? (
+                      <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+                    ) : customers.filter(c => {
+                      const q = customerSearchQ.toLowerCase();
+                      return !q || c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.email?.toLowerCase().includes(q);
+                    }).length === 0 ? (
+                      <div className="flex flex-col items-center py-12 text-center">
+                        <div className="text-4xl mb-3">👥</div>
+                        <p className="text-sm font-semibold text-gray-900 mb-1">No customers found</p>
+                        <button onClick={() => setShowNewCustomerForm(true)} className="mt-3 px-5 py-2 rounded-xl bg-blue-600 text-white text-sm font-bold">Add New Customer</button>
+                      </div>
+                    ) : customers.filter(c => {
+                      const q = customerSearchQ.toLowerCase();
+                      return !q || c.name?.toLowerCase().includes(q) || c.phone?.includes(q) || c.email?.toLowerCase().includes(q);
+                    }).map(c => {
+                      const active = selectedCustomer?.id === c.id;
+                      return (
+                        <button key={c.id} onClick={() => handleCustomerSelected(c)}
+                          className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${active ? 'border-blue-500 bg-blue-50' : 'border-gray-100 bg-white shadow-sm'}`}>
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                            <span className={`text-base font-extrabold ${active ? 'text-white' : 'text-gray-500'}`}>{c.name?.[0]?.toUpperCase() || '?'}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-900 truncate">{c.name}</p>
+                            {c.phone && <p className="text-xs text-gray-400">{c.phone}</p>}
+                            {(c.city || c.state) && <p className="text-xs text-gray-400 truncate">{[c.address, c.city, c.state].filter(Boolean).join(', ')}</p>}
+                            {c.gst_number && <p className="text-xs text-gray-400 font-mono">GST: {c.gst_number}</p>}
+                          </div>
+                          {active && <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="px-4 pt-4 pb-44">
+                  <p className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">New Customer</p>
+                  <CustomerForm
+                    onCustomerCreated={handleCustomerCreated}
+                    onCancel={() => setShowNewCustomerForm(false)}
+                    showCard={false}
+                    hideActions={true}
+                    onSubmitRef={customerFormSubmitRef}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 1 — Items (mobile) */}
+          {step === 1 && (
+            <div className="px-4 pt-4 pb-44">
+              {/* Section header */}
+              <div className="mb-3">
+                <p className="text-sm font-extrabold text-gray-900">Order Items</p>
+                <p className="text-[12.5px] text-gray-500 mt-0.5">Add products or materials. Tap an item to expand and edit.</p>
+              </div>
+
+              {/* Item cards */}
+              {orderItems.map((item) => (
+                <MobileOrderItemForm
+                  key={item.id}
+                  item={item}
+                  index={orderItems.indexOf(item)}
+                  isExpanded={mobileExpandedItemId === item.id}
+                  onToggle={() => setMobileExpandedItemId(prev => prev === item.id ? null : item.id)}
+                  onUpdate={updateOrderItem}
+                  onRemove={(id) => { removeOrderItem(id); if (mobileExpandedItemId === id) setMobileExpandedItemId(null); }}
+                  onSelectProduct={(item) => { setCurrentOrderItem(item); setShowProductSearch(true); }}
+                  products={realProducts}
+                  rawMaterials={rawMaterials}
+                />
+              ))}
+
+              {/* Add Item button */}
+              <button
+                onClick={addOrderItem}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-[1.5px] border-dashed border-blue-500 bg-blue-50 mb-4"
+              >
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span className="text-sm font-bold text-blue-600">Add Item</span>
+              </button>
+
+              {/* Order summary */}
+              {orderItems.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                  <p className="text-sm font-extrabold text-gray-900 mb-3">Order Summary</p>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-[13px] text-gray-500">Subtotal</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{formatCurrency(orderItems.reduce((s, i) => s + (i.subtotal || 0), 0), { full: true })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[13px] text-gray-500">GST</span>
+                      <span className="text-[13px] font-semibold text-gray-900">{formatCurrency(orderItems.reduce((s, i) => s + (i.gst_amount || 0), 0), { full: true })}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-100 pt-2 mt-2">
+                      <span className="text-sm font-bold text-gray-900">Total</span>
+                      <span className="text-[15px] font-extrabold text-blue-600">{formatCurrency(orderItems.reduce((s, i) => s + (i.total_price || 0), 0), { full: true })}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2 — Details */}
+          {step === 2 && (
+            <div className="px-4 pt-4 pb-44 space-y-4">
+
+              {/* Order Details card */}
+              <div>
+                <p className="text-sm font-extrabold text-gray-900 mb-2.5">Order Details</p>
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                  {/* Delivery Date */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">Expected Delivery Date <span className="text-red-500">*</span></label>
+                    <input type="date" value={orderDetails.expectedDelivery} min={new Date().toISOString().split('T')[0]}
+                      onChange={e => setOrderDetails(p => ({ ...p, expectedDelivery: e.target.value }))}
+                      className="w-full h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] text-gray-900 outline-none focus:border-blue-400" />
+                  </div>
+                  {/* Advance Paid */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
+                      Advance Paid (₹) <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <div className="flex items-center h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 gap-1">
+                      <span className="text-gray-400 text-[15px]">₹</span>
+                      <input type="number" placeholder="0.00"
+                        value={orderDetails.paidAmount > 0 ? orderDetails.paidAmount : ''}
+                        onChange={e => setOrderDetails(p => ({ ...p, paidAmount: parseFloat(e.target.value) || 0 }))}
+                        className="flex-1 bg-transparent text-[15px] text-gray-900 outline-none" />
+                    </div>
+                  </div>
+                  {/* PI Number */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
+                      PI Number <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input type="text" placeholder="PI-001" value={orderDetails.piNumber}
+                      onChange={e => setOrderDetails(p => ({ ...p, piNumber: e.target.value }))}
+                      className="w-full h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] outline-none focus:border-blue-400" />
+                  </div>
+                  {/* Notes */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
+                      Notes <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <textarea rows={3} placeholder="Special instructions or notes…" value={orderDetails.notes}
+                      onChange={e => setOrderDetails(p => ({ ...p, notes: e.target.value }))}
+                      className="w-full px-[13px] pt-2.5 rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] outline-none focus:border-blue-400 resize-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delivery Address card */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <p className="text-sm font-extrabold text-gray-900">Delivery Address</p>
+                  {!orderDeliveryAddress && selectedCustomer && (
+                    <button onClick={handleUseCustomerAddress} className="text-xs font-bold text-blue-600">Use customer's</button>
+                  )}
+                </div>
+                <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                  {orderDeliveryAddress ? (
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm text-gray-900 flex-1">{[orderDeliveryAddress.address, orderDeliveryAddress.city, orderDeliveryAddress.state, orderDeliveryAddress.pincode].filter(Boolean).join(', ')}</p>
+                      <button onClick={() => setShowAddressEditor(true)} className="flex-shrink-0 p-1">
+                        <Edit2 className="w-4 h-4 text-blue-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowAddressEditor(true)}
+                      className="w-full h-11 border border-dashed border-gray-300 rounded-xl text-sm text-gray-400 flex items-center justify-center gap-2">
+                      <MapPin className="w-4 h-4" /> Set delivery address
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Transport card */}
+              <div>
+                <p className="text-sm font-extrabold text-gray-900 mb-2.5">Transport</p>
+                <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+                  {/* Type toggle */}
+                  <div className="flex gap-2.5">
+                    {([{ v: 'own', l: 'Own Transport' }, { v: 'outside', l: 'Outside Transport' }] as const).map(({ v, l }) => (
+                      <button key={v} onClick={() => setTransportType(v as 'own' | 'outside')}
+                        className={`flex-1 py-2.5 rounded-xl border-[1.5px] text-[12.5px] font-bold transition-colors ${
+                          transportType === v
+                            ? 'border-blue-600 bg-blue-50 text-blue-600'
+                            : 'border-gray-200 bg-white text-gray-500'
+                        }`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Vehicle No */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
+                      Vehicle No <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input type="text" placeholder="e.g. MH12AB1234" value={transportVehicleNo}
+                      onChange={e => setTransportVehicleNo(e.target.value)}
+                      className="w-full h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] outline-none focus:border-blue-400" />
+                  </div>
+                  {/* Remark */}
+                  <div>
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
+                      Remark <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input type="text" placeholder="Any notes about transport…" value={transportRemark}
+                      onChange={e => setTransportRemark(e.target.value)}
+                      className="w-full h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] outline-none focus:border-blue-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 — Review */}
+          {step === 3 && (
+            <div className="px-4 pt-4 pb-44 space-y-3">
+              <p className="text-sm font-extrabold text-gray-900 mb-1">Review Order</p>
+
+              {/* Customer */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11.5px] font-bold text-gray-400 uppercase tracking-widest">Customer</span>
+                  <button onClick={() => setStep(0)} className="text-xs font-bold text-blue-600">Change</button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-blue-600 font-extrabold text-base">{selectedCustomer?.name?.[0]?.toUpperCase() || '?'}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{selectedCustomer?.name || '—'}</p>
+                    {selectedCustomer?.phone && <p className="text-xs text-gray-500 mt-0.5">{selectedCustomer.phone}</p>}
+                    {selectedCustomer?.city && <p className="text-[11px] text-gray-400">{[selectedCustomer.city, selectedCustomer.state].filter(Boolean).join(', ')}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11.5px] font-bold text-gray-400 uppercase tracking-widest">Items ({orderItems.length})</span>
+                  <button onClick={() => setStep(1)} className="text-xs font-bold text-blue-600">Edit</button>
+                </div>
+                <div className="space-y-0">
+                  {orderItems.map((item, idx) => {
+                    const pricingLbl = item.pricing_unit === 'unit' ? (item.unit || 'unit') : (item.pricing_unit || 'unit');
+                    return (
+                      <div key={item.id} className={`py-2.5 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                        <div className="flex justify-between gap-2">
+                          <p className="text-[13.5px] font-bold text-gray-900 truncate flex-1">{item.product_name || '—'}</p>
+                          <p className="text-[13.5px] font-extrabold text-gray-900 flex-shrink-0">{formatCurrency(item.total_price || 0, { full: true })}</p>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {item.quantity} {item.unit} · {pricingLbl} @ {formatCurrency(item.unit_price || 0, { full: true })}
+                          {item.gst_included && item.gst_rate ? ` + GST ${item.gst_rate}%` : ''}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Details */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11.5px] font-bold text-gray-400 uppercase tracking-widest">Details</span>
+                  <button onClick={() => setStep(2)} className="text-xs font-bold text-blue-600">Edit</button>
+                </div>
+                <div className="space-y-1.5">
+                  {orderDetails.expectedDelivery && (
+                    <div className="flex justify-between">
+                      <span className="text-[12.5px] text-gray-500">Delivery Date</span>
+                      <span className="text-[12.5px] font-semibold text-gray-900">{formatIndianDate(orderDetails.expectedDelivery)}</span>
+                    </div>
+                  )}
+                  {transportType && (
+                    <div className="flex justify-between">
+                      <span className="text-[12.5px] text-gray-500">Transport</span>
+                      <span className="text-[12.5px] font-semibold text-gray-900 capitalize">{transportType}</span>
+                    </div>
+                  )}
+                  {transportVehicleNo && (
+                    <div className="flex justify-between">
+                      <span className="text-[12.5px] text-gray-500">Vehicle No</span>
+                      <span className="text-[12.5px] font-semibold text-gray-900">{transportVehicleNo}</span>
+                    </div>
+                  )}
+                  {orderDeliveryAddress?.city && (
+                    <div className="flex justify-between">
+                      <span className="text-[12.5px] text-gray-500">Ship to</span>
+                      <span className="text-[12.5px] font-semibold text-gray-900">{[orderDeliveryAddress.city, orderDeliveryAddress.state].filter(Boolean).join(', ')}</span>
+                    </div>
+                  )}
+                  {orderDetails.piNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-[12.5px] text-gray-500">PI Number</span>
+                      <span className="text-[12.5px] font-semibold text-gray-900">{orderDetails.piNumber}</span>
+                    </div>
+                  )}
+                  {orderDetails.notes && (
+                    <div>
+                      <p className="text-[12.5px] text-gray-500 mb-0.5">Notes</p>
+                      <p className="text-[12.5px] text-gray-900">{orderDetails.notes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Order Total — green card like RN app */}
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
+                <p className="text-[11.5px] font-bold text-gray-400 uppercase tracking-widest mb-3">Order Total</p>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <span className="text-[13px] text-gray-500">Subtotal</span>
+                    <span className="text-[13px] font-semibold text-gray-900">{formatCurrency(subtotal, { full: true })}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[13px] text-gray-500">GST</span>
+                    <span className="text-[13px] font-semibold text-gray-900">{formatCurrency(gstAmount, { full: true })}</span>
+                  </div>
+                  {(orderDetails.paidAmount || 0) > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[13px] text-green-700">Advance Paid</span>
+                      <span className="text-[13px] font-semibold text-green-700">-{formatCurrency(orderDetails.paidAmount || 0, { full: true })}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-green-200 pt-2 mt-1">
+                    <span className="text-[15px] font-extrabold text-green-800">Total</span>
+                    <span className="text-base font-extrabold text-green-800">{formatCurrency(total, { full: true })}</span>
+                  </div>
+                  {(orderDetails.paidAmount || 0) > 0 && (
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-[13px] text-amber-600">Balance Due</span>
+                      <span className="text-[13px] font-bold text-amber-600">{formatCurrency(Math.max(0, total - (orderDetails.paidAmount || 0)), { full: true })}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile fixed footer nav */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 z-30 lg:hidden">
+          {step === 0 && showNewCustomerForm ? (
+            <>
+              <button onClick={() => setShowNewCustomerForm(false)}
+                className="h-[52px] px-5 rounded-[10px] border border-gray-200 bg-white text-[15px] font-semibold text-gray-700">
+                Cancel
+              </button>
+              <button onClick={() => customerFormSubmitRef.current?.()}
+                className="flex-1 h-[52px] rounded-[10px] bg-blue-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2">
+                Save Customer
+              </button>
+            </>
+          ) : (
+            <>
+              {step > 0 && (
+                <button onClick={handleBack}
+                  className="h-[52px] px-5 rounded-[10px] border border-gray-200 bg-white text-[15px] font-semibold text-gray-700 flex items-center gap-2">
+                  <ArrowLeft className="w-4 h-4" /> Back
+                </button>
+              )}
+              {step < 3 ? (
+                <button
+                  onClick={() => {
+                    if (step === 0 && selectedCustomer) setStep(1);
+                    else if (step === 1 && canGoNextFromItems) setStep(2);
+                    else if (step === 2 && orderDetails.expectedDelivery) setStep(3);
+                  }}
+                  disabled={
+                    (step === 0 && !selectedCustomer) ||
+                    (step === 1 && !canGoNextFromItems) ||
+                    (step === 2 && !orderDetails.expectedDelivery)
+                  }
+                  className="flex-1 h-[52px] rounded-[10px] bg-blue-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                >
+                  {step === 0 ? 'Continue' : step === 1 ? 'Next: Details' : 'Review Order'}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button onClick={handleSubmit} disabled={isSubmitting}
+                  className="flex-1 h-[52px] rounded-[10px] bg-green-600 text-white text-[15px] font-semibold flex items-center justify-center gap-2 disabled:opacity-40">
+                  {isSubmitting ? (
+                    <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Placing Order…</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Place Order</>
+                  )}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Mobile dialogs */}
+        <ProductMaterialSelectionDialog
+          isOpen={showProductSearch}
+          onClose={() => { setShowProductSearch(false); setProductSearchTerm(''); setProductPage(1); setMaterialPage(1); }}
+          currentItem={currentOrderItem}
+          products={realProducts}
+          materials={rawMaterials}
+          productSearchTerm={productSearchTerm}
+          onSearchChange={setProductSearchTerm}
+          onSelectProduct={(productId) => {
+            if (currentOrderItem) { updateOrderItem(currentOrderItem.id, 'product_id', productId); setShowProductSearch(false); setProductSearchTerm(''); }
+          }}
+          productPage={productPage}
+          materialPage={materialPage}
+          productItemsPerPage={productItemsPerPage}
+          materialItemsPerPage={materialItemsPerPage}
+          onProductPageChange={setProductPage}
+          onMaterialPageChange={setMaterialPage}
+          productSortBy={productSortBy}
+          productSortOrder={productSortOrder}
+          materialSortBy={materialSortBy}
+          materialSortOrder={materialSortOrder}
+          onProductSortChange={(s, o) => { setProductSortBy(s); setProductSortOrder(o); setProductPage(1); }}
+          onMaterialSortChange={(s, o) => { setMaterialSortBy(s); setMaterialSortOrder(o); setMaterialPage(1); }}
+        />
+        <DeliveryAddressDialog isOpen={showAddressEditor} onClose={() => setShowAddressEditor(false)} address={orderDeliveryAddress}
+          onSave={addr => { setOrderDeliveryAddress(addr); setShowAddressEditor(false); }} />
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════
+          DESKTOP WIZARD — unchanged
+      ════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-w-5xl mx-auto" style={{ height: 'calc(100dvh - 100px)' }}>
 
         {/* Top bar */}
         <div className="flex items-center justify-between px-5 h-14 border-b border-slate-200 bg-white flex-shrink-0">

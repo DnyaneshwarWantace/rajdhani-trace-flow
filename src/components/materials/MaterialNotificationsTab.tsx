@@ -90,11 +90,29 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
     switch (type) {
       case 'low_stock':
       case 'out_of_stock':
-        return <AlertCircle className="w-5 h-5 text-orange-500" />;
+        return (
+          <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-650 shadow-sm border border-amber-100">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+        );
       case 'reorder_alert':
-        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+        return (
+          <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-550 shadow-sm border border-red-100">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+        );
+      case 'restock_request':
+        return (
+          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm border border-blue-100">
+            <Bell className="w-5 h-5" />
+          </div>
+        );
       default:
-        return <Info className="w-5 h-5 text-gray-500" />;
+        return (
+          <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-500 shadow-sm border border-gray-150">
+            <Info className="w-5 h-5" />
+          </div>
+        );
     }
   };
 
@@ -149,7 +167,7 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
           </div>
 
           {/* Notifications List */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             {notifications.map((notification) => {
               const isExpanded = expandedNotificationId === notification.id;
               const hasDetails = notification.related_data && (
@@ -164,17 +182,36 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
                 notification.related_data.shortage !== undefined
               );
 
+              // Determine left accent border based on status and priority
+              let leftBorderClass = 'border-l-4 ';
+              if (notification.status === 'unread') {
+                if (notification.priority?.toLowerCase() === 'high') leftBorderClass += 'border-l-red-650';
+                else if (notification.priority?.toLowerCase() === 'medium') leftBorderClass += 'border-l-amber-500';
+                else leftBorderClass += 'border-l-blue-600';
+              } else {
+                if (notification.priority?.toLowerCase() === 'high') leftBorderClass += 'border-l-red-400';
+                else if (notification.priority?.toLowerCase() === 'medium') leftBorderClass += 'border-l-amber-300';
+                else leftBorderClass += 'border-l-gray-200';
+              }
+
               return (
                 <Card
                   key={notification.id}
-                  className={`border-0 shadow-sm hover:shadow-md transition-shadow ${
+                  className={`border-0 border-y border-r border-gray-100 ${leftBorderClass} shadow-[0_4px_12px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.05)] hover:-translate-y-[1px] transition-all duration-200 relative overflow-hidden ${
                     notification.status === 'unread'
-                      ? 'bg-blue-50'
+                      ? 'bg-blue-50/45'
                       : 'bg-white'
                   } ${hasDetails ? 'cursor-pointer' : ''}`}
                   onClick={() => hasDetails && setExpandedNotificationId(isExpanded ? null : notification.id)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-5 relative">
+                    {/* Pulsing blue dot for unread status */}
+                    {notification.status === 'unread' && (
+                      <span className="absolute top-3 right-3 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+                      </span>
+                    )}
                     <div className="flex items-start gap-4">
                       {/* Icon */}
                       <div className="flex-shrink-0 mt-0.5">
@@ -227,7 +264,7 @@ export default function MaterialNotificationsTab({ notifications: propNotificati
 
                         {/* Related Data - Collapsible */}
                         {isExpanded && hasDetails && (
-                          <div className="bg-gray-50 rounded-lg p-3 my-2 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                          <div className="bg-[#F8FAFC] border border-gray-150 rounded-xl p-4 my-2.5 space-y-2 text-gray-700 animate-in slide-in-from-top-2 duration-250 ease-out shadow-inner">
                             {/* Order-Related Stock Alert Details */}
                             {notification.type === 'restock_request' && notification.related_data.order_number && (
                               <div className="border-b border-gray-200 pb-2 mb-2">

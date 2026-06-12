@@ -269,9 +269,11 @@ export function IndividualProductSelectionDialog({
       return 0;
     });
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent customLayout className="max-w-4xl h-[85vh] flex flex-col p-0 gap-0">
+      <DialogContent customLayout className={`flex flex-col p-0 gap-0 ${isMobile ? 'max-w-full w-full m-0 rounded-none !translate-x-0 !translate-y-0 !left-0 !top-0 !right-0 !bottom-0 !inset-0 h-[100dvh] max-h-[100dvh]' : 'max-w-4xl h-[85vh]'}`}>
         {/* Sticky Header */}
         <div className="px-6 pt-5 pb-3 border-b bg-white shrink-0">
           <DialogHeader>
@@ -295,6 +297,7 @@ export function IndividualProductSelectionDialog({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              autoComplete="off"
             />
           </div>
           <Select value={sortOrder} onValueChange={setSortOrder}>
@@ -420,8 +423,8 @@ export function IndividualProductSelectionDialog({
           )}
         </div>
 
-        <div className="border-t bg-white px-6 py-3 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 text-sm">
+        <div className="border-t bg-white px-4 py-3 shrink-0 space-y-2">
+          <div className="flex items-center gap-3 text-sm flex-wrap">
             <span className="text-gray-500">Required: <strong>{requiredQuantity}</strong></span>
             <span className={`font-semibold ${selectionComplete ? 'text-green-600' : selectedProducts.length > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
               Selected: {selectedProducts.length}
@@ -432,10 +435,10 @@ export function IndividualProductSelectionDialog({
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleAutoSelect} disabled={loading || saving}>Auto Select</Button>
-            <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={selectedProducts.length === 0 || selectedProducts.length > requiredQuantity || saving} className="bg-green-600 hover:bg-green-700 text-white">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+            <Button variant="outline" size="sm" onClick={handleAutoSelect} disabled={loading || saving} className="flex-1">Auto Select</Button>
+            <Button variant="outline" size="sm" onClick={onClose} disabled={saving} className="flex-1">Cancel</Button>
+            <Button size="sm" onClick={handleSave} disabled={selectedProducts.length === 0 || selectedProducts.length > requiredQuantity || saving} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
               Confirm ({selectedProducts.length}/{requiredQuantity})
             </Button>
           </div>

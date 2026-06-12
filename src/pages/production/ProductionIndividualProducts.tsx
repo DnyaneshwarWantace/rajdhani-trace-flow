@@ -365,7 +365,8 @@ export default function ProductionIndividualProducts() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      {/* Desktop View */}
+      <div className="hidden lg:block space-y-6">
         <IndividualProductsStageHeader
           batch={batch}
           onBack={() => {
@@ -424,36 +425,38 @@ export default function ProductionIndividualProducts() {
             </span>
           )}
         </div>
-
-        {/* Individual Products Table */}
-        <IndividualProductsTable
-          individualProducts={filteredIndividualProducts}
-          onUpdate={handleTableUpdate}
-          product={product ? {
-            name: product.name,
-            color: product.color,
-            pattern: product.pattern,
-            weight_unit: product.weight_unit,
-            width_unit: product.width_unit,
-            length_unit: product.length_unit,
-            weight: product.weight,
-            width: product.width,
-            length: product.length,
-          } : undefined}
-          plannedQuantity={batch?.planned_quantity || 0}
-          batchId={id}
-          productId={product?.id}
-          onComplete={handleProceedToWastage}
-          canComplete={canProceed}
-          onCanCompleteChange={setCanProceedFromTable}
-          onCreatedProductsCountChange={setCreatedProductsCount}
-          actionLabel="Proceed to Wastage"
-          stageCompleted={isStageCompleted}
-          dbSavedCount={dbSavedCount}
-          onStageCompleted={() => setIsStageCompleted(true)}
-        />
       </div>
 
+      {/* Individual Products Table/List */}
+      <IndividualProductsTable
+        individualProducts={filteredIndividualProducts}
+        onUpdate={handleTableUpdate}
+        product={product ? {
+          name: product.name,
+          category: product.category,
+          color: product.color,
+          pattern: product.pattern,
+          weight_unit: product.weight_unit,
+          width_unit: product.width_unit,
+          length_unit: product.length_unit,
+          weight: product.weight,
+          width: product.width,
+          length: product.length,
+        } : undefined}
+        plannedQuantity={batch?.planned_quantity || 0}
+        batchId={id}
+        productId={product?.id}
+        onComplete={handleProceedToWastage}
+        canComplete={canProceed}
+        onCanCompleteChange={setCanProceedFromTable}
+        onCreatedProductsCountChange={setCreatedProductsCount}
+        actionLabel="Proceed to Wastage"
+        stageCompleted={isStageCompleted}
+        dbSavedCount={dbSavedCount}
+        onStageCompleted={() => setIsStageCompleted(true)}
+        mobileBatch={batch}
+        mobileConsumedMaterials={consumedMaterials}
+      />
     </Layout>
   );
 }

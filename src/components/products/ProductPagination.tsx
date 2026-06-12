@@ -71,7 +71,7 @@ export default function ProductPagination({
   }
 
   return (
-    <div className="mt-4 sm:mt-6 w-full">
+    <div className="hidden lg:block mt-4 sm:mt-6 w-full">
       <Pagination className="w-full">
         <PaginationContent className="w-full justify-center flex-wrap gap-1">
           <PaginationItem>

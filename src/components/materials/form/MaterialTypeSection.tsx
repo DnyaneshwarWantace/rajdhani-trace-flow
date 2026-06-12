@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MobileOptionSheet, MobileSelectTrigger } from '@/components/ui/MobileOptionSheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,9 +27,6 @@ import ColorSwatch from '@/components/ui/ColorSwatch';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import type { DropdownOption } from '@/types/dropdown';
 
-const CUSTOM_COLOR_VALUE = '__material_color_custom__';
-const ADD_COLOR_VALUE = '__material_color_add_new__';
-
 interface MaterialTypeSectionProps {
   type: string;
   color: string;
@@ -37,7 +35,6 @@ interface MaterialTypeSectionProps {
   onTypeChange: (value: string) => void;
   onColorChange: (value: string) => void;
   onTypesReload?: () => void;
-  colorFallbackWhenBlank?: string;
   typeFullOptions?: DropdownOption[];
   usageMap?: Record<string, boolean>;
 }
@@ -50,7 +47,6 @@ export default function MaterialTypeSection({
   onTypeChange,
   onColorChange,
   onTypesReload,
-  colorFallbackWhenBlank,
   typeFullOptions,
   usageMap,
 }: MaterialTypeSectionProps) {
@@ -71,6 +67,12 @@ export default function MaterialTypeSection({
   const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
     setSelectOpen(false); setTogglingOption(opt);
+  };
+  const handleInstantToggle = async (opt: DropdownOption) => {
+    try {
+      await DropdownService.toggleActive(opt.id || opt._id);
+      if (onTypesReload) onTypesReload();
+    } catch { toast({ title: 'Error', description: 'Failed to toggle', variant: 'destructive' }); }
   };
   const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
@@ -224,228 +226,165 @@ export default function MaterialTypeSection({
     }
   };
 
-  const inPalette = Boolean(color && colors.includes(color));
-  const selectColorValue =
-    type !== 'color'
-      ? ''
-      : colors.length === 0
-        ? CUSTOM_COLOR_VALUE
-        : inPalette
-          ? color
-          : CUSTOM_COLOR_VALUE;
+  const [mobileTypeSheetOpen, setMobileTypeSheetOpen] = useState(false);
 
   return (
     <div className="space-y-3">
-      <div>
-        <Label htmlFor="type">Material Type</Label>
-        <div className="space-y-2">
-          <Select
-            open={selectOpen}
-            onOpenChange={setSelectOpen}
-            value={type || ''}
-            onValueChange={(value) => {
-              if (value === 'add_new') { setShowAddType(true); setSelectOpen(false); }
-              else { onTypeChange(value); setSelectOpen(false); }
-            }}
-          >
-            <SelectTrigger id="type">
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              {types.length > 0 ? (
-                types.map((typeOption) => {
-                  const fullOpt = findFullOption(typeOption);
-                  const used = isUsed(typeOption);
-                  return (
-                    <div key={typeOption} className="relative flex items-center group">
-                      <SelectItem value={typeOption} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>
-                        {typeOption.charAt(0).toUpperCase() + typeOption.slice(1)}
-                      </SelectItem>
-                      {hasManagement && fullOpt && (
-                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
-                          <button type="button" title={fullOpt.is_active ? 'Deactivate' : 'Activate'} className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
-                            {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
-                          </button>
-                          {!used && (
-                            <button type="button" title="Delete" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
-                              <Trash2 className="w-3 h-3 text-red-500" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <SelectItem value="no_types" disabled>No types available</SelectItem>
-              )}
-              <SelectItem value="add_new" className="text-primary-600 font-medium">
-                <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Type</div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {showAddType && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    value={newTypeName}
-                    onChange={(e) => handleTypeNameChange(e.target.value)}
-                    placeholder="Enter new type"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {wordCount}/4 words • Max 15 characters per word
-                  </p>
-                </div>
-                <Button type="button" size="sm" onClick={handleAddType}>
-                  Add
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddType(false);
-                    setNewTypeName('');
-                  }}
-                >
-                  Cancel
-                </Button>
+
+      {/* Mobile: Type + Color side by side (like RN app) */}
+      <div className="lg:hidden">
+        <div className={`grid gap-3 ${type === 'color' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div>
+            <Label>Material Type</Label>
+            <MobileSelectTrigger
+              value={type ? type.charAt(0).toUpperCase() + type.slice(1) : ''}
+              placeholder="Select type"
+              onClick={() => setMobileTypeSheetOpen(true)}
+            />
+          </div>
+          {type === 'color' && (
+            <ColorPickerSection
+              color={color}
+              colors={colors}
+              colorCodeMap={colorCodeMap}
+              onColorChange={onColorChange}
+              onAddColor={handleAddColor}
+              newColorName={newColorName}
+              setNewColorName={setNewColorName}
+              newColorCode={newColorCode}
+              setNewColorCode={setNewColorCode}
+              attachColorCode={attachColorCode}
+              setAttachColorCode={setAttachColorCode}
+              showAddColor={showAddColor}
+              setShowAddColor={setShowAddColor}
+              mobileInline
+            />
+          )}
+        </div>
+        <MobileOptionSheet
+          open={mobileTypeSheetOpen}
+          onClose={() => setMobileTypeSheetOpen(false)}
+          title="Type"
+          options={(typeFullOptions && typeFullOptions.length > 0 ? typeFullOptions : types.map(t => ({ value: t }))).map(o => {
+            const fo = typeFullOptions?.find(f => f.value === (typeof o === 'string' ? o : o.value));
+            const val = typeof o === 'string' ? o : o.value;
+            return { value: val, label: val.charAt(0).toUpperCase() + val.slice(1), isActive: fo ? fo.is_active !== false : true, id: fo?.id || fo?._id, isUsed: isUsed(val) };
+          })}
+          selected={type}
+          onSelect={(val) => { onTypeChange(val); }}
+          onAddNew={() => setShowAddType(true)}
+          onToggleActive={(opt) => {
+            const fo = typeFullOptions?.find(f => f.value === opt.value);
+            if (fo) handleInstantToggle(fo);
+          }}
+          onDelete={(opt) => {
+            const fo = typeFullOptions?.find(f => f.value === opt.value);
+            if (fo) { const e = { stopPropagation: () => {}, preventDefault: () => {} } as any; handleDeleteClick(e, fo); }
+          }}
+        />
+        {showAddType && (
+          <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input value={newTypeName} onChange={(e) => handleTypeNameChange(e.target.value)} placeholder="New type name" className="h-10 rounded-xl" />
+                <p className="text-xs text-gray-400 mt-1">{wordCount}/4 words • Max 15 chars per word</p>
               </div>
+              <Button type="button" size="sm" onClick={handleAddType}>Add</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddType(false); setNewTypeName(''); }}>✕</Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
-      {type === 'color' && (
-        <div className="space-y-2">
-          <Label htmlFor="color">Color</Label>
-          {colors.length > 0 ? (
-            <>
-              <Select
-                value={selectColorValue}
-                onValueChange={(value) => {
-                  if (value === ADD_COLOR_VALUE) {
-                    setShowAddColor(true);
-                    return;
-                  }
-                  setShowAddColor(false);
-                  if (value === CUSTOM_COLOR_VALUE) {
-                    onColorChange('');
-                  } else {
-                    onColorChange(value);
-                  }
-                }}
-              >
-                <SelectTrigger id="color" className="h-auto min-h-10 py-2">
-                  <SelectValue placeholder="Select color" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ADD_COLOR_VALUE} textValue="Add new color">
-                    <span className="flex items-center gap-2 text-primary-600 font-medium">
-                      <Plus className="w-4 h-4" />
-                      Add New Color
-                    </span>
-                  </SelectItem>
-                  {colors.map((colorOption) => (
-                    <SelectItem key={colorOption} value={colorOption} textValue={colorOption}>
-                      <span className="flex items-center gap-2 py-0.5">
-                        {colorCodeMap[colorOption] ? (
-                          <ColorSwatch colorCode={colorCodeMap[colorOption]} className="w-7 h-7 rounded-md shrink-0" />
-                        ) : null}
-                        <span>{colorOption}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={CUSTOM_COLOR_VALUE} textValue="Other custom color">
-                    Other (type a custom name)…
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              {showAddColor && (
-                <div className="space-y-2 rounded-md border p-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="material-new-color-name" className="text-xs text-muted-foreground">
-                      Color name
-                    </Label>
-                    <Input
-                      id="material-new-color-name"
-                      value={newColorName}
-                      onChange={(e) => setNewColorName(e.target.value)}
-                      placeholder="e.g. Coffee Brown"
-                    />
+
+      {/* Desktop: Type field + Color below */}
+      <div className="hidden lg:block">
+        <div>
+          <Label htmlFor="type">Material Type</Label>
+          <div className="space-y-2">
+            <Select
+              open={selectOpen}
+              onOpenChange={setSelectOpen}
+              value={type || ''}
+              onValueChange={(value) => {
+                if (value === 'add_new') { setShowAddType(true); setSelectOpen(false); }
+                else { onTypeChange(value); setSelectOpen(false); }
+              }}
+            >
+              <SelectTrigger id="type">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {(typeFullOptions && typeFullOptions.length > 0 ? typeFullOptions : types.map((t) => ({ value: t, is_active: true } as DropdownOption))).length > 0 ? (
+                  (typeFullOptions && typeFullOptions.length > 0 ? typeFullOptions : types.map((t) => ({ value: t, is_active: true } as DropdownOption))).map((opt) => {
+                    const typeOption = opt.value;
+                    const isInactive = opt.is_active === false;
+                    const fullOpt = isInactive ? opt : (findFullOption(typeOption) ?? opt);
+                    const used = isUsed(typeOption);
+                    const label = typeOption.charAt(0).toUpperCase() + typeOption.slice(1);
+                    return (
+                      <div key={typeOption} className="relative flex items-center group">
+                        <SelectItem
+                          value={typeOption}
+                          disabled={isInactive}
+                          className={`flex-1 ${hasManagement ? 'pr-14' : ''} ${isInactive ? 'text-gray-400' : ''}`}
+                        >
+                          {isInactive ? `${label} (Inactive)` : label}
+                        </SelectItem>
+                        {hasManagement && fullOpt && (
+                          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10">
+                            <button type="button" className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
+                              {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                            </button>
+                            {!used && (
+                              <button type="button" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
+                                <Trash2 className="w-3 h-3 text-red-500" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <SelectItem value="no_types" disabled>No types available</SelectItem>
+                )}
+                <SelectItem value="add_new" className="text-primary-600 font-medium">
+                  <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Type</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {showAddType && (
+              <div className="space-y-2 mt-2">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input value={newTypeName} onChange={(e) => handleTypeNameChange(e.target.value)} placeholder="Enter new type" />
+                    <p className="text-xs text-muted-foreground mt-1">{wordCount}/4 words • Max 15 characters per word</p>
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={attachColorCode}
-                      onChange={(e) => setAttachColorCode(e.target.checked)}
-                    />
-                    Add color code (optional)
-                  </label>
-                  {attachColorCode && (
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={newColorCode}
-                        onChange={(e) => setNewColorCode(e.target.value)}
-                        placeholder="#2563eb"
-                        className="max-w-[140px] uppercase"
-                      />
-                      <ColorSwatch colorCode={newColorCode} className="w-7 h-7 rounded-md" />
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" onClick={handleAddColor}>
-                      Add
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddColor(false);
-                        setNewColorName('');
-                        setNewColorCode('#2563eb');
-                        setAttachColorCode(true);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
+                  <Button type="button" size="sm" onClick={handleAddType}>Add</Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddType(false); setNewTypeName(''); }}>Cancel</Button>
                 </div>
-              )}
-              {selectColorValue === CUSTOM_COLOR_VALUE && (
-                <div className="space-y-1">
-                  <Label htmlFor="material-custom-color" className="text-xs text-muted-foreground">
-                    Custom color name
-                  </Label>
-                  <Input
-                    id="material-custom-color"
-                    value={color}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    placeholder="e.g. Solvent Blue 38"
-                  />
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-1">
-              <Input
-                id="color-free"
-                value={colorFallbackWhenBlank === 'NA' && color === 'NA' ? '' : color}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (colorFallbackWhenBlank !== undefined) {
-                    onColorChange(v.trim() === '' ? colorFallbackWhenBlank : v);
-                  } else {
-                    onColorChange(v);
-                  }
-                }}
-                placeholder="No palette options — type color name"
-              />
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+        {type === 'color' && (
+          <ColorPickerSection
+            color={color}
+            colors={colors}
+            colorCodeMap={colorCodeMap}
+            onColorChange={onColorChange}
+            onAddColor={handleAddColor}
+            newColorName={newColorName}
+            setNewColorName={setNewColorName}
+            newColorCode={newColorCode}
+            setNewColorCode={setNewColorCode}
+            attachColorCode={attachColorCode}
+            setAttachColorCode={setAttachColorCode}
+            showAddColor={showAddColor}
+            setShowAddColor={setShowAddColor}
+          />
+        )}
+      </div>{/* end hidden lg:block */}
 
       <AlertDialog open={!!togglingOption} onOpenChange={(open) => !open && setTogglingOption(null)}>
         <AlertDialogContent>
@@ -478,6 +417,104 @@ export default function MaterialTypeSection({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function ColorPickerSection({ color, colors, colorCodeMap, onColorChange, onAddColor, newColorName, setNewColorName, newColorCode, setNewColorCode, attachColorCode, setAttachColorCode, showAddColor, setShowAddColor, mobileInline = false }: {
+  color: string; colors: string[]; colorCodeMap: Record<string, string>;
+  onColorChange: (v: string) => void; onAddColor: () => void;
+  newColorName: string; setNewColorName: (v: string) => void;
+  newColorCode: string; setNewColorCode: (v: string) => void;
+  attachColorCode: boolean; setAttachColorCode: (v: boolean) => void;
+  showAddColor: boolean; setShowAddColor: (v: boolean) => void;
+  mobileInline?: boolean;
+}) {
+  const [mobileColorSheetOpen, setMobileColorSheetOpen] = useState(false);
+  const inPalette = Boolean(color && colors.includes(color));
+
+  const addColorForm = showAddColor && (
+    <div className="space-y-2 rounded-xl border border-gray-200 p-3 mt-2">
+      <div className="space-y-1">
+        <Label htmlFor="material-new-color-name" className="text-xs text-gray-500">Color name</Label>
+        <Input id="material-new-color-name" value={newColorName} onChange={(e) => setNewColorName(e.target.value)} placeholder="e.g. Coffee Brown" />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
+        <input type="checkbox" checked={attachColorCode} onChange={(e) => setAttachColorCode(e.target.checked)} />
+        Add color code (optional)
+      </label>
+      {attachColorCode && (
+        <div className="flex items-center gap-2">
+          <Input value={newColorCode} onChange={(e) => setNewColorCode(e.target.value)} placeholder="#2563eb" className="max-w-[140px] uppercase" />
+          <ColorSwatch colorCode={newColorCode} className="w-7 h-7 rounded-md" />
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Button type="button" size="sm" onClick={onAddColor}>Add</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddColor(false); setNewColorName(''); setNewColorCode('#2563eb'); setAttachColorCode(true); }}>Cancel</Button>
+      </div>
+    </div>
+  );
+
+  // mobileInline = rendered inside the 2-col grid — just show label + trigger + sheet
+  if (mobileInline) {
+    return (
+      <div>
+        <Label>Color</Label>
+        <MobileSelectTrigger
+          value={inPalette ? color : ''}
+          placeholder="Select color"
+          onClick={() => setMobileColorSheetOpen(true)}
+        />
+        <MobileOptionSheet
+          open={mobileColorSheetOpen}
+          onClose={() => setMobileColorSheetOpen(false)}
+          title="Color"
+          options={colors.map(c => ({ value: c, label: c, colorCode: colorCodeMap[c] || null }))}
+          selected={color}
+          onSelect={onColorChange}
+          onAddNew={() => setShowAddColor(true)}
+        />
+        {addColorForm}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="color">Color</Label>
+
+      {/* Desktop: Radix Select */}
+      <div className="hidden lg:block">
+        <Select
+          value={inPalette ? color : ''}
+          onValueChange={(value) => {
+            if (value === '__add_new__') { setShowAddColor(true); return; }
+            setShowAddColor(false);
+            onColorChange(value);
+          }}
+        >
+          <SelectTrigger id="color" className="h-auto min-h-10 py-2">
+            <SelectValue placeholder="Select color" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__add_new__" textValue="Add new color">
+              <span className="flex items-center gap-2 text-primary-600 font-medium">
+                <Plus className="w-4 h-4" />Add New Color
+              </span>
+            </SelectItem>
+            {colors.map((c) => (
+              <SelectItem key={c} value={c} textValue={c}>
+                <span className="flex items-center gap-2 py-0.5">
+                  {colorCodeMap[c] && <ColorSwatch colorCode={colorCodeMap[c]} className="w-7 h-7 rounded-md shrink-0" />}
+                  <span>{c}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {addColorForm}
+      </div>
     </div>
   );
 }

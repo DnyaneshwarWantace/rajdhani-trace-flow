@@ -663,18 +663,19 @@ export default function SendToProductionModal({
 
   const getStockChip = (mat: MaterialWithStock) => {
     const qty = mat.available_stock ?? mat.stock ?? 0;
+    const fmtQty = Number.isInteger(qty) ? qty : parseFloat(qty.toFixed(2));
     if (mat.stockStatus === 'available') return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-        <CheckCircle className="w-3 h-3" />{qty} {mat.unit} available
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full shrink-0">
+        <CheckCircle className="w-3 h-3" />{fmtQty} {mat.unit}
       </span>
     );
     if (mat.stockStatus === 'low') return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-        <AlertTriangle className="w-3 h-3" />Low — {qty} {mat.unit}
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+        <AlertTriangle className="w-3 h-3" />Low — {fmtQty} {mat.unit}
       </span>
     );
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full shrink-0">
         <XCircle className="w-3 h-3" />Out of stock
       </span>
     );
@@ -699,7 +700,6 @@ export default function SendToProductionModal({
             placeholder="Search by name, email or role..."
             value={search}
             onChange={e => setPickerSearch(productId, e.target.value)}
-            autoFocus
           />
           <button onClick={() => closePicker(productId)} className="text-gray-400 hover:text-gray-600 p-0.5">
             <X className="w-4 h-4" />
@@ -798,34 +798,39 @@ export default function SendToProductionModal({
         {/* Card */}
         <div className={`rounded-2xl border-2 ${isMain ? 'border-blue-400 bg-white' : 'border-gray-200 bg-gray-50'} overflow-hidden`}>
           {/* Card top bar */}
-          <div className={`px-5 py-3 flex items-center justify-between ${isMain ? 'bg-blue-600' : 'bg-gray-700'}`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${isMain ? 'bg-white text-blue-600' : 'bg-white text-gray-700'}`}>
-                {stepNumber}
-              </div>
-              <div>
-                <div className="text-white font-bold text-base leading-tight">{node.productName}</div>
-                <div className="text-xs mt-0.5 opacity-80 text-white">
-                  {isMain
-                    ? `Main product · Order: ${orderQuantity} rolls · Available: ${globalAvailableRolls} · Reserved: ${reservedRollsForOrder} · Need: ${Math.round(stepQty * 1000) / 1000} rolls`
-                    : `Sub-product · Step ${stepNumber} of ${totalSteps}${stepQty > 0 ? ` · Need: ${Math.round(stepQty * 1000) / 1000} rolls` : ''}`}
+          <div className={`px-4 py-3 ${isMain ? 'bg-blue-600' : 'bg-gray-700'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${isMain ? 'bg-white text-blue-600' : 'bg-white text-gray-700'}`}>
+                  {stepNumber}
                 </div>
+                <div className="text-white font-bold text-sm leading-tight truncate">{node.productName}</div>
               </div>
+              {node.productStock !== undefined && (
+                <div className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  node.productStock > 0 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                }`}>
+                  <Archive className="w-3 h-3" />
+                  {node.productStock > 0 ? `${node.productStock} in stock` : 'No stock'}
+                </div>
+              )}
             </div>
-
-            {/* Current stock for every step (main and sub-products) */}
-            {node.productStock !== undefined && (
-              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${
-                node.productStock > 0 ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-              }`}>
-                <Archive className="w-3.5 h-3.5" />
-                {node.productStock > 0 ? `${node.productStock} rolls in stock` : 'No stock'}
+            {/* Stats row */}
+            {isMain ? (
+              <div className="flex gap-3 mt-2 ml-9">
+                <div className="text-xs text-blue-100"><span className="text-white font-semibold">{orderQuantity}</span> ordered</div>
+                <div className="text-xs text-blue-100"><span className="text-white font-semibold">{reservedRollsForOrder}</span> reserved</div>
+                <div className="text-xs text-blue-100"><span className="text-white font-semibold">{Math.round(stepQty * 1000) / 1000}</span> to make</div>
               </div>
-            )}
+            ) : stepQty > 0 ? (
+              <div className="mt-1 ml-9 text-xs text-gray-300">
+                Step {stepNumber} of {totalSteps} · Need <span className="text-white font-semibold">{Math.round(stepQty * 1000) / 1000}</span> rolls
+              </div>
+            ) : null}
           </div>
 
           {/* Card body */}
-          <div className="px-5 py-4 space-y-4">
+          <div className="px-4 py-3 space-y-3">
             {/* Stock suggestion banner */}
             {banner && (
               <div className={`flex items-start gap-2.5 px-4 py-3 rounded-xl border text-sm ${banner.color}`}>
@@ -850,9 +855,9 @@ export default function SendToProductionModal({
                     const isOutRaw = mat.stockStatus === 'out' && mat.material_type === 'raw_material';
                     const mos = matOrderState[mat.material_id];
                     return (
-                    <div key={mat.id} className={`flex flex-col gap-2 px-4 py-3 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
-                      <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-2.5 min-w-0">
+                    <div key={mat.id} className={`flex flex-col gap-2 px-3 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
                         {mat.material_type === 'product' ? (
                           <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
                             <Layers className="w-3.5 h-3.5 text-purple-600" />
@@ -863,28 +868,30 @@ export default function SendToProductionModal({
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-gray-900 truncate">{mat.material_name}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">
+                          <div className="text-sm font-medium text-gray-900 leading-tight">{mat.material_name}</div>
+                          <div className="text-xs text-gray-400 mt-1 space-y-0.5">
                             {mat.material_type === 'product' && stepQty > 0 && node.productSqm ? (() => {
                               const totalSqm = stepQty * node.productSqm;
                               const rollsNeeded = totalSqm * mat.quantity_per_sqm;
                               return (
-                                <span className="font-semibold text-purple-700">
-                                  Need: <span className="text-gray-900">{rollsNeeded % 1 === 0 ? rollsNeeded.toFixed(0) : rollsNeeded.toFixed(3)} {mat.unit}</span>
-                                  <span className="ml-1 text-gray-400 font-normal">({stepQty} rolls × {node.productSqm.toFixed(2)} sqm = {totalSqm.toFixed(2)} sqm total)</span>
-                                </span>
+                                <>
+                                  <div className="font-semibold text-purple-700">
+                                    Need: <span className="text-gray-900">{rollsNeeded % 1 === 0 ? rollsNeeded.toFixed(0) : rollsNeeded.toFixed(3)} {mat.unit}</span>
+                                  </div>
+                                  <div className="text-gray-400">{stepQty} rolls × {node.productSqm.toFixed(2)} sqm = {totalSqm.toFixed(2)} sqm</div>
+                                </>
                               );
                             })() : (
                               <>
-                                Need: <span className="font-medium text-gray-600">{mat.quantity_per_sqm.toFixed(6)} {mat.unit}/sqm</span>
+                                <div>Need: <span className="font-medium text-gray-600">{parseFloat(mat.quantity_per_sqm.toFixed(4))} {mat.unit}/sqm</span></div>
                                 {stepQty > 0 && node.productSqm && (
-                                  <span className="ml-1 font-semibold text-gray-800">
-                                    = {(mat.quantity_per_sqm * stepQty * node.productSqm).toFixed(3)} {mat.unit} total
-                                  </span>
+                                  <div className="font-semibold text-gray-800">
+                                    = {parseFloat((mat.quantity_per_sqm * stepQty * node.productSqm).toFixed(3))} {mat.unit} total
+                                  </div>
                                 )}
                               </>
                             )}
-                            {mat.material_type === 'product' && <span className="ml-2 text-purple-500 font-medium">sub-product</span>}
+                            {mat.material_type === 'product' && <div className="text-purple-500 font-medium">sub-product</div>}
                             </div>
                           </div>
                         </div>
@@ -922,7 +929,6 @@ export default function SendToProductionModal({
                                   placeholder="Search user..."
                                   value={mos.search}
                                   onChange={e => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], search: e.target.value } }))}
-                                  autoFocus
                                 />
                                 <button onClick={() => setMatOrderState(prev => ({ ...prev, [mat.material_id]: { ...prev[mat.material_id], pickingUser: false, search: '' } }))}>
                                   <X className="w-3.5 h-3.5 text-gray-400" />
@@ -970,41 +976,37 @@ export default function SendToProductionModal({
             )}
 
             {/* Assign section */}
-            <div className={`rounded-xl border-2 border-dashed p-4 ${assignedUser ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {isMain ? 'Assign production to' : 'Assign this sub-production to'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {assignedUser ? `Will be handled by ${assignedUser.full_name}` : 'Pick assigned personnel who will handle this step'}
-                  </p>
-                </div>
-                {assignedUser ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 bg-white border border-green-300 rounded-full pl-1 pr-3 py-1">
-                      <div className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold text-white">
-                        {assignedUser.full_name?.charAt(0)?.toUpperCase() || '?'}
-                      </div>
-                      <span className="text-sm font-semibold text-green-800 max-w-32 truncate">{assignedUser.full_name}</span>
-                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    </div>
-                    <button onClick={() => clearAssignment(node.productId)} className="text-gray-400 hover:text-red-500 transition-colors">
+            <div className={`rounded-xl border-2 border-dashed p-3 ${assignedUser ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+              {assignedUser ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold text-white shrink-0">
+                    {assignedUser.full_name?.charAt(0)?.toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-500">Assigned to</p>
+                    <p className="text-sm font-bold text-green-800 truncate">{assignedUser.full_name}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <button onClick={() => clearAssignment(node.productId)} className="text-gray-300 hover:text-red-500 transition-colors">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openPicker(node.productId, node.productName)}
-                    className="gap-2 border-gray-300 hover:border-blue-400 hover:text-blue-600"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    Assign Personnel
-                  </Button>
-                )}
-              </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => openPicker(node.productId, node.productName)}
+                  className="w-full flex items-center gap-3 py-1"
+                >
+                  <div className="w-9 h-9 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center shrink-0">
+                    <UserPlus className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-gray-700">Assign Operator</p>
+                    <p className="text-xs text-gray-400">Tap to pick who handles this step</p>
+                  </div>
+                </button>
+              )}
 
               {isPicking && renderUserPicker(node.productId, node.productName)}
             </div>
@@ -1016,159 +1018,199 @@ export default function SendToProductionModal({
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   const assignedCount = Object.values(assignments).filter(a => a.assignedUser).length;
   const steps = recipeTree ? flattenToSteps(recipeTree) : [];
 
-  return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[92vh] flex flex-col gap-0 p-0">
-        {/* Header */}
-        <div className="px-7 pt-6 pb-5 border-b border-gray-100 bg-white rounded-t-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2.5 text-xl">
-              <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
-                <Factory className="w-5 h-5 text-white" />
-              </div>
-              Send to Production
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-            Each step below shows what needs to be produced and in what order.
-            Start from <strong>Step 1</strong> (deepest sub-product) and work up to the main product.
-            Assign personnel to each step you want to schedule now.
-          </p>
-          <ProductAttributePreview
-            color={productItem.color}
-            pattern={productItem.pattern}
-            length={productItem.length}
-            width={productItem.width}
-            lengthUnit={productItem.length_unit}
-            widthUnit={productItem.width_unit}
-            size="large"
-            className="mt-2"
-          />
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Reserved stock rule: if this order is accepted and has reserved individual rolls, planning uses remaining quantity only. Otherwise, produce the full order quantity.
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="text-xs text-gray-600">
-              Order status: <span className="font-semibold uppercase">{orderStatus}</span> · Available: <span className="font-semibold">{globalAvailableRolls}</span> · Reserved for this order: <span className="font-semibold">{reservedRollsForOrder}</span> · Need to make: <span className="font-semibold">{Math.round(netProductionQuantity * 1000) / 1000}</span>
+  const renderStepContent = () => {
+    if (loadingRecipe) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
+          <Loader2 className="w-8 h-8 animate-spin" />
+          <span className="text-sm">Loading recipe tree & stock levels...</span>
+        </div>
+      );
+    }
+    if (steps.length > 0) {
+      return <div className="space-y-0">{steps.map((node, i) => renderStepCard(node, i + 1, steps.length))}</div>;
+    }
+    if (recipeTree) {
+      return renderStepCard(recipeTree, 1, 1);
+    }
+    return (
+      <div className="rounded-2xl border-2 border-blue-400 bg-white overflow-hidden">
+        <div className="px-5 py-3 bg-blue-600 flex items-center gap-3">
+          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-sm font-bold text-blue-600">1</div>
+          <div>
+            <div className="text-white font-bold text-base">{productItem.productName}</div>
+            <div className="text-xs text-blue-100 mt-0.5">
+              Main product · Order: {orderQuantity} rolls · Available: {globalAvailableRolls} · Reserved: {reservedRollsForOrder} · Need: {Math.round(netProductionQuantity * 1000) / 1000} rolls
             </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowRollSelectionDialog(true)}>
-                Select Rolls
-              </Button>
-              {orderStatus !== 'accepted' && (
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            No recipe found — operator will plan materials manually
+          </div>
+          <div className="rounded-xl border-2 border-dashed border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Assign production to</p>
+                <p className="text-xs text-gray-500 mt-0.5">Pick assigned personnel for this batch</p>
+              </div>
+              {mainProductId && assignments[mainProductId]?.assignedUser ? (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white border border-green-300 rounded-full pl-1 pr-3 py-1">
+                    <div className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold text-white">
+                      {assignments[mainProductId].assignedUser!.full_name?.charAt(0)?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-semibold text-green-800">
+                      {assignments[mainProductId].assignedUser!.full_name}
+                    </span>
+                  </div>
+                  <button onClick={() => clearAssignment(mainProductId)} className="text-gray-400 hover:text-red-500">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
                 <Button
+                  variant="outline"
                   size="sm"
-                  onClick={handleAcceptOrderAndReserve}
-                  disabled={acceptingOrder}
+                  onClick={() => mainProductId && openPicker(mainProductId, productItem.productName)}
                   className="gap-2"
                 >
-                  {acceptingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Accept Order
+                  <UserPlus className="w-4 h-4" />
+                  Assign Personnel
                 </Button>
               )}
             </div>
+            {mainProductId && assignments[mainProductId]?.picking && renderUserPicker(mainProductId, productItem.productName)}
           </div>
-          <p className="mt-2 text-xs text-gray-500">
-            After accepting, click <strong>Select Rolls</strong> and reserve individual rolls for this order item. Only reserved rolls reduce the required production quantity.
-          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFooterButtons = () => (
+    <>
+      <Button variant="outline" onClick={onClose} disabled={submitting} className="h-12 px-5 rounded-2xl border border-gray-200 text-sm font-bold text-gray-700">
+        Cancel
+      </Button>
+      <Button
+        onClick={handleGoToProduction}
+        disabled={submitting}
+        className="flex-1 h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold gap-2"
+      >
+        {submitting
+          ? <><Loader2 className="w-4 h-4 animate-spin" />Creating...</>
+          : <><Factory className="w-4 h-4" />Send to Production</>}
+      </Button>
+    </>
+  );
+
+  if (!open) return null;
+
+  if (isMobile) return (
+    <>
+      {/* backdrop */}
+      <div className="fixed inset-0 z-[59] bg-black/40" onClick={showRollSelectionDialog ? undefined : onClose} />
+
+      {/* ── Bottom sheet slides up ───────────────────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-3xl flex flex-col"
+        style={{ maxHeight: 'calc(100dvh - 56px)', height: 'calc(100dvh - 56px)' }}>
+
+        {/* Handle bar */}
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-gray-300" />
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-7 py-5 space-y-1 bg-gray-50">
-          {loadingRecipe ? (
-            <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <span className="text-sm">Loading recipe tree & stock levels...</span>
-            </div>
-          ) : steps.length > 0 ? (
-            <div className="space-y-0">
-              {steps.map((node, i) => renderStepCard(node, i + 1, steps.length))}
-            </div>
-          ) : recipeTree ? (
-            // Single product, no sub-products
-            renderStepCard(recipeTree, 1, 1)
-          ) : (
-            // Fallback — no tree loaded
-            <div className="rounded-2xl border-2 border-blue-400 bg-white overflow-hidden">
-              <div className="px-5 py-3 bg-blue-600 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-sm font-bold text-blue-600">1</div>
-                <div>
-                  <div className="text-white font-bold text-base">{productItem.productName}</div>
-                  <div className="text-xs text-blue-100 mt-0.5">
-                    Main product · Order: {orderQuantity} rolls · Available: {globalAvailableRolls} · Reserved: {reservedRollsForOrder} · Need: {Math.round(netProductionQuantity * 1000) / 1000} rolls
-                  </div>
-                </div>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pb-4 pt-1 shrink-0">
+          <h2 className="text-xl font-bold text-gray-900">Send to Production</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+            <X className="w-4 h-4 text-gray-600" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-4 pb-32 space-y-3">
+
+          {/* Order info card */}
+          <div className="bg-gray-50 rounded-2xl px-4 py-3 space-y-1">
+            <p className="text-sm text-gray-500">Order: <span className="font-semibold text-gray-900">{order.orderNumber || order.id}</span></p>
+            <p className="text-sm text-gray-500">Target Product: <span className="font-bold text-gray-900">{productItem.productName}</span></p>
+            <p className="text-sm text-gray-500">Target Quantity: <span className="font-bold text-gray-900">{Math.round(netProductionQuantity * 1000) / 1000} rolls</span></p>
+          </div>
+
+          {/* Accept order warning — only if pending */}
+          {orderStatus !== 'accepted' && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <p className="text-sm font-bold text-red-700">Order is still {orderStatus.charAt(0).toUpperCase() + orderStatus.slice(1)}</p>
               </div>
-              <div className="px-5 py-4 space-y-3">
-                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  No recipe found — operator will plan materials manually
-                </div>
-                <div className="rounded-xl border-2 border-dashed border-gray-200 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">Assign production to</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Pick assigned personnel for this batch</p>
-                    </div>
-                    {mainProductId && assignments[mainProductId]?.assignedUser ? (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2 bg-white border border-green-300 rounded-full pl-1 pr-3 py-1">
-                          <div className="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-sm font-bold text-white">
-                            {assignments[mainProductId].assignedUser!.full_name?.charAt(0)?.toUpperCase()}
-                          </div>
-                          <span className="text-sm font-semibold text-green-800">
-                            {assignments[mainProductId].assignedUser!.full_name}
-                          </span>
-                        </div>
-                        <button onClick={() => clearAssignment(mainProductId)} className="text-gray-400 hover:text-red-500">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => mainProductId && openPicker(mainProductId, productItem.productName)}
-                        className="gap-2"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        Assign Personnel
-                      </Button>
-                    )}
-                  </div>
-                  {mainProductId && assignments[mainProductId]?.picking && renderUserPicker(mainProductId, productItem.productName)}
-                </div>
-              </div>
+              <p className="text-xs text-red-600 mb-3 leading-relaxed">You must accept this order before production tasks can accurately deduct reserved rolls.</p>
+              <button
+                onClick={handleAcceptOrderAndReserve}
+                disabled={acceptingOrder}
+                className="w-full h-11 rounded-xl bg-red-600 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {acceptingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Accept Order &amp; Reserve
+              </button>
             </div>
           )}
+
+          {/* Select rolls card */}
+          <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Layers className="w-5 h-5 text-blue-600 shrink-0" />
+              <p className="text-base font-bold text-gray-900">Select Rolls from Stock</p>
+            </div>
+            <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+              You have <span className="font-semibold text-gray-800">{globalAvailableRolls} rolls</span> in stock. You can assign them directly instead of producing new ones.
+            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 mb-0.5">Reserved Rolls</p>
+                <p className="text-2xl font-bold text-gray-900">{reservedRollsForOrder} / {Number(productItem.quantity || 0)}</p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowRollSelectionDialog(true); }}
+                className="h-11 px-5 rounded-xl bg-blue-600 text-white text-sm font-bold"
+              >
+                Select Rolls
+              </button>
+            </div>
+          </div>
+
+          {/* Recipe tree */}
+          <div>
+            <p className="text-lg font-bold text-gray-900 mb-1">Production Recipe Tree</p>
+            <p className="text-sm text-gray-500 mb-3">Need to produce {Math.round(netProductionQuantity * 1000) / 1000} rolls. Assign an operator below.</p>
+            {renderStepContent()}
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-7 py-4 border-t border-gray-100 bg-white rounded-b-xl flex items-center justify-between gap-3">
-          <div className="text-sm text-gray-400">
-            {assignedCount > 0
-              ? <span className="text-green-700 font-medium">{assignedCount} step{assignedCount > 1 ? 's' : ''} assigned</span>
-              : 'No assignments yet — you can assign later in the production stage'}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose} disabled={submitting} className="px-5">
-              Cancel
-            </Button>
-            <Button
-              onClick={handleGoToProduction}
-              disabled={submitting}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 gap-2"
-            >
-              {submitting
-                ? <><Loader2 className="w-4 h-4 animate-spin" />Creating...</>
-                : <><Factory className="w-4 h-4" />Send to Production</>}
-            </Button>
-          </div>
+        {/* Fixed footer — inside the sheet, above tab bar */}
+        <div className="shrink-0 px-4 py-3 pb-safe border-t border-gray-100 bg-white">
+          <button
+            onClick={handleGoToProduction}
+            disabled={submitting}
+            className="w-full h-14 rounded-2xl bg-blue-600 text-white text-base font-bold flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {submitting ? <><Loader2 className="w-5 h-5 animate-spin" />Creating...</> : <>Send to Production</>}
+          </button>
         </div>
-      </DialogContent>
+      </div>
+
       <IndividualProductSelectionDialog
         isOpen={showRollSelectionDialog}
         onClose={() => setShowRollSelectionDialog(false)}
@@ -1181,6 +1223,99 @@ export default function SendToProductionModal({
         }}
         onSave={handleSaveReservedRolls}
       />
-    </Dialog>
+    </>
+  );
+
+  // ── Desktop Dialog ────────────────────────────────────────────────────────
+  return (
+    <>
+      <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+        <DialogContent className="max-w-3xl max-h-[92vh] flex flex-col gap-0 p-0">
+          {/* Header */}
+          <div className="px-7 pt-6 pb-5 border-b border-gray-100 bg-white rounded-t-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2.5 text-xl">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
+                  <Factory className="w-5 h-5 text-white" />
+                </div>
+                Send to Production
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+              Each step below shows what needs to be produced and in what order.
+              Start from <strong>Step 1</strong> (deepest sub-product) and work up to the main product.
+              Assign personnel to each step you want to schedule now.
+            </p>
+            <ProductAttributePreview
+              color={productItem.color}
+              pattern={productItem.pattern}
+              length={productItem.length}
+              width={productItem.width}
+              lengthUnit={productItem.length_unit}
+              widthUnit={productItem.width_unit}
+              size="large"
+              className="mt-2"
+            />
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Reserved stock rule: if this order is accepted and has reserved individual rolls, planning uses remaining quantity only. Otherwise, produce the full order quantity.
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="text-xs text-gray-600">
+                Order status: <span className="font-semibold uppercase">{orderStatus}</span> · Available: <span className="font-semibold">{globalAvailableRolls}</span> · Reserved for this order: <span className="font-semibold">{reservedRollsForOrder}</span> · Need to make: <span className="font-semibold">{Math.round(netProductionQuantity * 1000) / 1000}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setShowRollSelectionDialog(true)}>
+                  Select Rolls
+                </Button>
+                {orderStatus !== 'accepted' && (
+                  <Button size="sm" onClick={handleAcceptOrderAndReserve} disabled={acceptingOrder} className="gap-2">
+                    {acceptingOrder ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Accept Order
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              After accepting, click <strong>Select Rolls</strong> and reserve individual rolls for this order item. Only reserved rolls reduce the required production quantity.
+            </p>
+          </div>
+
+          {/* Scrollable content */}
+          <div className="flex-1 overflow-y-auto px-7 py-5 space-y-1 bg-gray-50">
+            {renderStepContent()}
+          </div>
+
+          {/* Footer */}
+          <div className="px-7 py-4 border-t border-gray-100 bg-white rounded-b-xl flex items-center justify-between gap-3">
+            <div className="text-sm text-gray-400">
+              {assignedCount > 0
+                ? <span className="text-green-700 font-medium">{assignedCount} step{assignedCount > 1 ? 's' : ''} assigned</span>
+                : 'No assignments yet — you can assign later in the production stage'}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={onClose} disabled={submitting} className="px-5">Cancel</Button>
+              <Button onClick={handleGoToProduction} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-white px-6 gap-2">
+                {submitting
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />Creating...</>
+                  : <><Factory className="w-4 h-4" />Send to Production</>}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <IndividualProductSelectionDialog
+        isOpen={showRollSelectionDialog}
+        onClose={() => setShowRollSelectionDialog(false)}
+        orderItem={{
+          id: (productItem as any).id,
+          product_id: productItem.productId,
+          product_name: productItem.productName,
+          quantity: Number(productItem.quantity || 0),
+          selected_individual_products: reservedSelections,
+        }}
+        onSave={handleSaveReservedRolls}
+      />
+    </>
   );
 }

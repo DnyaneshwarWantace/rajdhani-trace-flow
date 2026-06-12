@@ -47,16 +47,6 @@ if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       return;
     }
 
-    // Prevent selection on interactive elements
-    if (
-      target.tagName === 'BUTTON' ||
-      target.tagName === 'A' ||
-      target.getAttribute('role') === 'button' ||
-      target.closest('button, a, [role="button"]')
-    ) {
-      e.preventDefault();
-      return;
-    }
   }, { passive: false });
 
   document.addEventListener('touchend', (e) => {

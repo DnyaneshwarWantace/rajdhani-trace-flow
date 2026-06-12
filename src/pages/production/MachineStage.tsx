@@ -2,7 +2,28 @@ import { formatIndianDate } from '@/utils/formatHelpers';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, FileText, Calendar, AlertTriangle, Clock } from 'lucide-react';
+import {
+  Loader2,
+  FileText,
+  Calendar,
+  AlertTriangle,
+  Clock,
+  ArrowLeft,
+  Sun,
+  Moon,
+  Check,
+  CheckCircle,
+  Package,
+  Boxes,
+  Layers,
+  Settings,
+  User,
+  Play,
+  Pause,
+  Cpu,
+  Trash2,
+  RefreshCw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +39,7 @@ import ProductionStageProgress from '@/components/production/planning/Production
 import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
 import ProductionOverviewStats from '@/components/production/planning/ProductionOverviewStats';
 import type { Product } from '@/types/product';
+import { calculateSQM } from '@/utils/sqmCalculator';
 
 export default function MachineStage() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +59,23 @@ export default function MachineStage() {
   const [navigatingToWastage, setNavigatingToWastage] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
+  const [steps, setSteps] = useState<any[]>([]);
+
+  useEffect(() => {
+    ProductService.getDropdownData()
+      .then(data => {
+        const cm: Record<string, string> = {};
+        (data.colors || []).forEach((c: any) => { if (c?.value && c?.color_code) cm[c.value.toLowerCase()] = c.color_code; });
+        setColorCodeMap(cm);
+        const pm: Record<string, string> = {};
+        (data.patterns || []).forEach((p: any) => { if (p?.value && p?.image_url) pm[p.value.toLowerCase()] = p.image_url; });
+        setPatternImageMap(pm);
+      })
+      .catch(() => {});
+  }, []);
+
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const actorName = (() => {
     try {
@@ -263,6 +302,8 @@ export default function MachineStage() {
         s.step_type === 'machine_operation' ||
         s.step_name?.toLowerCase().includes('machine')
       );
+      machineSteps.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+      setSteps(machineSteps);
 
       console.log('🔧 Machine steps found:', {
         count: machineSteps.length,
@@ -280,22 +321,9 @@ export default function MachineStage() {
 
       console.log('✅ All machine steps completed:', allCompleted);
 
-      // Also check if consumed materials exist and products have individual IDs
-      // Use ref so we always read the latest loaded materials, not a stale closure value
+      // Machine stage is complete when all steps are done and materials exist
       const currentMaterials = consumedMaterialsRef.current;
-      const productMaterials = currentMaterials.filter(m => m.material_type === 'product');
-      const hasIndividualProducts = productMaterials.length === 0 || productMaterials.every(
-        m => m.individual_product_ids && m.individual_product_ids.length > 0
-      );
-
-      const isCompleted = allCompleted && currentMaterials.length > 0 && hasIndividualProducts;
-
-      console.log('🎯 Machine completion result:', {
-        allStepsCompleted: allCompleted,
-        hasMaterials: currentMaterials.length > 0,
-        hasIndividualProducts,
-        finalResult: isCompleted,
-      });
+      const isCompleted = allCompleted && currentMaterials.length > 0;
 
       setIsMachineCompleted(isCompleted);
     } catch (error) {
@@ -307,6 +335,45 @@ export default function MachineStage() {
   // Separate function to check completion without full refresh
   const checkCompletionOnly = async () => {
     await checkMachineCompletion();
+  };
+
+  const handleUpdateStep = async (stepId: string, updates: any) => {
+    try {
+      const { error } = await ProductionService.updateProductionFlowStep(stepId, updates);
+      
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Update local state steps immediately
+      setSteps(prevSteps => 
+        prevSteps.map(step => 
+          step.id === stepId 
+            ? { ...step, ...updates }
+            : step
+        )
+      );
+
+      toast({
+        title: 'Success',
+        description: 'Step updated successfully',
+      });
+
+      // Re-evaluate batch completion status
+      await checkMachineCompletion();
+    } catch (error) {
+      console.error('Error updating step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update step',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleRefresh = () => {
@@ -485,7 +552,8 @@ export default function MachineStage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      {/* Desktop View */}
+      <div className="hidden lg:block space-y-6">
         <MachineStageHeader
           batch={batch}
           onBack={() => {
@@ -599,7 +667,7 @@ export default function MachineStage() {
           >
             {navigatingToWastage ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 mr-2 animate-spin animate-spin-reverse" />
                 Proceeding to Individual Products...
               </>
             ) : (
@@ -609,6 +677,458 @@ export default function MachineStage() {
               </>
             )}
           </Button>
+        </div>
+      </div>
+
+      {/* Mobile View */}
+      <div className="lg:hidden min-h-screen bg-gray-50 pb-40">
+        {/* Mobile Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/production', { state: { section: location.state?.section || 'assigned' } })}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900 leading-tight">
+                {batch?.batch_number || 'New Batch'}
+              </h1>
+              <p className="text-[10px] text-gray-500 font-semibold truncate max-w-[140px]">
+                {product?.name || batch?.product_name || 'Machine Stage'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleRefresh}
+              className="p-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="p-2 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
+              title="Delete batch"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Stepper Progress */}
+          <div className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs text-gray-500 font-medium">Stage Progress</span>
+              <span className="text-xs text-purple-600 font-bold bg-purple-50 px-2.5 py-0.5 rounded-full">
+                2. Machine Operations
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="bg-purple-500 rounded-full" />
+              <div className="bg-purple-500 rounded-full animate-pulse" />
+              <div className="bg-gray-200 rounded-full" />
+              <div className="bg-gray-200 rounded-full" />
+            </div>
+            <div className="flex justify-between text-[9px] text-gray-400 mt-2 font-semibold">
+              <span className="text-purple-650 font-medium">Planning</span>
+              <span className="text-purple-600 font-bold">Machine</span>
+              <span>Details</span>
+              <span>Wastage</span>
+            </div>
+          </div>
+
+          {/* Stats Summary Tags Layout */}
+          <div className="flex flex-wrap gap-2 mb-1">
+            <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+              <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-blue-900 leading-tight">
+                  {batch?.planned_quantity || 0} {product?.count_unit || 'rolls'}
+                </p>
+                <p className="text-[9px] text-gray-500 font-semibold">Target Qty</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+              <Boxes className="w-3.5 h-3.5 text-green-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-green-900 leading-tight">
+                  {consumedMaterials.length} Items
+                </p>
+                <p className="text-[9px] text-gray-500 font-semibold">Materials Used</p>
+              </div>
+            </div>
+
+            {product?.length && (
+              <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+                <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-purple-900 leading-tight">
+                    {product.length} {product.length_unit || 'm'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-semibold">Expected L</p>
+                </div>
+              </div>
+            )}
+
+            {product?.width && (
+              <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+                <Settings className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-orange-900 leading-tight">
+                    {product.width} {product.width_unit || 'm'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-semibold">Expected W</p>
+                </div>
+              </div>
+            )}
+
+            {product?.weight && product.weight !== 'N/A' && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+                <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-amber-900 leading-tight">
+                    {product.weight} {product.weight_unit || 'GSM'}
+                  </p>
+                  <p className="text-[9px] text-gray-500 font-semibold">Expected GSM</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Product Details Inline List */}
+          {product && (
+            <div className="bg-white rounded-xl border border-gray-150 px-3 py-2 flex flex-wrap gap-x-2 gap-y-1.5 items-center text-xs text-gray-500 shadow-sm">
+              <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-400">Product:</span>
+                <span className="font-bold text-gray-800">{product.name}</span>
+              </div>
+              
+              {product.category && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">Category:</span>
+                  <span className="font-bold text-gray-800">{product.category}</span>
+                </div>
+              )}
+              
+              {product.length && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">Length:</span>
+                  <span className="font-bold text-gray-800">{product.length} {product.length_unit || 'm'}</span>
+                </div>
+              )}
+              
+              {product.width && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">Width:</span>
+                  <span className="font-bold text-gray-800">{product.width} {product.width_unit || 'm'}</span>
+                </div>
+              )}
+              
+              {product.weight && product.weight !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">GSM:</span>
+                  <span className="font-bold text-gray-800">{product.weight} {product.weight_unit || 'GSM'}</span>
+                </div>
+              )}
+              
+              {product.color && product.color !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">Color:</span>
+                  <span className="font-bold text-gray-800">{product.color}</span>
+                  {colorCodeMap[product.color.toLowerCase()] && (
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: colorCodeMap[product.color.toLowerCase()] }}
+                    />
+                  )}
+                </div>
+              )}
+              
+              {product.pattern && product.pattern !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-355">•</span>
+                  <span className="text-gray-400">Pattern:</span>
+                  <span className="font-bold text-gray-800">{product.pattern}</span>
+                  {patternImageMap[product.pattern.toLowerCase()] && (
+                    <img
+                      src={patternImageMap[product.pattern.toLowerCase()]}
+                      alt=""
+                      className="w-3.5 h-3.5 rounded border border-black/10 object-cover shrink-0"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Machine Operations Warning Banner */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 shadow-sm">
+            <Cpu className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-xs text-amber-800 mb-0.5">Machine Operations</h4>
+              <p className="text-[11px] leading-relaxed text-amber-700">
+                Update the status of machine operations below. Once all steps are completed, you can proceed to the next stage.
+              </p>
+            </div>
+          </div>
+
+          {/* Consumed Materials */}
+          {consumedMaterials.length > 0 && (
+            <div className="bg-green-50/70 border border-green-200 rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <h3 className="font-bold text-green-900 text-sm">Consumed Materials</h3>
+                <span className="ml-auto text-xs bg-green-150 text-green-800 px-2 py-0.5 rounded-full font-bold">
+                  {consumedMaterials.length} Items
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {consumedMaterials.map((m, idx) => {
+                  const targetQty = batch?.planned_quantity || 0;
+                  const sqmPerUnit = calculateSQM(
+                    product?.length || (product as any)?.roll_length || '0',
+                    product?.width || (product as any)?.roll_width || '0',
+                    product?.length_unit || (product as any)?.measurement_unit || 'm',
+                    product?.width_unit || (product as any)?.measurement_unit || 'm'
+                  );
+                  const totalSQM = targetQty * sqmPerUnit;
+
+                  let qtyPerSqmNum = m.quantity_per_sqm;
+                  if ((qtyPerSqmNum == null || qtyPerSqmNum === 0) && totalSQM > 0) {
+                    const reqQty = m.required_quantity || m.quantity_used || m.actual_consumed_quantity || 0;
+                    qtyPerSqmNum = reqQty / totalSQM;
+                  }
+                  qtyPerSqmNum = qtyPerSqmNum || 0;
+
+                  const sqmPerRoll = targetQty > 0 ? totalSQM / targetQty : 0;
+                  const perRoll = qtyPerSqmNum * sqmPerRoll;
+                  const forNRolls = qtyPerSqmNum * totalSQM;
+
+                  const isProduct = m.material_type === 'product';
+                  const typeBg = isProduct ? '#EDE9FE' : '#EFF6FF';
+                  const typeColor = isProduct ? '#7C3AED' : '#2563EB';
+                  const typeLabel = isProduct ? 'Product' : 'Raw Material';
+
+                  const consumedQty = m.material_type === 'product' && m.whole_product_count !== undefined
+                    ? m.whole_product_count
+                    : (m.actual_consumed_quantity ?? m.required_quantity ?? forNRolls);
+
+                  return (
+                    <div key={`consumed-${m.material_id}-${idx}`} className="bg-white rounded-xl p-3 border border-gray-200">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-gray-900 text-[13px] leading-tight mb-0.5 truncate">{m.material_name}</h4>
+                          <p className="text-[10px] text-gray-405 truncate">ID: {m.material_id || 'N/A'}</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ backgroundColor: typeBg, color: typeColor }}>
+                            {typeLabel}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-green-100 text-green-700 border border-green-200">
+                            Consumed
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Breakdown details */}
+                      <div className="bg-blue-50/50 rounded-lg border border-blue-100 p-2.5 space-y-2">
+                        <p className="text-[10px] font-bold text-blue-750">Quantity Breakdown</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-white rounded-md p-1.5 border border-blue-50">
+                            <p className="text-[8px] text-gray-400">Per 1 SQM</p>
+                            <p className="text-[11px] font-bold text-gray-800">{qtyPerSqmNum.toFixed(6)} {m.unit}</p>
+                          </div>
+                          <div className="bg-white rounded-md p-1.5 border border-blue-50">
+                            <p className="text-[8px] text-gray-400">Per 1 Roll</p>
+                            <p className="text-[11px] font-bold text-gray-800">{perRoll.toFixed(4)} {m.unit}</p>
+                          </div>
+                          <div className="bg-white rounded-md p-1.5 border border-blue-50">
+                            <p className="text-[8px] text-gray-400">Required Qty</p>
+                            <p className="text-[11px] font-bold text-gray-800">
+                              {Number(m.required_quantity || forNRolls).toFixed(2)} {m.unit}
+                            </p>
+                          </div>
+                          <div className="bg-white rounded-md p-1.5 border border-blue-50">
+                            <p className="text-[8px] text-gray-400">Consumed Qty</p>
+                            <p className="text-[11px] font-bold text-green-750">
+                              {Number(consumedQty).toFixed(2)} {m.unit}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Machine Steps List */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="px-4 py-3 border-b border-gray-150 bg-gray-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-900">Machine Steps</h3>
+              <span className="text-xs font-bold text-gray-505">{steps.length} Steps</span>
+            </div>
+
+            {steps.length === 0 ? (
+              <p className="p-6 text-center text-xs text-gray-400">No machine steps configured.</p>
+            ) : (
+              <div className="divide-y divide-gray-150">
+                {steps.map((s: any, idx: number) => {
+                  const isDone = s.status === 'completed';
+                  const isProgress = s.status === 'in_progress';
+                  const statusLabel = isDone ? 'Completed' : isProgress ? 'In Progress' : 'Pending';
+
+                  return (
+                    <div key={s.id} className="p-4 space-y-3">
+                      {/* Step ID & Status */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400">Step {idx + 1}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          isDone
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : isProgress
+                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                            : 'bg-gray-50 border-gray-205 text-gray-600'
+                        }`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+
+                      {/* Step Title & Description */}
+                      <div>
+                        <h4 className="text-[14px] font-bold text-gray-900">{s.step_name || 'Machine Operation'}</h4>
+                        {(s.notes || s.description) && (
+                          <p className="text-xs text-gray-500 mt-1 leading-relaxed">{s.notes || s.description}</p>
+                        )}
+                      </div>
+
+                      {/* Details Flex Wrap Row */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-600 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                        {(s.machine_name || s.machine_id) && (
+                          <div className="flex items-center gap-1.5">
+                            <Settings className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Machine: <strong className="text-gray-800">{s.machine_name || s.machine_id}</strong></span>
+                          </div>
+                        )}
+
+                        {s.shift && (
+                          <div className="flex items-center gap-1.5">
+                            {s.shift === 'day' ? (
+                              <Sun className="w-3.5 h-3.5 text-amber-500" />
+                            ) : (
+                              <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                            )}
+                            <span>Shift: <strong className="text-gray-800 capitalize">{s.shift}</strong></span>
+                          </div>
+                        )}
+
+                        {(s.inspector_name || s.inspector) && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-gray-400" />
+                            <span>Inspector: <strong className="text-gray-800">{s.inspector_name || s.inspector}</strong></span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions buttons */}
+                      <div className="flex gap-2">
+                        {s.status === 'pending' && (
+                          <button
+                            onClick={() => handleUpdateStep(s.id, { status: 'in_progress', start_time: new Date().toISOString() })}
+                            className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                          >
+                            <Play className="w-3.5 h-3.5 text-white fill-current" />
+                            Start Step
+                          </button>
+                        )}
+                        {isProgress && (
+                          <>
+                            <button
+                              onClick={() => handleUpdateStep(s.id, { status: 'pending' })}
+                              className="flex-1 py-2 bg-white border border-gray-200 text-gray-750 hover:bg-gray-50 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                            >
+                              <Pause className="w-3.5 h-3.5 text-gray-600" />
+                              Pause
+                            </button>
+                            <button
+                              onClick={() => handleUpdateStep(s.id, { status: 'completed', end_time: new Date().toISOString() })}
+                              className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                            >
+                              <Check className="w-3.5 h-3.5 text-white" />
+                              Complete
+                            </button>
+                          </>
+                        )}
+                        {isDone && (
+                          <div className="flex items-center gap-1.5 text-green-600 py-1 font-semibold text-xs">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <span>Step Completed</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Remark Optional */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+            <Label htmlFor="mobile-machine-stage-remark" className="block text-xs font-bold text-gray-755 mb-2">
+              Remark (Optional)
+            </Label>
+            <Textarea
+              id="mobile-machine-stage-remark"
+              value={machineStageRemark}
+              onChange={(e) => setMachineStageRemark(e.target.value)}
+              placeholder="e.g. Completed with minor delays..."
+              rows={3}
+              className="text-xs bg-gray-50 border-gray-200 rounded-lg resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Sticky Bottom Footer CTA — sits above the bottom nav (h-16 = 64px) */}
+        <div className="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-3 pb-4 z-20 shadow-lg space-y-1.5">
+          {!isMachineCompleted && (
+            <p className="text-center text-[11px] text-amber-600 font-semibold">
+              Complete all machine steps to proceed
+            </p>
+          )}
+          <button
+            onClick={handleNavigateToWastage}
+            disabled={!isMachineCompleted || navigatingToWastage}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-[14px] font-bold text-white transition-colors"
+            style={{ backgroundColor: (!isMachineCompleted || navigatingToWastage) ? '#9CA3AF' : '#7C3AED' }}
+          >
+            {navigatingToWastage ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Proceeding...
+              </>
+            ) : (
+              <>
+                <FileText className="w-4 h-4" />
+                Individual Products Stage
+              </>
+            )}
+          </button>
         </div>
       </div>
 

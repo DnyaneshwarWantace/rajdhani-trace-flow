@@ -3,53 +3,39 @@
  * Handles both localhost and network IP access so testers on same WiFi can use your machine's IP
  */
 export const getApiUrl = (): string => {
+  const urls = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api')
+    .split(',').map((u: string) => u.trim());
+
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-
-    // If opened via network IP, always use that host for API (so testers hit your backend)
-    if (
-      hostname.match(/^192\.168\./) ||
-      hostname.match(/^10\./) ||
-      hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)
-    ) {
-      return `http://${hostname}:8000/api`;
-    }
-
-    // Localhost: use env or default local backend
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    }
-
-    // Production / other: relative or env
-    return import.meta.env.VITE_API_URL || '/api';
+    // Pick the URL whose host matches the current hostname
+    const match = urls.find((u: string) => {
+      try { return new URL(u).hostname === hostname; } catch { return false; }
+    });
+    if (match) return match;
   }
 
-  return import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  return urls[0];
 };
 
 /**
  * Get the Socket.IO URL based on the current environment
  */
 export const getSocketUrl = (): string => {
+  const apiUrls = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api')
+    .split(',').map((u: string) => u.trim());
+
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-
-    // If opened via network IP, use that host so testers hit your backend
-    if (
-      hostname.match(/^192\.168\./) ||
-      hostname.match(/^10\./) ||
-      hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)
-    ) {
-      return `http://${hostname}:8000`;
+    const match = apiUrls.find((u: string) => {
+      try { return new URL(u).hostname === hostname; } catch { return false; }
+    });
+    if (match) {
+      try { const p = new URL(match); return `${p.protocol}//${p.hostname}:${p.port || 8000}`; } catch {}
     }
-
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
-    }
-
-    return import.meta.env.VITE_SOCKET_URL || window.location.origin;
   }
 
-  return import.meta.env.VITE_SOCKET_URL || 'http://localhost:8000';
+  const socketUrls = (import.meta.env.VITE_SOCKET_URL || '').split(',').map((u: string) => u.trim()).filter(Boolean);
+  return socketUrls[0] || 'http://localhost:8000';
 };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, useParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
-import { Loader2, Save, AlertCircle } from 'lucide-react';
+import { Loader2, Save, AlertCircle, ArrowLeft, Info, Plus, Play, Trash2, HelpCircle, CheckCircle, Factory, Truck, Package, Edit, Boxes, Ruler, Weight, X, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProductionService, type ProductionBatch, type CreateProductionBatchData } from '@/services/productionService';
 import { RecipeService } from '@/services/recipeService';
@@ -29,6 +29,7 @@ export default function PlanningStage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const { id: routeBatchId } = useParams();
   const { toast } = useToast();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,8 +60,47 @@ export default function PlanningStage() {
   const [isEditing, setIsEditing] = useState(false);
   const [showRemoveMaterialDialog, setShowRemoveMaterialDialog] = useState(false);
   const [materialToRemove, setMaterialToRemove] = useState<{id: string, name: string} | null>(null);
+  const [showRemoveConsumptionDialog, setShowRemoveConsumptionDialog] = useState(false);
+  const [consumptionToRemove, setConsumptionToRemove] = useState<{id: string, name: string} | null>(null);
   const skipRecalcAfterRemoveRef = useRef(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [mobileHelpOpen, setMobileHelpOpen] = useState(false);
+
+  // Sync quantity inputs for mobile view
+  const [mobileQuantityInputs, setMobileQuantityInputs] = useState<Record<string, string>>({});
+
+  const [colorCodeMap, setColorCodeMap] = useState<Record<string, string>>({});
+  const [patternImageMap, setPatternImageMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    ProductService.getDropdownData()
+      .then(data => {
+        const cm: Record<string, string> = {};
+        (data.colors || []).forEach((c: any) => { if (c?.value && c?.color_code) cm[c.value.toLowerCase()] = c.color_code; });
+        setColorCodeMap(cm);
+        const pm: Record<string, string> = {};
+        (data.patterns || []).forEach((p: any) => { if (p?.value && p?.image_url) pm[p.value.toLowerCase()] = p.image_url; });
+        setPatternImageMap(pm);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setMobileQuantityInputs(prev => {
+      const updated = { ...prev };
+      materials.forEach((material) => {
+        if (!(material.material_id in updated)) {
+          updated[material.material_id] = material.quantity_per_sqm === 0 ? '' : Number(material.quantity_per_sqm).toFixed(4);
+        }
+      });
+      consumedMaterials.forEach((material) => {
+        if (!(material.material_id in updated)) {
+          updated[material.material_id] = material.quantity_per_sqm === 0 ? '' : Number(material.quantity_per_sqm).toFixed(4);
+        }
+      });
+      return updated;
+    });
+  }, [materials, consumedMaterials]);
   const actorName = (() => {
     try {
       const raw = localStorage.getItem('user');
@@ -99,9 +139,10 @@ export default function PlanningStage() {
     return Array.from(new Set(orderNos.map((v) => v.trim()).filter(Boolean)));
   };
 
-  // Check if batchId was passed via query params or product was passed from product selection
+  // Check if batchId was passed via query params, path parameters, or product was passed from product selection
   useEffect(() => {
-    const batchId = searchParams.get('batchId');
+    const queryBatchId = searchParams.get('batchId');
+    const batchId = queryBatchId || routeBatchId;
     const productFromState = location.state?.product as Product | undefined;
 
     if (batchId) {
@@ -112,7 +153,7 @@ export default function PlanningStage() {
     } else {
       navigate('/production/create');
     }
-  }, [location.state, searchParams, navigate]);
+  }, [location.state, searchParams, routeBatchId, navigate]);
 
   // Recalculate materials when quantity changes (skip once after remove so we don't overwrite)
   useEffect(() => {
@@ -199,22 +240,9 @@ export default function PlanningStage() {
   // Send low stock notification to backend for material section
   const sendLowStockNotification = async (material: any) => {
     try {
-      console.log(`📨 Sending low stock notification for ${material.material_name}...`);
-
-      // Get batch details if available
-      let batchNumber = 'New Batch';
-      let batchId = currentBatchId;
-      if (currentBatchId) {
-        try {
-          const { data: batch } = await ProductionService.getBatchById(currentBatchId);
-          if (batch) {
-            batchNumber = batch.batch_number || batch.id || 'New Batch';
-            batchId = batch.id;
-          }
-        } catch (error) {
-          console.error('Error fetching batch details:', error);
-        }
-      }
+      // Use already-loaded currentBatch — no extra API call needed
+      const batchNumber = currentBatch?.batch_number || currentBatch?.id || currentBatchId || 'New Batch';
+      const batchId = currentBatch?.id || currentBatchId;
 
       const productName = selectedProduct?.name || 'Unknown Product';
       const productId = selectedProduct?.id || '';
@@ -835,18 +863,6 @@ export default function PlanningStage() {
     
     if (!material) return;
     
-    // Only block if this material is IN the saved recipe AND it's the last one (recipe must have at least one)
-    const isInSavedRecipe = recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialId);
-    const remainingInRecipe = recipe?.materials?.filter((m: any) => m.material_id !== materialId).length ?? 0;
-    if (isInSavedRecipe && remainingInRecipe === 0) {
-      toast({
-        title: 'Cannot Remove',
-        description: 'Recipe must have at least one material',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
     // Check if material exists in saved recipe (for dialog copy)
     
     // Store material info and show confirmation dialog
@@ -999,13 +1015,15 @@ export default function PlanningStage() {
       // - recipe was modified, OR
       // - no recipe exists yet but user has materials in planning section.
       const mustCreateInitialRecipe = !recipe && materials.length > 0;
+      let recipeSaved = !!recipe;
       if (recipeModified || mustCreateInitialRecipe) {
         await updateRecipeInDatabase(materials);
         setRecipeModified(false);
+        recipeSaved = true;
       }
 
-      // 1.1 Hard verification: recipe must exist after save attempt.
-      if (!recipe) {
+      // 1.1 Hard verification: only needed if recipe was never saved before this call
+      if (!recipeSaved) {
         const verifiedRecipe = await RecipeService.getRecipeByProductId(selectedProduct.id);
         if (!verifiedRecipe) {
           toast({
@@ -1019,21 +1037,10 @@ export default function PlanningStage() {
         setRecipe(verifiedRecipe);
       }
 
-      // 2. Check for insufficient materials and SEND NOTIFICATION (but DON'T block)
-      console.log('🔍 Checking materials for insufficient stock...');
-      console.log('📊 Materials to check:', materials.map(m => ({
-        name: m.material_name,
-        required: m.required_quantity,
-        available: m.available_quantity,
-        shortage: m.shortage,
-        status: m.status
-      })));
-
+      // 2. Check for insufficient materials and fire notifications (non-blocking)
       const insufficientMaterials = materials.filter(
         (m) => m.status === 'low' || m.status === 'unavailable'
       );
-
-      console.log('⚠️ Insufficient materials found:', insufficientMaterials.length);
 
       if (insufficientMaterials.length > 0) {
         // Send notification for EACH insufficient material to material section
@@ -1222,9 +1229,170 @@ export default function PlanningStage() {
   const sqmPerUnit = calculateSQM(productLength, productWidth, lengthUnit, widthUnit);
   const totalSQM = formData.planned_quantity * sqmPerUnit;
 
+  const handleBack = () => {
+    const from = location.state?.from;
+    const batchId = currentBatch?.id;
+
+    if (from === 'production-detail' && batchId) {
+      navigate(`/production/${batchId}`);
+    } else {
+      navigate('/production');
+    }
+  };
+
+  const handleOrderRawMaterial = async (materialId: string, materialName: string) => {
+    const orderId = currentBatch?.order_id;
+    if (orderId) {
+      try {
+        const { OrderService } = await import('@/services/orderService');
+        const result = await OrderService.createMaterialProcurementTask(orderId, {
+          material_id: materialId,
+        });
+        if (!result.success) {
+          toast({
+            title: 'Error',
+            description: result.error || 'Failed to create procurement task',
+            variant: 'destructive',
+          });
+          return;
+        }
+        toast({
+          title: 'Raw Material Task Created',
+          description: `Ordering task created for ${materialName} under Order #${currentBatch.order_number || orderId}.`,
+        });
+      } catch (error) {
+        console.error('Error creating procurement task:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to create procurement task',
+          variant: 'destructive',
+        });
+      }
+    } else {
+      try {
+        const material = materials.find(m => m.material_id === materialId) || 
+                         consumedMaterials.find(m => m.material_id === materialId);
+        if (material) {
+          await sendLowStockNotification(material);
+          toast({
+            title: 'Low Stock Alert Sent',
+            description: `A notification has been sent to supervisors to restock ${materialName}.`,
+          });
+        } else {
+          toast({
+            title: 'No linked order',
+            description: `Could not request restocking for ${materialName} because this batch is not linked to any order.`,
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error sending low stock notification:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to send restock request',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+
+
+
+  const handleMobileQtyChange = (materialId: string, value: string, isConsumed = false) => {
+    if (value === '' || /^\d*\.?\d{0,4}$/.test(value)) {
+      setMobileQuantityInputs(prev => ({
+        ...prev,
+        [materialId]: value
+      }));
+
+      const updateFn = isConsumed ? handleUpdateConsumedQuantity : handleUpdateQuantity;
+      if (value === '') {
+        updateFn(materialId, 0);
+      } else {
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue) && numValue >= 0) {
+          updateFn(materialId, numValue);
+        }
+      }
+    }
+  };
+
+  const handleMobileQtyBlur = (materialId: string, value: string, isConsumed = false) => {
+    const updateFn = isConsumed ? handleUpdateConsumedQuantity : handleUpdateQuantity;
+    if (value === '' || value === '.') {
+      setMobileQuantityInputs(prev => ({
+        ...prev,
+        [materialId]: ''
+      }));
+      updateFn(materialId, 0);
+    } else {
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        const roundedValue = Math.round(numValue * 100000) / 100000;
+        setMobileQuantityInputs(prev => ({
+          ...prev,
+          [materialId]: roundedValue.toString()
+        }));
+        updateFn(materialId, roundedValue);
+      }
+    }
+  };
+
+  const handleUpdateConsumedQuantity = (materialId: string, quantityPerSqm: number) => {
+    const updated = consumedMaterials.map((m) => {
+      if (m.material_id === materialId) {
+        const productLength = parseFloat(selectedProduct?.length || '0');
+        const productWidth = parseFloat(selectedProduct?.width || '0');
+        const lengthUnit = selectedProduct?.length_unit || 'm';
+        const widthUnit = selectedProduct?.width_unit || 'm';
+        const sqmPerUnit = calculateSQM(productLength, productWidth, lengthUnit, widthUnit);
+        const totalSQM = formData.planned_quantity * sqmPerUnit;
+        const requiredQuantity = quantityPerSqm * totalSQM;
+
+        return {
+          ...m,
+          quantity_per_sqm: quantityPerSqm,
+          required_quantity: requiredQuantity,
+          actual_consumed_quantity: requiredQuantity,
+          whole_product_count: m.material_type === 'product' ? Math.ceil(requiredQuantity) : 0,
+        };
+      }
+      return m;
+    });
+    setConsumedMaterials(updated);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'available':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+            <CheckCircle className="w-3.5 h-3.5 text-green-600 animate-pulse" />
+            Available
+          </span>
+        );
+      case 'low':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+            Low Stock
+          </span>
+        );
+      case 'unavailable':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+            Shortage
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <Layout>
-      <div className="min-h-screen bg-gray-50">
+      <div className="hidden lg:block min-h-screen bg-gray-50">
         <PlanningStageHeader
           onBack={() => {
             // Check where we came from based on location state
@@ -1240,6 +1408,7 @@ export default function PlanningStage() {
             }
           }}
           onEdit={handleEdit}
+          onAssign={() => setShowAssignModal(true)}
           batch={currentBatch}
         />
 
@@ -1305,7 +1474,10 @@ export default function PlanningStage() {
             existingSubTasks={existingSubTasks}
             onAddMaterial={() => setShowMaterialDialog(true)}
             onRemoveMaterial={handleRemoveMaterial}
-            onRemoveMaterialFromDraft={handleRemoveMaterialFromDraft}
+            onRemoveMaterialFromDraft={(materialId) => {
+              const mat = consumedMaterials.find(m => m.material_id === materialId);
+              if (mat) { setConsumptionToRemove({ id: mat.material_id, name: mat.material_name }); setShowRemoveConsumptionDialog(true); }
+            }}
             onUpdateQuantity={handleUpdateQuantity}
             onSelectIndividualProducts={(materialId: string) => {
               const material = materials.find(m => m.material_id === materialId);
@@ -1506,6 +1678,552 @@ export default function PlanningStage() {
         </div>
       </div>
 
+
+      {/* Mobile View */}
+      <div className="lg:hidden min-h-screen bg-gray-50 pb-16">
+        {/* Mobile Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-600"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div>
+              <h1 className="text-sm font-bold text-gray-900 leading-tight">
+                {currentBatch?.batch_number || 'New Batch'}
+              </h1>
+              <p className="text-[10px] text-gray-505 font-semibold truncate max-w-[150px]">
+                {selectedProduct.name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Edit Batch */}
+            {currentBatch && currentBatch.status === 'planned' && (
+              <button
+                onClick={handleEdit}
+                className="p-2 bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                title="Edit Batch"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
+            {/* Guide Help Button */}
+            <button
+              onClick={() => setMobileHelpOpen(true)}
+              className="p-2 bg-primary-50 text-primary-600 rounded-xl hover:bg-primary-100 transition-colors border border-primary-100"
+              title="Guide"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Order quantity mismatch banner */}
+          {orderQuantityMismatch && (() => {
+            const productionStarted = currentBatch?.status !== 'planned';
+            return (
+              <div className={`border rounded-xl p-3.5 flex flex-col gap-3 shadow-sm ${productionStarted ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'}`}>
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className={`w-5 h-5 shrink-0 mt-0.5 ${productionStarted ? 'text-orange-600' : 'text-amber-600'}`} />
+                  <div>
+                    <p className={`font-bold text-xs ${productionStarted ? 'text-orange-800' : 'text-amber-800'}`}>
+                      {productionStarted ? 'Order quantity changed' : 'Order quantity updated'}
+                    </p>
+                    <p className={`text-[11px] leading-relaxed mt-0.5 ${productionStarted ? 'text-orange-700' : 'text-amber-700'}`}>
+                      {productionStarted
+                        ? <>Linked order quantity is <strong>{orderQuantityMismatch.currentOrderQty}</strong> (was <strong>{orderQuantityMismatch.batchQty}</strong>). Cannot auto-adjust.</>
+                        : <>Linked order shows <strong>{orderQuantityMismatch.currentOrderQty}</strong> rolls (batch is <strong>{orderQuantityMismatch.batchQty}</strong>). Sync planned quantity?</>
+                      }
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1 self-end">
+                  <button
+                    onClick={() => setOrderQuantityMismatch(null)}
+                    className="px-2.5 py-1 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-700"
+                  >
+                    Dismiss
+                  </button>
+                  {!productionStarted && (
+                    <button
+                      onClick={handleSyncOrderQuantity}
+                      disabled={syncingQuantity}
+                      className="px-2.5 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg inline-flex items-center"
+                    >
+                      {syncingQuantity && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
+                      Sync
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Stepper Progress */}
+          <div className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-xs text-gray-500 font-medium">Stage Progress</span>
+              <span className="text-xs text-primary-600 font-bold bg-primary-55 px-2.5 py-0.5 rounded-full">
+                1. Material Selection
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="bg-primary-500 rounded-full" />
+              <div className="bg-gray-200 rounded-full" />
+              <div className="bg-gray-200 rounded-full" />
+              <div className="bg-gray-200 rounded-full" />
+            </div>
+            <div className="flex justify-between text-[9px] text-gray-400 mt-2 font-semibold">
+              <span className="text-primary-600 font-bold">Planning</span>
+              <span>Machine</span>
+              <span>Details</span>
+              <span>Wastage</span>
+            </div>
+          </div>
+
+          {/* Stats Summary Tags Layout */}
+          <div className="flex flex-wrap gap-2 mb-1">
+            <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+              <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-blue-900 leading-tight">{formData.planned_quantity} {selectedProduct.count_unit || 'rolls'}</p>
+                <p className="text-[9px] text-gray-500 font-semibold">Target Qty</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+              <Boxes className="w-3.5 h-3.5 text-green-600 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-green-900 leading-tight">{materials.length + consumedMaterials.length} Items</p>
+                <p className="text-[9px] text-gray-500 font-semibold">Materials</p>
+              </div>
+            </div>
+
+            {productLength > 0 && (
+              <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+                <Ruler className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-purple-900 leading-tight">{productLength}M × {productWidth}M</p>
+                  <p className="text-[9px] text-gray-500 font-semibold">Dimensions</p>
+                </div>
+              </div>
+            )}
+
+            {selectedProduct.weight && selectedProduct.weight !== 'N/A' && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-xl shadow-sm">
+                <Weight className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-amber-900 leading-tight">{selectedProduct.weight} GSM</p>
+                  <p className="text-[9px] text-gray-500 font-semibold">Expected GSM</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Product Details Inline List */}
+          {selectedProduct && (
+            <div className="bg-white rounded-xl border border-gray-150 px-3 py-2 flex flex-wrap gap-x-2 gap-y-1.5 items-center text-xs text-gray-500 shadow-sm">
+              <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-400">Product:</span>
+                <span className="font-bold text-gray-800">{selectedProduct.name}</span>
+              </div>
+              
+              {selectedProduct.category && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">Category:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.category}</span>
+                </div>
+              )}
+              
+              {selectedProduct.length && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">Length:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.length} {selectedProduct.length_unit || 'M'}</span>
+                </div>
+              )}
+              
+              {selectedProduct.width && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">Width:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.width} {selectedProduct.width_unit || 'M'}</span>
+                </div>
+              )}
+              
+              {selectedProduct.weight && selectedProduct.weight !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">GSM:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.weight} {selectedProduct.weight_unit || 'GSM'}</span>
+                </div>
+              )}
+              
+              {selectedProduct.color && selectedProduct.color !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">Color:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.color}</span>
+                  {colorCodeMap[selectedProduct.color.toLowerCase()] && (
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0"
+                      style={{ backgroundColor: colorCodeMap[selectedProduct.color.toLowerCase()] }}
+                    />
+                  )}
+                </div>
+              )}
+              
+              {selectedProduct.pattern && selectedProduct.pattern !== 'N/A' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-gray-300">•</span>
+                  <span className="text-gray-400">Pattern:</span>
+                  <span className="font-bold text-gray-800">{selectedProduct.pattern}</span>
+                  {patternImageMap[selectedProduct.pattern.toLowerCase()] && (
+                    <img
+                      src={patternImageMap[selectedProduct.pattern.toLowerCase()]}
+                      alt=""
+                      className="w-3.5 h-3.5 rounded border border-black/10 object-cover shrink-0"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Material Requirements Section */}
+          <div className="bg-white rounded-2xl border border-gray-205 p-4 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Truck className="w-5 h-5 text-gray-700" />
+                <h3 className="font-bold text-gray-900 text-sm">Material Requirements</h3>
+              </div>
+              <button
+                onClick={() => setShowMaterialDialog(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Select
+              </button>
+            </div>
+
+            {materials.length === 0 ? (
+              <div className="text-center py-8">
+                <Truck className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+                <p className="text-xs text-gray-500">No pending materials to plan.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {materials.map((material, idx) => {
+                  const sqmPerProduct = totalSQM / formData.planned_quantity;
+                  const quantityPerProduct = material.quantity_per_sqm * sqmPerProduct;
+                  const shortage = material.shortage || 0;
+                  const isAssigned = existingSubTasks[material.material_id];
+
+                  const sqmPerRoll = formData.planned_quantity > 0 ? totalSQM / formData.planned_quantity : 0;
+                  const forNRolls = material.quantity_per_sqm * totalSQM;
+                  const isProduct = material.material_type === 'product';
+                  const typeBg = isProduct ? '#EDE9FE' : '#EFF6FF';
+                  const typeColor = isProduct ? '#7C3AED' : '#2563EB';
+                  const isFromRecipe = recipe?.materials?.some((rm: any) => rm.material_id === material.material_id) ?? false;
+
+                  return (
+                    <div key={`${material.material_id}-${idx}`}
+                      className="rounded-xl p-3 mb-2.5 bg-white"
+                      style={{ border: `1px solid ${material.status !== 'available' ? (material.status === 'low' ? '#FDE047' : '#FECACA') : '#E5E7EB'}` }}>
+
+                      {/* Header row: name + type badge + status + actions */}
+                      <div className="flex items-start justify-between gap-2 mb-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-1.5 flex-wrap mb-1">
+                            <h4 className="font-extrabold text-gray-900 text-[14px] leading-tight">{material.material_name}</h4>
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold mt-0.5" style={{ backgroundColor: typeBg, color: typeColor }}>
+                              {isProduct ? 'Product' : 'Raw Material'}
+                            </span>
+                            {getStatusBadge(material.status)}
+                          </div>
+                          <span className="text-[10px] text-gray-400">{isFromRecipe ? 'From Recipe' : 'Manual'} · {material.material_id}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {isProduct && (material.status === 'low' || material.status === 'unavailable') && (
+                            <button onClick={() => { setSubProductionMaterial({ id: material.material_id, name: material.material_name }); setShowSubProductionModal(true); }}
+                              className="p-1.5 rounded-lg border" style={{ borderColor: '#F59E0B', backgroundColor: '#FEF3C7' }}>
+                              <Factory className="w-3.5 h-3.5" style={{ color: '#D97706' } as any} />
+                            </button>
+                          )}
+                          {isProduct && (
+                            <button onClick={() => { setSelectedMaterialForIndividual({ id: material.material_id, name: material.material_name, required: material.required_quantity }); setShowIndividualProductDialog(true); }}
+                              className="p-1.5 rounded-lg border" style={{ borderColor: '#3B82F6', backgroundColor: '#EFF6FF' }}>
+                              <Package className="w-3.5 h-3.5 text-blue-600" />
+                            </button>
+                          )}
+                          {material.material_type === 'raw_material' && (material.status === 'low' || material.status === 'unavailable') && (
+                            <button onClick={() => handleOrderRawMaterial(material.material_id, material.material_name)}
+                              className="p-1.5 rounded-lg border" style={{ borderColor: '#3B82F6', backgroundColor: '#EFF6FF' }}>
+                              <Truck className="w-3.5 h-3.5 text-blue-600" />
+                            </button>
+                          )}
+                          <button onClick={() => handleRemoveMaterial(material.material_id)}
+                            className="p-1.5 rounded-lg border border-red-200 bg-red-50">
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Product banner */}
+                      {isProduct && (
+                        <div className="rounded-lg p-2.5 mb-2.5 flex items-center flex-wrap gap-2" style={{ backgroundColor: '#FAF5FF' }}>
+                          <span className="text-[12px] font-semibold" style={{ color: '#4C1D95' }}>To Make {formData.planned_quantity} Rolls</span>
+                          <ChevronRight className="w-3.5 h-3.5" style={{ color: '#7C3AED' } as any} />
+                          <span className="text-[12px] font-bold text-gray-900">Need <span style={{ color: '#7C3AED' }}>{forNRolls.toFixed(4).replace(/\.?0+$/, '')} {material.unit}</span> of {material.material_name}</span>
+                        </div>
+                      )}
+
+                      {/* Blue quantity breakdown box */}
+                      <div className="rounded-[10px] border border-blue-200 bg-blue-50 p-2.5 mb-2.5">
+                        <p className="text-[11px] font-bold text-blue-800 mb-2">Quantity Breakdown</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-[11px] text-gray-400 mb-0.5">{isProduct ? 'Per 1 SQM of Parent' : 'Per 1 SQM'}</p>
+                            <p className="text-[13px] font-bold text-gray-900">{Number(material.quantity_per_sqm).toFixed(6).replace(/\.?0+$/, '')} {material.unit}</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-[11px] text-gray-400 mb-0.5">Per 1 Roll</p>
+                            <p className="text-[13px] font-bold text-gray-900">{quantityPerProduct.toFixed(4).replace(/\.?0+$/, '')} {material.unit}</p>
+                            <p className="text-[10px] text-gray-400">({sqmPerRoll.toFixed(2)} sqm/roll)</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-[11px] text-gray-400 mb-0.5">For {formData.planned_quantity} Rolls</p>
+                            <p className="text-[13px] font-bold text-blue-700">{material.required_quantity.toFixed(4).replace(/\.?0+$/, '')} {material.unit}</p>
+                            <p className="text-[10px] text-gray-400">({totalSQM.toFixed(2)} sqm total)</p>
+                          </div>
+                          <div className="bg-white rounded-lg p-2">
+                            <p className="text-[11px] text-gray-400 mb-0.5">Available Stock</p>
+                            <p className={`text-[13px] font-bold ${material.status === 'available' ? 'text-green-700' : material.status === 'low' ? 'text-amber-600' : 'text-red-600'}`}>
+                              {material.available_quantity.toFixed(2)} {material.unit}
+                            </p>
+                            {shortage > 0 && <p className="text-[10px] font-bold text-red-600">Short: {shortage.toFixed(2)} {material.unit}</p>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Edit qty per SQM */}
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-600 mb-1.5">Adjust Quantity Per SQM (Base Quantity) *</p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={mobileQuantityInputs[material.material_id] ?? (material.quantity_per_sqm === 0 ? '' : Number(material.quantity_per_sqm).toFixed(6).replace(/\.?0+$/, ''))}
+                            onChange={(e) => handleMobileQtyChange(material.material_id, e.target.value)}
+                            onBlur={(e) => handleMobileQtyBlur(material.material_id, e.target.value)}
+                            placeholder="0.000000"
+                            className="h-[38px] w-[120px] bg-white border border-gray-200 rounded-lg px-3 text-[13px] text-gray-900 outline-none"
+                          />
+                          <span className="text-[12px] text-gray-500">{material.unit} Per SQM</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">(Changing this will auto-recalculate all quantities above)</p>
+                      </div>
+
+                      {/* Selected Individual Products */}
+                      {material.material_type === 'product' && selectedIndividualProducts[material.material_id] && selectedIndividualProducts[material.material_id].length > 0 && (
+                        <div className="bg-green-50/50 border border-green-155 rounded-lg p-2.5 space-y-1.5">
+                          <span className="text-[11px] font-bold text-green-900 block">
+                            Selected Rolls ({selectedIndividualProducts[material.material_id].length})
+                          </span>
+                          <div className="divide-y divide-green-100 max-h-40 overflow-y-auto">
+                            {selectedIndividualProducts[material.material_id].map((product: any, pIdx: number) => (
+                              <div key={product.id} className="py-1 text-[10px] text-green-800 flex justify-between">
+                                <span>{pIdx + 1}. ID: <span className="font-semibold">{product.id}</span></span>
+                                <span>{product.length}×{product.width} m · {product.weight} GSM</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Row Actions */}
+                      <div className="flex items-center gap-2 pt-2.5 border-t border-gray-100">
+                        {/* Sub-Produce */}
+                        {material.material_type === 'product' && (material.status === 'low' || material.status === 'unavailable') && (
+                          isAssigned ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-[10px] text-blue-700 font-bold">
+                              <Factory className="w-3.5 h-3.5" />
+                              Sub: {isAssigned.assigned_to_name}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setSubProductionMaterial({ id: material.material_id, name: material.material_name });
+                                setShowSubProductionModal(true);
+                              }}
+                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-800 text-[10px] font-bold bg-amber-50 hover:bg-amber-100 transition-colors"
+                            >
+                              <Factory className="w-3.5 h-3.5" />
+                              Sub-Produce
+                            </button>
+                          )
+                        )}
+
+                        {/* Order Stock */}
+                        {material.material_type === 'raw_material' && (material.status === 'low' || material.status === 'unavailable') && (
+                          <button
+                            onClick={() => handleOrderRawMaterial(material.material_id, material.material_name)}
+                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-blue-300 text-blue-800 text-[10px] font-bold bg-blue-50 hover:bg-blue-100 transition-colors"
+                          >
+                            <Truck className="w-3.5 h-3.5" />
+                            Order Stock
+                          </button>
+                        )}
+
+                        {/* Select Individual Products */}
+                        {material.material_type === 'product' && (
+                          <button
+                            onClick={() => {
+                              setSelectedMaterialForIndividual({
+                                id: material.material_id,
+                                name: material.material_name,
+                                required: material.required_quantity
+                              });
+                              setShowIndividualProductDialog(true);
+                            }}
+                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary-300 text-primary-800 text-[10px] font-bold bg-primary-50 hover:bg-primary-100 transition-colors"
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            Select Rolls
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleRemoveMaterial(material.material_id)}
+                          className="ml-auto p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {materials.length > 0 && (
+              <button
+                onClick={handleAddToProduction}
+                disabled={submitting}
+                className="w-full mt-2 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors text-sm"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Adding to Production...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Add Materials to Production
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Consumed Materials Section */}
+          {consumedMaterials.length > 0 && (
+            <div className="bg-green-50/70 border border-green-200 rounded-2xl p-4 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                <h3 className="font-bold text-green-900 text-sm">Materials Added to Production</h3>
+                <span className="ml-auto text-xs bg-green-150 text-green-800 px-2 py-0.5 rounded-full font-bold">
+                  {consumedMaterials.length} Items
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {consumedMaterials.map((material, idx) => {
+                  const qtyPerSqmNum = parseFloat(material.quantity_per_sqm || 0);
+                  const sqmPerRoll = formData.planned_quantity > 0 ? totalSQM / formData.planned_quantity : 0;
+                  const forNRolls = qtyPerSqmNum * totalSQM;
+                  const isProduct = material.material_type === 'product';
+                  const typeBg = isProduct ? '#EDE9FE' : '#EFF6FF';
+                  const typeColor = isProduct ? '#7C3AED' : '#2563EB';
+                  const typeLabel = isProduct ? 'Product' : 'Raw Material';
+
+                  return (
+                    <div key={`consumed-${material.material_id}-${idx}`}
+                      className="bg-white rounded-xl p-3 mb-2.5"
+                      style={{ border: '1px solid #E5E7EB' }}>
+
+                      {/* Header */}
+                      <div className="flex items-start gap-2 mb-1.5">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-gray-900 text-[14px] leading-tight mb-0.5">{material.material_name}</h4>
+                          <span className="text-[10px] text-gray-400">Type: {material.material_type}</span>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0" style={{ backgroundColor: typeBg, color: typeColor }}>
+                          {typeLabel}
+                        </span>
+                      </div>
+
+                      {/* Remove action */}
+                      <div className="flex gap-2 mb-2.5">
+                        <button
+                          onClick={() => { setConsumptionToRemove({ id: material.material_id, name: material.material_name }); setShowRemoveConsumptionDialog(true); }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors"
+                          style={{ borderWidth: 1, borderColor: '#FDBA74', backgroundColor: '#FFF7ED', color: '#EA580C' }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          Remove Consumption
+                        </button>
+                      </div>
+
+                      {/* Confirmed Usage box */}
+                      <div className="rounded-[10px] p-2.5" style={{ backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' }}>
+                        <p className="text-[11px] font-bold text-gray-600 mb-2">Confirmed Usage</p>
+                        <div className="flex gap-1.5">
+                          <div className="flex-1 bg-white rounded-lg p-2">
+                            <p className="text-[9px] text-gray-500 mb-1">Per 1 SQM</p>
+                            <p className="text-[13px] font-bold text-gray-900">{Number(qtyPerSqmNum).toFixed(6)} {material.unit}</p>
+                          </div>
+                          <div className="flex-1 bg-white rounded-lg p-2">
+                            <p className="text-[9px] text-gray-500 mb-1">For {formData.planned_quantity} Rolls</p>
+                            <p className="text-[13px] font-bold text-blue-700">{forNRolls.toFixed(2)} {material.unit}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Start Flow Button */}
+              <button
+                onClick={() => setShowMachineDialog(true)}
+                disabled={submitting || consumedMaterials.length === 0}
+                className="w-full py-3.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-xl font-bold flex items-center justify-center gap-2 transition-colors text-sm mt-2.5"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Starting Flow...
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current" />
+                    Start Production Flow
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
       {/* Material Selection Dialog */}
       <MaterialSelectionDialog
         isOpen={showMaterialDialog}
@@ -2215,6 +2933,88 @@ export default function PlanningStage() {
         cancelText="Cancel"
         variant={recipe && recipe.materials && recipe.materials.some((m: any) => m.material_id === materialToRemove?.id) ? "danger" : "warning"}
       />
+
+      {/* Remove Consumption Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showRemoveConsumptionDialog}
+        onClose={() => { setShowRemoveConsumptionDialog(false); setConsumptionToRemove(null); }}
+        onConfirm={() => {
+          if (consumptionToRemove) handleRemoveMaterialFromDraft(consumptionToRemove.id);
+          setShowRemoveConsumptionDialog(false);
+          setConsumptionToRemove(null);
+        }}
+        title="Remove Consumption"
+        description={`Remove "${consumptionToRemove?.name}" from the consumed materials list?\n\nThis will undo its contribution to this production batch.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="warning"
+      />
+
+      {/* Mobile Help Modal */}
+      {mobileHelpOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-xl animate-in slide-in-from-bottom duration-200">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                  <Info className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-gray-900">Planning Guide</h3>
+              </div>
+              <button
+                onClick={() => setMobileHelpOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 overflow-y-auto space-y-4 text-sm text-gray-650 leading-relaxed">
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">1. Adjust Quantity Per SQM</h4>
+                <p>Type the base quantity (Per 1 SQM) for each material. The system will automatically calculate how much is needed for 1 Roll, and the total needed for the entire batch.</p>
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">2. Auto-Calculated Banners</h4>
+                <p>Products will show a purple banner detailing exactly how many child rolls are needed to produce the target amount, based on the dimensions of the parent and child products.</p>
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">3. Actions</h4>
+                <div className="space-y-2 mt-2">
+                  <div className="flex gap-3 items-start">
+                    <span className="p-1 rounded bg-amber-50 border border-amber-200 text-amber-700 shrink-0"><Factory className="w-3.5 h-3.5" /></span>
+                    <span><strong>Sub-Produce:</strong> Create sub-batches for low/out-of-stock products.</span>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <span className="p-1 rounded bg-blue-50 border border-blue-200 text-blue-700 shrink-0"><Package className="w-3.5 h-3.5" /></span>
+                    <span><strong>Select Rolls:</strong> Pick specific rolls from inventory for the product.</span>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <span className="p-1 rounded bg-red-50 border border-red-200 text-red-700 shrink-0"><Trash2 className="w-3.5 h-3.5" /></span>
+                    <span><strong>Trash Icon:</strong> Remove a material from the recipe (and list).</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">4. Add to Production</h4>
+                <p>Once all materials are configured, tap "Add Materials to Production" to lock them in. Then, allocate a machine and shift to start production.</p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-gray-50 border-t border-gray-150 rounded-b-2xl">
+              <button
+                onClick={() => setMobileHelpOpen(false)}
+                className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-semibold shadow-sm transition-colors text-sm"
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

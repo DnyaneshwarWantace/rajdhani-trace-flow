@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Recycle, Package, Loader2, AlertCircle, LayoutGrid, Table2 } from 'lucide-react';
+import { Recycle, Package, Loader2, AlertCircle, LayoutGrid, Table2, Clock } from 'lucide-react';
 import { WasteService, type WasteItem } from '@/services/wasteService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { ProductionService } from '@/services/productionService';
@@ -164,260 +164,206 @@ export default function ProductWastageTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-16">
         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
       </div>
     );
   }
 
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'available_for_reuse': return 'bg-green-100 text-green-700';
+      case 'added_to_inventory': return 'bg-blue-100 text-blue-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'available_for_reuse': return 'Reusable';
+      case 'added_to_inventory': return 'Added';
+      default: return 'Disposed';
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Waste</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
-              </div>
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <Package className="w-6 h-6 text-gray-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Available for Reuse</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{stats.availableForReuse}</p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <Recycle className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Added to Inventory</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{stats.addedToInventory}</p>
-              </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Disposed</p>
-                <p className="text-2xl font-bold text-gray-600 mt-1">{stats.disposed}</p>
-              </div>
-              <div className="p-3 bg-gray-100 rounded-lg">
-                <AlertCircle className="w-6 h-6 text-gray-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-3 pb-24">
+      {/* Mobile stats row */}
+      <div className="lg:hidden bg-white rounded-2xl border border-gray-100 shadow-sm flex divide-x divide-gray-100">
+        {[
+          { label: 'Total', value: stats.total, color: 'text-gray-900' },
+          { label: 'Reusable', value: stats.availableForReuse, color: 'text-green-600' },
+          { label: 'Added', value: stats.addedToInventory, color: 'text-blue-600' },
+          { label: 'Disposed', value: stats.disposed, color: 'text-gray-500' },
+        ].map(s => (
+          <div key={s.label} className="flex-1 flex flex-col items-center py-3 px-1">
+            <p className={`text-base font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{s.label}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Waste Items - Card or Table View */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5" />
-                Product Wastage
-              </CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
-                Track and manage product waste from production
-              </p>
-            </div>
-            {wasteData.length > 0 && (
-              <div className="hidden lg:flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
-                <Button
-                  variant={viewMode === 'card' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('card')}
-                  className="h-8 px-3"
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="h-8 px-3"
-                >
-                  <Table2 className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {wasteData.length === 0 ? (
-            <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Product Waste Found</h3>
-              <p className="text-sm text-gray-600">
-                Product waste items will appear here when they are generated during production.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Card view for small/medium screens */}
-              <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                {wasteData.map((waste) => (
-                  <ProductWasteCard key={waste.id} waste={waste} />
-                ))}
-              </div>
+      {/* Desktop stats */}
+      <div className="hidden lg:grid grid-cols-4 gap-4">
+        <Card><CardContent className="p-4 flex items-center justify-between">
+          <div><p className="text-sm text-gray-600">Total Waste</p><p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p></div>
+          <div className="p-3 bg-gray-100 rounded-lg"><Package className="w-6 h-6 text-gray-600" /></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center justify-between">
+          <div><p className="text-sm text-gray-600">Available for Reuse</p><p className="text-2xl font-bold text-green-600 mt-1">{stats.availableForReuse}</p></div>
+          <div className="p-3 bg-green-100 rounded-lg"><Recycle className="w-6 h-6 text-green-600" /></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center justify-between">
+          <div><p className="text-sm text-gray-600">Added to Inventory</p><p className="text-2xl font-bold text-blue-600 mt-1">{stats.addedToInventory}</p></div>
+          <div className="p-3 bg-blue-100 rounded-lg"><Package className="w-6 h-6 text-blue-600" /></div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 flex items-center justify-between">
+          <div><p className="text-sm text-gray-600">Disposed</p><p className="text-2xl font-bold text-gray-600 mt-1">{stats.disposed}</p></div>
+          <div className="p-3 bg-gray-100 rounded-lg"><AlertCircle className="w-6 h-6 text-gray-600" /></div>
+        </CardContent></Card>
+      </div>
 
-              {/* Card or Table view for large screens based on viewMode */}
+      {wasteData.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <Package className="w-8 h-8 text-gray-400" />
+          </div>
+          <p className="text-base font-bold text-gray-900 mb-1">No Wastage Found</p>
+          <p className="text-sm text-gray-400">Waste items appear when generated during production.</p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile waste cards */}
+          <div className="lg:hidden space-y-3">
+            {wasteData.map((waste) => {
+              const productConsumption = waste.materialConsumption?.filter(
+                (cons: any) => cons.material_type === 'product' && (cons.material_id === waste.product_id || cons.material_id === waste.material_id)
+              ) || [];
+              const totalUsed = productConsumption.reduce(
+                (sum: number, cons: any) => sum + (cons.quantity_used ?? cons.actual_consumed_quantity ?? cons.whole_product_count ?? cons.required_quantity ?? 0), 0
+              );
+              const totalWasted = waste.quantity || 0;
+
+              return (
+                <div key={waste.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="px-4 pt-3.5 pb-3 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                      <Recycle className="w-4 h-4 text-red-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="text-sm font-bold text-gray-900 line-clamp-2 flex-1">{waste.product_name || waste.material_name}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${getStatusBg(waste.status)}`}>
+                          {getStatusLabel(waste.status).toUpperCase()}
+                        </span>
+                      </div>
+                      {waste.waste_number && (
+                        <p className="text-[11px] text-gray-400 font-mono">{waste.waste_number}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Chips */}
+                  <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                    <span className="text-[11px] bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+                      Used: {totalUsed.toFixed(1)} {waste.unit}
+                    </span>
+                    <span className="text-[11px] bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium">
+                      Wasted: {totalWasted.toFixed(1)} {waste.unit}
+                    </span>
+                    {waste.waste_type && (
+                      <span className="text-[11px] bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full font-medium">
+                        {WasteService.mapWasteTypeToDisplay(waste.waste_type)}
+                      </span>
+                    )}
+                    {waste.production_batch_id && (
+                      <span className="text-[11px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-mono">
+                        {waste.production_batch_id.slice(-8)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Date */}
+                  {waste.generation_date && (
+                    <div className="px-4 pb-3 flex items-center gap-1 text-xs text-gray-400">
+                      <Clock className="w-3 h-3" />
+                      {formatIndianDateTime(waste.generation_date)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop card/table view */}
+          <Card className="hidden lg:block">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Product Wastage
+                </CardTitle>
+                <div className="flex items-center gap-1 border rounded-lg p-1 bg-gray-50">
+                  <Button variant={viewMode === 'card' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('card')} className="h-8 px-3">
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button variant={viewMode === 'table' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('table')} className="h-8 px-3">
+                    <Table2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
               {viewMode === 'card' ? (
-                <div className="hidden lg:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-                  {wasteData.map((waste) => (
-                    <ProductWasteCard key={waste.id} waste={waste} />
-                  ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+                  {wasteData.map((waste) => <ProductWasteCard key={waste.id} waste={waste} />)}
                 </div>
               ) : (
-                <div className="hidden lg:block bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product / Details</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Used</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wasted</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Waste Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Individual Products</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {wasteData.map((waste) => {
-                      const productConsumption = waste.materialConsumption?.filter(
-                        (cons: any) =>
-                          cons.material_type === 'product' &&
-                          (cons.material_id === waste.product_id || cons.material_id === waste.material_id)
-                      ) || [];
-                      const totalUsed = productConsumption.reduce(
-                        (sum: number, cons: any) =>
-                          sum + (cons.quantity_used ?? cons.actual_consumed_quantity ?? cons.whole_product_count ?? cons.required_quantity ?? 0),
-                        0
-                      );
-                      const totalWasted = waste.quantity || 0;
-
-                      const getStatusColor = (status: string) => {
-                        switch (status) {
-                          case 'available_for_reuse':
-                            return 'bg-green-100 text-green-700 border-green-200';
-                          case 'added_to_inventory':
-                            return 'bg-blue-100 text-blue-700 border-blue-200';
-                          default:
-                            return 'bg-gray-100 text-gray-700 border-gray-200';
-                        }
-                      };
-
-                      const getStatusLabel = (status: string) => {
-                        switch (status) {
-                          case 'available_for_reuse':
-                            return 'Reusable';
-                          case 'added_to_inventory':
-                            return 'Added';
-                          default:
-                            return 'Disposed';
-                        }
-                      };
-
-                      return (
-                        <tr key={waste.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-4">
-                            <div className="min-w-0 max-w-[250px]">
-                              <TruncatedText
-                                text={waste.product_name || waste.material_name}
-                                maxLength={35}
-                                className="font-medium text-gray-900 block"
-                                as="p"
-                              />
-                              <p className="text-xs text-gray-500 font-mono mt-0.5 truncate">
-                                {waste.product_id}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <Badge variant="outline" className={getStatusColor(waste.status)}>
-                              {getStatusLabel(waste.status)}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="font-medium text-gray-900">{totalUsed.toFixed(2)}</div>
-                            <p className="text-xs text-gray-500 mt-0.5">{waste.unit}</p>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="font-medium text-red-600">{totalWasted.toFixed(2)}</div>
-                            <p className="text-xs text-gray-500 mt-0.5">{waste.unit}</p>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="text-sm text-gray-700">
-                              {WasteService.mapWasteTypeToDisplay(waste.waste_type)}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4">
-                            {waste.production_batch_id ? (
-                              <div className="text-sm font-mono text-gray-700">
-                                <TruncatedText text={waste.production_batch_id} maxLength={20} className="block" />
-                              </div>
-                            ) : (
-                              <span className="text-sm text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {waste.generation_date && (
-                              <div className="text-sm text-gray-600">{formatIndianDateTime(waste.generation_date)}</div>
-                            )}
-                          </td>
-                          <td className="px-4 py-4">
-                            {waste.individualProducts && waste.individualProducts.length > 0 ? (
-                              <div className="text-sm text-gray-700">
-                                {waste.individualProducts.length} product{waste.individualProducts.length !== 1 ? 's' : ''}
-                              </div>
-                            ) : (
-                              <span className="text-sm text-gray-400">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-right">
-                            {/* Product wastage is never reused - no Return to Inventory */}
-                            {waste.status === 'added_to_inventory' && (
-                              <span className="text-sm text-green-600 font-medium">✓ Added</span>
-                            )}
-                          </td>
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Used</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Wasted</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated</th>
                         </tr>
-                      );
-                    })}
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {wasteData.map((waste) => {
+                          const pc = waste.materialConsumption?.filter(
+                            (c: any) => c.material_type === 'product' && (c.material_id === waste.product_id || c.material_id === waste.material_id)
+                          ) || [];
+                          const used = pc.reduce((s: number, c: any) => s + (c.quantity_used ?? c.actual_consumed_quantity ?? c.whole_product_count ?? c.required_quantity ?? 0), 0);
+                          return (
+                            <tr key={waste.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-4">
+                                <TruncatedText text={waste.product_name || waste.material_name} maxLength={35} className="font-medium text-gray-900 block" as="p" />
+                                <p className="text-xs text-gray-400 font-mono mt-0.5">{waste.product_id}</p>
+                              </td>
+                              <td className="px-4 py-4">
+                                <Badge variant="outline" className={`${getStatusBg(waste.status)} border-transparent`}>{getStatusLabel(waste.status)}</Badge>
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900">{used.toFixed(2)} {waste.unit}</td>
+                              <td className="px-4 py-4 text-sm text-red-600 font-medium">{(waste.quantity || 0).toFixed(2)} {waste.unit}</td>
+                              <td className="px-4 py-4 text-sm text-gray-700">{WasteService.mapWasteTypeToDisplay(waste.waste_type)}</td>
+                              <td className="px-4 py-4 text-xs font-mono text-gray-600">{waste.production_batch_id || '—'}</td>
+                              <td className="px-4 py-4 text-sm text-gray-600">{waste.generation_date ? formatIndianDateTime(waste.generation_date) : '—'}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

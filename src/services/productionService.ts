@@ -9,6 +9,7 @@ export interface ProductionBatch {
   product_id: string;
   product_name?: string;
   duplicated_from?: string; // ID of the batch this was duplicated from
+  parent_batch_id?: string | null;
   order_id?: string;
   order_item_id?: string;
   order_quantity_at_creation?: number;

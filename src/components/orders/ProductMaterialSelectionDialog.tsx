@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Search, Package, Grid3x3, List, Check, AlertCircle, Filter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Search, Package, Grid3x3, List, Check, AlertCircle, Filter, Tag, Droplet, Maximize2, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -78,6 +79,16 @@ export default function ProductMaterialSelectionDialog({
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
+
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Filter states
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -547,9 +558,550 @@ export default function ProductMaterialSelectionDialog({
     );
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent customLayout className="max-w-7xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+  // ── MOBILE full-screen sheet ────────────────────────────────────────
+  const [mobileSortOpen, setMobileSortOpen] = useState(false);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const [mobileActiveFilterTab, setMobileActiveFilterTab] = useState<'stock' | 'category' | 'subcategory' | 'color' | 'pattern'>('stock');
+
+  const MOBILE_SORT_OPTS = [
+    { sortBy: 'name' as const, sortOrder: 'asc' as const, label: 'Name A → Z' },
+    { sortBy: 'name' as const, sortOrder: 'desc' as const, label: 'Name Z → A' },
+    { sortBy: 'stock' as const, sortOrder: 'desc' as const, label: 'Stock: High → Low' },
+    { sortBy: 'stock' as const, sortOrder: 'asc' as const, label: 'Stock: Low → High' },
+    { sortBy: 'recent' as const, sortOrder: 'desc' as const, label: 'Recently Added' },
+  ];
+
+  const activeSortLabel = MOBILE_SORT_OPTS.find(o => o.sortBy === sortBy && o.sortOrder === sortOrder)?.label || 'Name A → Z';
+  const activeFilterCount = selectedCategories.length + selectedSubcategories.length + selectedColors.length + selectedPatterns.length + selectedStockFilters.length;
+
+  if (isOpen) {
+    const isProdType = currentItem?.product_type !== 'raw_material';
+
+    const mobileContent = (
+      <div 
+        className="fixed inset-0 z-[60] bg-black/40 flex flex-col justify-end lg:hidden animate-in fade-in duration-200" 
+        onClick={onClose}
+      >
+        <div 
+          className="w-full max-h-[96vh] h-[96vh] bg-white rounded-t-2xl flex flex-col relative animate-in slide-in-from-bottom duration-300"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Top drag indicator/handle bar */}
+          <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto my-2.5 flex-shrink-0" />
+          
+          {/* Header */}
+          <div className="px-4 pb-2.5 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+            <span className="text-lg font-bold text-gray-900">
+              Select {isProdType ? 'Product' : 'Raw Material'}
+            </span>
+            <button onClick={onClose} className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors" aria-label="Close dialog">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          
+          {/* Search Box & Info */}
+          <div className="px-4 py-2.5 flex-shrink-0 border-b border-gray-100">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                className="w-full pl-9 pr-8 py-2 rounded-lg border border-gray-200 bg-gray-50 text-xs outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all font-medium text-gray-800"
+                placeholder="Search by name, color, pattern…"
+                value={productSearchTerm}
+                onChange={e => onSearchChange(e.target.value)}
+              />
+              {productSearchTerm && (
+                <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="text-xs text-gray-400 mt-1.5 font-normal">
+              {totalCount} {isProdType ? 'products' : 'materials'} found
+            </div>
+          </div>
+
+          {/* Product list */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-6">
+            {paginatedItems.length === 0 ? (
+              <div className="flex flex-col items-center py-12 text-center">
+                <Package className="w-10 h-10 text-gray-300 mb-2" />
+                <p className="text-xs font-semibold text-gray-500">No {isProdType ? 'products' : 'materials'} found</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">Try a different search term</p>
+              </div>
+            ) : paginatedItems.map(item => {
+              const isSelected = currentItem?.product_id === item.id;
+              const stock = isProdType
+                ? (item.current_stock || item.stock || 0)
+                : (item.available_stock !== undefined ? item.available_stock : (item.current_stock || item.stock || 0));
+              const maxStock = Math.max(stock, 50);
+              const stockPct = Math.min(100, (stock / maxStock) * 100);
+              const stockUnit = isProdType ? (item.count_unit || 'rolls') : (item.unit || 'units');
+              const stockStatus = stock === 0 ? 'out' : stock < 10 ? 'low' : 'in';
+              const stockBarColor = stockStatus === 'out' ? 'bg-red-500' : stockStatus === 'low' ? 'bg-amber-400' : 'bg-green-500';
+              const stockBadgeStyle = stockStatus === 'out'
+                ? 'bg-red-100 text-red-700' : stockStatus === 'low'
+                ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+              const stockLabel = stockStatus === 'out' ? 'Out of Stock' : stockStatus === 'low' ? 'Low Stock' : 'In Stock';
+              const hexColor = item.color && /^#[0-9A-Fa-f]{3,6}$/.test(item.color) ? item.color : (colorCodeMap[item.color] || null);
+              const length = parseFloat(item.length || '0');
+              const width = parseFloat(item.width || '0');
+              const lengthUnit = item.length_unit || 'm';
+              const widthUnit = item.width_unit || 'm';
+              const sqm = length > 0 && width > 0 ? calculateSQM(length, width, lengthUnit, widthUnit) : 0;
+              const sqmUnit = isProdType ? (item.count_unit ? (item.count_unit.endsWith('s') ? item.count_unit.slice(0, -1) : item.count_unit) : 'roll') : '';
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={() => handleSelect(item.id)}
+                  className={`w-full text-left rounded-xl border transition-all overflow-hidden p-2.5 flex gap-2.5 relative cursor-pointer ${
+                    isSelected ? 'border-blue-500 bg-blue-50/70 shadow-sm' : 'border-gray-100 bg-white shadow-sm'
+                  }`}
+                >
+                  {/* Left: Thumbnail/swatch/icon */}
+                  <div className="flex-shrink-0 flex flex-col items-center justify-start w-12">
+                    {item.image_url || item.imageUrl ? (
+                      <img src={item.image_url || item.imageUrl} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                    ) : item.pattern && patternImageMap[item.pattern] ? (
+                      <img src={patternImageMap[item.pattern]} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                    ) : hexColor ? (
+                      <div className="w-12 h-12 rounded-lg border border-black/10 shadow-inner" style={{ backgroundColor: hexColor }} />
+                    ) : (
+                      <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${isProdType ? 'bg-blue-50' : 'bg-purple-50'}`}>
+                        <Package className={`w-5 h-5 ${isProdType ? 'text-blue-400' : 'text-purple-400'}`} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Details */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between">
+                    {/* Name + badge */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[13px] font-bold text-gray-900 leading-tight flex-1">{item.name}</p>
+                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full flex-shrink-0 ${stockBadgeStyle}`}>{stockLabel}</span>
+                    </div>
+
+                    {/* Chips/Tags */}
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {item.category && (
+                        <span className="flex items-center gap-1 text-[9.5px] bg-gray-50 border border-gray-200/85 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                          <Tag className="w-2.5 h-2.5 text-gray-400 flex-shrink-0" />
+                          {item.category}
+                        </span>
+                      )}
+                      {item.subcategory && (
+                        <span className="text-[9.5px] bg-gray-50 border border-gray-200/85 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                          {item.subcategory}
+                        </span>
+                      )}
+                      {isProdType && item.color && item.color !== 'N/A' && (
+                        <span className="flex items-center gap-1 text-[9.5px] bg-amber-50 border border-amber-200/60 text-amber-800 px-2 py-0.5 rounded-full font-bold uppercase">
+                          <Droplet className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                          {item.color}
+                        </span>
+                      )}
+                      {isProdType && length > 0 && width > 0 && (
+                        <span className="flex items-center gap-1 text-[9.5px] bg-blue-50 border border-blue-200/60 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                          <Maximize2 className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                          {item.length}{item.length_unit || 'm'} × {item.width}{item.width_unit || 'm'}
+                        </span>
+                      )}
+                      {isProdType && sqm > 0 && (
+                        <span className="flex items-center gap-1 text-[9.5px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
+                          <Grid3x3 className="w-3 h-3 text-white flex-shrink-0" />
+                          {sqm.toFixed(2)} SQM/{sqmUnit}
+                        </span>
+                      )}
+                      {isProdType && item.weight && (
+                        <span className="flex items-center gap-1 text-[9.5px] bg-green-50 border border-green-200/60 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                          <Layers className="w-3 h-3 text-green-500 flex-shrink-0" />
+                          {item.weight} {item.weight_unit || 'GSM'}
+                        </span>
+                      )}
+                      {!isProdType && item.supplier && (
+                        <span className="text-[9.5px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                          {item.supplier}
+                        </span>
+                      )}
+                      {!isProdType && item.brand && (
+                        <span className="text-[9.5px] bg-purple-50 border border-purple-200/50 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                          {item.brand}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stock bar + stock number */}
+                    <div className="flex items-center justify-between gap-2.5 mt-2 pt-0.5">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${stockBarColor}`} style={{ width: `${stockPct}%` }} />
+                      </div>
+                      <span className="text-[11px] font-bold text-green-700 flex-shrink-0">
+                        {formatIndianNumberWithDecimals(stock, 0)} {stockUnit}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Pagination */}
+            {totalCount > perPage && (
+              <div className="flex items-center justify-between py-2">
+                <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 disabled:opacity-40">
+                  Previous
+                </button>
+                <span className="text-xs text-gray-400">{currentPage} / {Math.ceil(totalCount / perPage)}</span>
+                <button onClick={() => onPageChange(Math.min(Math.ceil(totalCount / perPage), currentPage + 1))} disabled={currentPage >= Math.ceil(totalCount / perPage)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 disabled:opacity-40">
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Sort + Filter bar */}
+          <div className="p-3.5 bg-white border-t border-gray-100 flex gap-3.5 w-full flex-shrink-0 pb-5">
+            <button onClick={() => setMobileSortOpen(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 border border-gray-200 rounded-2xl bg-gray-50 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
+              <List className="w-3.5 h-3.5 text-gray-500" />
+              <span>{activeSortLabel}</span>
+            </button>
+            <button onClick={() => setMobileFilterOpen(true)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3.5 border rounded-2xl text-xs font-semibold transition-colors ${
+                activeFilterCount > 0 
+                  ? 'bg-blue-50 border-blue-200 text-blue-600' 
+                  : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+              }`}>
+              <Filter className="w-3.5 h-3.5" />
+              <span>Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Sort sheet */}
+        {mobileSortOpen && (
+          <div onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 bg-black/40 z-[70]" onClick={() => setMobileSortOpen(false)} />
+            <div className="fixed bottom-0 left-0 right-0 z-[80] bg-white rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom duration-200 pb-8">
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
+                <span className="text-base font-bold text-gray-900">Sort By</span>
+                <button onClick={() => setMobileSortOpen(false)}>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="pb-8">
+                {MOBILE_SORT_OPTS.map((opt, i) => {
+                  const active = opt.sortBy === sortBy && opt.sortOrder === sortOrder;
+                  return (
+                    <button key={opt.label} onClick={() => {
+                      if (isProdType) onProductSortChange?.(opt.sortBy, opt.sortOrder);
+                      else onMaterialSortChange?.(opt.sortBy, opt.sortOrder);
+                      setMobileSortOpen(false);
+                    }} className={`w-full flex items-center gap-4 px-5 py-4 text-left ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-blue-600' : 'border-gray-300'}`}>
+                        {active && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
+                      </div>
+                      <span className={`text-sm ${active ? 'font-bold text-blue-600' : 'font-normal text-gray-900'}`}>{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filter sheet */}
+        {mobileFilterOpen && (
+          <div onClick={e => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[70] bg-white flex flex-col animate-in slide-in-from-bottom duration-250">
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 pt-12 pb-3 border-b border-gray-250 flex-shrink-0">
+                <span className="text-lg font-bold text-gray-900">Filters</span>
+                <div className="flex items-center gap-3">
+                  {activeFilterCount > 0 && (
+                    <button 
+                      onClick={clearAllFilters} 
+                      className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      CLEAR ALL
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setMobileFilterOpen(false)} 
+                    className="p-1.5 text-gray-500 hover:text-gray-700 transition-colors"
+                    aria-label="Close filters"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Two Column Layout */}
+              <div className="flex-1 flex overflow-hidden">
+                {/* Left Sidebar Sections */}
+                <div className="w-[115px] bg-gray-50 border-r border-gray-200 flex-shrink-0 overflow-y-auto">
+                  {/* Stock Status tab */}
+                  <button
+                    onClick={() => setMobileActiveFilterTab('stock')}
+                    className={`w-full text-left py-4 px-3.5 text-xs font-semibold border-l-4 transition-all relative flex flex-col gap-1 ${
+                      mobileActiveFilterTab === 'stock'
+                        ? 'border-blue-600 bg-white text-blue-600 font-extrabold'
+                        : 'border-transparent text-gray-700 hover:bg-gray-100/50'
+                    }`}
+                  >
+                    <span>Stock Status</span>
+                    {selectedStockFilters.length > 0 && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-extrabold flex items-center justify-center">
+                        {selectedStockFilters.length}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Categories tab */}
+                  {categories.length > 0 && (
+                    <button
+                      onClick={() => setMobileActiveFilterTab('category')}
+                      className={`w-full text-left py-4 px-3.5 text-xs font-semibold border-l-4 transition-all relative flex flex-col gap-1 ${
+                        mobileActiveFilterTab === 'category'
+                          ? 'border-blue-600 bg-white text-blue-600 font-extrabold'
+                          : 'border-transparent text-gray-700 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span>Category</span>
+                      {selectedCategories.length > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-extrabold flex items-center justify-center">
+                          {selectedCategories.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Subcategories tab */}
+                  {subcategories.length > 0 && (
+                    <button
+                      onClick={() => setMobileActiveFilterTab('subcategory')}
+                      className={`w-full text-left py-4 px-3.5 text-xs font-semibold border-l-4 transition-all relative flex flex-col gap-1 ${
+                        mobileActiveFilterTab === 'subcategory'
+                          ? 'border-blue-600 bg-white text-blue-600 font-extrabold'
+                          : 'border-transparent text-gray-700 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span>Subcategory</span>
+                      {selectedSubcategories.length > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-extrabold flex items-center justify-center">
+                          {selectedSubcategories.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Colors tab */}
+                  {colors.length > 0 && (
+                    <button
+                      onClick={() => setMobileActiveFilterTab('color')}
+                      className={`w-full text-left py-4 px-3.5 text-xs font-semibold border-l-4 transition-all relative flex flex-col gap-1 ${
+                        mobileActiveFilterTab === 'color'
+                          ? 'border-blue-600 bg-white text-blue-600 font-extrabold'
+                          : 'border-transparent text-gray-700 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span>Color</span>
+                      {selectedColors.length > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-extrabold flex items-center justify-center">
+                          {selectedColors.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Patterns tab */}
+                  {patterns.length > 0 && (
+                    <button
+                      onClick={() => setMobileActiveFilterTab('pattern')}
+                      className={`w-full text-left py-4 px-3.5 text-xs font-semibold border-l-4 transition-all relative flex flex-col gap-1 ${
+                        mobileActiveFilterTab === 'pattern'
+                          ? 'border-blue-600 bg-white text-blue-600 font-extrabold'
+                          : 'border-transparent text-gray-700 hover:bg-gray-100/50'
+                      }`}
+                    >
+                      <span>Pattern</span>
+                      {selectedPatterns.length > 0 && (
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-extrabold flex items-center justify-center">
+                          {selectedPatterns.length}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                {/* Right Options Content */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {/* Stock options */}
+                  {mobileActiveFilterTab === 'stock' && (
+                    <div className="space-y-1">
+                      {[{ v: 'in_stock', l: 'In Stock' }, { v: 'low_stock', l: 'Low Stock' }, { v: 'out_of_stock', l: 'Out of Stock' }].map(opt => {
+                        const checked = selectedStockFilters.includes(opt.v);
+                        return (
+                          <button 
+                            key={opt.v} 
+                            onClick={() => setSelectedStockFilters(prev => prev.includes(opt.v) ? prev.filter(x => x !== opt.v) : [...prev, opt.v])}
+                            className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
+                          >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                            }`}>
+                              {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                            </div>
+                            <span className={`text-sm font-medium ${checked ? 'text-blue-700 font-bold' : 'text-gray-800'}`}>
+                              {opt.l}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Category options */}
+                  {mobileActiveFilterTab === 'category' && (
+                    <div className="space-y-1">
+                      {categories.map(cat => {
+                        const checked = selectedCategories.includes(cat);
+                        return (
+                          <button 
+                            key={cat} 
+                            onClick={() => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(x => x !== cat) : [...prev, cat])}
+                            className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
+                          >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                            }`}>
+                              {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                            </div>
+                            <span className={`text-sm font-medium ${checked ? 'text-blue-700 font-bold' : 'text-gray-800'}`}>
+                              {cat}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Subcategory options */}
+                  {mobileActiveFilterTab === 'subcategory' && (
+                    <div className="space-y-1">
+                      {subcategories.map(sub => {
+                        const checked = selectedSubcategories.includes(sub);
+                        return (
+                          <button 
+                            key={sub} 
+                            onClick={() => setSelectedSubcategories(prev => prev.includes(sub) ? prev.filter(x => x !== sub) : [...prev, sub])}
+                            className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
+                          >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                            }`}>
+                              {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                            </div>
+                            <span className={`text-sm font-medium ${checked ? 'text-blue-700 font-bold' : 'text-gray-800'}`}>
+                              {sub}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Color options */}
+                  {mobileActiveFilterTab === 'color' && (
+                    <div className="space-y-1">
+                      {colors.map(color => {
+                        const checked = selectedColors.includes(color);
+                        return (
+                          <button 
+                            key={color} 
+                            onClick={() => setSelectedColors(prev => prev.includes(color) ? prev.filter(x => x !== color) : [...prev, color])}
+                            className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
+                          >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                            }`}>
+                              {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                            </div>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {colorCodeMap[color] && (
+                                <span 
+                                  className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0 inline-block shadow-inner" 
+                                  style={{ backgroundColor: colorCodeMap[color] }} 
+                                />
+                              )}
+                              <span className={`text-sm font-medium truncate ${checked ? 'text-blue-700 font-bold' : 'text-gray-800'}`}>
+                                {color}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Pattern options */}
+                  {mobileActiveFilterTab === 'pattern' && (
+                    <div className="space-y-1">
+                      {patterns.map(pattern => {
+                        const checked = selectedPatterns.includes(pattern);
+                        return (
+                          <button 
+                            key={pattern} 
+                            onClick={() => setSelectedPatterns(prev => prev.includes(pattern) ? prev.filter(x => x !== pattern) : [...prev, pattern])}
+                            className="w-full flex items-center gap-3 py-3 border-b border-gray-100 text-left"
+                          >
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                              checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300'
+                            }`}>
+                              {checked && <Check className="w-3.5 h-3.5 text-white stroke-[3px]" />}
+                            </div>
+                            <span className={`text-sm font-medium ${checked ? 'text-blue-700 font-bold' : 'text-gray-800'}`}>
+                              {pattern}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-4 border-t border-gray-100 mb-6 flex-shrink-0">
+                <button 
+                  onClick={() => setMobileFilterOpen(false)}
+                  className="w-full py-3 rounded-2xl bg-blue-600 text-white text-base font-bold"
+                >
+                  Apply{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+    if (isMobile) {
+      return createPortal(mobileContent, document.body);
+    }
+
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent customLayout className="max-w-7xl h-[90vh] max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
@@ -903,5 +1455,8 @@ export default function ProductMaterialSelectionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+    );
+  }
+
+  return null;
 }

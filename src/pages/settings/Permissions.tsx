@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, RefreshCw, Save } from 'lucide-react';
+import { Shield, RefreshCw, Save, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -284,175 +284,358 @@ export default function Permissions(_props: PermissionsProps) {
   const isSelectedUserSuperAdmin = selectedUser?.role === 'super-admin';
 
   return (
-    <Card>
-      <CardHeader className="space-y-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-blue-600" />
-            <CardTitle>User Permissions</CardTitle>
-          </div>
-          <CardDescription>
-            Control which pages and actions are allowed for each user.
-            {isSuperAdmin ? (
-              <span className="ml-1">
-                As <strong>super-admin</strong> you can adjust permissions for any user.
-              </span>
-            ) : (
-              <span className="ml-1">
-                As <strong>admin</strong> you can adjust permissions only for users you can manage.
-              </span>
-            )}
-          </CardDescription>
-        </div>
-
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide sm:w-24">
-              User
-            </span>
-            <Select
-              value={selectedUserId}
-              onValueChange={(val) => setSelectedUserId(val)}
-              disabled={loadingMeta || users.length === 0}
-            >
-              <SelectTrigger className="w-full sm:max-w-xs md:max-w-sm">
-                <SelectValue placeholder="Select user" />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    <div className="flex flex-col">
-                      <span>{u.full_name || u.email}</span>
-                      <span className="text-xs text-gray-400">
-                        {u.email} • role: {u.role}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              disabled={!selectedUserId || saving || loadingPermissions || isSelectedUserSuperAdmin}
-            >
-              <RefreshCw className="w-4 h-4 mr-1" />
-              Reset to default
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSave}
-              disabled={!selectedUserId || saving || loadingPermissions || isSelectedUserSuperAdmin}
-            >
-              <Save className="w-4 h-4 mr-1" />
-              Save changes
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
-        {loadingMeta || loadingPermissions ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="flex items-center gap-3 text-gray-500">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900" />
-              <span>Loading permissions…</span>
-            </div>
-          </div>
-        ) : !selectedUser ? (
-          <div className="py-10 text-center text-gray-500">Select a user to view and edit permissions.</div>
-        ) : (
-          <div className="space-y-4">
-            {isSelectedUserSuperAdmin && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Super-admin has full access. Permissions cannot be edited.
-              </div>
-            )}
-            <div className="flex items-center justify-between">
+    <>
+      {/* ─── DESKTOP VIEW ────────────────────────────────────────────── */}
+      <div className="hidden lg:block">
+        <Card>
+          <CardHeader className="space-y-4">
+            <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">Editing user:</span>
-                <Badge variant="outline" className="text-xs">
-                  {selectedUser.full_name || selectedUser.email} ({selectedUser.role})
-                </Badge>
+                <Shield className="w-5 h-5 text-blue-600" />
+                <CardTitle>User Permissions</CardTitle>
               </div>
+              <CardDescription>
+                Control which pages and actions are allowed for each user.
+                {isSuperAdmin ? (
+                  <span className="ml-1">
+                    As <strong>super-admin</strong> you can adjust permissions for any user.
+                  </span>
+                ) : (
+                  <span className="ml-1">
+                    As <strong>admin</strong> you can adjust permissions only for users you can manage.
+                  </span>
+                )}
+              </CardDescription>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pages.map((page) => {
-                const enabled = !!pagePermissions[page.key];
-                const moduleActions = actionsMeta[page.key] || [];
-
-                return (
-                  <div
-                    key={page.key}
-                    className="border border-gray-200 rounded-lg p-4 flex flex-col gap-3 bg-white"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{page.label}</span>
-                          <Badge variant={enabled ? 'default' : 'outline'} className="text-xs">
-                            {enabled ? 'Enabled' : 'Disabled'}
-                          </Badge>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 rounded-md border border-gray-100 bg-gray-50 px-3 py-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide sm:w-24">
+                  User
+                </span>
+                <Select
+                  value={selectedUserId}
+                  onValueChange={(val) => setSelectedUserId(val)}
+                  disabled={loadingMeta || users.length === 0}
+                >
+                  <SelectTrigger className="w-full sm:max-w-xs md:max-w-sm">
+                    <SelectValue placeholder="Select user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        <div className="flex flex-col">
+                          <span>{u.full_name || u.email}</span>
+                          <span className="text-xs text-gray-400">
+                            {u.email} • role: {u.role}
+                          </span>
                         </div>
-                        {page.description && (
-                          <p className="text-xs text-gray-500">{page.description}</p>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  disabled={!selectedUserId || saving || loadingPermissions || isSelectedUserSuperAdmin}
+                >
+                  <RefreshCw className="w-4 h-4 mr-1" />
+                  Reset to default
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={!selectedUserId || saving || loadingPermissions || isSelectedUserSuperAdmin}
+                >
+                  <Save className="w-4 h-4 mr-1" />
+                  Save changes
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent>
+            {loadingMeta || loadingPermissions ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="flex items-center gap-3 text-gray-500">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900" />
+                  <span>Loading permissions…</span>
+                </div>
+              </div>
+            ) : !selectedUser ? (
+              <div className="py-10 text-center text-gray-500">Select a user to view and edit permissions.</div>
+            ) : (
+              <div className="space-y-4">
+                {isSelectedUserSuperAdmin && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    Super-admin has full access. Permissions cannot be edited.
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Editing user:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {selectedUser.full_name || selectedUser.email} ({selectedUser.role})
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pages.map((page) => {
+                    const enabled = !!pagePermissions[page.key];
+                    const moduleActions = actionsMeta[page.key] || [];
+
+                    return (
+                      <div
+                        key={page.key}
+                        className="border border-gray-200 rounded-lg p-4 flex flex-col gap-3 bg-white"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">{page.label}</span>
+                              <Badge variant={enabled ? 'default' : 'outline'} className="text-xs">
+                                {enabled ? 'Enabled' : 'Disabled'}
+                              </Badge>
+                            </div>
+                            {page.description && (
+                              <p className="text-xs text-gray-500">{page.description}</p>
+                            )}
+                          </div>
+                          <SimpleSwitch
+                            checked={enabled}
+                            onCheckedChange={(val) => handleTogglePage(page.key, val)}
+                            disabled={isSelectedUserSuperAdmin}
+                          />
+                        </div>
+
+                        {moduleActions.length > 0 && (
+                          <div className="border-t border-gray-100 pt-3 mt-1">
+                            <p className="text-xs font-semibold text-gray-500 mb-2">
+                              Actions for this page
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {moduleActions.filter(a => !a.key.includes('_delete')).map((action) => {
+                                const checked = !!actionPermissions[action.key];
+                                // View is locked on if create or edit is enabled
+                                const module = action.key.split('_')[0];
+                                const isViewLocked = action.key.includes('_view') &&
+                                  (!!actionPermissions[`${module}_create`] || !!actionPermissions[`${module}_edit`]);
+                                const isDisabled = isSelectedUserSuperAdmin || isViewLocked;
+                                return (
+                                  <button
+                                    key={action.key}
+                                    type="button"
+                                    disabled={isDisabled}
+                                    onClick={() => !isDisabled && handleToggleAction(action.key, !checked)}
+                                    title={isViewLocked ? 'View is required when create or edit is enabled' : undefined}
+                                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                      checked
+                                        ? 'bg-blue-50 border-blue-500 text-blue-700'
+                                        : 'bg-gray-50 border-gray-300 text-gray-600'
+                                    } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                  >
+                                    {action.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <SimpleSwitch
-                        checked={enabled}
-                        onCheckedChange={(val) => handleTogglePage(page.key, val)}
-                        disabled={isSelectedUserSuperAdmin}
-                      />
-                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-                    {moduleActions.length > 0 && (
-                      <div className="border-t border-gray-100 pt-3 mt-1">
-                        <p className="text-xs font-semibold text-gray-500 mb-2">
-                          Actions for this page
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {moduleActions.filter(a => !a.key.includes('_delete')).map((action) => {
-                            const checked = !!actionPermissions[action.key];
-                            // View is locked on if create or edit is enabled
-                            const module = action.key.split('_')[0];
-                            const isViewLocked = action.key.includes('_view') &&
-                              (!!actionPermissions[`${module}_create`] || !!actionPermissions[`${module}_edit`]);
-                            const isDisabled = isSelectedUserSuperAdmin || isViewLocked;
-                            return (
-                              <button
-                                key={action.key}
-                                type="button"
-                                disabled={isDisabled}
-                                onClick={() => !isDisabled && handleToggleAction(action.key, !checked)}
-                                title={isViewLocked ? 'View is required when create or edit is enabled' : undefined}
-                                className={`text-xs px-2 py-1 rounded-full border transition-colors ${
-                                  checked
-                                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                                    : 'bg-gray-50 border-gray-300 text-gray-600'
-                                } ${isDisabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                              >
-                                {action.label}
-                              </button>
-                            );
-                          })}
-                        </div>
+      {/* ─── MOBILE VIEW ─────────────────────────────────────────────── */}
+      <div className="lg:hidden flex flex-col gap-4">
+        {/* Header and User Selector Card */}
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-blue-600" />
+              <h3 className="text-base font-extrabold text-gray-950 leading-tight">User Permissions</h3>
+            </div>
+            <p className="text-xs text-gray-500 leading-normal font-medium">
+              Control which pages and actions each user can access.
+            </p>
+          </div>
+
+          {/* User selector input trigger */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Select User</span>
+            {loadingMeta || users.length === 0 ? (
+              <div className="h-12 flex items-center justify-center bg-gray-50 border border-gray-200 rounded-xl select-none">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent mr-2" />
+                <span className="text-xs text-gray-400 font-bold">Loading users...</span>
+              </div>
+            ) : (
+              <Select
+                value={selectedUserId}
+                onValueChange={(val) => setSelectedUserId(val)}
+              >
+                <SelectTrigger className="w-full h-12 rounded-xl bg-gray-50 border border-gray-200 text-left px-3.5 shadow-none focus:ring-0 focus:ring-offset-0 focus:border-[#0066FF] focus:bg-white flex items-center justify-between">
+                  {selectedUser ? (
+                    <div className="flex flex-col text-left truncate">
+                      <span className="text-sm font-extrabold text-gray-900 leading-tight truncate">
+                        {selectedUser.full_name || selectedUser.email}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-bold mt-0.5 truncate uppercase">
+                        {selectedUser.role} • {selectedUser.email}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400 font-bold">Select user...</span>
+                  )}
+                </SelectTrigger>
+                <SelectContent className="rounded-xl max-h-[250px] overflow-y-auto">
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id} className="rounded-lg py-2 my-0.5">
+                      <div className="flex flex-col text-left">
+                        <span className="text-sm font-extrabold text-gray-900 leading-none">{u.full_name || u.email}</span>
+                        <span className="text-[10px] text-gray-400 font-bold mt-1 uppercase">
+                          {u.role} • {u.email}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Reset & Save buttons */}
+          {selectedUser && (
+            <div className="flex gap-3 pt-2 border-t border-gray-150">
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={saving || loadingPermissions || isSelectedUserSuperAdmin}
+                className="flex-1 h-11 border border-gray-200 text-gray-700 font-extrabold text-xs rounded-xl active:bg-gray-50 disabled:opacity-55 transition-all flex items-center justify-center gap-1.5 select-none"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+                Reset to Default
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || loadingPermissions || isSelectedUserSuperAdmin}
+                className="flex-1 h-11 bg-[#0066FF] text-white font-extrabold text-xs rounded-xl active:bg-blue-700 disabled:bg-gray-450 transition-all flex items-center justify-center gap-1.5 shadow-sm select-none"
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save className="w-3.5 h-3.5" />
+                )}
+                Save Changes
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Super-admin locked banner */}
+        {selectedUser && isSelectedUserSuperAdmin && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 shadow-sm select-none">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <h4 className="font-extrabold text-amber-900 text-xs uppercase tracking-wider">Super Admin Account</h4>
+              <p className="text-[11px] text-amber-800 mt-0.5 font-medium leading-normal">
+                Super-admin accounts possess absolute control over all pages and actions. Their permissions cannot be altered.
+              </p>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+
+        {/* Permission Cards List */}
+        {loadingMeta || loadingPermissions ? (
+          <div className="flex flex-col items-center justify-center py-16 bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <div className="animate-spin rounded-full h-7 w-7 border-2 border-[#0066FF] border-t-transparent" />
+            <span className="text-xs text-gray-400 font-bold mt-2">Loading permissions...</span>
+          </div>
+        ) : !selectedUser ? (
+          <div className="py-12 bg-white border border-gray-200 rounded-2xl text-center text-gray-400 font-bold text-xs shadow-sm">
+            Select a user above to view and edit permissions.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {pages.map((page) => {
+              const enabled = !!pagePermissions[page.key];
+              const moduleActions = actionsMeta[page.key] || [];
+
+              return (
+                <div
+                  key={page.key}
+                  className="bg-white border border-gray-200 rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-gray-900 text-sm leading-tight">{page.label}</span>
+                        <Badge className={`text-[9px] font-extrabold px-2 py-0.5 border-none shadow-none leading-none select-none ${
+                          enabled ? 'bg-blue-50 text-[#0066FF]' : 'bg-gray-100 text-gray-450'
+                        }`}>
+                          {enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      </div>
+                      {page.description && (
+                        <p className="text-[11px] text-gray-400 mt-1 font-medium leading-normal">{page.description}</p>
+                      )}
+                    </div>
+                    <SimpleSwitch
+                      checked={enabled}
+                      onCheckedChange={(val) => {
+                        if (!isSelectedUserSuperAdmin) handleTogglePage(page.key, val);
+                      }}
+                      disabled={isSelectedUserSuperAdmin}
+                    />
+                  </div>
+
+                  {moduleActions.length > 0 && (
+                    <div className="border-t border-gray-100 pt-3 mt-1">
+                      <div className="flex flex-wrap gap-2">
+                        {moduleActions.filter(a => !a.key.includes('_delete')).map((action) => {
+                          const checked = !!actionPermissions[action.key];
+                          const module = action.key.split('_')[0];
+                          const isViewLocked = action.key.includes('_view') &&
+                            (!!actionPermissions[`${module}_create`] || !!actionPermissions[`${module}_edit`]);
+                          const isDisabled = isSelectedUserSuperAdmin || isViewLocked;
+                          return (
+                            <button
+                              key={action.key}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => !isDisabled && handleToggleAction(action.key, !checked)}
+                              className={`text-[11px] font-extrabold px-3 py-1.5 rounded-full border transition-all select-none ${
+                                checked
+                                  ? 'bg-blue-50 border-blue-200 text-[#0066FF]'
+                                  : 'bg-gray-50 border-gray-200 text-gray-600'
+                              } ${isDisabled ? 'opacity-55 cursor-not-allowed' : 'active:scale-95'}`}
+                            >
+                              {action.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

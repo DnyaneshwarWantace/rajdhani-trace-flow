@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MobileOptionSheet, MobileSelectTrigger } from '@/components/ui/MobileOptionSheet';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,12 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
   const handleToggleClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
     setSelectOpen(false); setTogglingOption(opt);
+  };
+  const handleInstantToggle = async (opt: DropdownOption) => {
+    try {
+      await DropdownService.toggleActive(opt.id || opt._id);
+      onUnitsReload();
+    } catch { toast({ title: 'Error', description: 'Failed to toggle', variant: 'destructive' }); }
   };
   const handleDeleteClick = (e: React.MouseEvent, opt: DropdownOption) => {
     e.stopPropagation(); e.preventDefault();
@@ -164,95 +171,125 @@ const MaterialUnitSection = forwardRef<HTMLButtonElement, MaterialUnitSectionPro
     }
   };
 
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const hasFieldError = hasError || (touchedFields.has('unit') && !unit.trim());
+
   return (
     <div>
       <Label htmlFor="unit">Unit *</Label>
       <div className="space-y-2">
-        <Select
-          open={selectOpen}
-          onOpenChange={(open) => {
-            setSelectOpen(open);
-            if (!open) markFieldTouched('unit');
-          }}
-          value={unit || ''}
-          onValueChange={(value) => {
-            if (value === 'add_new') { setShowAddUnit(true); setSelectOpen(false); }
-            else { onUnitChange(value); markFieldTouched('unit'); setSelectOpen(false); }
-          }}
-        >
-          <SelectTrigger
-            ref={ref}
-            id="unit"
-            className={(hasError || (touchedFields.has('unit') && !unit.trim())) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}
-          >
-            <SelectValue placeholder="Select unit" />
-          </SelectTrigger>
-          <SelectContent>
-            {units.length > 0 ? (
-              units.filter((u) => u && u.trim() !== '').map((u) => {
-                const fullOpt = findFullOption(u);
-                const used = isUsed(u);
-                return (
-                  <div key={u} className="relative flex items-center group">
-                    <SelectItem value={u} className={`flex-1 ${hasManagement ? 'pr-14' : ''}`}>{u}</SelectItem>
-                    {hasManagement && fullOpt && (
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10 transition-opacity">
-                        <button type="button" title={fullOpt.is_active ? 'Deactivate' : 'Activate'} className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
-                          {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
-                        </button>
-                        {!used && (
-                          <button type="button" title="Delete" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
-                            <Trash2 className="w-3 h-3 text-red-500" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <SelectItem value="no_units" disabled>No units available</SelectItem>
-            )}
-            <SelectItem value="add_new" className="text-primary-600 font-medium">
-              <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Unit</div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        {touchedFields.has('unit') && !unit.trim() && (
-          <p className="text-xs text-red-500 mt-1">
-            Unit is required
-          </p>
-        )}
-        {showAddUnit && (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  value={newUnitName}
-                  onChange={(e) => handleUnitNameChange(e.target.value)}
-                  placeholder="Enter new unit"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {wordCount}/2 words • Max 10 characters per word
-                </p>
+
+        {/* Mobile: bottom sheet */}
+        <div className="lg:hidden">
+          <MobileSelectTrigger
+            value={unit}
+            placeholder="Select unit"
+            hasError={hasFieldError}
+            onClick={() => setMobileSheetOpen(true)}
+          />
+          <MobileOptionSheet
+            open={mobileSheetOpen}
+            onClose={() => { setMobileSheetOpen(false); markFieldTouched('unit'); }}
+            title="Unit"
+            options={(fullOptions && fullOptions.length > 0 ? fullOptions : units.map(u => ({ value: u }))).map(o => {
+              const fo = fullOptions?.find(f => f.value === (typeof o === 'string' ? o : o.value));
+              const val = typeof o === 'string' ? o : o.value;
+              return { value: val, label: val, isActive: fo ? fo.is_active !== false : true, id: fo?.id || fo?._id, isUsed: isUsed(val) };
+            })}
+            selected={unit}
+            onSelect={(val) => { onUnitChange(val); markFieldTouched('unit'); }}
+            onAddNew={() => setShowAddUnit(true)}
+            onToggleActive={(opt) => {
+              const fo = fullOptions?.find(f => f.value === opt.value);
+              if (fo) handleInstantToggle(fo);
+            }}
+            onDelete={(opt) => {
+              const fo = fullOptions?.find(f => f.value === opt.value);
+              if (fo) { const e = { stopPropagation: () => {}, preventDefault: () => {} } as any; handleDeleteClick(e, fo); }
+            }}
+          />
+          {showAddUnit && (
+            <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input value={newUnitName} onChange={(e) => handleUnitNameChange(e.target.value)} placeholder="New unit name" className="h-10 rounded-xl" />
+                  <p className="text-xs text-gray-400 mt-1">{wordCount}/2 words • Max 10 chars per word</p>
+                </div>
+                <Button type="button" size="sm" onClick={handleAddUnit}>Add</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddUnit(false); setNewUnitName(''); }}>✕</Button>
               </div>
-              <Button type="button" size="sm" onClick={handleAddUnit}>
-                Add
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setShowAddUnit(false);
-                  setNewUnitName('');
-                }}
-              >
-                Cancel
-              </Button>
             </div>
-          </div>
-        )}
+          )}
+          {touchedFields.has('unit') && !unit.trim() && <p className="text-xs text-red-500 mt-1">Unit is required</p>}
+        </div>
+
+        {/* Desktop: Radix Select */}
+        <div className="hidden lg:block">
+          <Select
+            open={selectOpen}
+            onOpenChange={(open) => { setSelectOpen(open); if (!open) markFieldTouched('unit'); }}
+            value={unit || ''}
+            onValueChange={(value) => {
+              if (value === 'add_new') { setShowAddUnit(true); setSelectOpen(false); }
+              else { onUnitChange(value); markFieldTouched('unit'); setSelectOpen(false); }
+            }}
+          >
+            <SelectTrigger ref={ref} id="unit" className={hasFieldError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}>
+              <SelectValue placeholder="Select unit" />
+            </SelectTrigger>
+            <SelectContent>
+              {(fullOptions && fullOptions.length > 0 ? fullOptions : units.filter((u) => u && u.trim() !== '').map((u) => ({ value: u, is_active: true } as DropdownOption))).length > 0 ? (
+                (fullOptions && fullOptions.length > 0 ? fullOptions : units.filter((u) => u && u.trim() !== '').map((u) => ({ value: u, is_active: true } as DropdownOption))).map((opt) => {
+                  const u = opt.value;
+                  const isInactive = opt.is_active === false;
+                  const fullOpt = isInactive ? opt : (findFullOption(u) ?? opt);
+                  const used = isUsed(u);
+                  return (
+                    <div key={u} className="relative flex items-center group">
+                      <SelectItem
+                        value={u}
+                        disabled={isInactive}
+                        className={`flex-1 ${hasManagement ? 'pr-14' : ''} ${isInactive ? 'text-gray-400' : ''}`}
+                      >
+                        {isInactive ? `${u} (Inactive)` : u}
+                      </SelectItem>
+                      {hasManagement && fullOpt && (
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10">
+                          <button type="button" className="p-1 rounded hover:bg-gray-100" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleToggleClick(e, fullOpt)}>
+                            {fullOpt.is_active ? <Check className="w-3 h-3 text-green-600" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                          </button>
+                          {!used && (
+                            <button type="button" className="p-1 rounded hover:bg-red-50" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => handleDeleteClick(e, fullOpt)}>
+                              <Trash2 className="w-3 h-3 text-red-500" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <SelectItem value="no_units" disabled>No units available</SelectItem>
+              )}
+              <SelectItem value="add_new" className="text-primary-600 font-medium">
+                <div className="flex items-center gap-2"><Plus className="w-4 h-4" />Add New Unit</div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          {touchedFields.has('unit') && !unit.trim() && <p className="text-xs text-red-500 mt-1">Unit is required</p>}
+          {showAddUnit && (
+            <div className="space-y-2 mt-2">
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input value={newUnitName} onChange={(e) => handleUnitNameChange(e.target.value)} placeholder="Enter new unit" />
+                  <p className="text-xs text-muted-foreground mt-1">{wordCount}/2 words • Max 10 characters per word</p>
+                </div>
+                <Button type="button" size="sm" onClick={handleAddUnit}>Add</Button>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddUnit(false); setNewUnitName(''); }}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <AlertDialog open={!!togglingOption} onOpenChange={(open) => !open && setTogglingOption(null)}>

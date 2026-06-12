@@ -73,9 +73,9 @@ export default function IndividualProductCard({
                 <Hash className="w-3 h-3 text-gray-500" />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] text-gray-500">Serial</p>
+                <p className="text-[9px] text-gray-500">Roll No</p>
                 <p className="text-[10px] font-mono font-medium text-gray-900 truncate">
-                  {individualProduct.serial_number || individualProduct.id}
+                  {individualProduct.roll_number || '—'}
                 </p>
               </div>
             </div>
@@ -84,12 +84,9 @@ export default function IndividualProductCard({
                 <QrCode className="w-3 h-3 text-primary-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-[9px] text-gray-500">QR / Roll</p>
+                <p className="text-[9px] text-gray-500">QR Code</p>
                 <p className="text-[10px] font-mono font-semibold text-gray-900 truncate">
-                  {individualProduct.qr_code || individualProduct.id.slice(0, 8)}
-                  {individualProduct.roll_number && (
-                    <span className="ml-1 text-[9px] text-gray-600">({individualProduct.roll_number})</span>
-                  )}
+                  {individualProduct.qr_code || individualProduct.id}
                 </p>
               </div>
             </div>
