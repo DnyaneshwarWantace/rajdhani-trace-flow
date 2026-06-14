@@ -124,7 +124,7 @@ export default function TransportManagement() {
     setSaving(true);
     const cleanedForm = {
       ...form,
-      driver_contact: /^\+\d{1,4}$/.test(form.driver_contact.trim()) ? '' : form.driver_contact.trim(),
+      driver_contact: /^\+\d{1,4}$/.test((form.driver_contact ?? '').trim()) ? '' : (form.driver_contact ?? '').trim(),
     };
     try {
       if (editing) {
