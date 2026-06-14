@@ -216,7 +216,7 @@ export default function NewOrder() {
     if (!newTruckNo.trim()) return;
     setSavingNewTruck(true);
     try {
-      const created = await TransportService.create({ vehicle_no: newTruckNo.trim().toUpperCase(), vehicle_type: newTruckType, capacity: '', driver_name: '', driver_contact: '', notes: '' });
+      const created = await TransportService.create({ vehicle_no: newTruckNo.trim().toUpperCase(), vehicle_type: newTruckType, capacity_value: null, capacity_unit: '', driver_name: '', driver_contact: '', notes: '' });
       setSavedTransports(prev => [...prev, created]);
       selectTruck(created);
       setNewTruckNo('');
@@ -818,7 +818,7 @@ export default function NewOrder() {
                       <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-1">
                         <div className="flex justify-between"><span>Type</span><span className="font-semibold text-gray-700">{t.vehicle_type === 'own' ? 'Own' : t.vehicle_type === 'outside' ? 'Outside' : 'Hired'} Transport</span></div>
                         {t.driver_name && <div className="flex justify-between"><span>Driver</span><span className="font-semibold text-gray-700">{t.driver_name}{t.driver_contact ? ` · ${t.driver_contact}` : ''}</span></div>}
-                        {t.capacity && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity}</span></div>}
+                        {t.capacity_value != null && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity_value}{t.capacity_unit ? ` ${t.capacity_unit}` : ''}</span></div>}
                       </div>
                     );
                   })()}
@@ -1298,7 +1298,7 @@ export default function NewOrder() {
                             <SelectItem key={t.id} value={t.id}>
                               <span className="font-semibold">{t.vehicle_no}</span>
                               {t.driver_name && <span className="text-gray-400 ml-1">— {t.driver_name}</span>}
-                              {t.capacity && <span className="text-gray-400 ml-1">({t.capacity})</span>}
+                              {t.capacity_value != null && <span className="text-gray-400 ml-1">({t.capacity_value}{t.capacity_unit ? ` ${t.capacity_unit}` : ''})</span>}
                             </SelectItem>
                           ))}
                           <SelectItem value="__new__">
@@ -1339,7 +1339,7 @@ export default function NewOrder() {
                         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-1">
                           <div className="flex justify-between"><span>Type</span><span className="font-semibold text-gray-700">{t.vehicle_type === 'own' ? 'Own' : t.vehicle_type === 'outside' ? 'Outside' : 'Hired'} Transport</span></div>
                           {t.driver_name && <div className="flex justify-between"><span>Driver</span><span className="font-semibold text-gray-700">{t.driver_name}{t.driver_contact ? ` · ${t.driver_contact}` : ''}</span></div>}
-                          {t.capacity && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity}</span></div>}
+                          {t.capacity_value != null && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity_value}{t.capacity_unit ? ` ${t.capacity_unit}` : ''}</span></div>}
                         </div>
                       );
                     })()}

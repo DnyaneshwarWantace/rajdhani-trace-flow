@@ -4,7 +4,8 @@ export interface Transport {
   id: string;
   vehicle_no: string;
   vehicle_type: 'own' | 'outside' | 'hired';
-  capacity: string;
+  capacity_value: number | null;
+  capacity_unit: string;
   driver_name?: string;
   driver_contact?: string;
   notes?: string;

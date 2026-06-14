@@ -7,10 +7,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { TransportService, type Transport } from '@/services/transportService';
-import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2 } from 'lucide-react';
+import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2, ChevronDown } from 'lucide-react';
+import { getApiUrl } from '@/utils/apiConfig';
+
+const API_URL = getApiUrl();
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = localStorage.getItem('auth_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+async function fetchCapacityUnits(): Promise<string[]> {
+  const res = await fetch(`${API_URL}/dropdowns/capacity_unit`, { headers: await authHeaders() });
+  const data = await res.json();
+  return data.success ? data.data.map((d: any) => d.value) : [];
+}
+
+async function addCapacityUnit(value: string): Promise<void> {
+  const res = await fetch(`${API_URL}/dropdowns`, {
+    method: 'POST',
+    headers: await authHeaders(),
+    body: JSON.stringify({ category: 'capacity_unit', value: value.trim() }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to add unit');
+}
 
 const EMPTY: Omit<Transport, 'id' | 'is_active'> = {
-  vehicle_no: '', vehicle_type: 'own', capacity: '', driver_name: '', driver_contact: '', notes: '',
+  vehicle_no: '', vehicle_type: 'own', capacity_value: null, capacity_unit: '',
+  driver_name: '', driver_contact: '', notes: '',
 };
 
 const typeLabel = (v: string) => v === 'own' ? 'Own' : v === 'outside' ? 'Outside' : 'Hired';
@@ -18,6 +43,12 @@ const typeBadge = (v: string) =>
   v === 'own' ? 'bg-blue-100 text-blue-700 border border-blue-200' :
   v === 'outside' ? 'bg-orange-100 text-orange-700 border border-orange-200' :
   'bg-purple-100 text-purple-700 border border-purple-200';
+
+function capacityDisplay(t: Transport) {
+  if (t.capacity_value != null && t.capacity_unit) return `${t.capacity_value} ${t.capacity_unit}`;
+  if (t.capacity_value != null) return String(t.capacity_value);
+  return '—';
+}
 
 export default function TransportManagement() {
   const { toast } = useToast();
@@ -32,19 +63,58 @@ export default function TransportManagement() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Capacity unit dropdown state
+  const [capacityUnits, setCapacityUnits] = useState<string[]>([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [addingUnit, setAddingUnit] = useState(false);
+  const [newUnitValue, setNewUnitValue] = useState('');
+  const [savingUnit, setSavingUnit] = useState(false);
+
   const load = async () => {
     setLoading(true);
     try { setTransports(await TransportService.getAll()); }
     finally { setLoading(false); }
   };
 
+  const loadUnits = async () => {
+    setUnitsLoading(true);
+    try { setCapacityUnits(await fetchCapacityUnits()); }
+    finally { setUnitsLoading(false); }
+  };
+
   useEffect(() => { load(); }, []);
 
-  const openCreate = () => { setEditing(null); setForm(EMPTY); setShowDialog(true); };
+  const openCreate = () => {
+    setEditing(null); setForm(EMPTY);
+    setAddingUnit(false); setNewUnitValue('');
+    loadUnits();
+    setShowDialog(true);
+  };
   const openEdit = (t: Transport) => {
     setEditing(t);
-    setForm({ vehicle_no: t.vehicle_no, vehicle_type: t.vehicle_type, capacity: t.capacity || '', driver_name: t.driver_name || '', driver_contact: t.driver_contact || '', notes: t.notes || '' });
+    setForm({
+      vehicle_no: t.vehicle_no, vehicle_type: t.vehicle_type,
+      capacity_value: t.capacity_value, capacity_unit: t.capacity_unit || '',
+      driver_name: t.driver_name || '', driver_contact: t.driver_contact || '', notes: t.notes || '',
+    });
+    setAddingUnit(false); setNewUnitValue('');
+    loadUnits();
     setShowDialog(true);
+  };
+
+  const handleAddUnit = async () => {
+    if (!newUnitValue.trim()) return;
+    setSavingUnit(true);
+    try {
+      await addCapacityUnit(newUnitValue.trim());
+      const updated = await fetchCapacityUnits();
+      setCapacityUnits(updated);
+      setForm(f => ({ ...f, capacity_unit: newUnitValue.trim() }));
+      setNewUnitValue('');
+      setAddingUnit(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingUnit(false); }
   };
 
   const handleSave = async () => {
@@ -203,7 +273,7 @@ export default function TransportManagement() {
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${typeBadge(t.vehicle_type)}`}>{typeLabel(t.vehicle_type)}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{t.capacity || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{capacityDisplay(t)}</td>
                       <td className="px-4 py-3">
                         {t.driver_name ? (
                           <div>
@@ -254,7 +324,7 @@ export default function TransportManagement() {
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
-                          {t.capacity && <span className="font-medium">{t.capacity}</span>}
+                          {(t.capacity_value != null) && <span className="font-medium">{capacityDisplay(t)}</span>}
                           {t.driver_name && <span className="flex items-center gap-1"><User className="w-3 h-3" />{t.driver_name}</span>}
                           {t.driver_contact && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{t.driver_contact}</span>}
                           {t.notes && <span className="text-gray-400 italic truncate max-w-[200px]">{t.notes}</span>}
@@ -308,11 +378,70 @@ export default function TransportManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Capacity — value + unit */}
             <div className="space-y-1.5">
-              <Label>Capacity <span className="text-gray-400 text-xs font-normal">optional — e.g. 5 tonnes, 200 bags</span></Label>
-              <Input placeholder="e.g. 5 tonnes, 200 bags, 10 rolls" value={form.capacity}
-                onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} />
+              <Label>Capacity <span className="text-gray-400 text-xs font-normal">optional</span></Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  className="w-28 flex-shrink-0"
+                  value={form.capacity_value ?? ''}
+                  onChange={e => setForm(f => ({ ...f, capacity_value: e.target.value === '' ? null : parseFloat(e.target.value) }))}
+                />
+                <div className="flex-1 min-w-0">
+                  {unitsLoading ? (
+                    <div className="h-10 border rounded-md flex items-center px-3 text-sm text-gray-400">Loading…</div>
+                  ) : (
+                    <Select
+                      value={form.capacity_unit || '__placeholder__'}
+                      onValueChange={v => {
+                        if (v === '__add_new__') { setAddingUnit(true); }
+                        else if (v !== '__placeholder__') { setForm(f => ({ ...f, capacity_unit: v })); setAddingUnit(false); }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {capacityUnits.length === 0 && (
+                          <div className="px-3 py-2 text-sm text-gray-400">No units yet</div>
+                        )}
+                        {capacityUnits.map(u => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                        <SelectItem value="__add_new__">
+                          <span className="text-primary-600 font-semibold flex items-center gap-1">
+                            <Plus className="w-3 h-3" /> Add New Unit
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </div>
+              {/* Inline add new unit */}
+              {addingUnit && (
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    placeholder="e.g. tonnes, bags, rolls"
+                    value={newUnitValue}
+                    onChange={e => setNewUnitValue(e.target.value)}
+                    className="flex-1"
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnit(); } }}
+                  />
+                  <Button size="sm" onClick={handleAddUnit} disabled={savingUnit || !newUnitValue.trim()}
+                    className="bg-primary-600 hover:bg-primary-700 text-white flex-shrink-0">
+                    {savingUnit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setAddingUnit(false); setNewUnitValue(''); }}
+                    className="flex-shrink-0">Cancel</Button>
+                </div>
+              )}
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Driver Name <span className="text-gray-400 text-xs font-normal">optional</span></Label>
