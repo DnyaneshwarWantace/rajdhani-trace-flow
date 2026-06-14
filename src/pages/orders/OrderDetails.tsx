@@ -543,17 +543,34 @@ export default function OrderDetails() {
     }
   };
 
-  const handleDispatchOrder = () => {
-    setTransportType('own');
-    setTransportVehicleNo('');
-    setTransportRemark('');
+  const handleDispatchOrder = async () => {
+    // Prefill from order's existing transport info
+    const existingVehicleNo = (order as any)?.transport_vehicle_no || '';
+    const existingType = (order as any)?.transport_type || 'own';
+    const existingRemark = (order as any)?.transport_remark || '';
+
+    setTransportType(existingType);
+    setTransportVehicleNo(existingVehicleNo);
+    setTransportRemark(existingRemark);
     setSelectedTransportId('');
     setAddingNewTruck(false);
     setNewTruckNo(''); setNewTruckType('own');
     setNewTruckDriverName(''); setNewTruckDriverContact('');
     setNewTruckCapacityValue(''); setNewTruckCapacityUnit('');
     setAddingCapacityUnit(false); setNewCapacityUnitValue('');
-    TransportService.getAll(true).then(setSavedTransports).catch(() => setSavedTransports([]));
+
+    try {
+      const trucks = await TransportService.getAll(true);
+      setSavedTransports(trucks);
+      // Auto-select the truck matching the order's vehicle no
+      if (existingVehicleNo) {
+        const match = trucks.find(t => t.vehicle_no === existingVehicleNo);
+        if (match) {
+          setSelectedTransportId(match.id);
+          setTransportType(match.vehicle_type);
+        }
+      }
+    } catch { setSavedTransports([]); }
     fetchCapacityUnitsOD().then(setCapacityUnits).catch(() => {});
     setShowTransportDialog(true);
   };
