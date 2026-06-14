@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, MapPin, Truck, Edit2, StickyNote } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MapPin, Truck, Edit2, StickyNote, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerService, type Customer } from '@/services/customerService';
 import { OrderService } from '@/services/orderService';
@@ -21,6 +21,7 @@ import OrderItemsList from '@/components/orders/OrderItemsList';
 import MobileOrderItemForm from '@/components/orders/MobileOrderItemForm';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import DeliveryAddressDialog from '@/components/orders/DeliveryAddressDialog';
+import { TransportService, type Transport } from '@/services/transportService';
 
 const DRAFT_KEY = 'newOrderDraft';
 
@@ -192,11 +193,37 @@ export default function NewOrder() {
   const [materialSortOrder, setMaterialSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [orderDetails, setOrderDetails] = useState({ expectedDelivery: '', notes: '', remarks: '', paidAmount: 0, piNumber: '' });
-  const [transportType, setTransportType] = useState<'own' | 'outside' | ''>('');
+  const [transportType, setTransportType] = useState<'own' | 'outside' | 'hired' | ''>('');
   const [transportVehicleNo, setTransportVehicleNo] = useState('');
   const [transportRemark, setTransportRemark] = useState('');
+  const [savedTransports, setSavedTransports] = useState<Transport[]>([]);
+  const [selectedTransportId, setSelectedTransportId] = useState('');
+  const [addingNewTruck, setAddingNewTruck] = useState(false);
+  const [newTruckNo, setNewTruckNo] = useState('');
+  const [newTruckType, setNewTruckType] = useState<'own' | 'outside' | 'hired'>('own');
+  const [savingNewTruck, setSavingNewTruck] = useState(false);
   const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{ address: string; city: string; state: string; pincode: string } | null>(null);
   const [showAddressEditor, setShowAddressEditor] = useState(false);
+
+  const selectTruck = (t: Transport) => {
+    setSelectedTransportId(t.id);
+    setTransportVehicleNo(t.vehicle_no);
+    setTransportType(t.vehicle_type);
+    setAddingNewTruck(false);
+  };
+
+  const handleSaveNewTruck = async () => {
+    if (!newTruckNo.trim()) return;
+    setSavingNewTruck(true);
+    try {
+      const created = await TransportService.create({ vehicle_no: newTruckNo.trim().toUpperCase(), vehicle_type: newTruckType, capacity_kg: 0, driver_name: '', driver_contact: '', notes: '' });
+      setSavedTransports(prev => [...prev, created]);
+      selectTruck(created);
+      setNewTruckNo('');
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingNewTruck(false); }
+  };
 
   const customerFormSubmitRef = useRef<(() => void) | null>(null);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,6 +270,7 @@ export default function NewOrder() {
   const clearDraft = () => { sessionStorage.removeItem(DRAFT_KEY); };
 
   useEffect(() => {
+    TransportService.getAll(true).then(setSavedTransports).catch(() => {});
     loadCustomers();
     loadProductsWithFilters();
     loadRawMaterialsWithFilters();
@@ -736,28 +764,64 @@ export default function NewOrder() {
               <div>
                 <p className="text-sm font-extrabold text-gray-900 mb-2.5">Transport</p>
                 <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-                  {/* Type toggle */}
-                  <div className="flex gap-2.5">
-                    {([{ v: 'own', l: 'Own Transport' }, { v: 'outside', l: 'Outside Transport' }] as const).map(({ v, l }) => (
-                      <button key={v} onClick={() => setTransportType(v as 'own' | 'outside')}
-                        className={`flex-1 py-2.5 rounded-xl border-[1.5px] text-[12.5px] font-bold transition-colors ${
-                          transportType === v
-                            ? 'border-blue-600 bg-blue-50 text-blue-600'
-                            : 'border-gray-200 bg-white text-gray-500'
-                        }`}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                  {/* Vehicle No */}
+                  {/* Truck picker */}
                   <div>
-                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
-                      Vehicle No <span className="text-gray-400 font-normal">(optional)</span>
-                    </label>
-                    <input type="text" placeholder="e.g. MH12AB1234" value={transportVehicleNo}
-                      onChange={e => setTransportVehicleNo(e.target.value)}
-                      className="w-full h-[46px] px-[13px] rounded-[10px] border border-gray-200 bg-gray-50 text-[15px] outline-none focus:border-blue-400" />
+                    <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">Select Vehicle <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <Select value={selectedTransportId} onValueChange={v => {
+                      if (v === '__new__') { setAddingNewTruck(true); setSelectedTransportId(''); }
+                      else { const t = savedTransports.find(x => x.id === v); if (t) selectTruck(t); }
+                    }}>
+                      <SelectTrigger className="h-[46px] text-[14px] rounded-[10px] border-gray-200 bg-gray-50">
+                        <SelectValue placeholder="Choose a saved vehicle…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {savedTransports.map(t => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="font-semibold">{t.vehicle_no}</span>
+                            {t.driver_name && <span className="text-gray-400 ml-1">— {t.driver_name}</span>}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__new__"><span className="text-primary-600 font-semibold flex items-center gap-1"><Plus className="w-3 h-3" /> Add New Vehicle</span></SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
+                  {/* Inline add new truck */}
+                  {addingNewTruck && (
+                    <div className="border border-orange-200 bg-orange-50 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-orange-700">New Vehicle</p>
+                      <input type="text" placeholder="Vehicle No e.g. MH12AB1234" value={newTruckNo}
+                        onChange={e => setNewTruckNo(e.target.value.toUpperCase())}
+                        className="w-full h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                      <div className="flex gap-2">
+                        {(['own', 'outside', 'hired'] as const).map(t => (
+                          <button key={t} onClick={() => setNewTruckType(t)}
+                            className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${newTruckType === t ? 'border-orange-500 bg-orange-100 text-orange-700' : 'border-gray-200 text-gray-500'}`}>
+                            {t === 'own' ? 'Own' : t === 'outside' ? 'Outside' : 'Hired'}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}
+                          className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-500">Cancel</button>
+                        <button onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()}
+                          className="flex-[2] py-2 rounded-lg bg-orange-500 text-white text-sm font-bold disabled:opacity-50">
+                          {savingNewTruck ? 'Saving…' : 'Save & Select'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* Selected truck info */}
+                  {selectedTransportId && !addingNewTruck && (() => {
+                    const t = savedTransports.find(x => x.id === selectedTransportId);
+                    if (!t) return null;
+                    return (
+                      <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-1">
+                        <div className="flex justify-between"><span>Type</span><span className="font-semibold text-gray-700">{t.vehicle_type === 'own' ? 'Own' : t.vehicle_type === 'outside' ? 'Outside' : 'Hired'} Transport</span></div>
+                        {t.driver_name && <div className="flex justify-between"><span>Driver</span><span className="font-semibold text-gray-700">{t.driver_name}{t.driver_contact ? ` · ${t.driver_contact}` : ''}</span></div>}
+                        {t.capacity_kg > 0 && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity_kg} kg</span></div>}
+                      </div>
+                    );
+                  })()}
                   {/* Remark */}
                   <div>
                     <label className="text-[13px] font-semibold text-gray-900 mb-1.5 block">
@@ -1219,24 +1283,68 @@ export default function NewOrder() {
                       <Truck className="w-3.5 h-3.5" />
                       <span className="text-sm font-semibold text-slate-700">Transport info</span>
                     </div>
+                    {/* Truck picker */}
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-gray-700">Type</Label>
-                      <Select value={transportType} onValueChange={v => setTransportType(v as 'own' | 'outside' | '')}>
+                      <Label className="text-sm font-medium text-gray-700">Select Vehicle</Label>
+                      <Select value={selectedTransportId} onValueChange={v => {
+                        if (v === '__new__') { setAddingNewTruck(true); setSelectedTransportId(''); }
+                        else { const t = savedTransports.find(x => x.id === v); if (t) selectTruck(t); }
+                      }}>
                         <SelectTrigger className="h-10 text-sm">
-                          <SelectValue placeholder="Select transport type…" />
+                          <SelectValue placeholder="Choose a saved vehicle…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="own">Own</SelectItem>
-                          <SelectItem value="outside">Outside</SelectItem>
+                          {savedTransports.map(t => (
+                            <SelectItem key={t.id} value={t.id}>
+                              <span className="font-semibold">{t.vehicle_no}</span>
+                              {t.driver_name && <span className="text-gray-400 ml-1">— {t.driver_name}</span>}
+                              {t.capacity_kg > 0 && <span className="text-gray-400 ml-1">({t.capacity_kg} kg)</span>}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__new__">
+                            <span className="text-primary-600 font-semibold flex items-center gap-1"><Plus className="w-3 h-3" /> Add New Vehicle</span>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Inline add new truck */}
+                    {addingNewTruck && (
+                      <div className="border border-orange-200 bg-orange-50 rounded-xl p-3 space-y-2.5">
+                        <p className="text-xs font-bold text-orange-700">New Vehicle</p>
+                        <Input placeholder="Vehicle No e.g. MH12AB1234" value={newTruckNo}
+                          onChange={e => setNewTruckNo(e.target.value.toUpperCase())} className="h-9 text-sm" />
+                        <div className="flex gap-2">
+                          {(['own', 'outside', 'hired'] as const).map(t => (
+                            <button key={t} onClick={() => setNewTruckType(t)}
+                              className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${newTruckType === t ? 'border-orange-500 bg-orange-100 text-orange-700' : 'border-gray-200 text-gray-500 bg-white'}`}>
+                              {t === 'own' ? 'Own' : t === 'outside' ? 'Outside' : 'Hired'}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}
+                            className="flex-1 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-500 bg-white">Cancel</button>
+                          <button onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()}
+                            className="flex-[2] py-1.5 rounded-lg bg-orange-500 text-white text-sm font-bold disabled:opacity-50">
+                            {savingNewTruck ? 'Saving…' : 'Save & Select'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Selected truck info */}
+                    {selectedTransportId && !addingNewTruck && (() => {
+                      const t = savedTransports.find(x => x.id === selectedTransportId);
+                      if (!t) return null;
+                      return (
+                        <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-500 space-y-1">
+                          <div className="flex justify-between"><span>Type</span><span className="font-semibold text-gray-700">{t.vehicle_type === 'own' ? 'Own' : t.vehicle_type === 'outside' ? 'Outside' : 'Hired'} Transport</span></div>
+                          {t.driver_name && <div className="flex justify-between"><span>Driver</span><span className="font-semibold text-gray-700">{t.driver_name}{t.driver_contact ? ` · ${t.driver_contact}` : ''}</span></div>}
+                          {t.capacity_kg > 0 && <div className="flex justify-between"><span>Capacity</span><span className="font-semibold text-gray-700">{t.capacity_kg} kg</span></div>}
+                        </div>
+                      );
+                    })()}
                     <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-gray-700">Vehicle no.</Label>
-                      <Input placeholder="MH-12-AB-1234" value={transportVehicleNo} onChange={e => setTransportVehicleNo(e.target.value)} className="h-10 text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-medium text-gray-700">Remark</Label>
+                      <Label className="text-sm font-medium text-gray-700">Remark <span className="text-gray-400 text-xs font-normal">(optional)</span></Label>
                       <Input placeholder="Optional note about transport" value={transportRemark} onChange={e => setTransportRemark(e.target.value)} className="h-10 text-sm" />
                     </div>
                   </div>
