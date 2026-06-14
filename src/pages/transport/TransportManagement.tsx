@@ -10,7 +10,7 @@ import { TransportService, type Transport } from '@/services/transportService';
 import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2 } from 'lucide-react';
 
 const EMPTY: Omit<Transport, 'id' | 'is_active'> = {
-  vehicle_no: '', vehicle_type: 'own', capacity_kg: 0, driver_name: '', driver_contact: '', notes: '',
+  vehicle_no: '', vehicle_type: 'own', capacity: '', driver_name: '', driver_contact: '', notes: '',
 };
 
 const typeLabel = (v: string) => v === 'own' ? 'Own' : v === 'outside' ? 'Outside' : 'Hired';
@@ -43,7 +43,7 @@ export default function TransportManagement() {
   const openCreate = () => { setEditing(null); setForm(EMPTY); setShowDialog(true); };
   const openEdit = (t: Transport) => {
     setEditing(t);
-    setForm({ vehicle_no: t.vehicle_no, vehicle_type: t.vehicle_type, capacity_kg: t.capacity_kg, driver_name: t.driver_name || '', driver_contact: t.driver_contact || '', notes: t.notes || '' });
+    setForm({ vehicle_no: t.vehicle_no, vehicle_type: t.vehicle_type, capacity: t.capacity || '', driver_name: t.driver_name || '', driver_contact: t.driver_contact || '', notes: t.notes || '' });
     setShowDialog(true);
   };
 
@@ -128,12 +128,7 @@ export default function TransportManagement() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              placeholder="Search vehicle no, driver name…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-            />
+            <Input placeholder="Search vehicle no, driver name…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Type" /></SelectTrigger>
@@ -168,9 +163,7 @@ export default function TransportManagement() {
               {transports.length === 0 ? 'No vehicles added yet' : 'No vehicles match your filters'}
             </p>
             <p className="text-gray-400 text-sm mb-5">
-              {transports.length === 0
-                ? 'Add your trucks so you can select them while dispatching orders.'
-                : 'Try adjusting your search or filters.'}
+              {transports.length === 0 ? 'Add your trucks so you can select them while dispatching orders.' : 'Try adjusting your search or filters.'}
             </p>
             {transports.length === 0 && (
               <Button onClick={openCreate} className="bg-primary-600 hover:bg-primary-700 text-white">
@@ -210,7 +203,7 @@ export default function TransportManagement() {
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${typeBadge(t.vehicle_type)}`}>{typeLabel(t.vehicle_type)}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{t.capacity_kg > 0 ? `${t.capacity_kg} kg` : '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{t.capacity || '—'}</td>
                       <td className="px-4 py-3">
                         {t.driver_name ? (
                           <div>
@@ -226,20 +219,14 @@ export default function TransportManagement() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => handleToggle(t)} title={t.is_active ? 'Deactivate' : 'Activate'}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                            {t.is_active
-                              ? <ToggleRight className="w-5 h-5 text-green-500" />
-                              : <ToggleLeft className="w-5 h-5 text-gray-400" />}
+                          <button onClick={() => handleToggle(t)} title={t.is_active ? 'Deactivate' : 'Activate'} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                            {t.is_active ? <ToggleRight className="w-5 h-5 text-green-500" /> : <ToggleLeft className="w-5 h-5 text-gray-400" />}
                           </button>
                           <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
                             <Edit2 className="w-4 h-4 text-gray-500" />
                           </button>
-                          <button onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}
-                            className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                            {deletingId === t.id
-                              ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
-                              : <Trash2 className="w-4 h-4 text-red-500" />}
+                          <button onClick={() => handleDelete(t.id)} disabled={deletingId === t.id} className="p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                            {deletingId === t.id ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-500" />}
                           </button>
                         </div>
                       </td>
@@ -267,7 +254,7 @@ export default function TransportManagement() {
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
-                          {t.capacity_kg > 0 && <span className="font-medium">{t.capacity_kg} kg</span>}
+                          {t.capacity && <span className="font-medium">{t.capacity}</span>}
                           {t.driver_name && <span className="flex items-center gap-1"><User className="w-3 h-3" />{t.driver_name}</span>}
                           {t.driver_contact && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{t.driver_contact}</span>}
                           {t.notes && <span className="text-gray-400 italic truncate max-w-[200px]">{t.notes}</span>}
@@ -282,9 +269,7 @@ export default function TransportManagement() {
                         <Edit2 className="w-4 h-4 text-gray-500" />
                       </button>
                       <button onClick={() => handleDelete(t.id)} disabled={deletingId === t.id} className="p-2 rounded-lg hover:bg-red-50">
-                        {deletingId === t.id
-                          ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
-                          : <Trash2 className="w-4 h-4 text-red-500" />}
+                        {deletingId === t.id ? <Loader2 className="w-4 h-4 text-red-400 animate-spin" /> : <Trash2 className="w-4 h-4 text-red-500" />}
                       </button>
                     </div>
                   </div>
@@ -324,9 +309,9 @@ export default function TransportManagement() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Capacity (kg) <span className="text-gray-400 text-xs font-normal">optional</span></Label>
-              <Input type="number" min="0" placeholder="0" value={form.capacity_kg || ''}
-                onChange={e => setForm(f => ({ ...f, capacity_kg: parseFloat(e.target.value) || 0 }))} />
+              <Label>Capacity <span className="text-gray-400 text-xs font-normal">optional — e.g. 5 tonnes, 200 bags</span></Label>
+              <Input placeholder="e.g. 5 tonnes, 200 bags, 10 rolls" value={form.capacity}
+                onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

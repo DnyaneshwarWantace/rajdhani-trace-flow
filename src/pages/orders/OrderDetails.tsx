@@ -536,7 +536,7 @@ export default function OrderDetails() {
       const created = await TransportService.create({
         vehicle_no: newTruckNo.trim().toUpperCase(),
         vehicle_type: newTruckType,
-        capacity_kg: 0,
+        capacity: '',
         driver_name: '',
         driver_contact: '',
         notes: '',
@@ -1630,7 +1630,7 @@ export default function OrderDetails() {
                       <SelectItem key={t.id} value={t.id}>
                         <span className="font-medium">{t.vehicle_no}</span>
                         {t.driver_name && <span className="text-gray-500 ml-1">— {t.driver_name}</span>}
-                        {t.capacity_kg > 0 && <span className="text-gray-400 ml-1">({t.capacity_kg} kg)</span>}
+                        {t.capacity && <span className="text-gray-400 ml-1">({t.capacity})</span>}
                       </SelectItem>
                     ))}
                     <SelectItem value="__new__">
@@ -1697,10 +1697,10 @@ export default function OrderDetails() {
                             <span>{t.driver_name}{t.driver_contact && ` · ${t.driver_contact}`}</span>
                           </div>
                         )}
-                        {t.capacity_kg > 0 && (
+                        {t.capacity && (
                           <div className="flex justify-between">
                             <span className="text-gray-500">Capacity</span>
-                            <span>{t.capacity_kg} kg</span>
+                            <span>{t.capacity}</span>
                           </div>
                         )}
                       </>
