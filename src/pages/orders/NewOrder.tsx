@@ -22,6 +22,25 @@ import MobileOrderItemForm from '@/components/orders/MobileOrderItemForm';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import DeliveryAddressDialog from '@/components/orders/DeliveryAddressDialog';
 import { TransportService, type Transport } from '@/services/transportService';
+import { getApiUrl } from '@/utils/apiConfig';
+
+async function _authHeaders(): Promise<Record<string, string>> {
+  const token = localStorage.getItem('auth_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+async function fetchCapacityUnits(): Promise<string[]> {
+  const res = await fetch(`${getApiUrl()}/dropdowns/capacity_unit`, { headers: await _authHeaders() });
+  const data = await res.json();
+  return data.success ? data.data.map((d: any) => d.value) : [];
+}
+async function addCapacityUnit(value: string): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/dropdowns`, {
+    method: 'POST', headers: await _authHeaders(),
+    body: JSON.stringify({ category: 'capacity_unit', value: value.trim() }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to add unit');
+}
 
 const DRAFT_KEY = 'newOrderDraft';
 
@@ -201,6 +220,14 @@ export default function NewOrder() {
   const [addingNewTruck, setAddingNewTruck] = useState(false);
   const [newTruckNo, setNewTruckNo] = useState('');
   const [newTruckType, setNewTruckType] = useState<'own' | 'outside' | 'hired'>('own');
+  const [newTruckDriverName, setNewTruckDriverName] = useState('');
+  const [newTruckDriverContact, setNewTruckDriverContact] = useState('');
+  const [newTruckCapacityValue, setNewTruckCapacityValue] = useState('');
+  const [newTruckCapacityUnit, setNewTruckCapacityUnit] = useState('');
+  const [capacityUnits, setCapacityUnits] = useState<string[]>([]);
+  const [addingCapacityUnit, setAddingCapacityUnit] = useState(false);
+  const [newCapacityUnitValue, setNewCapacityUnitValue] = useState('');
+  const [savingCapacityUnit, setSavingCapacityUnit] = useState(false);
   const [savingNewTruck, setSavingNewTruck] = useState(false);
   const [orderDeliveryAddress, setOrderDeliveryAddress] = useState<{ address: string; city: string; state: string; pincode: string } | null>(null);
   const [showAddressEditor, setShowAddressEditor] = useState(false);
@@ -216,13 +243,38 @@ export default function NewOrder() {
     if (!newTruckNo.trim()) return;
     setSavingNewTruck(true);
     try {
-      const created = await TransportService.create({ vehicle_no: newTruckNo.trim().toUpperCase(), vehicle_type: newTruckType, capacity_value: null, capacity_unit: '', driver_name: '', driver_contact: '', notes: '' });
+      const created = await TransportService.create({
+        vehicle_no: newTruckNo.trim().toUpperCase(),
+        vehicle_type: newTruckType,
+        capacity_value: newTruckCapacityValue.trim() !== '' ? parseFloat(newTruckCapacityValue) : null,
+        capacity_unit: newTruckCapacityUnit,
+        driver_name: newTruckDriverName.trim(),
+        driver_contact: newTruckDriverContact.trim(),
+        notes: '',
+      });
       setSavedTransports(prev => [...prev, created]);
       selectTruck(created);
-      setNewTruckNo('');
+      setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact('');
+      setNewTruckCapacityValue(''); setNewTruckCapacityUnit('');
+      setAddingCapacityUnit(false); setNewCapacityUnitValue('');
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally { setSavingNewTruck(false); }
+  };
+
+  const handleAddCapacityUnit = async () => {
+    if (!newCapacityUnitValue.trim()) return;
+    setSavingCapacityUnit(true);
+    try {
+      await addCapacityUnit(newCapacityUnitValue.trim());
+      const updated = await fetchCapacityUnits();
+      setCapacityUnits(updated);
+      setNewTruckCapacityUnit(newCapacityUnitValue.trim());
+      setNewCapacityUnitValue('');
+      setAddingCapacityUnit(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingCapacityUnit(false); }
   };
 
   const customerFormSubmitRef = useRef<(() => void) | null>(null);
@@ -271,6 +323,7 @@ export default function NewOrder() {
 
   useEffect(() => {
     TransportService.getAll(true).then(setSavedTransports).catch(() => {});
+    fetchCapacityUnits().then(setCapacityUnits).catch(() => {});
     loadCustomers();
     loadProductsWithFilters();
     loadRawMaterialsWithFilters();
@@ -800,8 +853,48 @@ export default function NewOrder() {
                           </button>
                         ))}
                       </div>
+                      {/* Capacity */}
                       <div className="flex gap-2">
-                        <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}
+                        <input type="number" min="0" placeholder="Capacity" value={newTruckCapacityValue}
+                          onChange={e => setNewTruckCapacityValue(e.target.value)}
+                          className="w-24 h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                        <Select value={newTruckCapacityUnit || '__placeholder__'} onValueChange={v => {
+                          if (v === '__add_new__') setAddingCapacityUnit(true);
+                          else if (v !== '__placeholder__') { setNewTruckCapacityUnit(v); setAddingCapacityUnit(false); }
+                        }}>
+                          <SelectTrigger className="flex-1 h-10 text-sm bg-white border-orange-200">
+                            <SelectValue placeholder="Unit" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {capacityUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            <SelectItem value="__add_new__"><span className="text-primary-600 font-semibold">+ Add Unit</span></SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {addingCapacityUnit && (
+                        <div className="flex gap-2">
+                          <input placeholder="e.g. tonnes, bags" value={newCapacityUnitValue}
+                            onChange={e => setNewCapacityUnitValue(e.target.value)}
+                            className="flex-1 h-9 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none" />
+                          <button onClick={handleAddCapacityUnit} disabled={savingCapacityUnit || !newCapacityUnitValue.trim()}
+                            className="px-3 h-9 rounded-lg bg-primary-600 text-white text-xs font-bold disabled:opacity-50">
+                            {savingCapacityUnit ? '…' : 'Add'}
+                          </button>
+                          <button onClick={() => { setAddingCapacityUnit(false); setNewCapacityUnitValue(''); }}
+                            className="px-2 h-9 rounded-lg text-gray-500 text-xs">×</button>
+                        </div>
+                      )}
+                      {/* Driver */}
+                      <div className="flex gap-2">
+                        <input placeholder="Driver name" value={newTruckDriverName}
+                          onChange={e => setNewTruckDriverName(e.target.value)}
+                          className="flex-1 h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                        <input placeholder="Phone" value={newTruckDriverContact}
+                          onChange={e => setNewTruckDriverContact(e.target.value)}
+                          className="flex-1 h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact(''); setNewTruckCapacityValue(''); setNewTruckCapacityUnit(''); setAddingCapacityUnit(false); }}
                           className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-500">Cancel</button>
                         <button onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()}
                           className="flex-[2] py-2 rounded-lg bg-orange-500 text-white text-sm font-bold disabled:opacity-50">
@@ -1312,7 +1405,7 @@ export default function NewOrder() {
                       <div className="border border-orange-200 bg-orange-50 rounded-xl p-3 space-y-2.5">
                         <p className="text-xs font-bold text-orange-700">New Vehicle</p>
                         <Input placeholder="Vehicle No e.g. MH12AB1234" value={newTruckNo}
-                          onChange={e => setNewTruckNo(e.target.value.toUpperCase())} className="h-9 text-sm" />
+                          onChange={e => setNewTruckNo(e.target.value.toUpperCase())} className="h-9 text-sm bg-white border-orange-200" />
                         <div className="flex gap-2">
                           {(['own', 'outside', 'hired'] as const).map(t => (
                             <button key={t} onClick={() => setNewTruckType(t)}
@@ -1321,8 +1414,48 @@ export default function NewOrder() {
                             </button>
                           ))}
                         </div>
+                        {/* Capacity */}
                         <div className="flex gap-2">
-                          <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}
+                          <Input type="number" min="0" placeholder="Capacity" value={newTruckCapacityValue}
+                            onChange={e => setNewTruckCapacityValue(e.target.value)}
+                            className="w-28 h-9 text-sm bg-white border-orange-200" />
+                          <Select value={newTruckCapacityUnit || '__placeholder__'} onValueChange={v => {
+                            if (v === '__add_new__') setAddingCapacityUnit(true);
+                            else if (v !== '__placeholder__') { setNewTruckCapacityUnit(v); setAddingCapacityUnit(false); }
+                          }}>
+                            <SelectTrigger className="flex-1 h-9 text-sm bg-white border-orange-200">
+                              <SelectValue placeholder="Unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {capacityUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                              <SelectItem value="__add_new__"><span className="text-primary-600 font-semibold">+ Add Unit</span></SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {addingCapacityUnit && (
+                          <div className="flex gap-2">
+                            <Input placeholder="e.g. tonnes, bags" value={newCapacityUnitValue}
+                              onChange={e => setNewCapacityUnitValue(e.target.value)}
+                              className="flex-1 h-8 text-sm bg-white" />
+                            <button onClick={handleAddCapacityUnit} disabled={savingCapacityUnit || !newCapacityUnitValue.trim()}
+                              className="px-3 h-8 rounded-lg bg-primary-600 text-white text-xs font-bold disabled:opacity-50">
+                              {savingCapacityUnit ? '…' : 'Add'}
+                            </button>
+                            <button onClick={() => { setAddingCapacityUnit(false); setNewCapacityUnitValue(''); }}
+                              className="px-2 h-8 text-gray-400 text-sm">×</button>
+                          </div>
+                        )}
+                        {/* Driver */}
+                        <div className="flex gap-2">
+                          <Input placeholder="Driver name" value={newTruckDriverName}
+                            onChange={e => setNewTruckDriverName(e.target.value)}
+                            className="flex-1 h-9 text-sm bg-white border-orange-200" />
+                          <Input placeholder="Phone" value={newTruckDriverContact}
+                            onChange={e => setNewTruckDriverContact(e.target.value)}
+                            className="flex-1 h-9 text-sm bg-white border-orange-200" />
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact(''); setNewTruckCapacityValue(''); setNewTruckCapacityUnit(''); setAddingCapacityUnit(false); }}
                             className="flex-1 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-500 bg-white">Cancel</button>
                           <button onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()}
                             className="flex-[2] py-1.5 rounded-lg bg-orange-500 text-white text-sm font-bold disabled:opacity-50">

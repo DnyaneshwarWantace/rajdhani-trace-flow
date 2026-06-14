@@ -45,6 +45,24 @@ import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialS
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 import { TransportService, type Transport } from '@/services/transportService';
 
+async function _authHeadersOD(): Promise<Record<string, string>> {
+  const token = localStorage.getItem('auth_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+async function fetchCapacityUnitsOD(): Promise<string[]> {
+  const res = await fetch(`${getApiUrl()}/dropdowns/capacity_unit`, { headers: await _authHeadersOD() });
+  const data = await res.json();
+  return data.success ? data.data.map((d: any) => d.value) : [];
+}
+async function addCapacityUnitOD(value: string): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/dropdowns`, {
+    method: 'POST', headers: await _authHeadersOD(),
+    body: JSON.stringify({ category: 'capacity_unit', value: value.trim() }),
+  });
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'Failed to add unit');
+}
+
 interface OrderItem {
   id: string;
   product_name: string;
@@ -121,6 +139,14 @@ export default function OrderDetails() {
   const [addingNewTruck, setAddingNewTruck] = useState(false);
   const [newTruckNo, setNewTruckNo] = useState('');
   const [newTruckType, setNewTruckType] = useState<'own' | 'outside' | 'hired'>('own');
+  const [newTruckDriverName, setNewTruckDriverName] = useState('');
+  const [newTruckDriverContact, setNewTruckDriverContact] = useState('');
+  const [newTruckCapacityValue, setNewTruckCapacityValue] = useState('');
+  const [newTruckCapacityUnit, setNewTruckCapacityUnit] = useState('');
+  const [capacityUnits, setCapacityUnits] = useState<string[]>([]);
+  const [addingCapacityUnit, setAddingCapacityUnit] = useState(false);
+  const [newCapacityUnitValue, setNewCapacityUnitValue] = useState('');
+  const [savingCapacityUnit, setSavingCapacityUnit] = useState(false);
   const [savingNewTruck, setSavingNewTruck] = useState(false);
   // Add item inline
   const [showAddItemPanel, setShowAddItemPanel] = useState(false);
@@ -523,9 +549,12 @@ export default function OrderDetails() {
     setTransportRemark('');
     setSelectedTransportId('');
     setAddingNewTruck(false);
-    setNewTruckNo('');
-    setNewTruckType('own');
+    setNewTruckNo(''); setNewTruckType('own');
+    setNewTruckDriverName(''); setNewTruckDriverContact('');
+    setNewTruckCapacityValue(''); setNewTruckCapacityUnit('');
+    setAddingCapacityUnit(false); setNewCapacityUnitValue('');
     TransportService.getAll(true).then(setSavedTransports).catch(() => setSavedTransports([]));
+    fetchCapacityUnitsOD().then(setCapacityUnits).catch(() => {});
     setShowTransportDialog(true);
   };
 
@@ -536,9 +565,10 @@ export default function OrderDetails() {
       const created = await TransportService.create({
         vehicle_no: newTruckNo.trim().toUpperCase(),
         vehicle_type: newTruckType,
-        capacity_value: null, capacity_unit: '',
-        driver_name: '',
-        driver_contact: '',
+        capacity_value: newTruckCapacityValue.trim() !== '' ? parseFloat(newTruckCapacityValue) : null,
+        capacity_unit: newTruckCapacityUnit,
+        driver_name: newTruckDriverName.trim(),
+        driver_contact: newTruckDriverContact.trim(),
         notes: '',
       });
       const updated = [...savedTransports, created];
@@ -547,12 +577,29 @@ export default function OrderDetails() {
       setTransportVehicleNo(created.vehicle_no);
       setTransportType(created.vehicle_type);
       setAddingNewTruck(false);
-      setNewTruckNo('');
+      setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact('');
+      setNewTruckCapacityValue(''); setNewTruckCapacityUnit('');
+      setAddingCapacityUnit(false); setNewCapacityUnitValue('');
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally {
       setSavingNewTruck(false);
     }
+  };
+
+  const handleAddCapacityUnitOD = async () => {
+    if (!newCapacityUnitValue.trim()) return;
+    setSavingCapacityUnit(true);
+    try {
+      await addCapacityUnitOD(newCapacityUnitValue.trim());
+      const updated = await fetchCapacityUnitsOD();
+      setCapacityUnits(updated);
+      setNewTruckCapacityUnit(newCapacityUnitValue.trim());
+      setNewCapacityUnitValue('');
+      setAddingCapacityUnit(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingCapacityUnit(false); }
   };
 
   const handleConfirmDispatch = async () => {
@@ -1642,22 +1689,19 @@ export default function OrderDetails() {
 
               {/* Inline new truck form */}
               {addingNewTruck && (
-                <div className="border rounded-lg p-3 space-y-3 bg-orange-50 border-orange-200">
+                <div className="border rounded-lg p-3 space-y-2.5 bg-orange-50 border-orange-200">
                   <p className="text-xs font-semibold text-orange-700">New Vehicle</p>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs">Vehicle No *</Label>
-                      <Input
-                        placeholder="MH12AB1234"
-                        value={newTruckNo}
+                      <Input placeholder="MH12AB1234" value={newTruckNo}
                         onChange={e => setNewTruckNo(e.target.value.toUpperCase())}
-                        className="text-sm"
-                      />
+                        className="text-sm bg-white border-orange-200" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Type</Label>
                       <Select value={newTruckType} onValueChange={v => setNewTruckType(v as 'own' | 'outside' | 'hired')}>
-                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="text-sm bg-white border-orange-200"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="own">Own</SelectItem>
                           <SelectItem value="outside">Outside</SelectItem>
@@ -1666,11 +1710,54 @@ export default function OrderDetails() {
                       </Select>
                     </div>
                   </div>
+                  {/* Capacity */}
+                  <div className="flex gap-2">
+                    <Input type="number" min="0" placeholder="Capacity" value={newTruckCapacityValue}
+                      onChange={e => setNewTruckCapacityValue(e.target.value)}
+                      className="w-24 text-sm bg-white border-orange-200" />
+                    <Select value={newTruckCapacityUnit || '__placeholder__'} onValueChange={v => {
+                      if (v === '__add_new__') setAddingCapacityUnit(true);
+                      else if (v !== '__placeholder__') { setNewTruckCapacityUnit(v); setAddingCapacityUnit(false); }
+                    }}>
+                      <SelectTrigger className="flex-1 text-sm bg-white border-orange-200"><SelectValue placeholder="Unit" /></SelectTrigger>
+                      <SelectContent>
+                        {capacityUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                        <SelectItem value="__add_new__"><span className="text-primary-600 font-semibold">+ Add Unit</span></SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {addingCapacityUnit && (
+                    <div className="flex gap-2">
+                      <Input placeholder="e.g. tonnes, bags" value={newCapacityUnitValue}
+                        onChange={e => setNewCapacityUnitValue(e.target.value)}
+                        className="flex-1 h-8 text-sm bg-white" />
+                      <Button size="sm" onClick={handleAddCapacityUnitOD} disabled={savingCapacityUnit || !newCapacityUnitValue.trim()}
+                        className="h-8 bg-primary-600 hover:bg-primary-700 text-white">
+                        {savingCapacityUnit ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add'}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => { setAddingCapacityUnit(false); setNewCapacityUnitValue(''); }}>×</Button>
+                    </div>
+                  )}
+                  {/* Driver */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Driver Name</Label>
+                      <Input placeholder="Name" value={newTruckDriverName}
+                        onChange={e => setNewTruckDriverName(e.target.value)}
+                        className="text-sm bg-white border-orange-200" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Contact</Label>
+                      <Input placeholder="Phone" value={newTruckDriverContact}
+                        onChange={e => setNewTruckDriverContact(e.target.value)}
+                        className="text-sm bg-white border-orange-200" />
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()} className="bg-orange-600 hover:bg-orange-700 text-white">
                       {savingNewTruck ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save & Select'}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}>Cancel</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact(''); setNewTruckCapacityValue(''); setNewTruckCapacityUnit(''); setAddingCapacityUnit(false); }}>Cancel</Button>
                   </div>
                 </div>
               )}
