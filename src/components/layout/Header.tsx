@@ -38,24 +38,6 @@ export default function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
       <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8 w-full max-w-full">
         {/* Left Section - Logo & Menu */}
         <div className="flex items-center gap-3">
-          {/* Hamburger Menu Button - Desktop only */}
-          <button
-            onClick={onMenuClick}
-            className="hidden lg:block p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            aria-label="Toggle menu"
-          >
-            <svg
-              className={`w-6 h-6 text-gray-600 transition-transform duration-200 ${isSidebarOpen ? 'rotate-90' : ''}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
-              {isSidebarOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-
           {/* Logo */}
           <Link to="/" className="flex items-center">
             <img 
