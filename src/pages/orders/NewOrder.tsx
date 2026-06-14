@@ -23,13 +23,15 @@ import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialS
 import DeliveryAddressDialog from '@/components/orders/DeliveryAddressDialog';
 import { TransportService, type Transport } from '@/services/transportService';
 import { getApiUrl } from '@/utils/apiConfig';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 async function _authHeaders(): Promise<Record<string, string>> {
   const token = localStorage.getItem('auth_token');
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 async function fetchCapacityUnits(): Promise<string[]> {
-  const res = await fetch(`${getApiUrl()}/dropdowns/capacity_unit`, { headers: await _authHeaders() });
+  const res = await fetch(`${getApiUrl()}/dropdowns/category/capacity_unit`, { headers: await _authHeaders() });
   const data = await res.json();
   return data.success ? data.data.map((d: any) => d.value) : [];
 }
@@ -249,7 +251,7 @@ export default function NewOrder() {
         capacity_value: newTruckCapacityValue.trim() !== '' ? parseFloat(newTruckCapacityValue) : null,
         capacity_unit: newTruckCapacityUnit,
         driver_name: newTruckDriverName.trim(),
-        driver_contact: newTruckDriverContact.trim(),
+        driver_contact: /^\+\d{1,4}$/.test(newTruckDriverContact.trim()) ? '' : newTruckDriverContact.trim(),
         notes: '',
       });
       setSavedTransports(prev => [...prev, created]);
@@ -885,13 +887,17 @@ export default function NewOrder() {
                         </div>
                       )}
                       {/* Driver */}
-                      <div className="flex gap-2">
-                        <input placeholder="Driver name" value={newTruckDriverName}
+                      <div className="space-y-2">
+                        <input placeholder="Driver name (optional)" value={newTruckDriverName}
                           onChange={e => setNewTruckDriverName(e.target.value)}
-                          className="flex-1 h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
-                        <input placeholder="Phone" value={newTruckDriverContact}
-                          onChange={e => setNewTruckDriverContact(e.target.value)}
-                          className="flex-1 h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                          className="w-full h-10 px-3 rounded-lg border border-orange-200 bg-white text-sm outline-none focus:border-orange-400" />
+                        <PhoneInput
+                          defaultCountry="in"
+                          value={newTruckDriverContact}
+                          onChange={v => setNewTruckDriverContact(v)}
+                          placeholder="Driver phone (optional)"
+                          style={{ width: '100%' }}
+                        />
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact(''); setNewTruckCapacityValue(''); setNewTruckCapacityUnit(''); setAddingCapacityUnit(false); }}
@@ -1446,13 +1452,17 @@ export default function NewOrder() {
                           </div>
                         )}
                         {/* Driver */}
-                        <div className="flex gap-2">
-                          <Input placeholder="Driver name" value={newTruckDriverName}
+                        <div className="space-y-2">
+                          <Input placeholder="Driver name (optional)" value={newTruckDriverName}
                             onChange={e => setNewTruckDriverName(e.target.value)}
-                            className="flex-1 h-9 text-sm bg-white border-orange-200" />
-                          <Input placeholder="Phone" value={newTruckDriverContact}
-                            onChange={e => setNewTruckDriverContact(e.target.value)}
-                            className="flex-1 h-9 text-sm bg-white border-orange-200" />
+                            className="h-9 text-sm bg-white border-orange-200" />
+                          <PhoneInput
+                            defaultCountry="in"
+                            value={newTruckDriverContact}
+                            onChange={v => setNewTruckDriverContact(v)}
+                            placeholder="Driver phone (optional)"
+                            style={{ width: '100%' }}
+                          />
                         </div>
                         <div className="flex gap-2">
                           <button onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); setNewTruckDriverName(''); setNewTruckDriverContact(''); setNewTruckCapacityValue(''); setNewTruckCapacityUnit(''); setAddingCapacityUnit(false); }}

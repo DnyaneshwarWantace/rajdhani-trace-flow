@@ -44,13 +44,15 @@ import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
 import { TransportService, type Transport } from '@/services/transportService';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 async function _authHeadersOD(): Promise<Record<string, string>> {
   const token = localStorage.getItem('auth_token');
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 async function fetchCapacityUnitsOD(): Promise<string[]> {
-  const res = await fetch(`${getApiUrl()}/dropdowns/capacity_unit`, { headers: await _authHeadersOD() });
+  const res = await fetch(`${getApiUrl()}/dropdowns/category/capacity_unit`, { headers: await _authHeadersOD() });
   const data = await res.json();
   return data.success ? data.data.map((d: any) => d.value) : [];
 }
@@ -585,7 +587,7 @@ export default function OrderDetails() {
         capacity_value: newTruckCapacityValue.trim() !== '' ? parseFloat(newTruckCapacityValue) : null,
         capacity_unit: newTruckCapacityUnit,
         driver_name: newTruckDriverName.trim(),
-        driver_contact: newTruckDriverContact.trim(),
+        driver_contact: /^\+\d{1,4}$/.test(newTruckDriverContact.trim()) ? '' : newTruckDriverContact.trim(),
         notes: '',
       });
       const updated = [...savedTransports, created];
@@ -1758,16 +1760,20 @@ export default function OrderDetails() {
                   {/* Driver */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <Label className="text-xs">Driver Name</Label>
+                      <Label className="text-xs">Driver Name <span className="text-gray-400">(optional)</span></Label>
                       <Input placeholder="Name" value={newTruckDriverName}
                         onChange={e => setNewTruckDriverName(e.target.value)}
                         className="text-sm bg-white border-orange-200" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Contact</Label>
-                      <Input placeholder="Phone" value={newTruckDriverContact}
-                        onChange={e => setNewTruckDriverContact(e.target.value)}
-                        className="text-sm bg-white border-orange-200" />
+                      <Label className="text-xs">Contact <span className="text-gray-400">(optional)</span></Label>
+                      <PhoneInput
+                        defaultCountry="in"
+                        value={newTruckDriverContact}
+                        onChange={v => setNewTruckDriverContact(v)}
+                        placeholder="Driver phone"
+                        style={{ width: '100%' }}
+                      />
                     </div>
                   </div>
                   <div className="flex gap-2">

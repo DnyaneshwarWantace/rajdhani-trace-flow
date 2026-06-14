@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { TransportService, type Transport } from '@/services/transportService';
 import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2, ChevronDown } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 
 const API_URL = getApiUrl();
 
@@ -18,7 +20,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 async function fetchCapacityUnits(): Promise<string[]> {
-  const res = await fetch(`${API_URL}/dropdowns/capacity_unit`, { headers: await authHeaders() });
+  const res = await fetch(`${API_URL}/dropdowns/category/capacity_unit`, { headers: await authHeaders() });
   const data = await res.json();
   return data.success ? data.data.map((d: any) => d.value) : [];
 }
@@ -120,12 +122,16 @@ export default function TransportManagement() {
   const handleSave = async () => {
     if (!form.vehicle_no.trim()) { toast({ title: 'Error', description: 'Vehicle number is required', variant: 'destructive' }); return; }
     setSaving(true);
+    const cleanedForm = {
+      ...form,
+      driver_contact: /^\+\d{1,4}$/.test(form.driver_contact.trim()) ? '' : form.driver_contact.trim(),
+    };
     try {
       if (editing) {
-        await TransportService.update(editing.id, form);
+        await TransportService.update(editing.id, cleanedForm);
         toast({ title: 'Updated', description: `${form.vehicle_no} updated.` });
       } else {
-        await TransportService.create(form);
+        await TransportService.create(cleanedForm);
         toast({ title: 'Added', description: `${form.vehicle_no} added.` });
       }
       setShowDialog(false);
@@ -450,8 +456,13 @@ export default function TransportManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>Driver Contact <span className="text-gray-400 text-xs font-normal">optional</span></Label>
-                <Input placeholder="Phone number" value={form.driver_contact}
-                  onChange={e => setForm(f => ({ ...f, driver_contact: e.target.value }))} />
+                <PhoneInput
+                  defaultCountry="in"
+                  value={form.driver_contact}
+                  onChange={v => setForm(f => ({ ...f, driver_contact: v }))}
+                  placeholder="Phone number"
+                  style={{ width: '100%' }}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
