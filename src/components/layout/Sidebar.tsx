@@ -9,7 +9,7 @@ import { OrderService } from '@/services/orderService';
 interface MenuItem {
   name: string;
   path: string;
-  pageKey: string;
+  pageKey: string | null;
   icon: React.ReactNode;
 }
 
@@ -131,6 +131,17 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    name: 'Transport / Trucks',
+    path: '/transport',
+    pageKey: null,
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l1 1h1m8-1h2a1 1 0 001-1V9l-3-3h-3v10m-4 0h4" />
+      </svg>
+    ),
+  },
+  {
     name: 'Dropdown Master',
     path: '/dropdowns',
     pageKey: 'settings',
@@ -166,7 +177,7 @@ export default function Sidebar({ isOpen, onClose, onToggle }: SidebarProps) {
 
   // Re-compute when permissionsVersion changes so sidebar updates instantly
   const visibleMenuItems = useMemo(
-    () => menuItems.filter((item) => user && canAccessPage(item.pageKey)),
+    () => menuItems.filter((item) => user && (item.pageKey === null || canAccessPage(item.pageKey))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [user, permissionsVersion]
   );

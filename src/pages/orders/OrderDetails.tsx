@@ -43,6 +43,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useLiveSyncRefresh } from '@/hooks/useLiveSyncRefresh';
 import ProductMaterialSelectionDialog from '@/components/orders/ProductMaterialSelectionDialog';
 import ProductAttributePreview from '@/components/ui/ProductAttributePreview';
+import { TransportService, type Transport } from '@/services/transportService';
 
 interface OrderItem {
   id: string;
@@ -111,10 +112,16 @@ export default function OrderDetails() {
   } | null>(null);
   // Transport dialog
   const [showTransportDialog, setShowTransportDialog] = useState(false);
-  const [transportType, setTransportType] = useState<'own' | 'outside'>('own');
+  const [transportType, setTransportType] = useState<'own' | 'outside' | 'hired'>('own');
   const [transportVehicleNo, setTransportVehicleNo] = useState('');
   const [transportRemark, setTransportRemark] = useState('');
   const [dispatchingOrder, setDispatchingOrder] = useState(false);
+  const [savedTransports, setSavedTransports] = useState<Transport[]>([]);
+  const [selectedTransportId, setSelectedTransportId] = useState<string>('');
+  const [addingNewTruck, setAddingNewTruck] = useState(false);
+  const [newTruckNo, setNewTruckNo] = useState('');
+  const [newTruckType, setNewTruckType] = useState<'own' | 'outside' | 'hired'>('own');
+  const [savingNewTruck, setSavingNewTruck] = useState(false);
   // Add item inline
   const [showAddItemPanel, setShowAddItemPanel] = useState(false);
   const [emptyOrderPendingItems, setEmptyOrderPendingItems] = useState(false);
@@ -514,7 +521,38 @@ export default function OrderDetails() {
     setTransportType('own');
     setTransportVehicleNo('');
     setTransportRemark('');
+    setSelectedTransportId('');
+    setAddingNewTruck(false);
+    setNewTruckNo('');
+    setNewTruckType('own');
+    TransportService.getAll(true).then(setSavedTransports).catch(() => setSavedTransports([]));
     setShowTransportDialog(true);
+  };
+
+  const handleSaveNewTruck = async () => {
+    if (!newTruckNo.trim()) return;
+    setSavingNewTruck(true);
+    try {
+      const created = await TransportService.create({
+        vehicle_no: newTruckNo.trim().toUpperCase(),
+        vehicle_type: newTruckType,
+        capacity_kg: 0,
+        driver_name: '',
+        driver_contact: '',
+        notes: '',
+      });
+      const updated = [...savedTransports, created];
+      setSavedTransports(updated);
+      setSelectedTransportId(created.id);
+      setTransportVehicleNo(created.vehicle_no);
+      setTransportType(created.vehicle_type);
+      setAddingNewTruck(false);
+      setNewTruckNo('');
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally {
+      setSavingNewTruck(false);
+    }
   };
 
   const handleConfirmDispatch = async () => {
@@ -1557,29 +1595,120 @@ export default function OrderDetails() {
                 <Truck className="w-5 h-5 text-orange-600" />
                 Transport Details
               </DialogTitle>
-              <DialogDescription>Add transport info before shipping this order.</DialogDescription>
+              <DialogDescription>Select a saved truck or add a new one before shipping.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
+              {/* Truck picker */}
               <div className="space-y-1">
-                <Label>Transport Type</Label>
-                <Select value={transportType} onValueChange={(v) => setTransportType(v as 'own' | 'outside')}>
+                <Label>Select Vehicle</Label>
+                <Select
+                  value={selectedTransportId}
+                  onValueChange={(v) => {
+                    if (v === '__new__') {
+                      setSelectedTransportId('');
+                      setAddingNewTruck(true);
+                      setTransportVehicleNo('');
+                    } else {
+                      setAddingNewTruck(false);
+                      setSelectedTransportId(v);
+                      const t = savedTransports.find(x => x.id === v);
+                      if (t) {
+                        setTransportVehicleNo(t.vehicle_no);
+                        setTransportType(t.vehicle_type);
+                      }
+                    }
+                  }}
+                >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Choose a saved vehicle…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="own">Own Transport</SelectItem>
-                    <SelectItem value="outside">Outside Transport</SelectItem>
+                    {savedTransports.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-gray-400">No saved vehicles yet</div>
+                    )}
+                    {savedTransports.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <span className="font-medium">{t.vehicle_no}</span>
+                        {t.driver_name && <span className="text-gray-500 ml-1">— {t.driver_name}</span>}
+                        {t.capacity_kg > 0 && <span className="text-gray-400 ml-1">({t.capacity_kg} kg)</span>}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="__new__">
+                      <span className="text-orange-600 font-medium">+ Add New Vehicle</span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label>Vehicle No <span className="text-gray-400 text-xs">(optional)</span></Label>
-                <Input
-                  placeholder="e.g. MH12AB1234"
-                  value={transportVehicleNo}
-                  onChange={e => setTransportVehicleNo(e.target.value)}
-                />
-              </div>
+
+              {/* Inline new truck form */}
+              {addingNewTruck && (
+                <div className="border rounded-lg p-3 space-y-3 bg-orange-50 border-orange-200">
+                  <p className="text-xs font-semibold text-orange-700">New Vehicle</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Vehicle No *</Label>
+                      <Input
+                        placeholder="MH12AB1234"
+                        value={newTruckNo}
+                        onChange={e => setNewTruckNo(e.target.value.toUpperCase())}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Type</Label>
+                      <Select value={newTruckType} onValueChange={v => setNewTruckType(v as 'own' | 'outside' | 'hired')}>
+                        <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="own">Own</SelectItem>
+                          <SelectItem value="outside">Outside</SelectItem>
+                          <SelectItem value="hired">Hired</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSaveNewTruck} disabled={savingNewTruck || !newTruckNo.trim()} className="bg-orange-600 hover:bg-orange-700 text-white">
+                      {savingNewTruck ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save & Select'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setAddingNewTruck(false); setNewTruckNo(''); }}>Cancel</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected truck info */}
+              {selectedTransportId && !addingNewTruck && (
+                <div className="rounded-lg bg-gray-50 border p-3 text-sm space-y-1">
+                  {(() => {
+                    const t = savedTransports.find(x => x.id === selectedTransportId);
+                    if (!t) return null;
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Vehicle</span>
+                          <span className="font-semibold">{t.vehicle_no}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Type</span>
+                          <span className="capitalize">{t.vehicle_type === 'own' ? 'Own Transport' : t.vehicle_type === 'outside' ? 'Outside Transport' : 'Hired Transport'}</span>
+                        </div>
+                        {t.driver_name && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Driver</span>
+                            <span>{t.driver_name}{t.driver_contact && ` · ${t.driver_contact}`}</span>
+                          </div>
+                        )}
+                        {t.capacity_kg > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Capacity</span>
+                            <span>{t.capacity_kg} kg</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label>Remark <span className="text-gray-400 text-xs">(optional)</span></Label>
                 <Input
@@ -1591,7 +1720,7 @@ export default function OrderDetails() {
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowTransportDialog(false)} disabled={dispatchingOrder}>Cancel</Button>
-              <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleConfirmDispatch} disabled={dispatchingOrder}>
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleConfirmDispatch} disabled={dispatchingOrder || addingNewTruck}>
                 {dispatchingOrder ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Shipping…</> : <><Package className="w-4 h-4 mr-2" />Ship Order</>}
               </Button>
             </div>

@@ -46,6 +46,7 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import RollbackDashboard from '@/pages/admin/RollbackDashboard';
 import BackupDashboard from '@/pages/admin/BackupDashboard';
 import NotFound from '@/pages/NotFound';
+import TransportManagement from '@/pages/transport/TransportManagement';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -511,6 +512,7 @@ function AppRoutes() {
             </PrivateRoute>
           }
         />
+        <Route path="/transport" element={<PrivateRoute><TransportManagement /></PrivateRoute>} />
         <Route path="/more" element={<PrivateRoute><MorePage /></PrivateRoute>} />
         <Route path="/" element={<HomeRedirect />} />
         {/* Catch-all route for 404 */}
@@ -522,7 +524,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter basename="/v2">
+    <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
           <AppRoutes />
