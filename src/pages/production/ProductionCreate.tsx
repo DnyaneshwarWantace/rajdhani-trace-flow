@@ -764,7 +764,9 @@ export default function ProductionCreate() {
         </div>
 
         {/* ─── MOBILE VIEW ─── */}
-        <MobileProductionCreate />
+        <div className="lg:hidden">
+          <MobileProductionCreate />
+        </div>
       </div>
     </Layout>
   );
