@@ -270,12 +270,12 @@ export default function OrderList() {
             <p className="text-gray-600 mt-1">Manage customer orders and track fulfillment</p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0.5">
+            <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0">
               <Button
                 variant={viewMode === 'table' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('table')}
-                className={`h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
+                className={`h-10 w-10 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
                 title="Table View"
               >
                 <List className="w-4 h-4" />
@@ -284,7 +284,7 @@ export default function OrderList() {
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
-                className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}
+                className={`h-10 w-10 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}
                 title="Grid View"
               >
                 <Grid3x3 className="w-4 h-4" />

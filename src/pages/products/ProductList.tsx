@@ -417,12 +417,12 @@ export default function ProductList() {
             {activeTab === 'inventory' && (
               <div className="flex items-center gap-3">
                 {/* View Mode Toggle */}
-                <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0.5">
+                <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0">
                   <Button
                     variant={viewMode === 'table' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('table')}
-                    className={`hidden lg:inline-flex h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
+                    className={`hidden lg:inline-flex h-10 w-10 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}
                     title="Table View"
                   >
                     <List className="w-4 h-4" />
@@ -431,7 +431,7 @@ export default function ProductList() {
                     variant={viewMode === 'grid' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('grid')}
-                    className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}
+                    className={`h-10 w-10 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}
                     title="Grid View"
                   >
                     <Grid3x3 className="w-4 h-4" />
@@ -440,7 +440,7 @@ export default function ProductList() {
                     variant={viewMode === 'grouped' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('grouped')}
-                    className={`hidden lg:inline-flex h-8 w-8 p-0 ${viewMode === 'grouped' ? 'bg-primary-600 text-white' : ''}`}
+                    className={`hidden lg:inline-flex h-10 w-10 p-0 ${viewMode === 'grouped' ? 'bg-primary-600 text-white' : ''}`}
                     title="Grouped View"
                   >
                     <Layers className="w-4 h-4" />

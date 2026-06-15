@@ -97,36 +97,33 @@ export default function ProductStockFilters({
           </div>
         </div>
 
-        {/* Second Row: Date Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
+        {/* Second Row: Date Filters + Sort */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-44">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="w-5 h-5 text-gray-400" />
+              <Calendar className="w-4 h-4 text-gray-400" />
             </div>
             <Input
               type="date"
               placeholder="Start Date"
               value={startDate}
               onChange={(e) => onStartDateChange(e.target.value)}
-              className="pl-10"
+              className="pl-9 h-9 text-sm"
             />
           </div>
-          <div className="relative flex-1">
+          <div className="relative w-44">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Calendar className="w-5 h-5 text-gray-400" />
+              <Calendar className="w-4 h-4 text-gray-400" />
             </div>
             <Input
               type="date"
               placeholder="End Date"
               value={endDate}
               onChange={(e) => onEndDateChange(e.target.value)}
-              className="pl-10"
+              className="pl-9 h-9 text-sm"
             />
           </div>
-        </div>
-
-        {/* Sorting Controls */}
-        <div className="flex items-center gap-3 pt-3 border-t border-gray-200">
+          <div className="h-5 w-px bg-gray-200 hidden sm:block" />
           <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Sort by:</span>
           <Select
             value={sortBy}

@@ -381,7 +381,7 @@ export default function MaterialDetailTransactionHistory({
                       <td className="px-4 py-3 text-right text-gray-600">₹{r.cost_per_unit?.toFixed(2) ?? '—'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-900">₹{r.total_cost?.toFixed(2) ?? '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{r.new_stock != null ? parseFloat(Number(r.new_stock).toFixed(4)).toString() : '—'} {r.unit}</td>
-                      <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{r.notes || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-gray-500 max-w-xs"><div className="truncate" title={r.notes || ''}>{r.notes || '—'}</div></td>
                     </tr>
                   ))}
                 </tbody>

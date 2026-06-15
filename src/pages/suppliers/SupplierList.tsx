@@ -310,9 +310,9 @@ export default function SupplierList() {
                 <p className="text-sm text-gray-600">Manage your supplier database</p>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0.5">
-                  <Button variant={viewMode === 'table' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('table')} className={`h-8 w-8 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}><List className="w-4 h-4" /></Button>
-                  <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('grid')} className={`h-8 w-8 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}><Grid3x3 className="w-4 h-4" /></Button>
+                <div className="flex items-center gap-1 border border-gray-300 rounded-lg p-0">
+                  <Button variant={viewMode === 'table' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('table')} className={`h-10 w-10 p-0 ${viewMode === 'table' ? 'bg-primary-600 text-white' : ''}`}><List className="w-4 h-4" /></Button>
+                  <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm" onClick={() => setViewMode('grid')} className={`h-10 w-10 p-0 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : ''}`}><Grid3x3 className="w-4 h-4" /></Button>
                 </div>
                 {canCreate('suppliers') && (
                   <>
