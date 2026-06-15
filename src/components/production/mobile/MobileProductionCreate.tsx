@@ -1013,18 +1013,20 @@ export default function MobileProductionCreate() {
         </div>
       </div>
 
-      {/* ── Product Picker ── */}
-      {pickerOpen && (
-        <ProductPickerScreen
-          onClose={() => setPickerOpen(false)}
-          onSelect={p => { setSelectedProduct(p); setPickerOpen(false); }}
-          selectedId={selectedProduct?.id}
-        />
-      )}
+      {/* ── Product Picker (mobile only) ── */}
+      <div className="lg:hidden">
+        {pickerOpen && (
+          <ProductPickerScreen
+            onClose={() => setPickerOpen(false)}
+            onSelect={p => { setSelectedProduct(p); setPickerOpen(false); }}
+            selectedId={selectedProduct?.id}
+          />
+        )}
+      </div>
 
-      {/* ── Order Picker ── */}
+      {/* ── Order Picker (mobile only) ── */}
       {orderPickerOpen && (
-        <div className="fixed inset-0 z-[90] bg-gray-50 flex flex-col" style={{ height: '100dvh' }}>
+        <div className="lg:hidden fixed inset-0 z-[90] bg-gray-50 flex flex-col" style={{ height: '100dvh' }}>
           {/* Header */}
           <div className="flex items-center gap-2.5 bg-white border-b border-gray-100 px-[14px] py-3 shrink-0">
             <button type="button" onClick={() => setOrderPickerOpen(false)} className="p-1">

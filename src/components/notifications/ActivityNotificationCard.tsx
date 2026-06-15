@@ -208,7 +208,7 @@ export default function ActivityNotificationCard({
           : notification.status === 'dismissed'
           ? 'bg-gray-50/30 opacity-75'
           : 'bg-white'
-      } ${selected ? 'ring-2 ring-primary-500' : ''} ${hasDetails() ? 'cursor-pointer' : ''}`}
+      } ${selected ? 'border-2 border-primary-500' : 'border border-transparent'} ${hasDetails() ? 'cursor-pointer' : ''}`}
       onClick={handleCardClick}
     >
       <CardContent className="p-3 sm:p-4">
