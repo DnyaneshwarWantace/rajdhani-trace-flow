@@ -452,7 +452,8 @@ export default function ProductList() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="h-9 gap-2 px-4 text-sm font-medium border-gray-300"
+                      size="sm"
+                      className="gap-2 border-gray-300"
                       disabled={!!exporting}
                     >
                       {exporting ? (
@@ -486,7 +487,8 @@ export default function ProductList() {
                   <Button
                     onClick={() => setIsBulkUploadOpen(true)}
                     variant="outline"
-                    className="h-9 gap-2 px-4 text-sm font-medium border-gray-300"
+                    size="sm"
+                    className="gap-2 border-gray-300"
                   >
                     <Upload className="w-4 h-4" />
                     <span>Bulk Upload</span>
@@ -497,7 +499,8 @@ export default function ProductList() {
                 {canCreate('products') && (
                   <Button
                     onClick={handleCreate}
-                    className="h-9 gap-2 px-4 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white"
+                    size="sm"
+                    className="gap-2 bg-primary-600 hover:bg-primary-700 text-white"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
