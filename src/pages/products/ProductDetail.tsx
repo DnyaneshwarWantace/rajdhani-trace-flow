@@ -98,9 +98,7 @@ export default function ProductDetail() {
     }
   };
 
-  const handleBack = () => {
-    navigate('/products');
-  };
+  const handleBack = () => navigate(-1);
 
   if (loading) {
     return (

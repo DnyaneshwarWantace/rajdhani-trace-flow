@@ -57,9 +57,7 @@ export default function ProductStockHeader({
     }
   }, [exportOpen, downloadQROpen]);
 
-  const handleBack = () => {
-    navigate(`/products/${productId}`);
-  };
+  const handleBack = () => navigate(-1);
 
   const handleDownloadAllPdf = () => {
     onDownloadAllQrPdf?.();

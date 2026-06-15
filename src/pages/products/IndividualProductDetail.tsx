@@ -72,23 +72,7 @@ export default function IndividualProductDetail() {
     pollingMs: 8000,
   });
 
-  const handleBack = () => {
-    // Check where we came from based on location state
-    const fromPage = location.state?.from;
-    
-    if (fromPage === 'product-detail' || fromPage === 'stock-page') {
-      // If we came from product detail or stock (which came from product-detail), 
-      // go back to stock page with the same navigation state
-      navigate(`/products/${productId}/stock`, {
-        state: { from: fromPage }
-      });
-    } else {
-      // Default: go back to stock page (product list -> stock -> individual)
-      navigate(`/products/${productId}/stock`, {
-        state: { from: 'product-list' }
-      });
-    }
-  };
+  const handleBack = () => navigate(-1);
 
   const handleEdit = () => {
     setIsEditDialogOpen(true);
