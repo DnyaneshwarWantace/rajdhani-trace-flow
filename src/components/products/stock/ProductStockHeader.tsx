@@ -58,12 +58,7 @@ export default function ProductStockHeader({
   }, [exportOpen, downloadQROpen]);
 
   const handleBack = () => {
-    const fromPage = location.state?.from;
-    if (fromPage === 'product-detail') {
-      navigate(`/products/${productId}`, { state: { from: 'stock-page' } });
-    } else {
-      navigate('/products');
-    }
+    navigate(`/products/${productId}`);
   };
 
   const handleDownloadAllPdf = () => {
@@ -234,7 +229,7 @@ export default function ProductStockHeader({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => navigate(`/products/${productId}`, { state: { from: 'stock-page' } })}
+            onClick={() => navigate(`/products/${productId}`)}
             className="flex-1 sm:flex-initial"
           >
             View Product Details

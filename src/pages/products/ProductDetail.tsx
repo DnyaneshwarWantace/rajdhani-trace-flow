@@ -99,18 +99,7 @@ export default function ProductDetail() {
   };
 
   const handleBack = () => {
-    // Check where we came from based on location state
-    const fromPage = location.state?.from;
-    
-    if (fromPage === 'stock-page' && id) {
-      // If we came from stock page, go back to stock page
-      navigate(`/products/${id}/stock`, {
-        state: { from: 'product-detail' }
-      });
-    } else {
-      // Default: go back to product list
-      navigate('/products');
-    }
+    navigate('/products');
   };
 
   if (loading) {
