@@ -199,7 +199,7 @@ export default function InventoryFilters({
                 value={filters.sortBy || 'name'}
                 onValueChange={(v) => onSortChange(v, filters.sortOrder || 'asc')}
               >
-                <SelectTrigger className="h-9 text-sm w-36">
+                <SelectTrigger className="h-9 text-sm w-48">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
