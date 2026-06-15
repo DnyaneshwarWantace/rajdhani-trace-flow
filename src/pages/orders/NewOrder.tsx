@@ -196,6 +196,8 @@ export default function NewOrder() {
   const [orderItems, setOrderItems] = useState<ExtendedOrderItem[]>([]);
   const [realProducts, setRealProducts] = useState<any[]>([]);
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
 
   const [customerSearchQ, setCustomerSearchQ] = useState('');
   const [mobileExpandedItemId, setMobileExpandedItemId] = useState<string | null>(null);
@@ -356,6 +358,7 @@ export default function NewOrder() {
   };
 
   const loadProductsWithFilters = async () => {
+    setProductsLoading(true);
     try {
       const baseFilters: any = { limit: 100, sortBy: productSortBy === 'recent' ? 'created_at' : productSortBy, sortOrder: productSortOrder };
       if (productSearchTerm) baseFilters.search = productSearchTerm;
@@ -387,9 +390,11 @@ export default function NewOrder() {
       rest.forEach(r => all.push(...(r.products || [])));
       setRealProducts(all.map(mapProduct));
     } catch (e) { console.error(e); }
+    finally { setProductsLoading(false); }
   };
 
   const loadRawMaterialsWithFilters = async (searchTerm = '') => {
+    setMaterialsLoading(true);
     try {
       const baseFilters: any = { limit: 100, sortBy: materialSortBy === 'recent' ? 'created_at' : materialSortBy, sortOrder: materialSortOrder };
       if (searchTerm) baseFilters.search = searchTerm;
@@ -416,6 +421,7 @@ export default function NewOrder() {
       rest.forEach(r => all.push(...(r.materials || [])));
       setRawMaterials(all.map(mapMaterial));
     } catch (e) { console.error(e); }
+    finally { setMaterialsLoading(false); }
   };
 
   const addOrderItem = () => {
@@ -1139,6 +1145,8 @@ export default function NewOrder() {
           materialSortOrder={materialSortOrder}
           onProductSortChange={(s, o) => { setProductSortBy(s); setProductSortOrder(o); setProductPage(1); }}
           onMaterialSortChange={(s, o) => { setMaterialSortBy(s); setMaterialSortOrder(o); setMaterialPage(1); }}
+          productsLoading={productsLoading}
+          materialsLoading={materialsLoading}
         />
         <DeliveryAddressDialog isOpen={showAddressEditor} onClose={() => setShowAddressEditor(false)} address={orderDeliveryAddress}
           onSave={addr => { setOrderDeliveryAddress(addr); setShowAddressEditor(false); }} />
@@ -1646,6 +1654,8 @@ export default function NewOrder() {
           materialSortOrder={materialSortOrder}
           onProductSortChange={(s, o) => { setProductSortBy(s); setProductSortOrder(o); setProductPage(1); }}
           onMaterialSortChange={(s, o) => { setMaterialSortBy(s); setMaterialSortOrder(o); setMaterialPage(1); }}
+          productsLoading={productsLoading}
+          materialsLoading={materialsLoading}
         />
 
         <DeliveryAddressDialog

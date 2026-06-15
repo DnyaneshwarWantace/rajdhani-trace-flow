@@ -53,6 +53,8 @@ interface ProductMaterialSelectionDialogProps {
   materialSortOrder?: 'asc' | 'desc';
   onProductSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent', sortOrder: 'asc' | 'desc') => void;
   onMaterialSortChange?: (sortBy: 'name' | 'stock' | 'category' | 'recent', sortOrder: 'asc' | 'desc') => void;
+  productsLoading?: boolean;
+  materialsLoading?: boolean;
 }
 
 export default function ProductMaterialSelectionDialog({
@@ -76,6 +78,8 @@ export default function ProductMaterialSelectionDialog({
   materialSortOrder = 'asc',
   onProductSortChange,
   onMaterialSortChange,
+  productsLoading = false,
+  materialsLoading = false,
 }: ProductMaterialSelectionDialogProps) {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const { colorCodeMap, patternImageMap } = useDropdownVisualMaps();
@@ -626,7 +630,12 @@ export default function ProductMaterialSelectionDialog({
 
           {/* Product list */}
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 pb-6">
-            {paginatedItems.length === 0 ? (
+            {(isProdType ? productsLoading : materialsLoading) ? (
+              <div className="flex flex-col items-center py-12 text-center">
+                <div className="w-8 h-8 border-2 border-primary-300 border-t-primary-600 rounded-full animate-spin mb-3" />
+                <p className="text-xs text-gray-400">Loading {isProdType ? 'products' : 'materials'}…</p>
+              </div>
+            ) : paginatedItems.length === 0 ? (
               <div className="flex flex-col items-center py-12 text-center">
                 <Package className="w-10 h-10 text-gray-300 mb-2" />
                 <p className="text-xs font-semibold text-gray-500">No {isProdType ? 'products' : 'materials'} found</p>
