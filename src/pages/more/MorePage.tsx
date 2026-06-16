@@ -96,6 +96,19 @@ const ALL_ITEMS = [
     ),
   },
   {
+    label: 'Transport',
+    desc: 'Manage trucks & vehicle fleet',
+    path: '/transport',
+    pageKey: null,
+    iconBg: '#FFF4ED',
+    iconColor: '#EA580C',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a1 1 0 011 1v3m0 0h3l2 4v4h-2m-3-7H9m9 0v7m0 0h-5m5 0a2 2 0 11-4 0m4 0a2 2 0 01-4 0M9 17a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  },
+  {
     label: 'Settings',
     desc: 'Profile, security & users',
     path: '/settings',
@@ -123,7 +136,7 @@ export default function MorePage() {
     .toUpperCase() || '?';
 
   const visibleItems = ALL_ITEMS.filter(item =>
-    item.pageKey === 'settings' || canAccessPage(item.pageKey)
+    item.pageKey === null || item.pageKey === 'settings' || canAccessPage(item.pageKey)
   );
 
   return (
