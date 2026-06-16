@@ -135,7 +135,7 @@ export default function ProductList() {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      setError(null);
+      if ((filters.page || 1) === 1) setError(null);
 
       const { products: data, total } = await ProductService.getProducts({
         ...filters,

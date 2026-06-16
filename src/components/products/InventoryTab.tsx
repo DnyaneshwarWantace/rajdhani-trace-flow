@@ -193,6 +193,10 @@ export default function InventoryTab({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const currentPage = filters.page || 1;
   const hasMore = mobileProducts.length < totalProducts;
+  // Track whether we're in a mobile infinite-scroll load (page > 1)
+  const isLoadingMore = loading && currentPage > 1;
+  // Initial load: page 1 and no products yet
+  const isInitialLoad = loading && currentPage === 1 && mobileProducts.length === 0;
 
   // Reset accumulated list when filters change (page resets to 1)
   useEffect(() => {
@@ -200,8 +204,8 @@ export default function InventoryTab({
       setMobileProducts(products);
     } else {
       setMobileProducts(prev => {
-        const ids = new Set(prev.map(p => p._id));
-        return [...prev, ...products.filter(p => !ids.has(p._id))];
+        const ids = new Set(prev.map(p => p._id || p.id));
+        return [...prev, ...products.filter(p => !ids.has(p._id || p.id))];
       });
     }
   }, [products, currentPage]);
@@ -219,7 +223,7 @@ export default function InventoryTab({
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [loading, hasMore, currentPage]);
+  }, [loading, hasMore, currentPage, onPageChange]);
 
   return (
     <>
@@ -239,8 +243,22 @@ export default function InventoryTab({
         />
       </div>
 
-      {/* Loading State */}
-      {loading && (
+      {/* Mobile search bar — always visible */}
+      <div className="lg:hidden mb-3">
+        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
+          <Search className="w-4 h-4 text-gray-400 shrink-0" />
+          <input
+            type="text"
+            value={filters.search || ''}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search products..."
+            className="flex-1 text-sm outline-none bg-transparent text-gray-900 placeholder-gray-400"
+          />
+        </div>
+      </div>
+
+      {/* Initial Loading State — only on first load before any products show */}
+      {isInitialLoad && (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
             <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
@@ -261,26 +279,19 @@ export default function InventoryTab({
         </div>
       )}
 
-      {/* Mobile search bar */}
-      <div className="lg:hidden mb-3">
-        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
-          <Search className="w-4 h-4 text-gray-400 shrink-0" />
-          <input
-            type="text"
-            value={filters.search || ''}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search products..."
-            className="flex-1 text-sm outline-none bg-transparent text-gray-900 placeholder-gray-400"
-          />
-        </div>
-      </div>
-
-      {/* Products List */}
-      {!loading && !error && (
+      {/* Products List — show even while loading more pages */}
+      {!error && (mobileProducts.length > 0 || products.length > 0 || !loading) && (
         <>
           {/* Desktop View */}
           <div className="hidden lg:block">
-            {viewMode === 'table' ? (
+            {loading && currentPage === 1 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+                  <p className="text-gray-600">Loading products...</p>
+                </div>
+              </div>
+            ) : viewMode === 'table' ? (
               <ProductTable
                 products={products}
                 onView={onView}
@@ -305,7 +316,6 @@ export default function InventoryTab({
                 onQRCode={onQRCode}
               />
             ) : (
-              // Masonry-style grid using CSS columns
               <div className="columns-1 md:columns-2 xl:columns-3 gap-4 space-y-4">
                 {products.map((product) => (
                   <div key={product._id} className="break-inside-avoid">
@@ -326,37 +336,57 @@ export default function InventoryTab({
             )}
           </div>
 
-          {/* Mobile View - 2-column infinite scroll grid */}
-          <div className="lg:hidden grid grid-cols-2 gap-3 pb-24">
-            {mobileProducts.map((product) => (
-              <MobileProductCard
-                key={product._id}
-                product={product}
-                onView={onView}
-                onEdit={onEdit}
-                onDuplicate={onDuplicate}
-                onStock={onStock}
-                onProduction={onProduction}
-                onQRCode={onQRCode}
-                canEdit={canEdit}
-              />
-            ))}
+          {/* Mobile View - masonry 2-column infinite scroll grid */}
+          <div className="lg:hidden flex gap-3 pb-24">
+            <div className="flex-1 flex flex-col gap-3">
+              {mobileProducts.filter((_, i) => i % 2 === 0).map((product) => (
+                <MobileProductCard
+                  key={product._id || product.id}
+                  product={product}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDuplicate={onDuplicate}
+                  onStock={onStock}
+                  onProduction={onProduction}
+                  onQRCode={onQRCode}
+                  canEdit={canEdit}
+                />
+              ))}
+            </div>
+            <div className="flex-1 flex flex-col gap-3">
+              {mobileProducts.filter((_, i) => i % 2 === 1).map((product) => (
+                <MobileProductCard
+                  key={product._id || product.id}
+                  product={product}
+                  onView={onView}
+                  onEdit={onEdit}
+                  onDuplicate={onDuplicate}
+                  onStock={onStock}
+                  onProduction={onProduction}
+                  onQRCode={onQRCode}
+                  canEdit={canEdit}
+                />
+              ))}
+            </div>
           </div>
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="lg:hidden h-4" />
-          {loading && currentPage > 1 && (
+          {/* Loading spinner only for subsequent pages */}
+          {isLoadingMore && (
             <div className="lg:hidden flex justify-center py-4">
               <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
             </div>
           )}
 
-          {/* Pagination */}
-          <ProductPagination
-            totalProducts={totalProducts}
-            filters={filters}
-            onPageChange={onPageChange}
-            onLimitChange={onLimitChange}
-          />
+          {/* Pagination — desktop only */}
+          <div className="hidden lg:block">
+            <ProductPagination
+              totalProducts={totalProducts}
+              filters={filters}
+              onPageChange={onPageChange}
+              onLimitChange={onLimitChange}
+            />
+          </div>
         </>
       )}
     </>

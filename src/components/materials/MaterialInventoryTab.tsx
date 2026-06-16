@@ -414,18 +414,32 @@ export default function MaterialInventoryTab({
               </div>
             )}
 
-            {/* 2-column grid */}
-            <div className="grid grid-cols-2 gap-3 pb-32">
-              {materials.map((material) => (
-                <MobileGridCard
-                  key={material._id || material.id}
-                  material={material}
-                  onView={onView}
-                  onEdit={onEdit}
-                  onOrder={onOrder}
-                  onRecordUsage={onRecordUsage}
-                />
-              ))}
+            {/* masonry 2-column grid */}
+            <div className="flex gap-3 pb-32">
+              <div className="flex-1 flex flex-col gap-3">
+                {materials.filter((_, i) => i % 2 === 0).map((material) => (
+                  <MobileGridCard
+                    key={material._id || material.id}
+                    material={material}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onOrder={onOrder}
+                    onRecordUsage={onRecordUsage}
+                  />
+                ))}
+              </div>
+              <div className="flex-1 flex flex-col gap-3">
+                {materials.filter((_, i) => i % 2 === 1).map((material) => (
+                  <MobileGridCard
+                    key={material._id || material.id}
+                    material={material}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onOrder={onOrder}
+                    onRecordUsage={onRecordUsage}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Empty state */}

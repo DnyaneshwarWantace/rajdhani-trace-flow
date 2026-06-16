@@ -256,7 +256,7 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5 text-gray-600" />
           <h3 className="text-base font-semibold text-gray-800">Pending Orders</h3>
@@ -264,142 +264,134 @@ export default function AllPendingOrdersSection({ onSelectOrder }: Props) {
             {visibleOrders.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          {urgentCount > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
-              <Clock className="h-3 w-3" />{urgentCount} urgent
-            </span>
-          )}
-          {shortageCount > 0 && (
-            <span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
-              <AlertTriangle className="h-3 w-3" />{shortageCount} need production
-            </span>
-          )}
-        </div>
+        {(urgentCount > 0 || shortageCount > 0) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {urgentCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
+                <Clock className="h-3 w-3" />{urgentCount} Urgent
+              </span>
+            )}
+            {shortageCount > 0 && (
+              <span className="flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full border border-orange-200">
+                <AlertTriangle className="h-3 w-3" />{shortageCount} Need Production
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {visibleOrders.map((order, index) => {
-          const days = getDaysUntil(order.expected_delivery);
+      <div className="space-y-3">
+        {/* Group items by order */}
+        {Object.values(
+          visibleOrders.reduce<Record<string, { meta: PendingOrder; items: PendingOrder[] }>>((acc, order) => {
+            if (!acc[order.order_id]) {
+              acc[order.order_id] = { meta: order, items: [] };
+            }
+            acc[order.order_id].items.push(order);
+            return acc;
+          }, {})
+        ).map(({ meta, items }) => {
+          const days = getDaysUntil(meta.expected_delivery);
           const isOverdue = days < 0;
           const isVeryUrgent = days >= 0 && days <= 3;
-          const hasShortage = (order.shortage ?? 0) > 0;
-          const priorityConf = PRIORITY_CONFIG[order.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium;
-          const statusConf = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
+          const priorityConf = PRIORITY_CONFIG[meta.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.medium;
+          const statusConf = STATUS_CONFIG[meta.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.pending;
 
-          const task = taskMap[order.order_item_id];
-          // If ANY task is assigned for this order+product, block batch creation here
-          const hasAssignedTask = Boolean(task);
-
-          const borderClass = hasAssignedTask
-            ? 'border-blue-200 bg-blue-50/20'
-            : isOverdue
-            ? 'border-red-300 hover:border-red-400 hover:shadow-md cursor-pointer'
+          const accentClass = isOverdue ? 'bg-red-500' : isVeryUrgent ? 'bg-orange-400' : 'bg-blue-400';
+          const borderClass = isOverdue
+            ? 'border-red-300'
             : isVeryUrgent
-            ? 'border-orange-300 hover:border-orange-400 hover:shadow-md cursor-pointer'
-            : 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer';
-
-          const accentClass = hasAssignedTask
-            ? 'bg-blue-400'
-            : isOverdue
-            ? 'bg-red-500'
-            : isVeryUrgent
-            ? 'bg-orange-400'
-            : 'bg-blue-400';
+            ? 'border-orange-300'
+            : 'border-gray-200';
 
           return (
-            <div
-              key={`${order.order_id}-${index}`}
-              className={`group relative bg-white rounded-xl border transition-all duration-150 overflow-hidden ${borderClass}`}
-              onClick={() => { if (!hasAssignedTask) onSelectOrder(order, order.product_id ?? ''); }}
-            >
+            <div key={meta.order_id} className={`bg-white rounded-xl border overflow-hidden ${borderClass}`}>
               <div className={`h-1 w-full ${accentClass}`} />
 
-              <div className="p-4 space-y-3">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-bold text-gray-400 tracking-wide uppercase">{order.order_number}</p>
-                    <p className="text-sm font-semibold text-gray-800 mt-0.5 flex items-center gap-1">
-                      <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                      {order.customer_name}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <Badge className={`text-[10px] px-1.5 py-0.5 border ${priorityConf.className}`}>
-                      {priorityConf.label}
-                    </Badge>
-                    <Badge className={`text-[10px] px-1.5 py-0.5 ${statusConf.className}`}>
-                      {statusConf.label}
-                    </Badge>
-                  </div>
+              {/* Order header — shown once */}
+              <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2 border-b border-gray-100">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 tracking-wide uppercase">{meta.order_number}</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5 flex items-center gap-1">
+                    <User className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    {meta.customer_name}
+                  </p>
                 </div>
-
-                {/* Product */}
-                <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                  <Package className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  <p className="text-sm font-medium text-gray-800 truncate">{order.product_name}</p>
-                </div>
-
-                {/* Qty / Stock / Shortage */}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">Ordered</p>
-                    <p className="text-sm font-bold text-gray-800">{order.quantity_needed}</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">In Stock</p>
-                    <p className={`text-sm font-bold ${(order.current_stock ?? 0) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                      {order.current_stock ?? 0}
-                    </p>
-                  </div>
-                  <div className={`rounded-lg p-2 ${hasShortage ? 'bg-red-50' : 'bg-green-50'}`}>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide">
-                      {hasShortage ? 'Make' : 'Status'}
-                    </p>
-                    {hasShortage ? (
-                      <p className="text-sm font-bold text-red-600">{order.shortage}</p>
-                    ) : (
-                      <p className="text-sm font-bold text-green-600">✓</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Assigned task banner */}
-                {hasAssignedTask && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
-                    <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span>
-                      Assigned to <span className="font-semibold">{task.assigned_to_name}</span> — start batch from <span className="font-semibold">Assigned Tasks</span> above
-                    </span>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-gray-400" />
-                    <span className="text-xs text-gray-600">{formatIndianDate(order.expected_delivery)}</span>
-                    <DeliveryBadge dateStr={order.expected_delivery} />
-                  </div>
-
-                  {hasAssignedTask ? (
-                    <Button size="sm" disabled className="h-7 px-3 text-xs gap-1 opacity-50 cursor-not-allowed">
-                      <ClipboardList className="h-3 w-3" />
-                      Use Assigned Tasks
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 group-hover:translate-x-0.5 transition-transform"
-                      onClick={(e) => { e.stopPropagation(); onSelectOrder(order, order.product_id ?? ''); }}
-                    >
-                      Create Batch
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  )}
+                <div className="flex flex-col items-end gap-1">
+                  <Badge className={`text-[10px] px-1.5 py-0.5 border ${priorityConf.className}`}>
+                    {priorityConf.label}
+                  </Badge>
+                  <Badge className={`text-[10px] px-1.5 py-0.5 ${statusConf.className}`}>
+                    {statusConf.label}
+                  </Badge>
                 </div>
               </div>
+
+              {/* One row per product item */}
+              {items.map((order) => {
+                const hasShortage = (order.shortage ?? 0) > 0;
+                const task = taskMap[order.order_item_id];
+                const hasAssignedTask = Boolean(task);
+
+                return (
+                  <div key={order.order_item_id} className="px-4 py-3 border-b border-gray-50 last:border-b-0 space-y-2">
+                    {/* Product name — full width */}
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                      <p className="text-sm font-semibold text-gray-800">{order.product_name}</p>
+                    </div>
+                    {/* Qty / Stock / Make chips */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-gray-50 rounded-lg py-1.5">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">Qty</p>
+                        <p className="text-sm font-bold text-gray-800">{order.quantity_needed}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg py-1.5">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">Stock</p>
+                        <p className={`text-sm font-bold ${(order.current_stock ?? 0) > 0 ? 'text-green-600' : 'text-gray-400'}`}>{order.current_stock ?? 0}</p>
+                      </div>
+                      <div className={`rounded-lg py-1.5 ${hasShortage ? 'bg-red-50' : 'bg-green-50'}`}>
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wide">{hasShortage ? 'Make' : 'OK'}</p>
+                        <p className={`text-sm font-bold ${hasShortage ? 'text-red-600' : 'text-green-600'}`}>{hasShortage ? order.shortage : '✓'}</p>
+                      </div>
+                    </div>
+
+                    {/* Assigned task banner */}
+                    {hasAssignedTask && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                        <ClipboardList className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span>Assigned to <span className="font-semibold">{task.assigned_to_name}</span></span>
+                      </div>
+                    )}
+
+                    {/* Action */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                          <span className="text-xs text-gray-600">{formatIndianDate(order.expected_delivery)}</span>
+                        </div>
+                        <DeliveryBadge dateStr={order.expected_delivery} />
+                      </div>
+                      {hasAssignedTask ? (
+                        <Button size="sm" disabled className="h-7 px-3 text-xs gap-1 opacity-50 cursor-not-allowed flex-shrink-0">
+                          <ClipboardList className="h-3 w-3" />
+                          Assigned
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1 flex-shrink-0"
+                          onClick={() => onSelectOrder(order, order.product_id ?? '')}
+                        >
+                          Create Batch
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}

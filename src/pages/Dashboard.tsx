@@ -82,6 +82,7 @@ interface DashboardData {
     productionInProgress: number;
     productionCompleted: number;
     productionCancelled: number;
+    productionTotal: number;
   };
   recentOrders: Order[];
   productionBatches: any[];
@@ -255,16 +256,14 @@ function StatTile({ label, value, sub, color, bg, icon: Icon }: {
   label: string; value: string; sub?: string; color: string; bg: string; icon: any;
 }) {
   return (
-    <div className="bg-white border border-gray-150 rounded-2xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.01)] flex flex-col justify-between min-h-[105px]">
-      <div className="flex items-center justify-between mb-2">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-gray-100" style={{ backgroundColor: bg, color }}>
-          <Icon className="w-4 h-4" />
-        </div>
+    <div className="bg-white border border-gray-150 rounded-2xl p-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)] flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 shrink-0" style={{ backgroundColor: bg, color }}>
+        <Icon className="w-5 h-5" />
       </div>
-      <div>
-        <p className="text-xl font-extrabold text-gray-900 tracking-tight leading-none mb-1">{value}</p>
-        {sub && <p className="text-[10.5px] font-bold" style={{ color }}>{sub}</p>}
-        <p className="text-[10px] text-gray-400 font-semibold mt-1 uppercase tracking-wide">{label}</p>
+      <div className="min-w-0">
+        <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide leading-none mb-1">{label}</p>
+        <p className="text-xl font-extrabold text-gray-900 tracking-tight leading-none">{value}</p>
+        {sub && <p className="text-[10.5px] font-bold mt-0.5" style={{ color }}>{sub}</p>}
       </div>
     </div>
   );
@@ -306,6 +305,7 @@ export default function Dashboard() {
       productionInProgress: 0,
       productionCompleted: 0,
       productionCancelled: 0,
+      productionTotal: 0,
     },
     recentOrders: [],
     productionBatches: [],
@@ -357,6 +357,7 @@ export default function Dashboard() {
         orderStatsResponse,
         manageStockOrdersResponse,
         materialsResponse,
+        productionStatsResponse,
       ] = await Promise.all([
         ProductService.getProducts({ limit: 50 }),
         OrderService.getOrders({ limit: 50 }),
@@ -368,6 +369,7 @@ export default function Dashboard() {
         OrderService.getOrderStats().catch(() => ({ data: null, error: null })),
         ManageStockService.getRecentRestockOrders(5).catch(() => ({ data: [] })),
         MaterialService.getMaterials({ limit: 100 }).catch(() => ({ materials: [], total: 0 })),
+        ProductionService.getProductionStats().catch(() => ({ data: null, error: null })),
       ]);
 
       // Process products data
@@ -418,10 +420,13 @@ export default function Dashboard() {
           return isDateInMonth(batchDate, monthKey);
         });
       }
-      const productionPlanned = productionBatches.filter((b: any) => b.status === 'planned').length;
-      const productionInProgress = productionBatches.filter((b: any) => b.status === 'in_progress' || b.status === 'in_production').length;
-      const productionCompleted = productionBatches.filter((b: any) => b.status === 'completed').length;
-      const productionCancelled = productionBatches.filter((b: any) => b.status === 'cancelled').length;
+      // Use server-side stats for accurate totals (not limited by the limit:50 fetch)
+      const prodStats = productionStatsResponse?.data ?? null;
+      const productionPlanned = monthKey ? productionBatches.filter((b: any) => b.status === 'planned').length : (prodStats?.planned_batches ?? productionBatches.filter((b: any) => b.status === 'planned').length);
+      const productionInProgress = monthKey ? productionBatches.filter((b: any) => b.status === 'in_progress' || b.status === 'in_production').length : (prodStats?.in_progress_batches ?? productionBatches.filter((b: any) => b.status === 'in_progress' || b.status === 'in_production').length);
+      const productionCompleted = monthKey ? productionBatches.filter((b: any) => b.status === 'completed').length : (prodStats?.completed_batches ?? productionBatches.filter((b: any) => b.status === 'completed').length);
+      const productionTotal = monthKey ? productionBatches.length : (prodStats?.total_batches ?? productionBatches.length);
+      const productionCancelled = Math.max(0, productionTotal - productionPlanned - productionInProgress - productionCompleted);
       const activeBatches = productionBatches.filter(
         (batch: any) => batch.status === 'in_progress' || batch.status === 'planned'
       );
@@ -506,6 +511,7 @@ export default function Dashboard() {
           productionInProgress,
           productionCompleted,
           productionCancelled,
+          productionTotal,
         },
         recentOrders: orders
           .slice(0, 10)
@@ -585,12 +591,9 @@ export default function Dashboard() {
   }, [batches]);
 
   const maxVal = Math.max(...monthsData.map(m => m.planned + m.active + m.completed), 1);
-  const totalBatches = batches.length;
-  const completedCount = batches.filter((b: any) => b.status === 'completed').length;
-  const activeCountVal = batches.filter((b: any) =>
-    b.status === 'in_progress' || b.status === 'in-progress' ||
-    b.status === 'in_production' || b.status === 'planned'
-  ).length;
+  const totalBatches = dashboardData.stats.productionTotal || batches.length;
+  const completedCount = dashboardData.stats.productionCompleted;
+  const activeCountVal = dashboardData.stats.productionInProgress;
   const sparkValues = monthsData.map(m => m.planned + m.active + m.completed);
 
   const orderBreakdownSegments = [
@@ -605,7 +608,7 @@ export default function Dashboard() {
     { label: 'Planned', value: dashboardData.stats.productionPlanned,   color: '#EA580C' },
     { label: 'Active',  value: dashboardData.stats.productionInProgress,     color: '#2563EB' },
     { label: 'Done',    value: dashboardData.stats.productionCompleted,  color: '#16A34A' },
-    { label: 'Void',    value: dashboardData.stats.productionCancelled,  color: '#DC2626' },
+    { label: 'Cancelled', value: dashboardData.stats.productionCancelled,  color: '#DC2626' },
   ];
   const prodOverviewMaxVal = Math.max(...prodOverviewBars.map(b => b.value), 1);
 
@@ -677,27 +680,6 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => loadDashboardData(false, selectedMonth)}
-              className="w-9.5 h-9.5 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200 transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            <div className="relative">
-              <button
-                onClick={() => navigate('/notifications')}
-                className="w-9.5 h-9.5 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200 transition-colors"
-                title="Notifications"
-              >
-                <Bell className="w-4 h-4" />
-              </button>
-              {alertMaterials.length > 0 && (
-                <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[8px] font-extrabold rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5 border border-white">
-                  {alertMaterials.length}
-                </div>
-              )}
-            </div>
           </div>
         </div>
 
@@ -848,7 +830,6 @@ export default function Dashboard() {
               <p className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest mb-1">6-Month Production</p>
               <h4 className="text-xl font-extrabold text-gray-900 tracking-tight leading-none">{totalBatches} Batches</h4>
             </div>
-            <Sparkline values={sparkValues} color="#EA580C" width={72} height={36} />
           </div>
           
           <div className="flex items-end gap-2.5 h-24 pt-4">
@@ -937,32 +918,41 @@ export default function Dashboard() {
 
         {/* Production Overview */}
         <div className="bg-white border border-gray-150 rounded-3xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-          <div className="flex items-center gap-2.5 mb-3.5">
-            <div className="w-7 h-7 rounded-lg bg-[#EA580C]/10 flex items-center justify-center text-[#EA580C]">
-              <Cpu className="w-3.5 h-3.5" />
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest mb-1">Production Overview</p>
+              <h4 className="text-xl font-extrabold text-gray-900 tracking-tight leading-none">{totalBatches} Batches</h4>
             </div>
-            <h4 className="text-sm font-extrabold text-gray-900 flex-1">Production Overview</h4>
           </div>
-          
-          <div className="flex items-end gap-3 h-24 pt-4">
+
+          <div className="flex items-end gap-2.5 h-24 pt-4">
             {prodOverviewBars.map((b, i) => {
               const pct = b.value / prodOverviewMaxVal;
-              const barH = Math.max(pct * 72, b.value > 0 ? 6 : 2);
+              const barH = Math.max(pct * 66, b.value > 0 ? 6 : 2);
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
                   {b.value > 0 && (
-                    <span className="text-[10px] font-black leading-none" style={{ color: b.color }}>{b.value}</span>
+                    <span className="text-[8.5px] font-black leading-none" style={{ color: b.color }}>{b.value}</span>
                   )}
-                  <div className="w-4/5 rounded-t-lg" style={{ height: barH, backgroundColor: b.color, opacity: 0.88 }} />
-                  <span className="text-[9.5px] text-gray-500 font-bold leading-none">{b.label}</span>
+                  <div className="w-full rounded-md" style={{ height: barH, backgroundColor: b.color, opacity: 0.85 }} />
+                  <span className="text-[9.5px] text-gray-400 font-bold leading-none text-center">{b.label}</span>
                 </div>
               );
             })}
           </div>
-          
-          <div className="mt-4 pt-3.5 border-t border-gray-100 flex justify-between items-center text-xs">
-            <span className="text-gray-500 font-bold">Total Batches</span>
-            <span className="text-gray-950 font-black">{batches.length}</span>
+
+          {/* Legend — matches 6-Month chart footer */}
+          <div className="flex gap-4 mt-4 pt-3.5 border-t border-gray-100">
+            {[
+              { label: 'Planned',   color: '#EA580C', count: dashboardData.stats.productionPlanned },
+              { label: 'Active',    color: '#2563EB', count: dashboardData.stats.productionInProgress },
+              { label: 'Completed', color: '#16A34A', count: dashboardData.stats.productionCompleted },
+            ].map((leg, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center text-center">
+                <span className="text-base font-extrabold leading-none" style={{ color: leg.color }}>{leg.count}</span>
+                <span className="text-[10px] text-gray-400 font-semibold mt-1 uppercase tracking-wide">{leg.label}</span>
+              </div>
+            ))}
           </div>
         </div>
 
