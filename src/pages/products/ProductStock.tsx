@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import StockStatsCards from '@/components/products/stock/StockStatsCards';
 import ProductStockHeader from '@/components/products/stock/ProductStockHeader';
 import ProductStockFilters from '@/components/products/stock/ProductStockFilters';
 import ProductStockGrid from '@/components/products/stock/ProductStockGrid';
-import IndividualProductPagination from '@/components/products/stock/IndividualProductPagination';
 import ProductStockError from '@/components/products/stock/ProductStockError';
 import QRCodeDialog from '@/components/products/stock/QRCodeDialog';
 import EditIndividualProductDialog from '@/components/products/stock/EditIndividualProductDialog';
@@ -121,8 +120,12 @@ export default function ProductStock() {
   const [individualProducts, setIndividualProducts] = useState<IndividualProduct[]>([]);
   const [allIndividualProducts, setAllIndividualProducts] = useState<IndividualProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [totalProducts, setTotalProducts] = useState(0);
+  const PAGE_SIZE = 50;
+  const offsetRef = useRef(0);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -134,10 +137,6 @@ export default function ProductStock() {
   // Sorting
   const [sortBy, setSortBy] = useState<'qr_code' | 'status' | 'created_at'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [limit, setLimit] = useState(50);
 
   // QR Code Dialog
   const [showQRCode, setShowQRCode] = useState(false);
@@ -158,15 +157,18 @@ export default function ProductStock() {
   useEffect(() => {
     if (productId) {
       loadProduct();
-      loadAllIndividualProducts(); // Load all for stats
+      loadAllIndividualProducts();
     }
   }, [productId]);
 
+  // Reset and reload when filters/sort change
   useEffect(() => {
-    if (productId) {
-      loadIndividualProducts();
-    }
-  }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, currentPage, limit, sortBy, sortOrder]);
+    if (!productId) return;
+    offsetRef.current = 0;
+    setIndividualProducts([]);
+    setHasMore(true);
+    loadIndividualProducts(0, true);
+  }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
 
 
   const loadProduct = async () => {
@@ -194,40 +196,55 @@ export default function ProductStock() {
     }
   };
 
-  const loadIndividualProducts = async () => {
+  const loadIndividualProducts = useCallback(async (offset: number, isReset = false) => {
     if (!productId) {
       setError('Product ID is required');
       setLoading(false);
       return;
     }
-
     try {
-      setLoading(true);
+      if (isReset) setLoading(true);
+      else setLoadingMore(true);
       setError(null);
 
-      const offset = (currentPage - 1) * limit;
-      const statusParam = statusFilter.length > 0 ? statusFilter : undefined;
       const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
-        status: statusParam,
+        status: statusFilter.length > 0 ? statusFilter : undefined,
         location: locationFilter.length > 0 ? locationFilter : undefined,
         search: searchTerm || undefined,
         start_date: startDate || undefined,
         end_date: endDate || undefined,
-        limit,
+        limit: PAGE_SIZE,
         offset,
         sortBy,
         sortOrder,
       });
 
-      setIndividualProducts(result.products);
-      setTotalProducts(result.total);
+      setIndividualProducts(prev => isReset ? result.products : [...prev, ...result.products]);
+      offsetRef.current = offset + result.products.length;
+      setHasMore(result.products.length === PAGE_SIZE);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
-      console.error('Error loading data:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  };
+  }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
+
+  // Infinite scroll — load more when sentinel enters viewport
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          loadIndividualProducts(offsetRef.current);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loading, loadIndividualProducts]);
 
   useLiveSyncRefresh({
     modules: ['individual_products', 'products', 'production'],
@@ -235,7 +252,10 @@ export default function ProductStock() {
       if (!productId) return;
       loadProduct();
       loadAllIndividualProducts();
-      loadIndividualProducts();
+      offsetRef.current = 0;
+      setIndividualProducts([]);
+      setHasMore(true);
+      loadIndividualProducts(0, true);
     },
     pollingMs: 6000,
   });
@@ -249,19 +269,6 @@ export default function ProductStock() {
     sold: allIndividualProducts.filter((p) => p.status === 'sold').length,
     damaged: allIndividualProducts.filter((p) => p.status === 'damaged').length,
     total: allIndividualProducts.length,
-  };
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handleLimitChange = (newLimit: number) => {
-    setLimit(newLimit);
-    setCurrentPage(1); // Reset to first page when changing limit
-  };
-
-  const handleFilterChange = () => {
-    setCurrentPage(1); // Reset to first page when filters change
   };
 
   const handleView = (individualProduct: IndividualProduct) => {
@@ -293,35 +300,15 @@ export default function ProductStock() {
     setShowQRCode(true);
   };
 
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    handleFilterChange();
-  };
-
-  const handleStatusChange = (values: string[]) => {
-    setStatusFilter(values);
-    handleFilterChange();
-  };
-
-  const handleLocationChange = (values: string[]) => {
-    setLocationFilter(values);
-    handleFilterChange();
-  };
-
-  const handleStartDateChange = (value: string) => {
-    setStartDate(value);
-    handleFilterChange();
-  };
-
-  const handleEndDateChange = (value: string) => {
-    setEndDate(value);
-    handleFilterChange();
-  };
+  const handleSearchChange = (value: string) => setSearchTerm(value);
+  const handleStatusChange = (values: string[]) => setStatusFilter(values);
+  const handleLocationChange = (values: string[]) => setLocationFilter(values);
+  const handleStartDateChange = (value: string) => setStartDate(value);
+  const handleEndDateChange = (value: string) => setEndDate(value);
 
   const handleSortChange = (newSortBy: 'qr_code' | 'status' | 'created_at', newSortOrder: 'asc' | 'desc') => {
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
-    setCurrentPage(1);
   };
 
   const handleExportCSV = () => {
@@ -494,13 +481,14 @@ export default function ProductStock() {
             allSelected={allSelected}
           />
 
-          <IndividualProductPagination
-            totalProducts={totalProducts}
-            currentPage={currentPage}
-            limit={limit}
-            onPageChange={handlePageChange}
-            onLimitChange={handleLimitChange}
-          />
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-4" />
+          {loadingMore && (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary-600" />
+            </div>
+          )}
+
         </div>
 
         <QRCodeDialog
