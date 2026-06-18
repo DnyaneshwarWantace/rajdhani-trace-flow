@@ -165,45 +165,49 @@ function MobileProductListCard({
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => onView?.(product)}>
-        {/* Thumbnail */}
-        <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+      {/* Top: image left, details right */}
+      <div className="flex cursor-pointer" onClick={() => onView?.(product)}>
+        {/* Image — full height, ~40% width */}
+        <div className="relative w-[38%] shrink-0 bg-gray-100" style={{ minHeight: 130 }}>
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+            <img src={product.image_url} alt={product.name} className="absolute inset-0 w-full h-full object-cover" />
           ) : colorCode ? (
-            <div className="w-full h-full" style={{ backgroundColor: colorCode }} />
+            <div className="absolute inset-0" style={{ backgroundColor: colorCode }} />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <span className="text-xl font-bold text-gray-300">{product.name?.charAt(0)}</span>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-3xl font-bold text-gray-200">{product.name?.charAt(0)}</span>
             </div>
           )}
-          <span className={`absolute top-1 left-1 text-[8px] font-bold text-white px-1.5 py-0.5 rounded-full ${stockBadge.bg}`}>
+          {/* Status badge */}
+          <span className={`absolute top-2 left-2 text-[9px] font-bold text-white px-2 py-0.5 rounded-full ${stockBadge.bg}`}>
             {stockBadge.label}
           </span>
         </div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-900 leading-tight truncate">{product.name}</p>
+        {/* Details */}
+        <div className="flex-1 min-w-0 p-3">
+          <div className="flex items-start justify-between gap-1">
+            <p className="text-sm font-bold text-gray-900 leading-tight">{product.name}</p>
+            {(product as any).has_recipe && (
+              <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full shrink-0">Recipe</span>
+            )}
+          </div>
           {product.category && <p className="text-xs text-gray-400 mt-0.5">{product.category}</p>}
           {product.color && (
-            <div className="flex items-center gap-1 mt-0.5">
-              {colorCode && <div className="w-2.5 h-2.5 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: colorCode }} />}
-              <span className="text-xs text-gray-500">{product.color}</span>
+            <div className="flex items-center gap-1.5 mt-1">
+              {colorCode
+                ? <div className="w-3 h-3 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: colorCode }} />
+                : <div className="w-3 h-3 rounded-full bg-gray-300 shrink-0" />}
+              <span className="text-xs text-gray-600 font-medium">{product.color}</span>
             </div>
           )}
-          {(dimStr || gsmStr) && (
-            <p className="text-xs text-gray-400 mt-0.5 truncate">{[dimStr, gsmStr].filter(Boolean).join(' · ')}</p>
-          )}
-          <p className={`text-xs font-bold ${stockColor} mt-0.5`}>{stockCount} Rolls</p>
+          {dimStr && <p className="text-xs text-gray-400 mt-1">{dimStr}</p>}
+          {gsmStr && <p className="text-xs text-gray-400">{gsmStr}</p>}
+          <p className={`text-sm font-bold ${stockColor} mt-1.5`}>{stockCount} Rolls</p>
         </div>
-
-        {(product as any).has_recipe && (
-          <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full shrink-0 self-start">Recipe</span>
-        )}
       </div>
 
-      {/* Action icons */}
+      {/* Actions row — full width below */}
       <div className="border-t border-gray-100 py-1.5 flex items-center justify-around">
         <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} />
         {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} />}
