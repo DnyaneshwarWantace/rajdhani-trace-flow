@@ -2100,12 +2100,6 @@ export default function PlanningStage() {
                           </button>
                         )}
 
-                        <button
-                          onClick={() => handleRemoveMaterial(material.material_id)}
-                          className="ml-auto p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
                     </div>
                   );
