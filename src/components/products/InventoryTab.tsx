@@ -167,7 +167,7 @@ function MobileProductListCard({
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => onView?.(product)}>
         {/* Thumbnail */}
-        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+        <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-gray-100">
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
           ) : colorCode ? (
