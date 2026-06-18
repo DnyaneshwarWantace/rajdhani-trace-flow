@@ -1,4 +1,4 @@
-import { Loader2, Eye, Edit, Copy, QrCode, BarChart3, Factory, Search } from 'lucide-react';
+import { Loader2, Eye, Edit, Copy, QrCode, BarChart3, Factory, Search, LayoutGrid, AlignJustify } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ProductTable from '@/components/products/ProductTable';
 import ProductCard from '@/components/products/ProductCard';
@@ -129,6 +129,93 @@ function ActionBtn({ icon, label, onClick }: { icon: React.ReactNode; label: str
   );
 }
 
+function MobileProductListCard({
+  product, onView, onEdit, onDuplicate, onStock, onProduction, onQRCode, canEdit,
+}: {
+  product: Product;
+  onView?: (p: Product) => void;
+  onEdit?: (p: Product) => void;
+  onDuplicate?: (p: Product) => void;
+  onStock?: (p: Product) => void;
+  onProduction?: (p: Product) => void;
+  onQRCode?: (p: Product) => void;
+  canEdit?: boolean;
+}) {
+  const { colorCodeMap } = useDropdownVisualMaps();
+  const status = calculateStockStatus(product);
+
+  const stockBadge = ({
+    'in-stock':     { label: 'In Stock', bg: 'bg-green-500' },
+    'active':       { label: 'In Stock', bg: 'bg-green-500' },
+    'low-stock':    { label: 'Low',      bg: 'bg-amber-500' },
+    'out-of-stock': { label: 'Out',      bg: 'bg-red-500' },
+    'inactive':     { label: 'Inactive', bg: 'bg-gray-500' },
+  } as Record<string, { label: string; bg: string }>)[status] ?? { label: status, bg: 'bg-gray-400' };
+
+  const stockCount = product.individual_stock_tracking && product.individual_product_stats
+    ? product.individual_product_stats.available
+    : product.current_stock ?? 0;
+
+  const colorCode = product.color ? colorCodeMap[product.color] : undefined;
+  const stockColor = status === 'out-of-stock' ? 'text-red-600' : 'text-green-600';
+  const dimStr = product.length && product.width
+    ? `${product.length} ${product.length_unit || 'ft'} × ${product.width} ${product.width_unit || 'ft'}`
+    : null;
+  const gsmStr = product.weight ? `${product.weight} GSM` : null;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => onView?.(product)}>
+        {/* Thumbnail */}
+        <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100">
+          {product.image_url ? (
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+          ) : colorCode ? (
+            <div className="w-full h-full" style={{ backgroundColor: colorCode }} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-xl font-bold text-gray-300">{product.name?.charAt(0)}</span>
+            </div>
+          )}
+          <span className={`absolute top-1 left-1 text-[8px] font-bold text-white px-1.5 py-0.5 rounded-full ${stockBadge.bg}`}>
+            {stockBadge.label}
+          </span>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-gray-900 leading-tight truncate">{product.name}</p>
+          {product.category && <p className="text-xs text-gray-400 mt-0.5">{product.category}</p>}
+          {product.color && (
+            <div className="flex items-center gap-1 mt-0.5">
+              {colorCode && <div className="w-2.5 h-2.5 rounded-full border border-gray-200 shrink-0" style={{ backgroundColor: colorCode }} />}
+              <span className="text-xs text-gray-500">{product.color}</span>
+            </div>
+          )}
+          {(dimStr || gsmStr) && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate">{[dimStr, gsmStr].filter(Boolean).join(' · ')}</p>
+          )}
+          <p className={`text-xs font-bold ${stockColor} mt-0.5`}>{stockCount} Rolls</p>
+        </div>
+
+        {(product as any).has_recipe && (
+          <span className="text-[9px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full shrink-0 self-start">Recipe</span>
+        )}
+      </div>
+
+      {/* Action icons */}
+      <div className="border-t border-gray-100 py-1.5 flex items-center justify-around">
+        <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} />
+        {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} />}
+        {canEdit && <ActionBtn icon={<Copy className="w-3.5 h-3.5" />} label="Copy" onClick={() => onDuplicate?.(product)} />}
+        <ActionBtn icon={<QrCode className="w-3.5 h-3.5" />} label="QR" onClick={() => onQRCode?.(product)} />
+        <ActionBtn icon={<BarChart3 className="w-3.5 h-3.5" />} label="Stock" onClick={() => onStock?.(product)} />
+        <ActionBtn icon={<Factory className="w-3.5 h-3.5" />} label="Prod" onClick={() => onProduction?.(product)} />
+      </div>
+    </div>
+  );
+}
+
 interface InventoryTabProps {
   products: Product[];
   loading: boolean;
@@ -188,6 +275,9 @@ export default function InventoryTab({
   canEdit = true,
   canDelete = false,
 }: InventoryTabProps) {
+  // Mobile view toggle: 'list' = 1 per row, 'grid' = 2 per row
+  const [mobileView, setMobileView] = useState<'list' | 'grid'>('list');
+
   // Infinite scroll state for mobile
   const [mobileProducts, setMobileProducts] = useState<Product[]>([]);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -243,9 +333,9 @@ export default function InventoryTab({
         />
       </div>
 
-      {/* Mobile search bar — always visible */}
-      <div className="lg:hidden mb-3">
-        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
+      {/* Mobile search bar + view toggle — always visible */}
+      <div className="lg:hidden mb-3 flex items-center gap-2">
+        <div className="flex-1 flex items-center gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 shadow-sm">
           <Search className="w-4 h-4 text-gray-400 shrink-0" />
           <input
             type="text"
@@ -254,6 +344,21 @@ export default function InventoryTab({
             placeholder="Search products..."
             className="flex-1 text-sm outline-none bg-transparent text-gray-900 placeholder-gray-400"
           />
+        </div>
+        {/* View toggle */}
+        <div className="flex items-center bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden shrink-0">
+          <button
+            onClick={() => setMobileView('list')}
+            className={`w-9 h-9 flex items-center justify-center transition-colors ${mobileView === 'list' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+          >
+            <AlignJustify className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setMobileView('grid')}
+            className={`w-9 h-9 flex items-center justify-center transition-colors ${mobileView === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -336,11 +441,11 @@ export default function InventoryTab({
             )}
           </div>
 
-          {/* Mobile View - masonry 2-column infinite scroll grid */}
-          <div className="lg:hidden flex gap-3 pb-24">
-            <div className="flex-1 flex flex-col gap-3">
-              {mobileProducts.filter((_, i) => i % 2 === 0).map((product) => (
-                <MobileProductCard
+          {/* Mobile View — list (1-per-row) or grid (2-per-row) */}
+          {mobileView === 'list' ? (
+            <div className="lg:hidden flex flex-col gap-2.5 pb-24">
+              {mobileProducts.map((product) => (
+                <MobileProductListCard
                   key={product._id || product.id}
                   product={product}
                   onView={onView}
@@ -353,22 +458,40 @@ export default function InventoryTab({
                 />
               ))}
             </div>
-            <div className="flex-1 flex flex-col gap-3">
-              {mobileProducts.filter((_, i) => i % 2 === 1).map((product) => (
-                <MobileProductCard
-                  key={product._id || product.id}
-                  product={product}
-                  onView={onView}
-                  onEdit={onEdit}
-                  onDuplicate={onDuplicate}
-                  onStock={onStock}
-                  onProduction={onProduction}
-                  onQRCode={onQRCode}
-                  canEdit={canEdit}
-                />
-              ))}
+          ) : (
+            <div className="lg:hidden flex gap-3 pb-24">
+              <div className="flex-1 flex flex-col gap-3">
+                {mobileProducts.filter((_, i) => i % 2 === 0).map((product) => (
+                  <MobileProductCard
+                    key={product._id || product.id}
+                    product={product}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onDuplicate={onDuplicate}
+                    onStock={onStock}
+                    onProduction={onProduction}
+                    onQRCode={onQRCode}
+                    canEdit={canEdit}
+                  />
+                ))}
+              </div>
+              <div className="flex-1 flex flex-col gap-3">
+                {mobileProducts.filter((_, i) => i % 2 === 1).map((product) => (
+                  <MobileProductCard
+                    key={product._id || product.id}
+                    product={product}
+                    onView={onView}
+                    onEdit={onEdit}
+                    onDuplicate={onDuplicate}
+                    onStock={onStock}
+                    onProduction={onProduction}
+                    onQRCode={onQRCode}
+                    canEdit={canEdit}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           {/* Infinite scroll sentinel */}
           <div ref={sentinelRef} className="lg:hidden h-4" />
           {/* Loading spinner only for subsequent pages */}
