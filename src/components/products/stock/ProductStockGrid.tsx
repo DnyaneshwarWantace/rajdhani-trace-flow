@@ -103,12 +103,13 @@ export default function ProductStockGrid({
 
           {/* Mobile Grid View */}
           <div className="lg:hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3">
               {products.map((item) => (
                 <IndividualProductCard
                   key={item.id}
                   individualProduct={item}
                   onClick={() => navigate(`/products/${productId}/stock/${item.id}`)}
+                  onEdit={() => onEdit(item)}
                   lengthUnit={product?.length_unit}
                   widthUnit={product?.width_unit}
                   weightUnit={product?.weight_unit}

@@ -458,7 +458,7 @@ export default function ProductStock() {
           selectedCount={selectedIds.size}
         />
 
-        <div className="p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
+        <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 space-y-3 sm:space-y-4 lg:space-y-6">
           <StockStatsCards stats={stats} />
 
           <ProductStockFilters

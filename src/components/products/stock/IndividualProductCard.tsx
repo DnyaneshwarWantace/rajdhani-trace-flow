@@ -1,26 +1,32 @@
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { QrCode, Ruler, Weight, MapPin, User, Hash } from 'lucide-react';
+import { QrCode, Ruler, Weight, MapPin, User, Eye, Edit2 } from 'lucide-react';
 import type { IndividualProduct } from '@/types/product';
 
 function weightKgFromItem(item: IndividualProduct): number | null {
   const gsm = parseFloat((item.final_weight || '').toString().replace(/[^\d.]/g, ''));
-  const lengthStr = (item.final_length || '').toString();
-  const widthStr = (item.final_width || '').toString();
-  let lengthM = parseFloat(lengthStr.replace(/[^\d.]/g, ''));
-  let widthM = parseFloat(widthStr.replace(/[^\d.]/g, ''));
-  if (lengthStr.toLowerCase().includes('feet')) lengthM *= 0.3048;
-  if (widthStr.toLowerCase().includes('feet')) widthM *= 0.3048;
-  if (!isNaN(gsm) && !isNaN(lengthM) && !isNaN(widthM) && gsm > 0 && lengthM > 0 && widthM > 0) {
-    return (gsm * lengthM * widthM) / 1000;
-  }
+  const lenStr = (item.final_length || '').toString();
+  const widStr = (item.final_width || '').toString();
+  let l = parseFloat(lenStr.replace(/[^\d.]/g, ''));
+  let w = parseFloat(widStr.replace(/[^\d.]/g, ''));
+  if (lenStr.toLowerCase().includes('feet')) l *= 0.3048;
+  if (widStr.toLowerCase().includes('feet')) w *= 0.3048;
+  if (!isNaN(gsm) && !isNaN(l) && !isNaN(w) && gsm > 0 && l > 0 && w > 0) return (gsm * l * w) / 1000;
   return null;
 }
+
+const STATUS_CFG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  available:     { label: 'Available',     color: '#16A34A', bg: '#DCFCE7', dot: '#22C55E' },
+  in_production: { label: 'In Production', color: '#C2410C', bg: '#FFF4ED', dot: '#F97316' },
+  reserved:      { label: 'Reserved',      color: '#6D28D9', bg: '#F5F3FF', dot: '#8B5CF6' },
+  sold:          { label: 'Sold',          color: '#1D4ED8', bg: '#EFF4FF', dot: '#3B82F6' },
+  damaged:       { label: 'Damaged',       color: '#B91C1C', bg: '#FEF2F2', dot: '#EF4444' },
+  used:          { label: 'Used',          color: '#7C3AED', bg: '#FAF5FF', dot: '#A78BFA' },
+};
+const sc = (s: string) => STATUS_CFG[s] || { label: s, color: '#6B7280', bg: '#F3F4F6', dot: '#9CA3AF' };
 
 interface IndividualProductCardProps {
   individualProduct: IndividualProduct;
   onClick: () => void;
+  onEdit?: () => void;
   lengthUnit?: string;
   widthUnit?: string;
   weightUnit?: string;
@@ -29,154 +35,137 @@ interface IndividualProductCardProps {
 }
 
 export default function IndividualProductCard({
-  individualProduct,
+  individualProduct: ip,
   onClick,
+  onEdit,
   lengthUnit = '',
   widthUnit = '',
-  weightUnit: _weightUnit = '',
   selected,
   onToggleSelect,
 }: IndividualProductCardProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'available':
-        return 'bg-blue-600 text-white border-blue-600';
-      case 'sold':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'damaged':
-        return 'bg-red-100 text-red-700 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
+  const cfg = sc(ip.status);
+  const wKg = weightKgFromItem(ip);
+
+  const lenLabel = ip.final_length
+    ? (ip.final_length.includes(' ') ? ip.final_length : `${ip.final_length} ${lengthUnit || 'ft'}`.trim())
+    : null;
+  const widLabel = ip.final_width
+    ? (ip.final_width.includes(' ') ? ip.final_width : `${ip.final_width} ${widthUnit || 'ft'}`.trim())
+    : null;
 
   return (
-    <Card
-      onClick={onClick}
-      className={`hover:shadow-md transition-all cursor-pointer hover:border-primary-500 ${selected ? 'ring-2 ring-primary-500 border-primary-500' : ''}`}
+    <div
+      className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all active:scale-[0.99] ${
+        selected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-100'
+      }`}
     >
-      <CardContent className="p-3">
-        {/* Header: Checkbox (when selection enabled) + ID/QR/Roll & Status */}
-        <div className="flex items-start justify-between mb-2 gap-2">
-          {onToggleSelect && (
-            <div onClick={(e) => e.stopPropagation()} className="flex-shrink-0 pt-0.5">
-              <Checkbox
-                checked={selected}
-                onCheckedChange={() => onToggleSelect?.()}
-                aria-label={`Select ${individualProduct.qr_code || individualProduct.id}`}
-              />
-            </div>
-          )}
-          <div className="flex flex-col gap-1 min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 bg-gray-50 rounded flex items-center justify-center flex-shrink-0">
-                <Hash className="w-3 h-3 text-gray-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-gray-500">Roll No</p>
-                <p className="text-[10px] font-mono font-medium text-gray-900 truncate">
-                  {individualProduct.roll_number || '—'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 bg-primary-50 rounded flex items-center justify-center flex-shrink-0">
-                <QrCode className="w-3 h-3 text-primary-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[9px] text-gray-500">QR Code</p>
-                <p className="text-[10px] font-mono font-semibold text-gray-900 truncate">
-                  {individualProduct.qr_code || individualProduct.id}
-                </p>
-              </div>
-            </div>
-          </div>
-          <Badge
-            variant="outline"
-            className={`${getStatusColor(individualProduct.status)} text-[9px] px-1.5 py-0 flex-shrink-0 ml-2`}
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-3.5 pt-3 pb-2.5">
+        {/* Checkbox */}
+        {onToggleSelect && (
+          <div
+            onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 cursor-pointer transition-colors ${
+              selected ? 'border-blue-500 bg-blue-500' : 'border-gray-300 bg-white'
+            }`}
           >
-            {individualProduct.status}
-          </Badge>
-        </div>
-
-        {/* Details Grid */}
-        <div className="space-y-1.5 text-[10px] mb-2">
-          {/* Dimensions */}
-          {(individualProduct.final_length || individualProduct.final_width) && (
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <Ruler className="w-2.5 h-2.5" />
-                Dimensions
-              </span>
-              <span className="font-medium text-gray-900">
-                {individualProduct.final_length
-                  ? individualProduct.final_length.includes(' ')
-                    ? individualProduct.final_length
-                    : `${individualProduct.final_length} ${lengthUnit || 'feet'}`
-                  : 'N/A'} × {individualProduct.final_width
-                  ? individualProduct.final_width.includes(' ')
-                    ? individualProduct.final_width
-                    : `${individualProduct.final_width} ${widthUnit || 'feet'}`
-                  : 'N/A'}
-              </span>
-            </div>
-          )}
-
-          {/* Weight: show GSM and (weight kg) stacked */}
-          {individualProduct.final_weight && (
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <Weight className="w-2.5 h-2.5" />
-                GSM
-              </span>
-              <span className="font-medium text-gray-900 truncate ml-2">
-                <span className="block">{individualProduct.final_weight}</span>
-                {(() => {
-                  const wKg = weightKgFromItem(individualProduct);
-                  return wKg !== null ? (
-                    <span className="block text-gray-500 text-[9px] mt-0.5">
-                      ({wKg.toFixed(4)} kg)
-                    </span>
-                  ) : null;
-                })()}
-              </span>
-            </div>
-          )}
-
-          {/* Location */}
-          {individualProduct.location && (
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <MapPin className="w-2.5 h-2.5" />
-                Location
-              </span>
-              <span className="font-medium text-gray-900 truncate ml-2">
-                {individualProduct.location}
-              </span>
-            </div>
-          )}
-
-          {/* Inspector */}
-          {individualProduct.inspector && (
-            <div className="flex items-center justify-between">
-              <span className="text-gray-500 flex items-center gap-1">
-                <User className="w-2.5 h-2.5" />
-                Inspector
-              </span>
-              <span className="font-medium text-gray-900 truncate ml-2">
-                {individualProduct.inspector}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* View Details Button */}
-        <div className="pt-2 border-t border-gray-100">
-          <div className="text-center text-[10px] font-medium text-primary-600">
-            Tap to view details →
+            {selected && (
+              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            )}
           </div>
+        )}
+
+        {/* Roll number + QR */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+          <p className="text-sm font-bold text-gray-900 leading-tight truncate">
+            {ip.roll_number ? `#${ip.roll_number}` : ip.qr_code || ip.id}
+          </p>
+          {ip.qr_code && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <QrCode className="w-2.5 h-2.5 text-gray-400 shrink-0" />
+              <p className="text-[10px] font-mono text-gray-400 truncate">{ip.qr_code}</p>
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Status badge */}
+        <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0"
+          style={{ backgroundColor: cfg.bg, color: cfg.color }}>
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: cfg.dot }} />
+          {cfg.label}
+        </span>
+      </div>
+
+      {/* Info rows */}
+      <div className="px-3.5 pb-2.5 space-y-1.5 cursor-pointer" onClick={onClick}>
+        {(lenLabel || widLabel) && (
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10.5px] text-gray-400">
+              <Ruler className="w-3 h-3" /> Dimensions
+            </span>
+            <span className="text-[11px] font-semibold text-gray-900">
+              {[lenLabel, widLabel].filter(Boolean).join(' × ')}
+            </span>
+          </div>
+        )}
+        {ip.final_weight && (
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10.5px] text-gray-400">
+              <Weight className="w-3 h-3" /> GSM / Weight
+            </span>
+            <span className="text-[11px] font-semibold text-gray-900">
+              {ip.final_weight}{wKg != null ? ` · ${wKg.toFixed(1)} kg` : ''}
+            </span>
+          </div>
+        )}
+        {ip.location && (
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10.5px] text-gray-400">
+              <MapPin className="w-3 h-3" /> Location
+            </span>
+            <span className="text-[11px] font-semibold text-gray-900 truncate ml-4 max-w-[60%] text-right">{ip.location}</span>
+          </div>
+        )}
+        {ip.inspector && (
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[10.5px] text-gray-400">
+              <User className="w-3 h-3" /> Inspector
+            </span>
+            <span className="text-[11px] font-semibold text-gray-900 truncate ml-4 max-w-[60%] text-right">{ip.inspector}</span>
+          </div>
+        )}
+        {ip.batch_number && (
+          <div className="flex items-center justify-between">
+            <span className="text-[10.5px] text-gray-400">Batch</span>
+            <span className="text-[11px] font-mono font-semibold text-gray-500">{ip.batch_number}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Footer actions */}
+      <div className="border-t border-gray-50 flex items-center">
+        <button
+          onClick={onClick}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold text-blue-600 active:bg-blue-50 transition-colors"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          View Details
+        </button>
+        {onEdit && (
+          <>
+            <div className="w-px h-6 bg-gray-100" />
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold text-gray-500 active:bg-gray-50 transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
