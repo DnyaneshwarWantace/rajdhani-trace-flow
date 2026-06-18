@@ -72,6 +72,10 @@ export default function MobileFilterSheet({ filters, onApply, onClose }: MobileF
     ? Object.fromEntries(STATUS_OPTIONS.map(o => [o.value, o.label]))
     : {};
 
+  const statusColors: Record<string, string> = {
+    'in-stock': '#16a34a', 'low-stock': '#ea580c', 'out-of-stock': '#dc2626',
+  };
+
   const totalSelected = Object.values(selected).flat().length;
 
   return (
@@ -134,6 +138,9 @@ export default function MobileFilterSheet({ filters, onApply, onClose }: MobileF
                           </svg>
                         )}
                       </div>
+                      {activeSection === 'status' && statusColors[val] && (
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: statusColors[val] }} />
+                      )}
                       <span className="text-sm text-gray-800">{label}</span>
                     </button>
                     <div className="h-px bg-gray-100 mx-4" />

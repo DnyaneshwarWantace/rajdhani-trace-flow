@@ -391,52 +391,27 @@ export default function MaterialDetailTransactionHistory({
         )}
 
         {/* Consumption History Tab */}
-        {activeTab === 'consumption' && summary && (
-          <div className={`grid grid-cols-2 gap-4 mb-6 ${(material.category || '').toString().toLowerCase().trim() === 'ink' ? 'md:grid-cols-4' : 'md:grid-cols-5'}`}>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-sm text-blue-600 font-medium">Total Used</p>
-              <p className="text-2xl font-bold text-blue-900">
-                {summary.total_used?.toFixed(2) || 0} {material.unit}
-              </p>
+        {activeTab === 'consumption' && summary && (() => {
+          const isInk = (material.category || '').toString().toLowerCase().trim() === 'ink';
+          const unit = material.unit;
+          const stats = [
+            { label: 'Total Used', value: (summary.total_used?.toFixed(2) || '0') + ' ' + unit, color: 'text-blue-600' },
+            ...(!isInk ? [{ label: 'In Prod', value: (Number(summary.in_production ?? material.in_production ?? 0)).toFixed(2) + ' ' + unit, color: 'text-orange-500' }] : []),
+            { label: 'Reserved', value: (Number(material.reserved || 0) + Number(summary.reserved || 0)).toFixed(2) + ' ' + unit, color: 'text-yellow-600' },
+            { label: 'Used', value: (summary.used?.toFixed(2) || '0') + ' ' + unit, color: 'text-green-600' },
+            { label: 'Sold', value: (Number(material.sold || 0) + Number(summary.sold || 0)).toFixed(2) + ' ' + unit, color: 'text-purple-600' },
+          ];
+          return (
+            <div className="flex border border-gray-200 rounded-xl overflow-hidden bg-white text-center mb-4">
+              {stats.map((s, i) => (
+                <div key={s.label} className={`flex-1 flex flex-col items-center py-2.5 ${i > 0 ? 'border-l border-gray-200' : ''}`}>
+                  <span className={`text-xs font-extrabold tracking-tight ${s.color}`}>{s.value}</span>
+                  <span className="text-[8.5px] text-gray-400 font-medium mt-0.5 uppercase tracking-wide leading-none">{s.label}</span>
+                </div>
+              ))}
             </div>
-            {((material.category || '').toString().toLowerCase().trim() !== 'ink') && (
-              <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <p className="text-sm text-orange-600 font-medium">In Production</p>
-                <p className="text-2xl font-bold text-orange-900">
-                  {(Number(summary.in_production ?? material.in_production ?? 0)).toFixed(2)} {material.unit}
-                </p>
-              </div>
-            )}
-            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-              <p className="text-sm text-yellow-600 font-medium">Reserved</p>
-              <p className="text-2xl font-bold text-yellow-900">
-                {(Number(material.reserved || 0) + Number(summary.reserved || 0)).toFixed(2)} {material.unit}
-              </p>
-              {(Number(material.reserved || 0) > 0) && (
-                <p className="text-xs text-yellow-700 mt-1">
-                  {Number(material.reserved || 0).toFixed(2)} from orders
-                </p>
-              )}
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-              <p className="text-sm text-green-600 font-medium">Used</p>
-              <p className="text-2xl font-bold text-green-900">
-                {summary.used?.toFixed(2) || 0} {material.unit}
-              </p>
-            </div>
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <p className="text-sm text-purple-600 font-medium">Sold</p>
-              <p className="text-2xl font-bold text-purple-900">
-                {(Number(material.sold || 0) + Number(summary.sold || 0)).toFixed(2)} {material.unit}
-              </p>
-              {(Number(material.sold || 0) > 0) && (
-                <p className="text-xs text-purple-700 mt-1">
-                  {Number(material.sold || 0).toFixed(2)} from orders
-                </p>
-              )}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {activeTab === 'consumption' && (records.length === 0 ? (
           <div className="text-center py-12">
