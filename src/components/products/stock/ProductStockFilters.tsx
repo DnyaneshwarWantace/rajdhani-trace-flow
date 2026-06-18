@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, MapPin, ChevronDown, X, Check, SlidersHorizontal } from 'lucide-react';
+import { Search, X, AlignJustify, SlidersHorizontal, Check, MapPin } from 'lucide-react';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { DropdownService } from '@/services/dropdownService';
 
@@ -28,64 +28,11 @@ const STATUS_OPTIONS = [
   { label: 'Damaged',       value: 'damaged' },
 ];
 
-const SORT_BY_OPTIONS = [
+const SORT_BY_OPTIONS: { label: string; value: 'qr_code' | 'status' | 'created_at' }[] = [
   { label: 'Recently Added', value: 'created_at' },
   { label: 'QR Code',        value: 'qr_code' },
   { label: 'Status',         value: 'status' },
 ];
-
-const SORT_ORDER_OPTIONS = [
-  { label: 'Newest First', value: 'desc' },
-  { label: 'Oldest First', value: 'asc' },
-];
-
-function SimpleDropdown({
-  options,
-  value,
-  onChange,
-  placeholder,
-}: {
-  options: { label: string; value: string }[];
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const label = options.find(o => o.value === value)?.label ?? placeholder;
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-2 h-10 px-3.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-gray-300 transition-colors"
-      >
-        <span className="truncate">{label}</span>
-        <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full left-0 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-            {options.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm hover:bg-gray-50 transition-colors ${
-                  value === opt.value ? 'text-blue-600 font-semibold bg-blue-50' : 'text-gray-700'
-                }`}
-              >
-                {opt.label}
-                {value === opt.value && <Check className="w-3.5 h-3.5" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 export default function ProductStockFilters({
   searchTerm,
@@ -103,7 +50,8 @@ export default function ProductStockFilters({
   onSortChange,
 }: ProductStockFiltersProps) {
   const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
 
   useEffect(() => {
     DropdownService.getDropdownsByCategory('storage_location')
@@ -121,97 +69,55 @@ export default function ProductStockFilters({
   };
 
   return (
-    <div className="space-y-2">
-      {/* Search + filter toggle row — always visible */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => onSearchChange(e.target.value)}
-            placeholder="Search by QR code, roll no, inspector…"
-            className="w-full h-10 pl-10 pr-4 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors"
-          />
-          {searchTerm && (
-            <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="w-3.5 h-3.5 text-gray-400" />
-            </button>
-          )}
-        </div>
-
-        {/* Mobile: filter toggle button */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen(o => !o)}
-          className={`lg:hidden flex items-center gap-1.5 h-10 px-3.5 rounded-xl border text-sm font-semibold transition-colors ${
-            activeFilterCount > 0
-              ? 'bg-blue-600 border-blue-600 text-white'
-              : 'bg-white border-gray-200 text-gray-600'
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-          {activeFilterCount > 0 && <span className="text-xs">{activeFilterCount}</span>}
-        </button>
+    <>
+      {/* Search bar — always visible */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={e => onSearchChange(e.target.value)}
+          placeholder="Search by QR code, roll no, inspector…"
+          className="w-full h-10 pl-10 pr-9 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors"
+        />
+        {searchTerm && (
+          <button onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+            <X className="w-3.5 h-3.5 text-gray-400" />
+          </button>
+        )}
       </div>
 
-      {/* Desktop: always show filters inline */}
+      {/* Desktop: inline filter row */}
       <div className="hidden lg:flex flex-wrap items-center gap-3">
         <div className="w-52">
-          <MultiSelect
-            options={STATUS_OPTIONS}
-            selected={statusFilter}
-            onChange={onStatusChange}
-            placeholder="All Status"
-          />
+          <MultiSelect options={STATUS_OPTIONS} selected={statusFilter} onChange={onStatusChange} placeholder="All Status" />
         </div>
-
         <div className="w-52 relative">
           <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
           <div className="pl-8">
-            <MultiSelect
-              options={locationOptions}
-              selected={locationFilter}
-              onChange={onLocationChange}
-              placeholder="All Locations"
-            />
+            <MultiSelect options={locationOptions} selected={locationFilter} onChange={onLocationChange} placeholder="All Locations" />
           </div>
         </div>
-
-        {/* Date range — one line */}
         <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl overflow-hidden h-10 px-3">
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => onStartDateChange(e.target.value)}
-            className="text-sm text-gray-700 outline-none bg-transparent w-32"
-          />
+          <input type="date" value={startDate} onChange={e => onStartDateChange(e.target.value)} className="text-sm text-gray-700 outline-none bg-transparent w-32" />
           <span className="text-gray-300 text-xs">→</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => onEndDateChange(e.target.value)}
-            className="text-sm text-gray-700 outline-none bg-transparent w-32"
-          />
+          <input type="date" value={endDate} onChange={e => onEndDateChange(e.target.value)} className="text-sm text-gray-700 outline-none bg-transparent w-32" />
         </div>
-
         <div className="h-5 w-px bg-gray-200" />
-
-        <div className="w-40">
-          <SimpleDropdown
-            options={SORT_BY_OPTIONS}
-            value={sortBy}
-            onChange={v => onSortChange(v as typeof sortBy, sortOrder)}
-          />
+        <div className="flex gap-2">
+          {SORT_BY_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => onSortChange(opt.value, sortBy === opt.value && sortOrder === 'desc' ? 'asc' : 'desc')}
+              className={`h-9 px-3 rounded-xl text-sm font-medium border transition-colors ${
+                sortBy === opt.value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-200 text-gray-600'
+              }`}
+            >
+              {opt.label}
+              {sortBy === opt.value && <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>}
+            </button>
+          ))}
         </div>
-        <div className="w-36">
-          <SimpleDropdown
-            options={SORT_ORDER_OPTIONS}
-            value={sortOrder}
-            onChange={v => onSortChange(sortBy, v as typeof sortOrder)}
-          />
-        </div>
-
         {activeFilterCount > 0 && (
           <button onClick={clearAll} className="flex items-center gap-1 text-xs text-red-500 font-semibold hover:text-red-700">
             <X className="w-3 h-3" /> Clear
@@ -219,80 +125,164 @@ export default function ProductStockFilters({
         )}
       </div>
 
-      {/* Mobile: expandable filter panel */}
-      {mobileOpen && (
-        <div className="lg:hidden bg-white border border-gray-200 rounded-2xl p-4 space-y-3 shadow-sm">
-          {/* Status */}
-          <div>
-            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Status</p>
-            <MultiSelect
-              options={STATUS_OPTIONS}
-              selected={statusFilter}
-              onChange={onStatusChange}
-              placeholder="All Status"
-            />
-          </div>
+      {/* Mobile: fixed bottom SORT | FILTER bar */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 flex border-t border-gray-200 bg-white">
+        <button
+          onClick={() => { setShowSort(true); setShowFilter(false); }}
+          className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-gray-700 border-r border-gray-200"
+        >
+          <AlignJustify className="w-4 h-4" />
+          SORT
+          {sortBy !== 'created_at' && <span className="w-2 h-2 rounded-full bg-blue-500 ml-0.5" />}
+        </button>
+        <button
+          onClick={() => { setShowFilter(true); setShowSort(false); }}
+          className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold text-gray-700"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          FILTER
+          {activeFilterCount > 0 && (
+            <span className="ml-0.5 w-5 h-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
 
-          {/* Location — icon inside */}
-          <div>
-            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Location</p>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none z-10" />
-              <div className="pl-8">
-                <MultiSelect
-                  options={locationOptions}
-                  selected={locationFilter}
-                  onChange={onLocationChange}
-                  placeholder="All Locations"
-                />
+      {/* SORT bottom sheet */}
+      {showSort && (
+        <>
+          <div className="lg:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowSort(false)} />
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl" style={{ zIndex: 51 }}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
+              <p className="text-base font-bold text-gray-900">Sort By</p>
+              <button onClick={() => setShowSort(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+            <div className="px-5 py-3 space-y-1">
+              {SORT_BY_OPTIONS.map(opt => (
+                <div key={opt.value}>
+                  <button
+                    onClick={() => { onSortChange(opt.value, sortOrder); setShowSort(false); }}
+                    className={`w-full flex items-center justify-between text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                      sortBy === opt.value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                    {sortBy === opt.value && <Check className="w-4 h-4 text-blue-600" />}
+                  </button>
+                  <div className="h-px bg-gray-100 mx-1" />
+                </div>
+              ))}
+              <div className="pt-2 pb-6">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Order</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { onSortChange(sortBy, 'asc'); setShowSort(false); }}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${sortOrder === 'asc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Oldest First
+                  </button>
+                  <button
+                    onClick={() => { onSortChange(sortBy, 'desc'); setShowSort(false); }}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-colors ${sortOrder === 'desc' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  >
+                    Newest First
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Date range — both on one line */}
-          <div>
-            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Date Range</p>
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
-              <input
-                type="date"
-                value={startDate}
-                onChange={e => onStartDateChange(e.target.value)}
-                className="flex-1 text-sm text-gray-700 bg-transparent outline-none"
-              />
-              <span className="text-gray-300 text-xs shrink-0">→</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={e => onEndDateChange(e.target.value)}
-                className="flex-1 text-sm text-gray-700 bg-transparent outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Sort — both on one line */}
-          <div>
-            <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide mb-1.5">Sort</p>
-            <div className="grid grid-cols-2 gap-2">
-              <SimpleDropdown
-                options={SORT_BY_OPTIONS}
-                value={sortBy}
-                onChange={v => onSortChange(v as typeof sortBy, sortOrder)}
-              />
-              <SimpleDropdown
-                options={SORT_ORDER_OPTIONS}
-                value={sortOrder}
-                onChange={v => onSortChange(sortBy, v as typeof sortOrder)}
-              />
-            </div>
-          </div>
-
-          {activeFilterCount > 0 && (
-            <button onClick={clearAll} className="w-full flex items-center justify-center gap-1.5 py-2 text-sm text-red-500 font-semibold border border-red-100 rounded-xl bg-red-50">
-              <X className="w-3.5 h-3.5" /> Clear all filters
-            </button>
-          )}
-        </div>
+        </>
       )}
-    </div>
+
+      {/* FILTER bottom sheet */}
+      {showFilter && (
+        <>
+          <div className="lg:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setShowFilter(false)} />
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl" style={{ zIndex: 51 }}>
+            <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
+              <p className="text-base font-bold text-gray-900">Filter</p>
+              <div className="flex items-center gap-2">
+                {activeFilterCount > 0 && (
+                  <button onClick={clearAll} className="text-xs text-red-500 font-semibold px-3 py-1.5 rounded-lg bg-red-50">
+                    Clear all
+                  </button>
+                )}
+                <button onClick={() => setShowFilter(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
+                  <X className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+            <div className="px-5 py-4 space-y-5 pb-10 overflow-y-auto max-h-[75vh]">
+              {/* Status */}
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Status</p>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_OPTIONS.map(opt => {
+                    const active = statusFilter.includes(opt.value);
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => onStatusChange(active ? statusFilter.filter(v => v !== opt.value) : [...statusFilter, opt.value])}
+                        className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                          active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Location */}
+              {locationOptions.length > 0 && (
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Location</p>
+                  <div className="flex flex-wrap gap-2">
+                    {locationOptions.map(opt => {
+                      const active = locationFilter.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => onLocationChange(active ? locationFilter.filter(v => v !== opt.value) : [...locationFilter, opt.value])}
+                          className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                            active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Date range */}
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Date Range</p>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={e => onStartDateChange(e.target.value)}
+                    className="flex-1 text-sm text-gray-700 bg-transparent outline-none"
+                  />
+                  <span className="text-gray-300 text-xs shrink-0">→</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={e => onEndDateChange(e.target.value)}
+                    className="flex-1 text-sm text-gray-700 bg-transparent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
