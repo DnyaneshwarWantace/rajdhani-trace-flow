@@ -186,9 +186,14 @@ export default function TransportManagement() {
       <div className="space-y-1.5">
         <Label>Vehicle Number *</Label>
         <Input placeholder="e.g. MH12AB1234" value={form.vehicle_no}
-          onChange={e => setForm(f => ({ ...f, vehicle_no: e.target.value }))}
-          autoCapitalize="characters"
-          style={{ textTransform: 'uppercase' }} />
+          onChange={e => {
+            const el = e.target;
+            const pos = el.selectionStart;
+            const upper = el.value.toUpperCase();
+            setForm(f => ({ ...f, vehicle_no: upper }));
+            requestAnimationFrame(() => { el.setSelectionRange(pos, pos); });
+          }}
+          autoCapitalize="characters" />
       </div>
       <div className="space-y-1.5">
         <Label>Type</Label>
