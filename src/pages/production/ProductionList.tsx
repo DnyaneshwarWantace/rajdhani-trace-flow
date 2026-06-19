@@ -1909,16 +1909,6 @@ export default function ProductionList() {
           </div>
         )}
 
-        {/* Mobile Floating Action Button */}
-        {mobileTab !== 'pending' && canCreate('production') && (
-          <button
-            onClick={handleCreate}
-            className="lg:hidden fixed right-5 bottom-16 w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-            style={{ zIndex: 45 }}
-          >
-            <Plus className="w-6 h-6" />
-          </button>
-        )}
 
         {/* Mobile Sort Sheet */}
         {showMobileSort && (
