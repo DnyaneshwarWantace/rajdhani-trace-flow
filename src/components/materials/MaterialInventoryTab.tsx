@@ -73,7 +73,7 @@ function MobileGridCard({ material, onView, onEdit, onOrder, onRecordUsage }: {
     : null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden" onClick={() => onView?.(material)}>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden w-full max-w-full" onClick={() => onView?.(material)}>
       {/* Image area */}
       <div className="relative w-full" style={{ paddingTop: '66%' }}>
         {material.image_url ? (
@@ -102,7 +102,7 @@ function MobileGridCard({ material, onView, onEdit, onOrder, onRecordUsage }: {
       {/* Body */}
       <div className="p-2.5">
         <p className="text-xs font-bold text-gray-900 leading-tight line-clamp-2 mb-0.5">{material.name}</p>
-        <p className="text-[10px] text-gray-400 mb-2">
+        <p className="text-[10px] text-gray-400 mb-2 truncate">
           {material.category}{material.type && material.type !== 'N/A' ? ` · ${material.type}` : ''}
         </p>
 
@@ -136,37 +136,37 @@ function MobileGridCard({ material, onView, onEdit, onOrder, onRecordUsage }: {
         )}
 
         {/* Actions — icon + label below, like RN app */}
-        <div className="flex border-t border-gray-100 mt-1">
+        <div className="flex border-t border-gray-100 mt-1 min-w-0">
           {onView && (
-            <button onClick={(e) => { e.stopPropagation(); onView(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-blue-500 active:bg-blue-50">
-              <Eye className="w-3.5 h-3.5" />
-              <span className="text-[9px] font-semibold">View</span>
+            <button onClick={(e) => { e.stopPropagation(); onView(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-blue-500 active:bg-blue-50 min-w-0 overflow-hidden">
+              <Eye className="w-3.5 h-3.5 shrink-0" />
+              <span className="text-[9px] font-semibold truncate w-full text-center leading-tight">View</span>
             </button>
           )}
           {onEdit && (
             <>
-              <div className="w-px bg-gray-100" />
-              <button onClick={(e) => { e.stopPropagation(); onEdit(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-green-500 active:bg-green-50">
-                <Edit className="w-3.5 h-3.5" />
-                <span className="text-[9px] font-semibold">Edit</span>
+              <div className="w-px bg-gray-100 shrink-0" />
+              <button onClick={(e) => { e.stopPropagation(); onEdit(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-green-500 active:bg-green-50 min-w-0 overflow-hidden">
+                <Edit className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[9px] font-semibold truncate w-full text-center leading-tight">Edit</span>
               </button>
             </>
           )}
           {onOrder && (
             <>
-              <div className="w-px bg-gray-100" />
-              <button onClick={(e) => { e.stopPropagation(); onOrder(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-orange-500 active:bg-orange-50">
-                <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-                <span className="text-[9px] font-semibold">Restock</span>
+              <div className="w-px bg-gray-100 shrink-0" />
+              <button onClick={(e) => { e.stopPropagation(); onOrder(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-orange-500 active:bg-orange-50 min-w-0 overflow-hidden">
+                <Plus className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+                <span className="text-[9px] font-semibold truncate w-full text-center leading-tight">Restock</span>
               </button>
             </>
           )}
           {onRecordUsage && material.category?.toLowerCase().trim() === 'ink' && (
             <>
-              <div className="w-px bg-gray-100" />
-              <button onClick={(e) => { e.stopPropagation(); onRecordUsage(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-violet-500 active:bg-violet-50">
-                <Droplets className="w-3.5 h-3.5" />
-                <span className="text-[9px] font-semibold">Record</span>
+              <div className="w-px bg-gray-100 shrink-0" />
+              <button onClick={(e) => { e.stopPropagation(); onRecordUsage(material); }} className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-violet-500 active:bg-violet-50 min-w-0 overflow-hidden">
+                <Droplets className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[9px] font-semibold truncate w-full text-center leading-tight">Record</span>
               </button>
             </>
           )}
@@ -467,12 +467,6 @@ export default function MaterialInventoryTab({
                 showCounter={false}
               />
             </div>
-            {mobileInitialLoading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-              </div>
-            )}
-
             {/* Active filter chips */}
             {activeFilterCount > 0 && (
               <div className="flex gap-2 mb-3 flex-wrap">
@@ -509,11 +503,28 @@ export default function MaterialInventoryTab({
               </div>
             )}
 
+            {mobileInitialLoading && (
+              <div className="flex gap-3 pb-4">
+                {[0, 1].map((col) => (
+                  <div key={col} className="flex-1 flex flex-col gap-3 min-w-0">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} className="bg-white rounded-xl border border-gray-200 p-3 space-y-2 animate-pulse">
+                        <div className="h-3 bg-gray-200 rounded w-3/4" />
+                        <div className="h-2 bg-gray-100 rounded w-1/2" />
+                        <div className="h-2 bg-gray-100 rounded w-2/3" />
+                        <div className="h-6 bg-gray-100 rounded mt-2" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
             {!mobileInitialLoading && (
               <>
                 {/* masonry 2-column grid */}
                 <div className="flex gap-3 pb-4">
-                  <div className="flex-1 flex flex-col gap-3">
+                  <div className="flex-1 flex flex-col gap-3 min-w-0 max-w-full">
                     {mobileMaterials.filter((_, i) => i % 2 === 0).map((material) => (
                       <MobileGridCard
                         key={material._id || material.id}
@@ -525,7 +536,7 @@ export default function MaterialInventoryTab({
                       />
                     ))}
                   </div>
-                  <div className="flex-1 flex flex-col gap-3">
+                  <div className="flex-1 flex flex-col gap-3 min-w-0 max-w-full">
                     {mobileMaterials.filter((_, i) => i % 2 === 1).map((material) => (
                       <MobileGridCard
                         key={material._id || material.id}

@@ -90,7 +90,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     overstock: 0,
   });
   const [fullStats, setFullStats] = useState<any>(null); // Full stats for analytics tab
-  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Notifications state - load count from cache immediately
   const [notifications, setNotifications] = useState<Notification[]>([]);
