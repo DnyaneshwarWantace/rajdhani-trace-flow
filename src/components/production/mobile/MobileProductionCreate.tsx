@@ -922,28 +922,39 @@ export default function MobileProductionCreate() {
               )}
 
               {/* Counts */}
-              {!loadingSiblings && allProductBatches.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {loadingSiblings ? (
+                <div className="flex gap-2 mb-2.5">
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} className="flex-1 bg-white/60 rounded-[8px] h-[36px] animate-pulse" />
+                  ))}
+                </div>
+              ) : allProductBatches.length > 0 ? (
+                <div className="flex border border-white/70 rounded-[8px] overflow-hidden mb-2.5 bg-white/50">
                   {[
                     { label: 'Total', val: allProductBatches.length },
                     { label: 'Planned', val: batchPlanned },
                     { label: 'Ongoing', val: batchOngoing },
-                    { label: 'Completed', val: batchCompleted },
-                    { label: 'Cancelled', val: batchCancelled },
-                  ].map(item => (
-                    <div key={item.label} className="bg-white rounded-[8px] px-2 py-1.5">
-                      <p className="text-[10px] text-gray-400">{item.label}</p>
-                      <p className="text-[13px] font-extrabold text-gray-800">{item.val}</p>
+                    { label: 'Done', val: batchCompleted },
+                    { label: 'Cancel', val: batchCancelled },
+                  ].map((item, i) => (
+                    <div key={item.label} className={`flex-1 flex flex-col items-center py-1.5 ${i > 0 ? 'border-l border-white/70' : ''}`}>
+                      <span className="text-[12px] font-extrabold text-gray-800">{item.val}</span>
+                      <span className="text-[9px] text-gray-400 font-medium uppercase tracking-wide leading-tight">{item.label}</span>
                     </div>
                   ))}
                 </div>
-              )}
-
-              {!loadingSiblings && allProductBatches.length === 0 && (
-                <p className="text-[12px]" style={{ color: '#1D4ED8' }}>No previous production batches found.</p>
+              ) : (
+                <p className="text-[12px] mb-2.5" style={{ color: '#1D4ED8' }}>No previous production batches found.</p>
               )}
 
               {/* Latest batches */}
+              {loadingSiblings && (
+                <div className="mb-2 space-y-1.5">
+                  {[0,1].map(i => (
+                    <div key={i} className="rounded-[10px] bg-white/60 h-[52px] animate-pulse" />
+                  ))}
+                </div>
+              )}
               {!loadingSiblings && latestBatches.length > 0 && (
                 <div className="mb-2">
                   <p className="text-[10px] font-bold mb-1.5" style={{ color: hasDuplicate ? (batchOngoing > 0 ? '#991B1B' : '#92400E') : '#1D4ED8' }}>Latest batches:</p>
