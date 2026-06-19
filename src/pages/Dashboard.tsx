@@ -890,17 +890,20 @@ export default function Dashboard() {
           </div>
           
           <StackedBar segments={orderBreakdownSegments} total={orderBreakdownTotal} height={12} />
-          
-          <div className="flex flex-wrap gap-2 mt-4">
-            {orderBreakdownSegments.map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.01)]" style={{ backgroundColor: s.color + '0E' }}>
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                <span className="text-[10.5px] text-gray-500 font-bold">{s.label}</span>
-                <span className="text-[10.5px] font-black" style={{ color: s.color }}>{s.value}</span>
+
+          <div className="grid grid-cols-4 mt-4 pt-3.5 border-t border-gray-100 text-center">
+            {[
+              { label: 'Pending',    count: dashboardData.stats.ordersPending,    color: '#EA580C' },
+              { label: 'Accepted',   count: dashboardData.stats.ordersAccepted,   color: '#2563EB' },
+              { label: 'Dispatched', count: dashboardData.stats.ordersDispatched, color: '#7C3AED' },
+              { label: 'Delivered',  count: dashboardData.stats.ordersDelivered,  color: '#16A34A' },
+            ].map((item, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <span className="text-base font-extrabold leading-none" style={{ color: item.color }}>{item.count}</span>
+                <span className="text-[9.5px] text-gray-400 font-semibold mt-1 uppercase tracking-wide leading-none">{item.label}</span>
               </div>
             ))}
           </div>
-          
         </div>
 
         {/* Production Overview */}
