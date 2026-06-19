@@ -13,6 +13,7 @@ import { OrderService, type Order } from '@/services/orderService';
 import { RecipeService } from '@/services/recipeService';
 import { formatIndianDate } from '@/utils/formatHelpers';
 import type { Product } from '@/types/product';
+import { MobileDateField } from '@/components/ui/MobileDatePickerSheet';
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -815,12 +816,14 @@ export default function MobileProductionCreate() {
 
           {/* Expected Completion */}
           <FLabel required>Expected Completion</FLabel>
-          <input
-            type="date"
-            value={completionDate}
-            onChange={e => setCompletionDate(e.target.value)}
-            className="w-full h-[44px] px-3 bg-white border border-gray-200 rounded-[10px] text-[14px] text-gray-900 outline-none mb-[14px]"
-          />
+          <div className="mb-[14px]">
+            <MobileDateField
+              value={completionDate}
+              onChange={setCompletionDate}
+              placeholder="Select completion date"
+              title="Expected Completion"
+            />
+          </div>
           {selectedOrderDeliveryDate && (
             <p className="text-[11px] text-red-600 font-medium mt-[-8px] mb-[14px]">
               Order delivery: {formatIndianDate(selectedOrderDeliveryDate)}. Suggested: complete before this date.
