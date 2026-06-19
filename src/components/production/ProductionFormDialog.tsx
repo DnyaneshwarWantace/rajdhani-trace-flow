@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, X, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import type { ProductionBatch, CreateProductionBatchData } from '@/services/productionService';
 import { ProductService } from '@/services/productService';
 import { OrderService } from '@/services/orderService';
@@ -37,12 +37,116 @@ function useIsMobile() {
   return isMobile;
 }
 
-interface ProductionFormDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: CreateProductionBatchData) => Promise<void>;
+// ─── Custom inline calendar date picker ──────────────────────────────────────
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_NAMES = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+function MobileDatePicker({
+  value,
+  onChange,
+}: {
+  value: string; // yyyy-mm-dd or ''
+  onChange: (v: string) => void;
+}) {
+  const today = new Date();
+  const parsed = value ? new Date(value + 'T00:00:00') : null;
+
+  const [viewYear, setViewYear] = useState(parsed ? parsed.getFullYear() : today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(parsed ? parsed.getMonth() : today.getMonth());
+
+  const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  };
+
+  const selectDay = (day: number) => {
+    const mm = String(viewMonth + 1).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    onChange(`${viewYear}-${mm}-${dd}`);
+  };
+
+  const isSelected = (day: number) =>
+    parsed &&
+    parsed.getFullYear() === viewYear &&
+    parsed.getMonth() === viewMonth &&
+    parsed.getDate() === day;
+
+  const isToday = (day: number) =>
+    today.getFullYear() === viewYear &&
+    today.getMonth() === viewMonth &&
+    today.getDate() === day;
+
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  // pad to full rows
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      {/* Month/year header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <button type="button" onClick={prevMonth} className="w-8 h-8 flex items-center justify-center rounded-full active:bg-gray-100">
+          <ChevronLeft className="w-4 h-4 text-gray-600" />
+        </button>
+        <span className="text-sm font-bold text-gray-900">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button type="button" onClick={nextMonth} className="w-8 h-8 flex items-center justify-center rounded-full active:bg-gray-100">
+          <ChevronRight className="w-4 h-4 text-gray-600" />
+        </button>
+      </div>
+
+      {/* Day names */}
+      <div className="grid grid-cols-7 px-2 pt-2">
+        {DAY_NAMES.map(d => (
+          <div key={d} className="text-center text-[10px] font-bold text-gray-400 py-1">{d}</div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div className="grid grid-cols-7 px-2 pb-3 gap-y-1">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const sel = isSelected(day);
+          const tod = isToday(day);
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => selectDay(day)}
+              className={`mx-auto w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors
+                ${sel ? 'bg-blue-600 text-white font-bold' : tod ? 'bg-blue-50 text-blue-600 font-bold' : 'text-gray-700 active:bg-gray-100'}`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared form fields (desktop uses shadcn Input for date, mobile uses calendar) ─
+
+interface FormFieldsProps {
+  formData: CreateProductionBatchData;
+  setFormData: (d: CreateProductionBatchData) => void;
+  products: Product[];
+  loadingProducts: boolean;
+  productName: string;
   selectedBatch: ProductionBatch | null;
-  submitting: boolean;
+  orderEarliestDelivery: string | null;
+  isMobile?: boolean;
 }
 
 function FormFields({
@@ -53,15 +157,12 @@ function FormFields({
   productName,
   selectedBatch,
   orderEarliestDelivery,
-}: {
-  formData: CreateProductionBatchData;
-  setFormData: (d: CreateProductionBatchData) => void;
-  products: Product[];
-  loadingProducts: boolean;
-  productName: string;
-  selectedBatch: ProductionBatch | null;
-  orderEarliestDelivery: string | null;
-}) {
+  isMobile,
+}: FormFieldsProps) {
+  const displayDate = formData.completion_date
+    ? new Date(formData.completion_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : '';
+
   return (
     <div className="space-y-4">
       <div>
@@ -130,14 +231,32 @@ function FormFields({
         <Label htmlFor="completion_date">
           Expected Completion Date <span className="text-red-500">*</span>
         </Label>
-        <input
-          id="completion_date"
-          type="date"
-          value={formData.completion_date || ''}
-          onChange={(e) => setFormData({ ...formData, completion_date: e.target.value })}
-          required
-          className="w-full h-[44px] px-3 bg-white border border-gray-200 rounded-[10px] text-[14px] text-gray-900 outline-none"
-        />
+
+        {isMobile ? (
+          <>
+            {/* Selected date display pill */}
+            {displayDate && (
+              <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl">
+                <CalendarDays className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-sm font-semibold text-blue-700">{displayDate}</span>
+              </div>
+            )}
+            <MobileDatePicker
+              value={formData.completion_date || ''}
+              onChange={(v) => setFormData({ ...formData, completion_date: v })}
+            />
+          </>
+        ) : (
+          <input
+            id="completion_date"
+            type="date"
+            value={formData.completion_date || ''}
+            onChange={(e) => setFormData({ ...formData, completion_date: e.target.value })}
+            required
+            className="w-full h-[44px] px-3 bg-white border border-gray-200 rounded-[10px] text-[14px] text-gray-900 outline-none"
+          />
+        )}
+
         {selectedBatch && orderEarliestDelivery ? (
           <p className="text-xs text-red-600 font-medium mt-1">
             Order delivery: {formatIndianDate(orderEarliestDelivery)}. Suggested: complete before this date.
@@ -161,6 +280,16 @@ function FormFields({
       </div>
     </div>
   );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+interface ProductionFormDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: CreateProductionBatchData) => Promise<void>;
+  selectedBatch: ProductionBatch | null;
+  submitting: boolean;
 }
 
 export default function ProductionFormDialog({
@@ -266,48 +395,38 @@ export default function ProductionFormDialog({
     ? `Update the production batch details${productName ? ` — ${productName}` : ''}`
     : 'Create a new production batch for a product';
 
+  const sharedProps: FormFieldsProps = {
+    formData,
+    setFormData,
+    products,
+    loadingProducts,
+    productName,
+    selectedBatch,
+    orderEarliestDelivery,
+  };
+
   // ── MOBILE: bottom sheet via portal ─────────────────────────────────────────
   const mobileSheet = isOpen && isMobile
     ? createPortal(
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={onClose}
-          />
-          {/* Sheet */}
+          <div className="absolute inset-0 bg-black/40" onClick={onClose} />
           <div className="relative bg-white rounded-t-2xl shadow-xl max-h-[92vh] flex flex-col">
-            {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-gray-300" />
             </div>
-            {/* Header */}
             <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-100 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-gray-900">{title}</h2>
                 <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
               </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100"
-              >
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">
                 <X className="w-4 h-4 text-gray-600" />
               </button>
             </div>
-            {/* Scrollable form body */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 overflow-y-auto px-4 py-4">
-                <FormFields
-                  formData={formData}
-                  setFormData={setFormData}
-                  products={products}
-                  loadingProducts={loadingProducts}
-                  productName={productName}
-                  selectedBatch={selectedBatch}
-                  orderEarliestDelivery={orderEarliestDelivery}
-                />
+                <FormFields {...sharedProps} isMobile />
               </div>
-              {/* Footer */}
               <div className="px-4 py-4 border-t border-gray-100 flex gap-3 shrink-0">
                 <button
                   type="button"
@@ -323,10 +442,7 @@ export default function ProductionFormDialog({
                   className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      {selectedBatch ? 'Updating...' : 'Creating...'}
-                    </>
+                    <><Loader2 className="w-4 h-4 animate-spin" />{selectedBatch ? 'Updating...' : 'Creating...'}</>
                   ) : (
                     selectedBatch ? 'Update Batch' : 'Create Batch'
                   )}
@@ -339,7 +455,7 @@ export default function ProductionFormDialog({
       )
     : null;
 
-  // ── DESKTOP: original centered dialog ───────────────────────────────────────
+  // ── DESKTOP: centered dialog ─────────────────────────────────────────────────
   return (
     <>
       {mobileSheet}
@@ -353,30 +469,15 @@ export default function ProductionFormDialog({
             </DialogHeader>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4 py-4">
-                <FormFields
-                  formData={formData}
-                  setFormData={setFormData}
-                  products={products}
-                  loadingProducts={loadingProducts}
-                  productName={productName}
-                  selectedBatch={selectedBatch}
-                  orderEarliestDelivery={orderEarliestDelivery}
-                />
+                <FormFields {...sharedProps} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  className="text-white"
-                  disabled={submitting || !canSubmit}
-                >
+                <Button type="submit" className="text-white" disabled={submitting || !canSubmit}>
                   {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {selectedBatch ? 'Updating...' : 'Creating...'}
-                    </>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{selectedBatch ? 'Updating...' : 'Creating...'}</>
                   ) : (
                     selectedBatch ? 'Update Batch' : 'Create Batch'
                   )}
