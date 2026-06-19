@@ -106,25 +106,25 @@ function MobileProductCard({
 
       {/* Action icons row */}
       <div className="border-t border-gray-100 py-1.5 flex items-center justify-around">
-        <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} />
-        {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} />}
-        {canEdit && <ActionBtn icon={<Copy className="w-3.5 h-3.5" />} label="Copy" onClick={() => onDuplicate?.(product)} />}
-        <ActionBtn icon={<QrCode className="w-3.5 h-3.5" />} label="QR" onClick={() => onQRCode?.(product)} />
-        <ActionBtn icon={<BarChart3 className="w-3.5 h-3.5" />} label="Stock" onClick={() => onStock?.(product)} />
-        <ActionBtn icon={<Factory className="w-3.5 h-3.5" />} label="Prod" onClick={() => onProduction?.(product)} />
+        <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} color="text-blue-500" activeColor="active:bg-blue-50" />
+        {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} color="text-green-500" activeColor="active:bg-green-50" />}
+        {canEdit && <ActionBtn icon={<Copy className="w-3.5 h-3.5" />} label="Copy" onClick={() => onDuplicate?.(product)} color="text-gray-500" activeColor="active:bg-gray-50" />}
+        <ActionBtn icon={<QrCode className="w-3.5 h-3.5" />} label="QR" onClick={() => onQRCode?.(product)} color="text-purple-500" activeColor="active:bg-purple-50" />
+        <ActionBtn icon={<BarChart3 className="w-3.5 h-3.5" />} label="Stock" onClick={() => onStock?.(product)} color="text-orange-500" activeColor="active:bg-orange-50" />
+        <ActionBtn icon={<Factory className="w-3.5 h-3.5" />} label="Prod" onClick={() => onProduction?.(product)} color="text-violet-500" activeColor="active:bg-violet-50" />
       </div>
     </div>
   );
 }
 
-function ActionBtn({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
+function ActionBtn({ icon, label, onClick, color = 'text-gray-500', activeColor = 'active:bg-gray-50' }: { icon: React.ReactNode; label: string; onClick?: () => void; color?: string; activeColor?: string }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-0.5 py-0.5 flex-1 text-gray-500 active:text-blue-600"
+      className={`flex flex-col items-center gap-0.5 py-0.5 flex-1 ${color} ${activeColor}`}
     >
       {icon}
-      <span className="text-[9px] font-medium leading-none">{label}</span>
+      <span className="text-[9px] font-semibold leading-none">{label}</span>
     </button>
   );
 }
@@ -209,12 +209,12 @@ function MobileProductListCard({
 
       {/* Actions row — full width below */}
       <div className="border-t border-gray-100 py-1.5 flex items-center justify-around">
-        <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} />
-        {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} />}
-        {canEdit && <ActionBtn icon={<Copy className="w-3.5 h-3.5" />} label="Copy" onClick={() => onDuplicate?.(product)} />}
-        <ActionBtn icon={<QrCode className="w-3.5 h-3.5" />} label="QR" onClick={() => onQRCode?.(product)} />
-        <ActionBtn icon={<BarChart3 className="w-3.5 h-3.5" />} label="Stock" onClick={() => onStock?.(product)} />
-        <ActionBtn icon={<Factory className="w-3.5 h-3.5" />} label="Prod" onClick={() => onProduction?.(product)} />
+        <ActionBtn icon={<Eye className="w-3.5 h-3.5" />} label="View" onClick={() => onView?.(product)} color="text-blue-500" activeColor="active:bg-blue-50" />
+        {canEdit && <ActionBtn icon={<Edit className="w-3.5 h-3.5" />} label="Edit" onClick={() => onEdit?.(product)} color="text-green-500" activeColor="active:bg-green-50" />}
+        {canEdit && <ActionBtn icon={<Copy className="w-3.5 h-3.5" />} label="Copy" onClick={() => onDuplicate?.(product)} color="text-gray-500" activeColor="active:bg-gray-50" />}
+        <ActionBtn icon={<QrCode className="w-3.5 h-3.5" />} label="QR" onClick={() => onQRCode?.(product)} color="text-purple-500" activeColor="active:bg-purple-50" />
+        <ActionBtn icon={<BarChart3 className="w-3.5 h-3.5" />} label="Stock" onClick={() => onStock?.(product)} color="text-orange-500" activeColor="active:bg-orange-50" />
+        <ActionBtn icon={<Factory className="w-3.5 h-3.5" />} label="Prod" onClick={() => onProduction?.(product)} color="text-violet-500" activeColor="active:bg-violet-50" />
       </div>
     </div>
   );
