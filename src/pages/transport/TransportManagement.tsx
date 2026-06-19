@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { TransportService, type Transport } from '@/services/transportService';
-import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2, X } from 'lucide-react';
+import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2, X, ChevronDown } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
 
 const API_URL = getApiUrl();
