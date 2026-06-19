@@ -380,7 +380,6 @@ export default function ProductList() {
         <div className="lg:hidden flex items-center justify-between mb-3">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-            <p className="text-sm text-gray-400 mt-0.5">{inventoryStats.totalProducts.toLocaleString()} finished goods</p>
           </div>
           <div className="flex items-center gap-2">
             {canCreate('products') && (
