@@ -180,13 +180,14 @@ export default function TransportManagement() {
   const own = transports.filter(t => t.vehicle_type === 'own').length;
   const outside = transports.filter(t => t.vehicle_type === 'outside' || t.vehicle_type === 'hired').length;
 
-  // ── Shared form fields ──────────────────────────────────────────────────────
-  const FormFields = () => (
+  // ── Shared form fields — JSX variable, NOT a component, to avoid focus loss ──
+  const formFields = (
     <div className="space-y-4">
       <div className="space-y-1.5">
         <Label>Vehicle Number *</Label>
         <Input placeholder="e.g. MH12AB1234" value={form.vehicle_no}
           onChange={e => setForm(f => ({ ...f, vehicle_no: e.target.value }))}
+          autoCapitalize="characters"
           style={{ textTransform: 'uppercase' }} />
       </div>
       <div className="space-y-1.5">
@@ -516,7 +517,7 @@ export default function TransportManagement() {
             </div>
             {/* Scrollable form */}
             <div className="flex-1 overflow-y-auto px-4 py-4">
-              <FormFields />
+              {formFields}
             </div>
             {/* Footer */}
             <div className="px-4 py-4 border-t border-gray-100 flex gap-3 shrink-0">
@@ -651,7 +652,7 @@ export default function TransportManagement() {
                 {formTitle}
               </DialogTitle>
             </DialogHeader>
-            <div className="py-2"><FormFields /></div>
+            <div className="py-2">{formFields}</div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setShowDialog(false)} disabled={saving}>Cancel</Button>
               <Button onClick={handleSave} disabled={saving} className="bg-primary-600 hover:bg-primary-700 text-white">
