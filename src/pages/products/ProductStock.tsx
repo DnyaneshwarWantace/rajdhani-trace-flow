@@ -242,26 +242,30 @@ export default function ProductStock() {
   }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
 
   // Desktop pagination load
-  useEffect(() => {
+  const loadDesktopProducts = useCallback(async () => {
     if (!productId) return;
-    (async () => {
-      try {
-        const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
-          status: statusFilter.length > 0 ? statusFilter : undefined,
-          location: locationFilter.length > 0 ? locationFilter : undefined,
-          search: searchTerm || undefined,
-          start_date: startDate || undefined,
-          end_date: endDate || undefined,
-          limit: desktopLimit,
-          offset: (desktopPage - 1) * desktopLimit,
-          sortBy,
-          sortOrder,
-        });
-        setDesktopProducts(result.products);
-        setDesktopTotal(result.total ?? allIndividualProducts.length);
-      } catch {}
-    })();
-  }, [productId, desktopPage, desktopLimit, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
+    try {
+      const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
+        status: statusFilter.length > 0 ? statusFilter : undefined,
+        location: locationFilter.length > 0 ? locationFilter : undefined,
+        search: searchTerm || undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        limit: desktopLimit,
+        offset: (desktopPage - 1) * desktopLimit,
+        sortBy,
+        sortOrder,
+      });
+      setDesktopProducts(result.products);
+      setDesktopTotal(result.total ?? allIndividualProducts.length);
+    } catch (err) {
+      console.error('Error loading desktop products:', err);
+    }
+  }, [productId, desktopPage, desktopLimit, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder, allIndividualProducts.length]);
+
+  useEffect(() => {
+    loadDesktopProducts();
+  }, [loadDesktopProducts]);
 
   // Infinite scroll — load more when sentinel enters viewport
   useEffect(() => {
@@ -285,6 +289,7 @@ export default function ProductStock() {
       if (!productId) return;
       loadProduct();
       loadAllIndividualProducts();
+      loadDesktopProducts();
       offsetRef.current = 0;
       setIndividualProducts([]);
       setHasMore(true);
@@ -320,7 +325,11 @@ export default function ProductStock() {
       await IndividualProductService.updateIndividualProduct(id, data);
 
       // Reload data to ensure consistency
-      await loadIndividualProducts();
+      await loadDesktopProducts();
+      offsetRef.current = 0;
+      setIndividualProducts([]);
+      setHasMore(true);
+      await loadIndividualProducts(0, true);
       await loadAllIndividualProducts(); // Reload for updated stats
     } catch (error) {
       console.error('Error updating individual product:', error);

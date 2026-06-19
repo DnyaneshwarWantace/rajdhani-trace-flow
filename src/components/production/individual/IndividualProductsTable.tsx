@@ -47,7 +47,8 @@ import { downloadQRsAsPdf, type ProductInfo } from '@/utils/qrPdfExport';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import type { IndividualProduct } from '@/types/product';
+import type { IndividualProduct, Product } from '@/types/product';
+import ExpectedProductDetails from '@/components/production/planning/ExpectedProductDetails';
 import { useNavigate } from 'react-router-dom';
 
 function weightKgFromRow(item: IndividualProduct): number | null {
@@ -89,18 +90,7 @@ function normalizeRollNumberInput(rawValue: string, productionDate?: string): st
 interface IndividualProductsTableProps {
   individualProducts: IndividualProduct[];
   onUpdate: () => void;
-  product?: {
-    name?: string;
-    category?: string;
-    color?: string;
-    pattern?: string;
-    weight_unit?: string;
-    width_unit?: string;
-    length_unit?: string;
-    weight?: string;
-    width?: string;
-    length?: string;
-  };
+  product?: Product;
   plannedQuantity?: number;
   batchId?: string;
   productId?: string;
@@ -2215,37 +2205,13 @@ export default function IndividualProductsTable({
           </div>
         </div>
 
-        {/* Product Info Strip */}
+        {/* Product Info Card */}
         {product && (
-          <div
-            onClick={() => { setInfoTab('product'); setShowInfoSheet(true); }}
-            className="flex flex-wrap items-center gap-x-2 gap-y-1 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-xs text-sky-700 font-bold shadow-sm cursor-pointer animate-fadeIn"
-          >
-            <Package className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-            <span className="text-sky-900 truncate max-w-[130px]">{product.name}</span>
-            {product.weight && <span>· GSM: {product.weight.replace(/[^\d.]/g, '')} {product.weight_unit || 'GSM'}</span>}
-            {product.width && <span>· W: {product.width.replace(/[^\d.]/g, '')} {product.width_unit || 'm'}</span>}
-            {product.length && <span>· L: {product.length.replace(/[^\d.]/g, '')} {product.length_unit || 'm'}</span>}
-            {product.color && product.color !== 'N/A' && (
-              <span className="flex items-center gap-1">
-                ·
-                {colorCodeMap[product.color] && (
-                  <span className="w-3 h-3 rounded-full border border-black/10 shrink-0 inline-block" style={{ backgroundColor: colorCodeMap[product.color] }} />
-                )}
-                {product.color}
-              </span>
-            )}
-            {product.pattern && product.pattern !== 'N/A' && (
-              <span className="flex items-center gap-1">
-                ·
-                {patternImageMap[product.pattern] && (
-                  <img src={patternImageMap[product.pattern]} alt="" className="w-4 h-4 rounded object-cover border border-black/10 shrink-0 inline-block" />
-                )}
-                {product.pattern}
-              </span>
-            )}
-            <ChevronRight className="w-3.5 h-3.5 text-sky-600 ml-auto" />
-          </div>
+          <ExpectedProductDetails
+            product={product as any}
+            plannedQuantity={plannedQuantity}
+            countUnit={product.count_unit}
+          />
         )}
 
         {/* Toolbar */}
@@ -2466,18 +2432,18 @@ export default function IndividualProductsTable({
                             onBlur={handleCellSave}
                             onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                             autoFocus
-                            className="h-8 text-center text-xs py-0 px-1"
+                            className="h-11 text-center text-xs py-0 px-1"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(index, 'final_weight')}
-                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 h-11 flex items-center justify-center"
                           >
                             {roll.final_weight ? (
-                              <span className="flex flex-col items-center">
-                                <span>{roll.final_weight.replace(/[a-zA-Z\s]/g, '')}</span>
+                              <span className="flex flex-col items-center justify-center">
+                                <span className="leading-tight">{roll.final_weight.replace(/[a-zA-Z\s]/g, '')}</span>
                                 {weightKgFromRow(roll) !== null && (
-                                  <span className="text-[8px] text-gray-400 font-semibold">{weightKgFromRow(roll)?.toFixed(1)} kg</span>
+                                  <span className="text-[8px] text-gray-400 font-semibold leading-none mt-0.5">{weightKgFromRow(roll)?.toFixed(1)} kg</span>
                                 )}
                               </span>
                             ) : (
@@ -2510,14 +2476,16 @@ export default function IndividualProductsTable({
                             onBlur={handleCellSave}
                             onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                             autoFocus
-                            className="h-8 text-center text-xs py-0 px-1"
+                            className="h-11 text-center text-xs py-0 px-1"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(index, 'final_width')}
-                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 h-11 flex items-center justify-center"
                           >
-                            {roll.final_width ? roll.final_width.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                            <span className="leading-tight">
+                              {roll.final_width ? roll.final_width.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                            </span>
                           </div>
                         )}
                         <button
@@ -2545,14 +2513,16 @@ export default function IndividualProductsTable({
                             onBlur={handleCellSave}
                             onKeyDown={(e) => e.key === 'Enter' && handleCellSave()}
                             autoFocus
-                            className="h-8 text-center text-xs py-0 px-1"
+                            className="h-11 text-center text-xs py-0 px-1"
                           />
                         ) : (
                           <div
                             onClick={() => handleCellClick(index, 'final_length')}
-                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 min-h-[32px] flex items-center justify-center"
+                            className="w-full text-center py-1 text-xs text-gray-800 font-bold bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 h-11 flex items-center justify-center"
                           >
-                            {roll.final_length ? roll.final_length.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                            <span className="leading-tight">
+                              {roll.final_length ? roll.final_length.replace(/[a-zA-Z\s]/g, '') : <span className="text-gray-400 font-normal">—</span>}
+                            </span>
                           </div>
                         )}
                         <button

@@ -524,7 +524,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/v2">
       <AuthProvider>
         <NotificationProvider>
           <AppRoutes />

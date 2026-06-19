@@ -1154,7 +1154,12 @@ export default function ProductionWastage() {
               expectedWidth={product.width ? parseFloat(product.width) : undefined}
               expectedWeight={product.weight ? parseFloat(product.weight) : undefined}
             />
-            <ExpectedProductDetails product={product} />
+            <ExpectedProductDetails
+              product={product}
+              plannedQuantity={batch?.planned_quantity}
+              materialsCount={consumedMaterials.length}
+              countUnit={product.count_unit}
+            />
           </>
         )}
 
@@ -1354,28 +1359,14 @@ export default function ProductionWastage() {
           </div>
         </div>
 
-        {/* Product Info Strip */}
-        {(product || batch) && (
-          <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-3.5 text-xs text-blue-750 font-bold shadow-sm cursor-pointer">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0">
-              <Package className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-blue-900 truncate text-xs font-extrabold leading-tight">
-                {product?.name || batch?.product_name || '—'}
-              </h4>
-              <p className="text-[10px] text-blue-600 font-semibold mt-1 flex flex-wrap gap-x-1.5 items-center">
-                {product?.weight && <span>GSM: {product.weight}</span>}
-                {product?.width && <span>· W: {product.width} {product.width_unit || 'ft'}</span>}
-                {product?.length && <span>· L: {product.length} {product.length_unit || 'ft'}</span>}
-                {product?.color && <span>· Color: {product.color}</span>}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-xs font-extrabold text-blue-900 leading-tight">{plannedQty}</p>
-              <p className="text-[9px] text-blue-500 font-bold uppercase mt-0.5">Planned</p>
-            </div>
-          </div>
+        {/* Product Info Card */}
+        {product && (
+          <ExpectedProductDetails
+            product={product}
+            plannedQuantity={plannedQty}
+            materialsCount={consumedMaterials.length}
+            countUnit={product.count_unit}
+          />
         )}
 
         {/* Stats Row */}

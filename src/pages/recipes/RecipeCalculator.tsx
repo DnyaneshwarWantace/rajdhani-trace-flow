@@ -94,7 +94,7 @@ export default function RecipeCalculator() {
         setProductionSteps([]);
         setExpandedSteps(new Set());
       } else {
-        calculateRecipes();
+        calculateRecipes(false);
       }
     }
     prevCalculationItemsLengthRef.current = currentLength;
@@ -157,22 +157,24 @@ export default function RecipeCalculator() {
     ]);
   };
 
-  const updateCalculationItem = (index: number, field: keyof RecipeCalculationItem, value: any) => {
-    console.log('updateCalculationItem called:', { index, field, value, currentItems: calculationItems });
+  const updateCalculationItem = (index: number, updates: Partial<RecipeCalculationItem>) => {
+    console.log('updateCalculationItem called:', { index, updates });
     setCalculationItems((prev) => {
       const updated = [...prev];
-      if (field === 'productId') {
-        const product = products.find((p) => p.id === value);
-        console.log('Found product in products array:', product);
-        updated[index] = {
-          ...updated[index],
-          productId: value,
-          productName: product?.name || updated[index].productName || '',
-          unit: product?.unit || updated[index].unit || 'piece',
-        };
-      } else {
-        updated[index] = { ...updated[index], [field]: value };
+      updated[index] = {
+        ...updated[index],
+        ...updates,
+      };
+
+      // If productId is updated, resolve productName and unit if not explicitly provided
+      if ('productId' in updates && updates.productId) {
+        const product = products.find((p) => p.id === updates.productId);
+        if (product) {
+          updated[index].productName = product.name;
+          updated[index].unit = product.count_unit || product.unit;
+        }
       }
+
       console.log('Updated item:', updated[index]);
       return updated;
     });
@@ -182,24 +184,32 @@ export default function RecipeCalculator() {
     setCalculationItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const calculateRecipes = async () => {
+  const calculateRecipes = async (isExplicitClick: boolean = false) => {
     if (calculationItems.length === 0) {
-      toast({
-        title: 'No Items',
-        description: 'Please add at least one product to calculate',
-        variant: 'destructive',
-      });
+      if (isExplicitClick) {
+        toast({
+          title: 'No Items',
+          description: 'Please add at least one product to calculate',
+          variant: 'destructive',
+        });
+      }
       return;
     }
 
     // Check if any item has invalid quantity (0 or less)
     const hasInvalidQuantity = calculationItems.some(item => !item.productId || item.quantity <= 0);
     if (hasInvalidQuantity) {
-      toast({
-        title: 'Invalid Quantity',
-        description: 'Please ensure all products have a quantity greater than 0',
-        variant: 'destructive',
-      });
+      if (isExplicitClick) {
+        toast({
+          title: 'Invalid Quantity',
+          description: 'Please ensure all products have a quantity greater than 0',
+          variant: 'destructive',
+        });
+      } else {
+        // Silently clear results since current input configuration is incomplete/invalid
+        setFinalBreakdown([]);
+        setProductionSteps([]);
+      }
       return;
     }
 
@@ -237,6 +247,11 @@ export default function RecipeCalculator() {
       const finalBreakdownArray = Array.from(materialBreakdown.values()).sort((a, b) =>
         a.material_name.localeCompare(b.material_name)
       );
+
+      // Re-assign step numbers sequentially so they are unique and correct
+      steps.forEach((step, index) => {
+        step.step = index + 1;
+      });
 
       setFinalBreakdown(finalBreakdownArray);
       setProductionSteps(steps);
@@ -473,7 +488,7 @@ export default function RecipeCalculator() {
               onAddItem={addCalculationItem}
               onUpdateItem={updateCalculationItem}
               onRemoveItem={removeCalculationItem}
-              onCalculate={calculateRecipes}
+              onCalculate={() => calculateRecipes(true)}
               isCalculating={isCalculating}
             />
 

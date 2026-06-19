@@ -390,7 +390,11 @@ export default function ProductionIndividualProducts() {
               expectedWidth={product.width ? parseFloat(product.width) : undefined}
               expectedWeight={product.weight ? parseFloat(product.weight) : undefined}
             />
-            <ExpectedProductDetails product={product} />
+            <ExpectedProductDetails
+              product={product}
+              plannedQuantity={batch?.planned_quantity}
+              countUnit={product.count_unit || product.unit || 'units'}
+            />
           </>
         )}
 
@@ -431,18 +435,7 @@ export default function ProductionIndividualProducts() {
       <IndividualProductsTable
         individualProducts={filteredIndividualProducts}
         onUpdate={handleTableUpdate}
-        product={product ? {
-          name: product.name,
-          category: product.category,
-          color: product.color,
-          pattern: product.pattern,
-          weight_unit: product.weight_unit,
-          width_unit: product.width_unit,
-          length_unit: product.length_unit,
-          weight: product.weight,
-          width: product.width,
-          length: product.length,
-        } : undefined}
+        product={product || undefined}
         plannedQuantity={batch?.planned_quantity || 0}
         batchId={id}
         productId={product?.id}

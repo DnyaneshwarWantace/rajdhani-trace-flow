@@ -313,47 +313,46 @@ export default function RecipeManagementCard({
                         {recipe.materials.map((material: any) => (
                           <div
                             key={material.id}
-                            className="border rounded-lg p-3 md:p-4 hover:bg-muted/50 flex flex-col md:flex-row md:items-center gap-3 md:gap-4"
+                            className="border rounded-xl p-3.5 md:p-4 hover:bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4 bg-white"
                           >
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4 text-sm">
-                              <div>
+                            {/* Material Info Block */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                <span className="font-bold text-sm md:text-base text-gray-900 truncate" title={material.material_name}>
+                                  {material.material_name}
+                                </span>
                                 <Badge
                                   variant={material.material_type === 'product' ? 'default' : 'secondary'}
-                                  className={`text-xs ${material.material_type === 'product' ? 'text-white' : ''}`}
+                                  className={`text-[10px] px-1.5 py-0.5 leading-none ${material.material_type === 'product' ? 'text-white bg-blue-600 hover:bg-blue-700' : 'bg-gray-100 text-gray-700'}`}
                                 >
                                   {material.material_type === 'product' ? 'Product' : 'Raw Material'}
                                 </Badge>
                               </div>
-                              <div>
-                                <div className="text-xs text-muted-foreground">Material Name</div>
-                                <div className="font-medium">{material.material_name}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-muted-foreground">Quantity (for 1 sqm)</div>
-                                <div className="font-medium">{Number(material.quantity_per_sqm).toFixed(2)}</div>
-                              </div>
-                              <div>
-                                <div className="text-xs text-muted-foreground">Unit</div>
-                                <div className="font-medium">{material.unit}</div>
+                              <div className="text-xs text-gray-500 font-medium">
+                                Quantity: <span className="font-bold text-gray-900">{Number(material.quantity_per_sqm).toFixed(4)} {material.unit}</span> <span className="text-gray-400 font-normal">(for 1 sqm)</span>
                               </div>
                             </div>
-                            <div className="flex gap-2">
+
+                            {/* Actions Group - Side-by-side or right aligned */}
+                            <div className="flex gap-2 justify-end w-full sm:w-auto shrink-0 border-t pt-2 sm:border-t-0 sm:pt-0">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditMaterial(material, recipe)}
-                                className="flex-1 md:flex-none"
+                                className="flex-1 sm:flex-none h-8 px-3 text-xs font-semibold rounded-lg border-gray-300"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-3.5 h-3.5 mr-1" />
+                                Edit
                               </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleDeleteClick(recipe.id, material.id, material.material_name, recipe, material)}
                                 disabled={!recipe.materials || recipe.materials.length <= 1}
-                                className="flex-1 md:flex-none text-red-600 hover:bg-red-50"
+                                className="flex-1 sm:flex-none h-8 px-3 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg border-gray-300"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                Delete
                               </Button>
                             </div>
                           </div>

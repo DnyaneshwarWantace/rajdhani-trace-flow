@@ -622,7 +622,12 @@ export default function MachineStage() {
               expectedWidth={product.width ? parseFloat(product.width) : undefined}
               expectedWeight={product.weight ? parseFloat(product.weight) : undefined}
             />
-            <ExpectedProductDetails product={product} />
+            <ExpectedProductDetails
+              product={product}
+              plannedQuantity={batch?.planned_quantity}
+              materialsCount={consumedMaterials.length}
+              countUnit={product.count_unit}
+            />
           </>
         )}
 
@@ -741,69 +746,15 @@ export default function MachineStage() {
             </div>
           </div>
 
-          {/* Combined product summary card — mobile only */}
-          <div className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
-            {/* Top: product name + attributes */}
-            {product && (
-              <div className="px-3 pt-2.5 pb-2 border-b border-gray-100 flex flex-wrap gap-x-3 gap-y-1.5 items-center">
-                <span className="text-sm font-bold text-gray-900">{product.name}</span>
-                {product.category && (
-                  <span className="text-[10px] text-gray-400 font-semibold bg-gray-100 px-2 py-0.5 rounded-full">{product.category}</span>
-                )}
-                {product.color && product.color !== 'N/A' && (
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-700">
-                    {colorCodeMap[product.color.toLowerCase()] ? (
-                      <span className="w-4 h-4 rounded-full border-2 border-white shadow shrink-0" style={{ backgroundColor: colorCodeMap[product.color.toLowerCase()] }} />
-                    ) : null}
-                    {product.color}
-                  </span>
-                )}
-                {product.pattern && product.pattern !== 'N/A' && (
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-700">
-                    {patternImageMap[product.pattern.toLowerCase()] ? (
-                      <img src={patternImageMap[product.pattern.toLowerCase()]} alt="" className="w-5 h-5 rounded border border-black/10 object-cover shrink-0" />
-                    ) : null}
-                    {product.pattern}
-                  </span>
-                )}
-              </div>
-            )}
-            {/* Bottom: key stats strip */}
-            <div className="flex overflow-x-auto">
-              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[80px]">
-                <Package className="w-3 h-3 text-blue-500 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{batch?.planned_quantity || 0} {product?.count_unit || 'rolls'}</p>
-                  <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Target Qty</p>
-                </div>
-              </div>
-              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[80px]">
-                <Boxes className="w-3 h-3 text-green-500 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{consumedMaterials.length} Items</p>
-                  <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Materials</p>
-                </div>
-              </div>
-              {product?.length && product?.width && (
-                <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[90px]">
-                  <Clock className="w-3 h-3 text-purple-500 shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{product.length}×{product.width}M</p>
-                    <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Dimensions</p>
-                  </div>
-                </div>
-              )}
-              {product?.weight && product.weight !== 'N/A' && (
-                <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 min-w-[70px]">
-                  <Layers className="w-3 h-3 text-amber-500 shrink-0" />
-                  <div>
-                    <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{product.weight} GSM</p>
-                    <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">GSM</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Product Info Card */}
+          {product && (
+            <ExpectedProductDetails
+              product={product}
+              plannedQuantity={batch?.planned_quantity}
+              materialsCount={consumedMaterials.length}
+              countUnit={product.count_unit}
+            />
+          )}
 
           {/* Machine Operations Warning Banner */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 shadow-sm">
