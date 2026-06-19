@@ -30,21 +30,19 @@ export default function ProductTabs({ activeTab, onTabChange, unreadCount }: Pro
           <button
             key={tab.value}
             onClick={() => onTabChange(tab.value)}
-            className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors relative ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 relative ${
               activeTab === tab.value ? 'text-blue-600' : 'text-gray-400'
             }`}
           >
             {tab.icon}
-            <span className="flex items-center gap-1">
-              {tab.label}
-              {tab.value === 'notifications' && unreadCount > 0 && (
-                <span className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-bold bg-red-500 text-white rounded-full">
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </span>
-              )}
-            </span>
+            <span className="text-[10px] font-semibold">{tab.label}</span>
+            {tab.value === 'notifications' && unreadCount > 0 && (
+              <span className="absolute top-1 right-3 w-4 h-4 text-[9px] font-bold bg-red-500 text-white rounded-full flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
             {activeTab === tab.value && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
+              <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-blue-600 rounded-full" />
             )}
           </button>
         ))}
