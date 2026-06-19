@@ -130,12 +130,13 @@ function FormFields({
         <Label htmlFor="completion_date">
           Expected Completion Date <span className="text-red-500">*</span>
         </Label>
-        <Input
+        <input
           id="completion_date"
           type="date"
           value={formData.completion_date || ''}
           onChange={(e) => setFormData({ ...formData, completion_date: e.target.value })}
           required
+          className="w-full h-[44px] px-3 bg-white border border-gray-200 rounded-[10px] text-[14px] text-gray-900 outline-none"
         />
         {selectedBatch && orderEarliestDelivery ? (
           <p className="text-xs text-red-600 font-medium mt-1">
