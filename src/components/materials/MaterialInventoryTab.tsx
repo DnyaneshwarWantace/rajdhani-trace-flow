@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, Eye, Edit, Plus, Droplets, AlignLeft, SlidersHorizontal, X } from 'lucide-react';
 import MaterialTable from './MaterialTable';
 import MaterialCard from './MaterialCard';
@@ -320,6 +320,39 @@ export default function MaterialInventoryTab({
   const [showSort, setShowSort] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
 
+  // Mobile infinite scroll
+  const [mobileMaterials, setMobileMaterials] = useState<RawMaterial[]>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const currentPage = filters.page || 1;
+  const hasMore = mobileMaterials.length < totalMaterials;
+
+  // Reset accumulated list when filters change (page resets to 1), append on next pages
+  useEffect(() => {
+    if (currentPage === 1) {
+      setMobileMaterials(materials);
+    } else {
+      setMobileMaterials(prev => {
+        const ids = new Set(prev.map(m => m._id || m.id));
+        return [...prev, ...materials.filter(m => !ids.has(m._id || m.id))];
+      });
+    }
+  }, [materials, currentPage]);
+
+  // IntersectionObserver — trigger next page when sentinel visible
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && hasMore) {
+          onPageChange(currentPage + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [loading, hasMore, currentPage, onPageChange]);
+
   const activeFilterCount = [
     ...(Array.isArray(filters.status)   ? filters.status   : filters.status   ? [filters.status]   : []),
     ...(!hideCategoryFilter ? (Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []) : []),
@@ -417,9 +450,9 @@ export default function MaterialInventoryTab({
             )}
 
             {/* masonry 2-column grid */}
-            <div className="flex gap-3 pb-32">
+            <div className="flex gap-3">
               <div className="flex-1 flex flex-col gap-3">
-                {materials.filter((_, i) => i % 2 === 0).map((material) => (
+                {mobileMaterials.filter((_, i) => i % 2 === 0).map((material) => (
                   <MobileGridCard
                     key={material._id || material.id}
                     material={material}
@@ -431,7 +464,7 @@ export default function MaterialInventoryTab({
                 ))}
               </div>
               <div className="flex-1 flex flex-col gap-3">
-                {materials.filter((_, i) => i % 2 === 1).map((material) => (
+                {mobileMaterials.filter((_, i) => i % 2 === 1).map((material) => (
                   <MobileGridCard
                     key={material._id || material.id}
                     material={material}
@@ -444,8 +477,16 @@ export default function MaterialInventoryTab({
               </div>
             </div>
 
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4 pb-32" />
+            {loading && currentPage > 1 && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
+              </div>
+            )}
+
             {/* Empty state */}
-            {materials.length === 0 && !loading && (
+            {mobileMaterials.length === 0 && !loading && (
               <div className="py-16 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
