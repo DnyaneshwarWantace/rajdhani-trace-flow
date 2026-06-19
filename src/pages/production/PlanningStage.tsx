@@ -1785,65 +1785,64 @@ export default function PlanningStage() {
             </div>
           </div>
 
-          {/* Combined product summary card */}
+          {/* Combined product summary card — mobile only */}
           <div className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
-            {/* Top strip: qty + materials count */}
-            <div className="flex border-b border-gray-100">
-              <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
-                <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+            {/* Top: product name + attributes */}
+            <div className="px-3 pt-2.5 pb-2 border-b border-gray-100 flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+              <span className="text-sm font-bold text-gray-900">{selectedProduct.name}</span>
+              {selectedProduct.category && (
+                <span className="text-[10px] text-gray-400 font-semibold bg-gray-100 px-2 py-0.5 rounded-full">{selectedProduct.category}</span>
+              )}
+              {selectedProduct.color && selectedProduct.color !== 'N/A' && (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-700">
+                  {colorCodeMap[selectedProduct.color.toLowerCase()] ? (
+                    <span className="w-4 h-4 rounded-full border-2 border-white shadow shrink-0" style={{ backgroundColor: colorCodeMap[selectedProduct.color.toLowerCase()] }} />
+                  ) : null}
+                  {selectedProduct.color}
+                </span>
+              )}
+              {selectedProduct.pattern && selectedProduct.pattern !== 'N/A' && (
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-gray-700">
+                  {patternImageMap[selectedProduct.pattern.toLowerCase()] ? (
+                    <img src={patternImageMap[selectedProduct.pattern.toLowerCase()]} alt="" className="w-5 h-5 rounded border border-black/10 object-cover shrink-0" />
+                  ) : null}
+                  {selectedProduct.pattern}
+                </span>
+              )}
+            </div>
+            {/* Bottom strip: key stats */}
+            <div className="flex overflow-x-auto">
+              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[80px]">
+                <Package className="w-3 h-3 text-blue-500 shrink-0" />
                 <div>
-                  <p className="text-xs font-bold text-gray-900 leading-tight">{formData.planned_quantity} {selectedProduct.count_unit || 'rolls'}</p>
+                  <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{formData.planned_quantity} {selectedProduct.count_unit || 'rolls'}</p>
                   <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Target Qty</p>
                 </div>
               </div>
-              <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
-                <Boxes className="w-3.5 h-3.5 text-green-500 shrink-0" />
+              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[80px]">
+                <Boxes className="w-3 h-3 text-green-500 shrink-0" />
                 <div>
-                  <p className="text-xs font-bold text-gray-900 leading-tight">{materials.length + consumedMaterials.length} Items</p>
+                  <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{materials.length + consumedMaterials.length} Items</p>
                   <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Materials</p>
                 </div>
               </div>
               {productLength > 0 && (
-                <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
-                  <Ruler className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 border-r border-gray-100 min-w-[90px]">
+                  <Ruler className="w-3 h-3 text-purple-500 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">{productLength}×{productWidth}M</p>
+                    <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{productLength}×{productWidth}M</p>
                     <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Dimensions</p>
                   </div>
                 </div>
               )}
               {selectedProduct.weight && selectedProduct.weight !== 'N/A' && (
-                <div className="flex-1 flex items-center gap-2 px-3 py-2.5">
-                  <Weight className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 min-w-[70px]">
+                  <Weight className="w-3 h-3 text-amber-500 shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-gray-900 leading-tight">{selectedProduct.weight}</p>
+                    <p className="text-xs font-bold text-gray-900 leading-tight whitespace-nowrap">{selectedProduct.weight} GSM</p>
                     <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">GSM</p>
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Bottom row: product name + attributes inline */}
-            <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-1 items-center">
-              <span className="text-xs font-bold text-gray-900">{selectedProduct.name}</span>
-              {selectedProduct.category && (
-                <span className="text-[10px] text-gray-400 font-medium">{selectedProduct.category}</span>
-              )}
-              {selectedProduct.color && selectedProduct.color !== 'N/A' && (
-                <span className="flex items-center gap-1 text-[10px] text-gray-500">
-                  {colorCodeMap[selectedProduct.color.toLowerCase()] && (
-                    <span className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: colorCodeMap[selectedProduct.color.toLowerCase()] }} />
-                  )}
-                  {selectedProduct.color}
-                </span>
-              )}
-              {selectedProduct.pattern && selectedProduct.pattern !== 'N/A' && (
-                <span className="flex items-center gap-1 text-[10px] text-gray-500">
-                  {patternImageMap[selectedProduct.pattern.toLowerCase()] && (
-                    <img src={patternImageMap[selectedProduct.pattern.toLowerCase()]} alt="" className="w-3 h-3 rounded object-cover border border-black/10" />
-                  )}
-                  {selectedProduct.pattern}
-                </span>
               )}
             </div>
           </div>

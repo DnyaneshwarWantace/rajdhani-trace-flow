@@ -123,7 +123,7 @@ export function MobileDatePickerSheet({
     : 'No date selected';
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+    <div className="fixed inset-0 z-[100] flex flex-col justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative bg-white rounded-t-2xl shadow-2xl overflow-hidden">
 
