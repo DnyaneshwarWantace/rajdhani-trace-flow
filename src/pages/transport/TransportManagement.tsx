@@ -83,6 +83,8 @@ export default function TransportManagement() {
   const [savingUnit, setSavingUnit] = useState(false);
 
   const [filterSheet, setFilterSheet] = useState<'type' | 'status' | null>(null);
+  const [typeSheet, setTypeSheet] = useState(false);
+  const [unitSheet, setUnitSheet] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -187,14 +189,23 @@ export default function TransportManagement() {
       </div>
       <div className="space-y-1.5">
         <Label>Type</Label>
-        <Select value={form.vehicle_type} onValueChange={v => setForm(f => ({ ...f, vehicle_type: v as any }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="own">Own Transport</SelectItem>
-            <SelectItem value="outside">Outside Transport</SelectItem>
-            <SelectItem value="hired">Hired Transport</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Mobile: button opens bottom sheet */}
+        <button type="button" onClick={() => isMobile && setTypeSheet(true)}
+          className="lg:hidden w-full h-10 px-3 flex items-center justify-between bg-white border border-gray-200 rounded-[10px] text-sm text-gray-900">
+          <span>{form.vehicle_type === 'own' ? 'Own Transport' : form.vehicle_type === 'outside' ? 'Outside Transport' : 'Hired Transport'}</span>
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        </button>
+        {/* Desktop: normal select */}
+        <div className="hidden lg:block">
+          <Select value={form.vehicle_type} onValueChange={v => setForm(f => ({ ...f, vehicle_type: v as any }))}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="own">Own Transport</SelectItem>
+              <SelectItem value="outside">Outside Transport</SelectItem>
+              <SelectItem value="hired">Hired Transport</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       <div className="space-y-1.5">
         <Label>Capacity <span className="text-gray-400 text-xs font-normal">optional</span></Label>
@@ -206,20 +217,31 @@ export default function TransportManagement() {
             {unitsLoading ? (
               <div className="h-10 border rounded-md flex items-center px-3 text-sm text-gray-400">Loading…</div>
             ) : (
-              <Select value={form.capacity_unit || '__placeholder__'}
-                onValueChange={v => {
-                  if (v === '__add_new__') setAddingUnit(true);
-                  else if (v !== '__placeholder__') { setForm(f => ({ ...f, capacity_unit: v })); setAddingUnit(false); }
-                }}>
-                <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
-                <SelectContent>
-                  {capacityUnits.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No units yet</div>}
-                  {capacityUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  <SelectItem value="__add_new__">
-                    <span className="text-primary-600 font-semibold flex items-center gap-1"><Plus className="w-3 h-3" /> Add New Unit</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <>
+                {/* Mobile: button opens bottom sheet */}
+                <button type="button" onClick={() => isMobile && setUnitSheet(true)}
+                  className="lg:hidden w-full h-10 px-3 flex items-center justify-between bg-white border border-gray-200 rounded-[10px] text-sm">
+                  <span className={form.capacity_unit ? 'text-gray-900' : 'text-gray-400'}>{form.capacity_unit || 'Select unit'}</span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </button>
+                {/* Desktop: normal select */}
+                <div className="hidden lg:block">
+                  <Select value={form.capacity_unit || '__placeholder__'}
+                    onValueChange={v => {
+                      if (v === '__add_new__') setAddingUnit(true);
+                      else if (v !== '__placeholder__') { setForm(f => ({ ...f, capacity_unit: v })); setAddingUnit(false); }
+                    }}>
+                    <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                    <SelectContent>
+                      {capacityUnits.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No units yet</div>}
+                      {capacityUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      <SelectItem value="__add_new__">
+                        <span className="text-primary-600 font-semibold flex items-center gap-1"><Plus className="w-3 h-3" /> Add New Unit</span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -504,6 +526,70 @@ export default function TransportManagement() {
                 className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 className="w-4 h-4 animate-spin" />{editing ? 'Saving…' : 'Adding…'}</> : editing ? 'Save Changes' : 'Add Vehicle'}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MOBILE: vehicle type sheet (form) ── */}
+      {typeSheet && createPortal(
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setTypeSheet(false)} />
+          <div className="relative bg-white rounded-t-2xl shadow-xl">
+            <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
+            <p className="text-sm font-bold text-gray-900 px-4 pb-3">Select Type</p>
+            <div className="px-4 pb-6 space-y-2">
+              {[
+                { value: 'own', label: 'Own Transport' },
+                { value: 'outside', label: 'Outside Transport' },
+                { value: 'hired', label: 'Hired Transport' },
+              ].map(opt => (
+                <button key={opt.value} onClick={() => { setForm(f => ({ ...f, vehicle_type: opt.value as any })); setTypeSheet(false); }}
+                  className={`w-full py-3.5 px-4 rounded-xl text-sm font-semibold text-left flex items-center justify-between ${form.vehicle_type === opt.value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-700 border border-gray-100'}`}>
+                  {opt.label}
+                  {form.vehicle_type === opt.value && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-white" /></span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MOBILE: capacity unit sheet (form) ── */}
+      {unitSheet && createPortal(
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setUnitSheet(false)} />
+          <div className="relative bg-white rounded-t-2xl shadow-xl">
+            <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 rounded-full bg-gray-300" /></div>
+            <p className="text-sm font-bold text-gray-900 px-4 pb-3">Select Unit</p>
+            <div className="px-4 pb-2 space-y-2 max-h-64 overflow-y-auto">
+              {capacityUnits.length === 0
+                ? <p className="text-sm text-gray-400 py-2">No units yet</p>
+                : capacityUnits.map(u => (
+                  <button key={u} onClick={() => { setForm(f => ({ ...f, capacity_unit: u })); setUnitSheet(false); }}
+                    className={`w-full py-3.5 px-4 rounded-xl text-sm font-semibold text-left flex items-center justify-between ${form.capacity_unit === u ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-700 border border-gray-100'}`}>
+                    {u}
+                    {form.capacity_unit === u && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-white" /></span>}
+                  </button>
+                ))
+              }
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100">
+              {addingUnit ? (
+                <div className="flex gap-2">
+                  <Input placeholder="e.g. tonnes, bags" value={newUnitValue} onChange={e => setNewUnitValue(e.target.value)}
+                    className="flex-1" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnit().then(() => setUnitSheet(false)); } }} autoFocus />
+                  <Button size="sm" onClick={() => handleAddUnit().then(() => setUnitSheet(false))} disabled={savingUnit || !newUnitValue.trim()}
+                    className="bg-primary-600 text-white flex-shrink-0">{savingUnit ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add'}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setAddingUnit(false); setNewUnitValue(''); }} className="flex-shrink-0">Cancel</Button>
+                </div>
+              ) : (
+                <button onClick={() => setAddingUnit(true)} className="w-full py-3 text-sm font-semibold text-blue-600 flex items-center justify-center gap-1.5">
+                  <Plus className="w-4 h-4" /> Add New Unit
+                </button>
+              )}
             </div>
           </div>
         </div>,
