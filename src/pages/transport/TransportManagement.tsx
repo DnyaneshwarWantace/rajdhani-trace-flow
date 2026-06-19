@@ -82,6 +82,8 @@ export default function TransportManagement() {
   const [newUnitValue, setNewUnitValue] = useState('');
   const [savingUnit, setSavingUnit] = useState(false);
 
+  const [filterSheet, setFilterSheet] = useState<'type' | 'status' | null>(null);
+
   const load = async () => {
     setLoading(true);
     try { setTransports(await TransportService.getAll()); }
@@ -314,30 +316,44 @@ export default function TransportManagement() {
         </div>
 
         {/* ── Search + Filters ── */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input placeholder="Search vehicle, driver…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
-          </div>
-          <div className="flex gap-2">
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="flex-1 sm:w-36"><SelectValue placeholder="Type" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="own">Own</SelectItem>
-                <SelectItem value="outside">Outside</SelectItem>
-                <SelectItem value="hired">Hired</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="flex-1 sm:w-36"><SelectValue placeholder="Status" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Search vehicle, driver…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+        </div>
+
+        {/* Mobile filter chips */}
+        <div className="lg:hidden flex gap-2">
+          <button onClick={() => setFilterSheet('type')}
+            className={`flex-1 h-10 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 ${filterType !== 'all' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'}`}>
+            {filterType === 'all' ? 'All Types' : typeLabel(filterType)}
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
+          <button onClick={() => setFilterSheet('status')}
+            className={`flex-1 h-10 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 ${filterStatus !== 'all' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'}`}>
+            {filterStatus === 'all' ? 'All Status' : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)}
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
+        </div>
+
+        {/* Desktop selects */}
+        <div className="hidden lg:flex gap-2">
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-36"><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="own">Own</SelectItem>
+              <SelectItem value="outside">Outside</SelectItem>
+              <SelectItem value="hired">Hired</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* ── List ── */}
@@ -488,6 +504,49 @@ export default function TransportManagement() {
                 className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-blue-600 active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2">
                 {saving ? <><Loader2 className="w-4 h-4 animate-spin" />{editing ? 'Saving…' : 'Adding…'}</> : editing ? 'Save Changes' : 'Add Vehicle'}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MOBILE: filter bottom sheets ── */}
+      {filterSheet && createPortal(
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setFilterSheet(null)} />
+          <div className="relative bg-white rounded-t-2xl shadow-xl">
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full bg-gray-300" />
+            </div>
+            <p className="text-sm font-bold text-gray-900 px-4 pb-3">
+              {filterSheet === 'type' ? 'Filter by Type' : 'Filter by Status'}
+            </p>
+            <div className="px-4 pb-6 space-y-2">
+              {filterSheet === 'type'
+                ? [
+                    { value: 'all', label: 'All Types' },
+                    { value: 'own', label: 'Own Transport' },
+                    { value: 'outside', label: 'Outside Transport' },
+                    { value: 'hired', label: 'Hired Transport' },
+                  ].map(opt => (
+                    <button key={opt.value} onClick={() => { setFilterType(opt.value); setFilterSheet(null); }}
+                      className={`w-full py-3.5 px-4 rounded-xl text-sm font-semibold text-left flex items-center justify-between ${filterType === opt.value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-700 border border-gray-100'}`}>
+                      {opt.label}
+                      {filterType === opt.value && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-white" /></span>}
+                    </button>
+                  ))
+                : [
+                    { value: 'all', label: 'All Status' },
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ].map(opt => (
+                    <button key={opt.value} onClick={() => { setFilterStatus(opt.value); setFilterSheet(null); }}
+                      className={`w-full py-3.5 px-4 rounded-xl text-sm font-semibold text-left flex items-center justify-between ${filterStatus === opt.value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-700 border border-gray-100'}`}>
+                      {opt.label}
+                      {filterStatus === opt.value && <span className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-white" /></span>}
+                    </button>
+                  ))
+              }
             </div>
           </div>
         </div>,
