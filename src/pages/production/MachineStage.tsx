@@ -741,137 +741,69 @@ export default function MachineStage() {
             </div>
           </div>
 
-          {/* Stats Summary Tags Layout */}
-          <div className="flex flex-wrap gap-2 mb-1">
-            <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 px-2.5 py-1.5 rounded-xl shadow-sm">
-              <Package className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-blue-900 leading-tight">
-                  {batch?.planned_quantity || 0} {product?.count_unit || 'rolls'}
-                </p>
-                <p className="text-[9px] text-gray-500 font-semibold">Target Qty</p>
+          {/* Combined product summary card */}
+          <div className="bg-white rounded-xl border border-gray-150 shadow-sm overflow-hidden">
+            {/* Top strip: key stats */}
+            <div className="flex border-b border-gray-100">
+              <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
+                <Package className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-gray-900 leading-tight">{batch?.planned_quantity || 0} {product?.count_unit || 'rolls'}</p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Target Qty</p>
+                </div>
               </div>
+              <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
+                <Boxes className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-gray-900 leading-tight">{consumedMaterials.length} Items</p>
+                  <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Materials</p>
+                </div>
+              </div>
+              {product?.length && product?.width && (
+                <div className="flex-1 flex items-center gap-2 px-3 py-2.5 border-r border-gray-100">
+                  <Clock className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-gray-900 leading-tight">{product.length}×{product.width}M</p>
+                    <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Dimensions</p>
+                  </div>
+                </div>
+              )}
+              {product?.weight && product.weight !== 'N/A' && (
+                <div className="flex-1 flex items-center gap-2 px-3 py-2.5">
+                  <Layers className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-gray-900 leading-tight">{product.weight}</p>
+                    <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">GSM</p>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <div className="flex items-center gap-1.5 bg-green-50 border border-green-100 px-2.5 py-1.5 rounded-xl shadow-sm">
-              <Boxes className="w-3.5 h-3.5 text-green-600 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-green-900 leading-tight">
-                  {consumedMaterials.length} Items
-                </p>
-                <p className="text-[9px] text-gray-500 font-semibold">Materials Used</p>
-              </div>
-            </div>
-
-            {product?.length && (
-              <div className="flex items-center gap-1.5 bg-purple-50 border border-purple-100 px-2.5 py-1.5 rounded-xl shadow-sm">
-                <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-purple-900 leading-tight">
-                    {product.length} {product.length_unit || 'm'}
-                  </p>
-                  <p className="text-[9px] text-gray-500 font-semibold">Expected L</p>
-                </div>
-              </div>
-            )}
-
-            {product?.width && (
-              <div className="flex items-center gap-1.5 bg-orange-50 border border-orange-100 px-2.5 py-1.5 rounded-xl shadow-sm">
-                <Settings className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-orange-900 leading-tight">
-                    {product.width} {product.width_unit || 'm'}
-                  </p>
-                  <p className="text-[9px] text-gray-500 font-semibold">Expected W</p>
-                </div>
-              </div>
-            )}
-
-            {product?.weight && product.weight !== 'N/A' && (
-              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 px-2.5 py-1.5 rounded-xl shadow-sm">
-                <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-amber-900 leading-tight">
-                    {product.weight} {product.weight_unit || 'GSM'}
-                  </p>
-                  <p className="text-[9px] text-gray-500 font-semibold">Expected GSM</p>
-                </div>
+            {/* Bottom row: product name + attributes */}
+            {product && (
+              <div className="px-3 py-2 flex flex-wrap gap-x-3 gap-y-1 items-center">
+                <span className="text-xs font-bold text-gray-900">{product.name}</span>
+                {product.category && (
+                  <span className="text-[10px] text-gray-400 font-medium">{product.category}</span>
+                )}
+                {product.color && product.color !== 'N/A' && (
+                  <span className="flex items-center gap-1 text-[10px] text-gray-500">
+                    {colorCodeMap[product.color.toLowerCase()] && (
+                      <span className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: colorCodeMap[product.color.toLowerCase()] }} />
+                    )}
+                    {product.color}
+                  </span>
+                )}
+                {product.pattern && product.pattern !== 'N/A' && (
+                  <span className="flex items-center gap-1 text-[10px] text-gray-500">
+                    {patternImageMap[product.pattern.toLowerCase()] && (
+                      <img src={patternImageMap[product.pattern.toLowerCase()]} alt="" className="w-3 h-3 rounded object-cover border border-black/10" />
+                    )}
+                    {product.pattern}
+                  </span>
+                )}
               </div>
             )}
           </div>
-
-          {/* Product Details Inline List */}
-          {product && (
-            <div className="bg-white rounded-xl border border-gray-150 px-3 py-2 flex flex-wrap gap-x-2 gap-y-1.5 items-center text-xs text-gray-500 shadow-sm">
-              <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-400">Product:</span>
-                <span className="font-bold text-gray-800">{product.name}</span>
-              </div>
-              
-              {product.category && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">Category:</span>
-                  <span className="font-bold text-gray-800">{product.category}</span>
-                </div>
-              )}
-              
-              {product.length && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">Length:</span>
-                  <span className="font-bold text-gray-800">{product.length} {product.length_unit || 'm'}</span>
-                </div>
-              )}
-              
-              {product.width && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">Width:</span>
-                  <span className="font-bold text-gray-800">{product.width} {product.width_unit || 'm'}</span>
-                </div>
-              )}
-              
-              {product.weight && product.weight !== 'N/A' && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">GSM:</span>
-                  <span className="font-bold text-gray-800">{product.weight} {product.weight_unit || 'GSM'}</span>
-                </div>
-              )}
-              
-              {product.color && product.color !== 'N/A' && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">Color:</span>
-                  <span className="font-bold text-gray-800">{product.color}</span>
-                  {colorCodeMap[product.color.toLowerCase()] && (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-black/10 shrink-0"
-                      style={{ backgroundColor: colorCodeMap[product.color.toLowerCase()] }}
-                    />
-                  )}
-                </div>
-              )}
-              
-              {product.pattern && product.pattern !== 'N/A' && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-gray-355">•</span>
-                  <span className="text-gray-400">Pattern:</span>
-                  <span className="font-bold text-gray-800">{product.pattern}</span>
-                  {patternImageMap[product.pattern.toLowerCase()] && (
-                    <img
-                      src={patternImageMap[product.pattern.toLowerCase()]}
-                      alt=""
-                      className="w-3.5 h-3.5 rounded border border-black/10 object-cover shrink-0"
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Machine Operations Warning Banner */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 shadow-sm">
