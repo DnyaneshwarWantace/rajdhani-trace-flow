@@ -8,6 +8,7 @@ import ProductStockGrid from '@/components/products/stock/ProductStockGrid';
 import ProductStockError from '@/components/products/stock/ProductStockError';
 import QRCodeDialog from '@/components/products/stock/QRCodeDialog';
 import EditIndividualProductDialog from '@/components/products/stock/EditIndividualProductDialog';
+import IndividualProductPagination from '@/components/products/stock/IndividualProductPagination';
 import { ProductService } from '@/services/productService';
 import { IndividualProductService } from '@/services/individualProductService';
 import { useToast } from '@/hooks/use-toast';
@@ -126,6 +127,11 @@ export default function ProductStock() {
   const PAGE_SIZE = 50;
   const offsetRef = useRef(0);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Desktop pagination
+  const [desktopPage, setDesktopPage] = useState(1);
+  const [desktopLimit, setDesktopLimit] = useState(50);
+  const [desktopProducts, setDesktopProducts] = useState<IndividualProduct[]>([]);
+  const [desktopTotal, setDesktopTotal] = useState(0);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -161,13 +167,18 @@ export default function ProductStock() {
     }
   }, [productId]);
 
-  // Reset and reload when filters/sort change
+  // Reset and reload when filters/sort change (mobile infinite scroll)
   useEffect(() => {
     if (!productId) return;
     offsetRef.current = 0;
     setIndividualProducts([]);
     setHasMore(true);
     loadIndividualProducts(0, true);
+  }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
+
+  // Desktop: reset to page 1 when filters change
+  useEffect(() => {
+    setDesktopPage(1);
   }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
 
 
@@ -229,6 +240,28 @@ export default function ProductStock() {
       setLoadingMore(false);
     }
   }, [productId, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
+
+  // Desktop pagination load
+  useEffect(() => {
+    if (!productId) return;
+    (async () => {
+      try {
+        const result = await IndividualProductService.getIndividualProductsByProductId(productId, {
+          status: statusFilter.length > 0 ? statusFilter : undefined,
+          location: locationFilter.length > 0 ? locationFilter : undefined,
+          search: searchTerm || undefined,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+          limit: desktopLimit,
+          offset: (desktopPage - 1) * desktopLimit,
+          sortBy,
+          sortOrder,
+        });
+        setDesktopProducts(result.products);
+        setDesktopTotal(result.total ?? allIndividualProducts.length);
+      } catch {}
+    })();
+  }, [productId, desktopPage, desktopLimit, searchTerm, statusFilter, locationFilter, startDate, endDate, sortBy, sortOrder]);
 
   // Infinite scroll — load more when sentinel enters viewport
   useEffect(() => {
@@ -464,30 +497,59 @@ export default function ProductStock() {
             onSortChange={handleSortChange}
           />
 
-          <ProductStockGrid
-            products={individualProducts}
-            product={product}
-            productId={productId}
-            searchTerm={searchTerm}
-            statusFilter={statusFilter}
-            onView={handleView}
-            onEdit={handleEdit}
-            onQRCodeClick={handleQRCodeClick}
-            loading={loading}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onSelectAllOnPage={handleSelectAllOnPage}
-            onSelectAll={handleSelectAll}
-            allSelected={allSelected}
-          />
+          {/* Desktop: paginated grid */}
+          <div className="hidden lg:block">
+            <ProductStockGrid
+              products={desktopProducts}
+              product={product}
+              productId={productId}
+              searchTerm={searchTerm}
+              statusFilter={statusFilter}
+              onView={handleView}
+              onEdit={handleEdit}
+              onQRCodeClick={handleQRCodeClick}
+              loading={loading}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onSelectAllOnPage={handleSelectAllOnPage}
+              onSelectAll={handleSelectAll}
+              allSelected={allSelected}
+            />
+            <IndividualProductPagination
+              totalProducts={desktopTotal}
+              currentPage={desktopPage}
+              limit={desktopLimit}
+              onPageChange={setDesktopPage}
+              onLimitChange={(l) => { setDesktopLimit(l); setDesktopPage(1); }}
+            />
+          </div>
 
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} className="h-4" />
-          {loadingMore && (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary-600" />
-            </div>
-          )}
+          {/* Mobile: infinite scroll grid */}
+          <div className="lg:hidden">
+            <ProductStockGrid
+              products={individualProducts}
+              product={product}
+              productId={productId}
+              searchTerm={searchTerm}
+              statusFilter={statusFilter}
+              onView={handleView}
+              onEdit={handleEdit}
+              onQRCodeClick={handleQRCodeClick}
+              loading={loading}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onSelectAllOnPage={handleSelectAllOnPage}
+              onSelectAll={handleSelectAll}
+              allSelected={allSelected}
+            />
+            {/* Infinite scroll sentinel */}
+            <div ref={sentinelRef} className="h-4" />
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary-600" />
+              </div>
+            )}
+          </div>
 
         </div>
 

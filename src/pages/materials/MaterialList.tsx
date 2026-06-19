@@ -843,9 +843,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
         )}
 
         {/* 10-day reminder – info only, on fixed days (10, 20, 30). Record from table row. */}
-        {(activeTab === 'inventory' || categoryFilter) && (periodicDueLoading ? (
-          <div className="mb-4 py-2 text-sm text-gray-500">Checking…</div>
-        ) : isFixedReminderDay ? (
+        {(activeTab === 'inventory' || categoryFilter) && (!periodicDueLoading && isFixedReminderDay ? (
           <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2">
             <Bell className="h-5 w-5 text-amber-600 shrink-0" aria-hidden="true" />
             <span className="text-sm font-medium text-amber-800">Every 10 days reminder (day 10, 20, 30).</span>
@@ -893,6 +891,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onOrder={handleOrder}
             onRecordUsage={handleRecordUsage}
             excludeCategories={categoryFilter ? undefined : ['Ink']}
+            hideCategoryFilter={!!categoryFilter}
           />
         )}
 

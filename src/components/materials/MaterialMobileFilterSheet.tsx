@@ -10,6 +10,7 @@ interface MaterialMobileFilterSheetProps {
   onApply: (f: Partial<MaterialFilters>) => void;
   onClose: () => void;
   excludeCategories?: string[];
+  hideCategorySection?: boolean;
 }
 
 const FILTER_SECTIONS = [
@@ -29,7 +30,7 @@ const STATUS_OPTIONS = [
   { label: 'Overstock',     value: 'overstock' },
 ];
 
-export default function MaterialMobileFilterSheet({ filters, onApply, onClose, excludeCategories = [] }: MaterialMobileFilterSheetProps) {
+export default function MaterialMobileFilterSheet({ filters, onApply, onClose, excludeCategories = [], hideCategorySection = false }: MaterialMobileFilterSheetProps) {
   const [activeSection, setActiveSection] = useState<FilterKey>('status');
   const [options, setOptions] = useState<Record<string, string[]>>({
     category: [], type: [], color: [], supplier: [],
@@ -84,6 +85,10 @@ export default function MaterialMobileFilterSheet({ filters, onApply, onClose, e
     'in-stock': '#16a34a', 'low-stock': '#ea580c', 'out-of-stock': '#dc2626', 'overstock': '#7c3aed',
   };
 
+  const visibleSections = hideCategorySection
+    ? FILTER_SECTIONS.filter(s => s.key !== 'category')
+    : FILTER_SECTIONS;
+
   const totalSelected = Object.values(selected).flat().length;
 
   return createPortal(
@@ -110,7 +115,7 @@ export default function MaterialMobileFilterSheet({ filters, onApply, onClose, e
         <div className="flex flex-1 overflow-hidden">
           {/* Left — section list */}
           <div className="w-32 bg-gray-50 border-r border-gray-100 overflow-y-auto shrink-0">
-            {FILTER_SECTIONS.map(section => {
+            {visibleSections.map(section => {
               const count = selected[section.key].length;
               return (
                 <button

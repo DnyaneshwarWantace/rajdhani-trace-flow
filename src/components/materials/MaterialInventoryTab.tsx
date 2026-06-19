@@ -32,6 +32,7 @@ interface MaterialInventoryTabProps {
   onOrder?: (material: RawMaterial) => void;
   onRecordUsage?: (material: RawMaterial) => void;
   excludeCategories?: string[];
+  hideCategoryFilter?: boolean;
 }
 
 // ─── Mobile card (2-column grid, matches RN app) ─────────────────────────────
@@ -314,13 +315,14 @@ export default function MaterialInventoryTab({
   onOrder,
   onRecordUsage,
   excludeCategories,
+  hideCategoryFilter,
 }: MaterialInventoryTabProps) {
   const [showSort, setShowSort] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
 
   const activeFilterCount = [
     ...(Array.isArray(filters.status)   ? filters.status   : filters.status   ? [filters.status]   : []),
-    ...(Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []),
+    ...(!hideCategoryFilter ? (Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []) : []),
     ...(Array.isArray(filters.type)     ? filters.type     : filters.type     ? [filters.type]     : []),
     ...(Array.isArray(filters.color)    ? filters.color    : filters.color    ? [filters.color]    : []),
     ...(Array.isArray(filters.supplier) ? filters.supplier : filters.supplier ? [filters.supplier] : []),
@@ -387,7 +389,7 @@ export default function MaterialInventoryTab({
                     <button onClick={() => onStatusChange((Array.isArray(filters.status) ? filters.status as string[] : []).filter((x) => x !== s))}><X className="w-3 h-3" /></button>
                   </span>
                 ))}
-                {(Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []).map((c) => (
+                {!hideCategoryFilter && (Array.isArray(filters.category) ? filters.category : filters.category ? [filters.category] : []).map((c) => (
                   <span key={`cat-${c}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-100">
                     {c}
                     <button onClick={() => onCategoryChange((Array.isArray(filters.category) ? filters.category as string[] : []).filter((x) => x !== c))}><X className="w-3 h-3" /></button>
@@ -519,6 +521,7 @@ export default function MaterialInventoryTab({
         <MaterialMobileFilterSheet
           filters={filters}
           excludeCategories={excludeCategories}
+          hideCategorySection={hideCategoryFilter}
           onApply={(f) => {
             if (f.status !== undefined) onStatusChange(f.status as string[]);
             if (f.category !== undefined) onCategoryChange(f.category as string[]);

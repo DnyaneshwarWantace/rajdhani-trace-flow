@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { NotificationService, type Notification } from '@/services/notificationService';
@@ -78,6 +78,14 @@ export default function Notifications() {
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+  // Mobile infinite scroll
+  const [mobileNotifications, setMobileNotifications] = useState<Notification[]>([]);
+  const [mobileHasMore, setMobileHasMore] = useState(true);
+  const [mobileLoadingMore, setMobileLoadingMore] = useState(false);
+  const mobileLoadingRef = useRef(false);
+  const mobileOffsetRef = useRef(0);
+  const mobileSentinelRef = useRef<HTMLDivElement>(null);
+  const MOBILE_PAGE_SIZE = 30;
   const [globalUnread, setGlobalUnread] = useState(0);
   const [globalRead, setGlobalRead] = useState(0);
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
@@ -98,12 +106,18 @@ export default function Notifications() {
   // Reset to first page whenever tab changes
   useEffect(() => {
     setPage(1);
+    mobileOffsetRef.current = 0;
+    setMobileNotifications([]);
+    setMobileHasMore(true);
   }, [activeTab]);
 
   // Reset to first page whenever high-level filters change so we don't
   // end up requesting an out-of-range page that looks "empty".
   useEffect(() => {
     setPage(1);
+    mobileOffsetRef.current = 0;
+    setMobileNotifications([]);
+    setMobileHasMore(true);
   }, [monthFilter, sortBy, sortOrder, filterTypes, filterStatuses, activeLogCategory]);
 
   // On initial mount, prefetch global activity log totals so the Activity Logs
@@ -251,6 +265,72 @@ export default function Notifications() {
       setLoadingMore(false);
     }
   };
+
+  const loadMobileNotifications = useCallback(async (offset: number, isReset = false) => {
+    if (mobileLoadingRef.current && !isReset) return;
+    mobileLoadingRef.current = true;
+    try {
+      if (!isReset) setMobileLoadingMore(true);
+      const include_logs = activeTab === 'all' ? 'false' : undefined;
+      let moduleParam: string | undefined;
+      if (activeTab === 'activity_logs') {
+        if (activeLogCategory === 'material') moduleParam = 'materials';
+        else if (activeLogCategory === 'product') moduleParam = 'products';
+        else if (activeLogCategory === 'order') moduleParam = 'orders';
+        else if (activeLogCategory === 'production') moduleParam = 'production';
+      }
+      const statusParam = activeTab === 'all' && filterStatuses.length > 0 ? filterStatuses.join(',') : undefined;
+      const typeParam = activeTab === 'all' && filterTypes.length === 1 ? filterTypes[0] : undefined;
+      const monthParam = monthFilter !== 'all' ? monthFilter : undefined;
+      const response = await NotificationService.getNotifications({
+        limit: MOBILE_PAGE_SIZE,
+        offset,
+        include_logs,
+        module: moduleParam,
+        status: statusParam,
+        type: typeParam,
+        sortBy,
+        sortOrder,
+        month: monthParam,
+      });
+      const items = (response.data || []).sort((a: Notification, b: Notification) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setMobileNotifications(prev => isReset ? items : [...prev, ...items]);
+      mobileOffsetRef.current = offset + items.length;
+      setMobileHasMore(items.length === MOBILE_PAGE_SIZE);
+      if (offset === 0) {
+        setTotalNotifications(response.totalNotifications || 0);
+        setTotalActivityLogs(response.totalActivityLogs || 0);
+        setGlobalUnread(response.unreadNotifications || 0);
+        setGlobalRead(response.readNotifications || 0);
+        setBackendCategoryCounts(response.activityLogCategoryCounts || {});
+        if (response.months?.length) setAvailableMonths(response.months);
+      }
+    } catch {}
+    finally { setMobileLoadingMore(false); mobileLoadingRef.current = false; }
+  }, [activeTab, activeLogCategory, filterStatuses, filterTypes, monthFilter, sortBy, sortOrder]);
+
+  // Mobile: initial load and filter-reset load
+  useEffect(() => {
+    loadMobileNotifications(0, true);
+  }, [loadMobileNotifications]);
+
+  // Mobile: IntersectionObserver sentinel
+  useEffect(() => {
+    const sentinel = mobileSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && mobileHasMore && !mobileLoadingRef.current) {
+          loadMobileNotifications(mobileOffsetRef.current);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [mobileHasMore, loadMobileNotifications]);
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -1154,15 +1234,6 @@ export default function Notifications() {
                   Mark All Read
                 </button>
               )}
-              {hasMore && (
-                <button
-                  onClick={handleLoadAll}
-                  disabled={loadingMore}
-                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold border border-gray-200 text-gray-700 bg-white active:bg-gray-50 transition-all select-none"
-                >
-                  {loadingMore ? 'Loading...' : 'Load All'}
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -1394,7 +1465,7 @@ export default function Notifications() {
         )}
 
         {/* Mobile Admin select/delete toolbar */}
-        {isAdmin && sortedNotifications.length > 0 && (
+        {isAdmin && mobileNotifications.length > 0 && (
           <div className="px-3 mt-2 shrink-0">
             <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
               <div className="flex gap-1.5">
@@ -1431,11 +1502,11 @@ export default function Notifications() {
 
         {/* Mobile List Content */}
         <div className="flex-1 p-3 overflow-y-auto space-y-3 mt-1.5">
-          {loading ? (
+          {loading && mobileNotifications.length === 0 ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : sortedNotifications.length === 0 ? (
+          ) : mobileNotifications.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
               <Bell className="w-12 h-12 mx-auto text-gray-300 mb-3" />
               <p className="text-gray-700 font-extrabold text-base">No notifications found</p>
@@ -1443,7 +1514,7 @@ export default function Notifications() {
             </div>
           ) : activeTab === 'activity_logs' ? (
             <div className="space-y-2.5">
-              {pagedNotifications.map((notification) => (
+              {mobileNotifications.map((notification) => (
                 <div key={notification.id} id={`notification-mob-${notification.id}`}>
                   <ActivityNotificationCard
                     notification={notification}
@@ -1460,7 +1531,7 @@ export default function Notifications() {
             </div>
           ) : (
             <div className="space-y-3.5">
-              {categorizeNotifications(sortedNotifications, sortBy, sortOrder).map((section) => (
+              {categorizeNotifications(mobileNotifications, sortBy, sortOrder).map((section) => (
                 <div key={section.category} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                   <NotificationSectionComponent
                     section={section}
@@ -1478,55 +1549,11 @@ export default function Notifications() {
             </div>
           )}
 
-          {/* Compact pagination for mobile */}
-          {!loading && sortedNotifications.length > 0 && (
-            <div className="mt-4 bg-white border border-gray-200 rounded-2xl p-3 shadow-sm space-y-2">
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => {
-                    if (currentPage > 1) setPage(currentPage - 1);
-                  }}
-                  disabled={currentPage === 1}
-                  className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white disabled:opacity-50 active:bg-gray-50 flex items-center gap-1 select-none"
-                >
-                  &larr; Prev
-                </button>
-                <span className="text-xs font-bold text-gray-600">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => {
-                    if (currentPage < totalPages) setPage(currentPage + 1);
-                  }}
-                  disabled={currentPage >= totalPages}
-                  className="px-3.5 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 bg-white disabled:opacity-50 active:bg-gray-50 flex items-center gap-1 select-none"
-                >
-                  Next &rarr;
-                </button>
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-gray-100 text-[11px] text-gray-500">
-                <span>
-                  Showing {(currentPage - 1) * pageSize + 1} to{' '}
-                  {Math.min(currentPage * pageSize, totalItemsForTab)} of {totalItemsForTab}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span>Show:</span>
-                  <select
-                    value={pageSize.toString()}
-                    onChange={(e) => {
-                      const newSize = parseInt(e.target.value);
-                      setPageSize(newSize);
-                      setPage(1);
-                    }}
-                    className="h-7 border border-gray-200 rounded-lg text-xs font-semibold px-1.5 bg-white focus:outline-none"
-                  >
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                  </select>
-                </div>
-              </div>
+          {/* Infinite scroll sentinel */}
+          <div ref={mobileSentinelRef} className="h-4" />
+          {mobileLoadingMore && (
+            <div className="flex justify-center py-4">
+              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
             </div>
           )}
         </div>
