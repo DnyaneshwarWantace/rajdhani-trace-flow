@@ -26,6 +26,17 @@ import { OrderService } from '@/services/orderService';
 import type { Product } from '@/types/product';
 import { formatIndianDate } from '@/utils/formatHelpers';
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 1024);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return isMobile;
+}
+
 interface ProductionFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -247,6 +258,7 @@ export default function ProductionFormDialog({
     await onSubmit(formData);
   };
 
+  const isMobile = useIsMobile();
   const canSubmit = !!formData.product_id && formData.planned_quantity > 0 && !!formData.completion_date;
   const title = selectedBatch ? 'Edit Production Batch' : 'Create Production Batch';
   const subtitle = selectedBatch
@@ -254,9 +266,9 @@ export default function ProductionFormDialog({
     : 'Create a new production batch for a product';
 
   // ── MOBILE: bottom sheet via portal ─────────────────────────────────────────
-  const mobileSheet = isOpen
+  const mobileSheet = isOpen && isMobile
     ? createPortal(
-        <div className="lg:hidden fixed inset-0 z-50 flex flex-col justify-end">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/40"
@@ -331,7 +343,7 @@ export default function ProductionFormDialog({
     <>
       {mobileSheet}
 
-      <div className="hidden lg:block">
+      {!isMobile && (
         <Dialog open={isOpen} onOpenChange={onClose}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -372,7 +384,7 @@ export default function ProductionFormDialog({
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      )}
     </>
   );
 }
