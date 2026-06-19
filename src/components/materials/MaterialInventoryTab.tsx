@@ -326,27 +326,38 @@ export default function MaterialInventoryTab({
   // Mobile infinite scroll — self-contained, does NOT touch desktop pagination
   const MOBILE_PAGE_SIZE = 30;
   const [mobileMaterials, setMobileMaterials] = useState<RawMaterial[]>([]);
-  const [mobileHasMore, setMobileHasMore] = useState(true);
+  const [mobileInitialLoading, setMobileInitialLoading] = useState(true);
   const [mobileLoadingMore, setMobileLoadingMore] = useState(false);
   const mobileOffsetRef = useRef(0);
   const mobileLoadingRef = useRef(false);
+  const mobileHasMoreRef = useRef(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  // Stable refs to filters so the fetch callback never needs to be recreated
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+  const usageTypeRef = useRef(mobileApiUsageType);
+  usageTypeRef.current = mobileApiUsageType;
 
   const loadMobileMaterials = useCallback(async (offset: number, isReset = false) => {
-    if (mobileLoadingRef.current && !isReset) return;
+    if (mobileLoadingRef.current) return;
     mobileLoadingRef.current = true;
     try {
-      if (!isReset) setMobileLoadingMore(true);
+      if (isReset) {
+        setMobileInitialLoading(true);
+      } else {
+        setMobileLoadingMore(true);
+      }
+      const f = filtersRef.current;
       const apiFilters: any = {
-        category: filters.category && (filters.category as string[]).length > 0 ? filters.category : undefined,
-        usage_type: mobileApiUsageType || undefined,
-        status: filters.status && (filters.status as string[]).length > 0 ? filters.status : undefined,
-        type: filters.type && (filters.type as string[]).length > 0 ? filters.type : undefined,
-        color: filters.color && (filters.color as string[]).length > 0 ? filters.color : undefined,
-        supplier: filters.supplier && (filters.supplier as string[]).length > 0 ? filters.supplier : undefined,
-        search: filters.search || undefined,
-        sortBy: filters.sortBy || 'name',
-        sortOrder: filters.sortOrder || 'asc',
+        category: f.category && (f.category as string[]).length > 0 ? f.category : undefined,
+        usage_type: usageTypeRef.current || undefined,
+        status: f.status && (f.status as string[]).length > 0 ? f.status : undefined,
+        type: f.type && (f.type as string[]).length > 0 ? f.type : undefined,
+        color: f.color && (f.color as string[]).length > 0 ? f.color : undefined,
+        supplier: f.supplier && (f.supplier as string[]).length > 0 ? f.supplier : undefined,
+        search: f.search || undefined,
+        sortBy: f.sortBy || 'name',
+        sortOrder: f.sortOrder || 'asc',
         limit: MOBILE_PAGE_SIZE,
         offset,
       };
@@ -354,34 +365,47 @@ export default function MaterialInventoryTab({
       const { materials: data } = await MaterialService.getMaterials(apiFilters);
       setMobileMaterials(prev => isReset ? data : [...prev, ...data]);
       mobileOffsetRef.current = offset + data.length;
-      setMobileHasMore(data.length === MOBILE_PAGE_SIZE);
-    } catch {}
-    finally { setMobileLoadingMore(false); mobileLoadingRef.current = false; }
-  }, [filters, mobileApiUsageType]);
+      mobileHasMoreRef.current = data.length === MOBILE_PAGE_SIZE;
+    } catch {
+      mobileHasMoreRef.current = false;
+    } finally {
+      setMobileInitialLoading(false);
+      setMobileLoadingMore(false);
+      mobileLoadingRef.current = false;
+    }
+  }, []); // stable — reads latest filters via ref
 
-  // Reset mobile list when filters change
+  // Serialize filters to detect real changes (primitives only, stable string)
+  const filtersKey = JSON.stringify([
+    filters.category, filters.status, filters.type, filters.color,
+    filters.supplier, filters.search, filters.sortBy, filters.sortOrder,
+    mobileApiUsageType,
+  ]);
+
+  // Reset and reload whenever filters change
   useEffect(() => {
     mobileOffsetRef.current = 0;
+    mobileHasMoreRef.current = true;
     setMobileMaterials([]);
-    setMobileHasMore(true);
     loadMobileMaterials(0, true);
-  }, [loadMobileMaterials]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
 
-  // IntersectionObserver sentinel
+  // IntersectionObserver — stable, mounted once, reads state via refs
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && mobileHasMore && !mobileLoadingRef.current) {
+        if (entries[0].isIntersecting && mobileHasMoreRef.current && !mobileLoadingRef.current) {
           loadMobileMaterials(mobileOffsetRef.current);
         }
       },
-      { threshold: 0.1 }
+      { rootMargin: '200px', threshold: 0 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [mobileHasMore, loadMobileMaterials]);
+  }, []); // mount/unmount only — reads state via refs
 
   const activeFilterCount = [
     ...(Array.isArray(filters.status)   ? filters.status   : filters.status   ? [filters.status]   : []),
@@ -412,24 +436,25 @@ export default function MaterialInventoryTab({
 
       {/* Materials List */}
       {!loading && !error && (
-        <>
-          {/* Desktop View */}
-          <div className="hidden lg:block">
-            {viewMode === 'table' ? (
-              <MaterialTable materials={materials} onView={onView} onEdit={onEdit} onOrder={onOrder} onRecordUsage={onRecordUsage} />
-            ) : (
-              <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
-                {materials.map((material) => (
-                  <div key={material._id} className="break-inside-avoid">
-                    <MaterialCard material={material} onView={onView} onEdit={onEdit} onOrder={onOrder} onRecordUsage={onRecordUsage} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        /* Desktop View — server-paginated, unchanged */
+        <div className="hidden lg:block">
+          {viewMode === 'table' ? (
+            <MaterialTable materials={materials} onView={onView} onEdit={onEdit} onOrder={onOrder} onRecordUsage={onRecordUsage} />
+          ) : (
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+              {materials.map((material) => (
+                <div key={material._id} className="break-inside-avoid">
+                  <MaterialCard material={material} onView={onView} onEdit={onEdit} onOrder={onOrder} onRecordUsage={onRecordUsage} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-          {/* Mobile View */}
-          <div className="lg:hidden">
+      {/* Mobile View — always rendered, manages its own loading state */}
+      {!error && (
+        <div className="lg:hidden">
             {/* Search bar */}
             <div className="mb-3">
               <DebouncedSearchInput
@@ -442,6 +467,11 @@ export default function MaterialInventoryTab({
                 showCounter={false}
               />
             </div>
+            {mobileInitialLoading && (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+              </div>
+            )}
 
             {/* Active filter chips */}
             {activeFilterCount > 0 && (
@@ -479,56 +509,65 @@ export default function MaterialInventoryTab({
               </div>
             )}
 
-            {/* masonry 2-column grid */}
-            <div className="flex gap-3 pb-32">
-              <div className="flex-1 flex flex-col gap-3">
-                {mobileMaterials.filter((_, i) => i % 2 === 0).map((material) => (
-                  <MobileGridCard
-                    key={material._id || material.id}
-                    material={material}
-                    onView={onView}
-                    onEdit={onEdit}
-                    onOrder={onOrder}
-                    onRecordUsage={onRecordUsage}
-                  />
-                ))}
-              </div>
-              <div className="flex-1 flex flex-col gap-3">
-                {mobileMaterials.filter((_, i) => i % 2 === 1).map((material) => (
-                  <MobileGridCard
-                    key={material._id || material.id}
-                    material={material}
-                    onView={onView}
-                    onEdit={onEdit}
-                    onOrder={onOrder}
-                    onRecordUsage={onRecordUsage}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="h-4" />
-            {mobileLoadingMore && (
-              <div className="flex justify-center py-4">
-                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
-              </div>
-            )}
-
-            {/* Empty state */}
-            {mobileMaterials.length === 0 && !loading && !mobileLoadingMore && (
-              <div className="py-16 text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11" />
-                  </svg>
+            {!mobileInitialLoading && (
+              <>
+                {/* masonry 2-column grid */}
+                <div className="flex gap-3 pb-4">
+                  <div className="flex-1 flex flex-col gap-3">
+                    {mobileMaterials.filter((_, i) => i % 2 === 0).map((material) => (
+                      <MobileGridCard
+                        key={material._id || material.id}
+                        material={material}
+                        onView={onView}
+                        onEdit={onEdit}
+                        onOrder={onOrder}
+                        onRecordUsage={onRecordUsage}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex-1 flex flex-col gap-3">
+                    {mobileMaterials.filter((_, i) => i % 2 === 1).map((material) => (
+                      <MobileGridCard
+                        key={material._id || material.id}
+                        material={material}
+                        onView={onView}
+                        onEdit={onEdit}
+                        onOrder={onOrder}
+                        onRecordUsage={onRecordUsage}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <p className="text-gray-500 text-sm">No materials found</p>
-                {(filters.search || activeFilterCount > 0) && (
-                  <p className="text-gray-400 text-xs mt-1">Try adjusting your search or filters</p>
+
+                {/* Loading more spinner */}
+                {mobileLoadingMore && (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
+                  </div>
                 )}
-              </div>
+
+                {/* Empty state */}
+                {mobileMaterials.length === 0 && !mobileLoadingMore && (
+                  <div className="py-16 text-center">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-500 text-sm">No materials found</p>
+                    {(filters.search || activeFilterCount > 0) && (
+                      <p className="text-gray-400 text-xs mt-1">Try adjusting your search or filters</p>
+                    )}
+                  </div>
+                )}
+
+                {/* End-of-list spacer (bottom bar clearance) */}
+                <div className="pb-32" />
+              </>
             )}
+
+            {/* Infinite scroll sentinel — always mounted so observer works from the start */}
+            <div ref={sentinelRef} className="h-1" />
 
             {/* Sticky SORT / FILTER bar — matches RN app */}
             <div className="fixed bottom-16 left-0 right-0 z-20 flex border-t border-gray-200 bg-white">
@@ -555,9 +594,12 @@ export default function MaterialInventoryTab({
               </button>
             </div>
           </div>
+      )}
 
-          {/* Empty State (desktop) */}
-          {materials.length === 0 && !loading && (
+      {/* Desktop empty state + pagination */}
+      {!loading && !error && (
+        <>
+          {materials.length === 0 && (
             <div className="hidden lg:block bg-white rounded-lg border border-gray-200 p-12 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -570,8 +612,6 @@ export default function MaterialInventoryTab({
               </p>
             </div>
           )}
-
-          {/* Pagination (desktop only) */}
           {materials.length > 0 && (
             <div className="hidden lg:block">
               <MaterialPagination totalMaterials={totalMaterials} filters={filters} onPageChange={onPageChange} onLimitChange={onLimitChange} />
