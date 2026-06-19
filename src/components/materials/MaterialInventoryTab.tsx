@@ -417,9 +417,9 @@ export default function MaterialInventoryTab({
 
   return (
     <>
-      {/* Loading State */}
+      {/* Loading State — desktop only, mobile manages its own */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="hidden lg:flex items-center justify-center py-12">
           <div className="text-center">
             <Loader2 className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
             <p className="text-gray-600">Loading materials...</p>
@@ -427,9 +427,9 @@ export default function MaterialInventoryTab({
         </div>
       )}
 
-      {/* Error */}
+      {/* Error — desktop only */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <div className="hidden lg:block bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <p className="text-red-800">{error}</p>
         </div>
       )}
@@ -453,8 +453,14 @@ export default function MaterialInventoryTab({
       )}
 
       {/* Mobile View — always rendered, manages its own loading state */}
-      {!error && (
-        <div className="lg:hidden">
+      <div className="lg:hidden">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+        {!error && (
+        <div>
             {/* Search bar */}
             <div className="mb-3">
               <DebouncedSearchInput
@@ -605,7 +611,8 @@ export default function MaterialInventoryTab({
               </button>
             </div>
           </div>
-      )}
+        )}
+      </div>
 
       {/* Desktop empty state + pagination */}
       {!loading && !error && (
