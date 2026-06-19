@@ -138,6 +138,7 @@ export default function TransportManagement() {
     setSaving(true);
     const cleanedForm = {
       ...form,
+      vehicle_no: form.vehicle_no.toUpperCase(),
       driver_contact: /^\+\d{1,4}$/.test((form.driver_contact ?? '').trim()) ? '' : (form.driver_contact ?? '').trim(),
     };
     try {
@@ -185,7 +186,8 @@ export default function TransportManagement() {
       <div className="space-y-1.5">
         <Label>Vehicle Number *</Label>
         <Input placeholder="e.g. MH12AB1234" value={form.vehicle_no}
-          onChange={e => setForm(f => ({ ...f, vehicle_no: e.target.value.toUpperCase() }))} />
+          onChange={e => setForm(f => ({ ...f, vehicle_no: e.target.value }))}
+          style={{ textTransform: 'uppercase' }} />
       </div>
       <div className="space-y-1.5">
         <Label>Type</Label>
