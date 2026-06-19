@@ -817,7 +817,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
           onAddMaterial={canCreate('materials') ? handleCreate : undefined}
           viewMode={viewMode}
           onViewModeChange={activeTab === 'inventory' ? setViewMode : undefined}
-          mobileSubtitle={materialStats.totalMaterials > 0 ? `${materialStats.totalMaterials.toLocaleString()} raw materials` : undefined}
+          mobileSubtitle={undefined}
         />
 
         {/* Stats Boxes – when categoryFilter (e.g. Ink), stats are for that category only */}
