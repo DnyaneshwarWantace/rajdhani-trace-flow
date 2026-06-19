@@ -9,8 +9,6 @@ import { useToast } from '@/hooks/use-toast';
 import { TransportService, type Transport } from '@/services/transportService';
 import { Truck, Plus, Edit2, Trash2, ToggleLeft, ToggleRight, Phone, User, Search, Loader2, ChevronDown } from 'lucide-react';
 import { getApiUrl } from '@/utils/apiConfig';
-import { PhoneInput } from 'react-international-phone';
-import 'react-international-phone/style.css';
 
 const API_URL = getApiUrl();
 
@@ -456,12 +454,11 @@ export default function TransportManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label>Driver Contact <span className="text-gray-400 text-xs font-normal">optional</span></Label>
-                <PhoneInput
-                  defaultCountry="in"
+                <Input
+                  type="tel"
+                  placeholder="+91 Phone number"
                   value={form.driver_contact}
-                  onChange={v => setForm(f => ({ ...f, driver_contact: v }))}
-                  placeholder="Phone number"
-                  style={{ width: '100%' }}
+                  onChange={e => setForm(f => ({ ...f, driver_contact: e.target.value }))}
                 />
               </div>
             </div>
