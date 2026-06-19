@@ -892,6 +892,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onRecordUsage={handleRecordUsage}
             excludeCategories={categoryFilter ? undefined : ['Ink']}
             hideCategoryFilter={!!categoryFilter}
+            mobileApiUsageType={categoryFilter ? undefined : 'per_batch'}
           />
         )}
 

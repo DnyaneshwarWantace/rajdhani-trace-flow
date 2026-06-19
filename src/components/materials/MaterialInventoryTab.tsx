@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Eye, Edit, Plus, Droplets, AlignLeft, SlidersHorizontal, X } from 'lucide-react';
 import MaterialTable from './MaterialTable';
 import MaterialCard from './MaterialCard';
 import MaterialPagination from './MaterialPagination';
 import MaterialMobileFilterSheet from './MaterialMobileFilterSheet';
 import type { RawMaterial, MaterialFilters } from '@/types/material';
+import { MaterialService } from '@/services/materialService';
 import { formatIndianNumberWithDecimals } from '@/utils/formatHelpers';
 import { useDropdownVisualMaps } from '@/hooks/useDropdownVisualMaps';
 import { DebouncedSearchInput } from '@/components/ui/DebouncedSearchInput';
@@ -33,6 +34,7 @@ interface MaterialInventoryTabProps {
   onRecordUsage?: (material: RawMaterial) => void;
   excludeCategories?: string[];
   hideCategoryFilter?: boolean;
+  mobileApiUsageType?: string;
 }
 
 // ─── Mobile card (2-column grid, matches RN app) ─────────────────────────────
@@ -316,42 +318,70 @@ export default function MaterialInventoryTab({
   onRecordUsage,
   excludeCategories,
   hideCategoryFilter,
+  mobileApiUsageType,
 }: MaterialInventoryTabProps) {
   const [showSort, setShowSort] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
 
-  // Mobile infinite scroll
+  // Mobile infinite scroll — self-contained, does NOT touch desktop pagination
+  const MOBILE_PAGE_SIZE = 30;
   const [mobileMaterials, setMobileMaterials] = useState<RawMaterial[]>([]);
+  const [mobileHasMore, setMobileHasMore] = useState(true);
+  const [mobileLoadingMore, setMobileLoadingMore] = useState(false);
+  const mobileOffsetRef = useRef(0);
+  const mobileLoadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const currentPage = filters.page || 1;
-  const hasMore = mobileMaterials.length < totalMaterials;
 
-  // Reset accumulated list when filters change (page resets to 1), append on next pages
-  useEffect(() => {
-    if (currentPage === 1) {
-      setMobileMaterials(materials);
-    } else {
-      setMobileMaterials(prev => {
-        const ids = new Set(prev.map(m => m._id || m.id));
-        return [...prev, ...materials.filter(m => !ids.has(m._id || m.id))];
-      });
-    }
-  }, [materials, currentPage]);
+  const loadMobileMaterials = useCallback(async (offset: number, isReset = false) => {
+    if (mobileLoadingRef.current && !isReset) return;
+    mobileLoadingRef.current = true;
+    try {
+      if (!isReset) setMobileLoadingMore(true);
+      const apiFilters: any = {
+        category: filters.category && (filters.category as string[]).length > 0 ? filters.category : undefined,
+        usage_type: mobileApiUsageType || undefined,
+        status: filters.status && (filters.status as string[]).length > 0 ? filters.status : undefined,
+        type: filters.type && (filters.type as string[]).length > 0 ? filters.type : undefined,
+        color: filters.color && (filters.color as string[]).length > 0 ? filters.color : undefined,
+        supplier: filters.supplier && (filters.supplier as string[]).length > 0 ? filters.supplier : undefined,
+        search: filters.search || undefined,
+        sortBy: filters.sortBy || 'name',
+        sortOrder: filters.sortOrder || 'asc',
+        limit: MOBILE_PAGE_SIZE,
+        offset,
+      };
+      Object.keys(apiFilters).forEach(k => apiFilters[k] === undefined && delete apiFilters[k]);
+      const { materials: data } = await MaterialService.getMaterials(apiFilters);
+      setMobileMaterials(prev => isReset ? data : [...prev, ...data]);
+      mobileOffsetRef.current = offset + data.length;
+      setMobileHasMore(data.length === MOBILE_PAGE_SIZE);
+    } catch {}
+    finally { setMobileLoadingMore(false); mobileLoadingRef.current = false; }
+  }, [filters, mobileApiUsageType]);
 
-  // IntersectionObserver — trigger next page when sentinel visible
+  // Reset mobile list when filters change
   useEffect(() => {
-    if (!sentinelRef.current) return;
+    mobileOffsetRef.current = 0;
+    setMobileMaterials([]);
+    setMobileHasMore(true);
+    loadMobileMaterials(0, true);
+  }, [loadMobileMaterials]);
+
+  // IntersectionObserver sentinel
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loading && hasMore) {
-          onPageChange(currentPage + 1);
+        if (entries[0].isIntersecting && mobileHasMore && !mobileLoadingRef.current) {
+          loadMobileMaterials(mobileOffsetRef.current);
         }
       },
       { threshold: 0.1 }
     );
-    observer.observe(sentinelRef.current);
+    observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loading, hasMore, currentPage, onPageChange]);
+  }, [mobileHasMore, loadMobileMaterials]);
 
   const activeFilterCount = [
     ...(Array.isArray(filters.status)   ? filters.status   : filters.status   ? [filters.status]   : []),
@@ -450,7 +480,7 @@ export default function MaterialInventoryTab({
             )}
 
             {/* masonry 2-column grid */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 pb-32">
               <div className="flex-1 flex flex-col gap-3">
                 {mobileMaterials.filter((_, i) => i % 2 === 0).map((material) => (
                   <MobileGridCard
@@ -478,15 +508,15 @@ export default function MaterialInventoryTab({
             </div>
 
             {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="h-4 pb-32" />
-            {loading && currentPage > 1 && (
+            <div ref={sentinelRef} className="h-4" />
+            {mobileLoadingMore && (
               <div className="flex justify-center py-4">
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
               </div>
             )}
 
             {/* Empty state */}
-            {mobileMaterials.length === 0 && !loading && (
+            {mobileMaterials.length === 0 && !loading && !mobileLoadingMore && (
               <div className="py-16 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
