@@ -1216,7 +1216,7 @@ export default function Notifications() {
         {/* Header */}
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Notifications</h1>
-          {activeTab === 'all' && unreadCount > 0 && (
+          {activeTab === 'all' && globalUnread > 0 && (
             <button
               onClick={handleMarkAllAsRead}
               className="text-xs font-bold text-white bg-blue-600 rounded-xl px-3 py-1.5 active:bg-blue-700"
@@ -1273,51 +1273,9 @@ export default function Notifications() {
           </button>
         </div>
 
-        {/* Category chips */}
-        <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
-          {(activeTab === 'all' ? [
-            { id: 'all', label: 'All', icon: Bell },
-            { id: 'material', label: 'Material', icon: Factory },
-            { id: 'product', label: 'Product', icon: Package },
-            { id: 'order', label: 'Order', icon: ShoppingCart },
-            { id: 'customer', label: 'Customer', icon: Users },
-            { id: 'supplier', label: 'Supplier', icon: Building2 },
-            { id: 'production', label: 'Production', icon: ChefHat },
-          ] : [
-            { id: 'all', label: 'All', icon: Activity },
-            { id: 'material', label: 'Material', icon: Factory },
-            { id: 'product', label: 'Product', icon: Package },
-            { id: 'order', label: 'Order', icon: ShoppingCart },
-            { id: 'customer', label: 'Customer', icon: Users },
-            { id: 'supplier', label: 'Supplier', icon: Building2 },
-            { id: 'production', label: 'Production', icon: ChefHat },
-          ]).map((cat) => {
-            const Icon = cat.icon;
-            const isActive = activeTab === 'all' ? activeNotificationCategory === cat.id : activeLogCategory === cat.id;
-            const count = activeTab === 'all' ? notificationCategoryCounts[cat.id] || 0 : categoryCounts[cat.id] || 0;
-            return (
-              <button
-                key={cat.id}
-                onClick={() => activeTab === 'all' ? setActiveNotificationCategory(cat.id) : setActiveLogCategory(cat.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
-                  isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'
-                }`}
-              >
-                <Icon className="w-3 h-3" />
-                {cat.label}
-                {count > 0 && (
-                  <span className={`text-[9px] font-extrabold px-1 rounded-full ${isActive ? 'bg-white/30 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Status filter chips — notifications tab only */}
+        {/* Filter row */}
         {activeTab === 'all' && (
-          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
             {(['all', 'unread', 'read'] as const).map(s => (
               <button
                 key={s}
@@ -1331,15 +1289,59 @@ export default function Notifications() {
                 {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
             ))}
-            {filterStatuses.length > 0 && (
+            <div className="w-px h-5 bg-gray-200 shrink-0" />
+            {([
+              { id: 'all', label: 'All' },
+              { id: 'material', label: 'Material' },
+              { id: 'product', label: 'Product' },
+              { id: 'order', label: 'Order' },
+              { id: 'production', label: 'Production' },
+            ]).map(cat => (
               <button
-                onClick={() => setFilterStatuses([])}
+                key={cat.id}
+                onClick={() => setActiveNotificationCategory(cat.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                  activeNotificationCategory === cat.id
+                    ? 'bg-gray-700 text-white border-gray-700'
+                    : 'bg-white text-gray-500 border-gray-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+            {(filterStatuses.length > 0 || activeNotificationCategory !== 'all') && (
+              <button
+                onClick={() => { setFilterStatuses([]); setActiveNotificationCategory('all'); }}
                 className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold border bg-white text-red-500 border-red-200"
               >
-                <ChevronDown className="w-3 h-3 rotate-90" />
+                <ListFilter className="w-3 h-3" />
                 Clear
               </button>
             )}
+          </div>
+        )}
+
+        {activeTab === 'activity_logs' && (
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+            {([
+              { id: 'all', label: 'All' },
+              { id: 'material', label: 'Material' },
+              { id: 'product', label: 'Product' },
+              { id: 'order', label: 'Order' },
+              { id: 'production', label: 'Production' },
+            ]).map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveLogCategory(cat.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                  activeLogCategory === cat.id
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-gray-500 border-gray-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
           </div>
         )}
 
@@ -1368,11 +1370,20 @@ export default function Notifications() {
 
         {/* List */}
         {loading && mobileNotifications.length === 0 ? (
-          <div className="space-y-2.5">
-            {[1, 2, 3, 4].map(i => (
+          <div className="space-y-3">
+            {/* Stats skeleton */}
+            <div className="flex border border-gray-100 rounded-2xl overflow-hidden bg-white">
+              {[1,2,3,4].map((_, i) => (
+                <div key={i} className={`flex-1 flex flex-col items-center py-3 ${i > 0 ? 'border-l border-gray-100' : ''}`}>
+                  <div className="h-5 w-8 bg-gray-100 rounded animate-pulse mb-1" />
+                  <div className="h-3 w-10 bg-gray-100 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+            {[1,2,3].map(i => (
               <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
                 <div className="flex gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-gray-100 shrink-0" />
+                  <div className="w-9 h-9 rounded-full bg-gray-100 shrink-0" />
                   <div className="flex-1">
                     <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
                     <div className="h-3 bg-gray-100 rounded w-full" />
@@ -1383,27 +1394,186 @@ export default function Notifications() {
           </div>
         ) : mobileNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-              <Bell className="w-8 h-8 text-gray-300" />
-            </div>
-            <p className="text-sm font-bold text-gray-700 mb-1">No notifications found</p>
-            <p className="text-xs text-gray-400">Try adjusting your filters</p>
+            {activeTab === 'all' ? (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="text-sm font-bold text-gray-800 mb-1">All Caught Up!</p>
+                <p className="text-xs text-gray-400">
+                  {filterStatuses.length > 0 || activeNotificationCategory !== 'all'
+                    ? 'No notifications match your filters'
+                    : 'No pending alerts'}
+                </p>
+                {(filterStatuses.length > 0 || activeNotificationCategory !== 'all') && (
+                  <button
+                    onClick={() => { setFilterStatuses([]); setActiveNotificationCategory('all'); }}
+                    className="mt-3 text-xs font-bold text-blue-600 border border-blue-200 rounded-xl px-4 py-2 bg-blue-50"
+                  >
+                    Clear Filters
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mb-4">
+                  <Activity className="w-8 h-8 text-purple-400" />
+                </div>
+                <p className="text-sm font-bold text-gray-800 mb-1">No Activity Yet</p>
+                <p className="text-xs text-gray-400">Activity logs will appear here</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-2.5">
-            {mobileNotifications.map((notification) => (
-              <ActivityNotificationCard
-                key={notification.id}
-                notification={notification}
-                onClick={() => handleNotificationClick(notification)}
-                expandedId={expandedNotificationId}
-                onExpand={handleExpand}
-                onMarkAsRead={handleMarkAsRead}
-                selectable={isAdmin}
-                selected={selectedIds.has(notification.id)}
-                onToggleSelect={toggleSelect}
-              />
-            ))}
+            {mobileNotifications.map((n) => {
+              const isExpanded = expandedNotificationId === n.id;
+              const isUnread = n.status === 'unread';
+              const rd = n.related_data || {};
+
+              const getTypeIcon = (type: string) => {
+                switch (type) {
+                  case 'low_stock':
+                  case 'out_of_stock':
+                    return <AlertTriangle className="w-4 h-4 text-amber-500" />;
+                  case 'production_request':
+                    return <Factory className="w-4 h-4 text-blue-500" />;
+                  case 'order_alert':
+                    return <ShoppingCart className="w-4 h-4 text-red-500" />;
+                  case 'activity_log':
+                    return <Activity className="w-4 h-4 text-purple-500" />;
+                  default:
+                    return <Info className="w-4 h-4 text-gray-400" />;
+                }
+              };
+
+              return (
+                <div
+                  key={n.id}
+                  className={`rounded-2xl border overflow-hidden transition-all ${
+                    isUnread ? 'bg-white border-blue-100 shadow-sm' : 'bg-white border-gray-100'
+                  }`}
+                >
+                  {isUnread && <div className="h-0.5 bg-gradient-to-r from-blue-500 to-blue-300" />}
+
+                  <button
+                    className="w-full text-left px-4 pt-3.5 pb-3 flex items-start gap-3"
+                    onClick={() => setExpandedNotificationId(isExpanded ? null : n.id)}
+                  >
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      n.type === 'low_stock' || n.type === 'out_of_stock' ? 'bg-amber-50' :
+                      n.type === 'production_request' ? 'bg-blue-50' :
+                      n.type === 'activity_log' ? 'bg-purple-50' : 'bg-gray-50'
+                    }`}>
+                      {getTypeIcon(n.type)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-0.5">
+                        <p className={`text-sm font-bold line-clamp-1 flex-1 ${isUnread ? 'text-gray-900' : 'text-gray-600'}`}>
+                          {n.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                          {n.priority && n.priority !== 'normal' && (
+                            <span className={`inline-flex items-center gap-1 text-[9px] font-extrabold px-1.5 py-0.5 rounded-full text-white ${
+                              n.priority === 'high' || n.priority === 'urgent' ? 'bg-red-500' :
+                              n.priority === 'medium' ? 'bg-amber-500' : 'bg-blue-400'
+                            }`}>
+                              <span className="w-1 h-1 rounded-full bg-white/60 inline-block" />
+                              {n.priority.toUpperCase()}
+                            </span>
+                          )}
+                          {isExpanded
+                            ? <ChevronUp className="w-3.5 h-3.5 text-gray-300" />
+                            : <ChevronDown className="w-3.5 h-3.5 text-gray-300" />}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{n.message}</p>
+                      {n.created_at && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Info className="w-2.5 h-2.5 text-gray-300" />
+                          <span className="text-[10px] text-gray-300">
+                            {new Date(n.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-gray-50 bg-gray-50/70 px-4 py-3 space-y-2">
+                      {rd.order_number && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Order</span>
+                          <span className="font-bold text-gray-800">{rd.order_number}</span>
+                        </div>
+                      )}
+                      {rd.customer_name && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Customer</span>
+                          <span className="font-bold text-gray-800">{rd.customer_name}</span>
+                        </div>
+                      )}
+                      {rd.product_name && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Product</span>
+                          <span className="font-bold text-gray-800">{rd.product_name}</span>
+                        </div>
+                      )}
+                      {rd.material_name && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Material</span>
+                          <span className="font-bold text-gray-800">{rd.material_name}</span>
+                        </div>
+                      )}
+                      {rd.required_quantity !== undefined && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Required</span>
+                          <span className="font-bold text-gray-800">{rd.required_quantity} {rd.unit || ''}</span>
+                        </div>
+                      )}
+                      {(rd.available_quantity !== undefined || rd.currentStock !== undefined) && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Available</span>
+                          <span className="font-bold text-gray-800">{rd.available_quantity ?? rd.currentStock} {rd.unit || ''}</span>
+                        </div>
+                      )}
+                      {(rd.shortfall ?? rd.shortage) !== undefined && (rd.shortfall ?? rd.shortage) > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">Shortage</span>
+                          <span className="font-bold text-red-500">{rd.shortfall ?? rd.shortage} {rd.unit || ''}</span>
+                        </div>
+                      )}
+                      {rd.created_by_user && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-400">By</span>
+                          <span className="font-bold text-gray-800">{rd.created_by_user}</span>
+                        </div>
+                      )}
+
+                      {activeTab === 'all' && (
+                        <div className="flex gap-2 pt-1.5">
+                          {n.status !== 'read' && (
+                            <button
+                              onClick={e => { e.stopPropagation(); handleMarkAsRead(n.id); }}
+                              className="flex-1 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 bg-white active:bg-gray-50"
+                            >
+                              Mark Read
+                            </button>
+                          )}
+                          <button
+                            onClick={e => { e.stopPropagation(); handleNotificationClick(n); }}
+                            className="flex-1 py-2 rounded-xl border border-blue-100 text-xs font-bold text-blue-600 bg-blue-50 active:bg-blue-100"
+                          >
+                            View
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
