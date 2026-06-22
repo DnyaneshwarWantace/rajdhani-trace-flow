@@ -1211,66 +1211,72 @@ export default function Notifications() {
       </div>
 
       {/* ─── MOBILE VIEW ─────────────────────────────────────────────── */}
-      <div className="lg:hidden -m-2 sm:-m-3 flex flex-col bg-[#F3F4F6] min-h-screen pb-24">
-        {/* Mobile Header */}
-        <div className="bg-white border-b border-gray-200 px-4 pt-3.5 pb-3.5 shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight leading-none">
-                {activeTab === 'activity_logs' ? 'Activity Logs' : 'Notifications'}
-              </h1>
-              <p className="text-[11px] text-gray-500 mt-1.5">
-                {activeTab === 'activity_logs'
-                  ? `System action logs • Total: ${totalActivityLogs}`
-                  : `Your system notifications • Total: ${totalNotifications}`}
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {activeTab === 'all' && unreadCount > 0 && (
-                <button
-                  onClick={handleMarkAllAsRead}
-                  className="px-2.5 py-1.5 rounded-xl text-[10px] font-bold text-white bg-blue-600 active:bg-blue-700 transition-all shadow-sm select-none"
-                >
-                  Mark All Read
-                </button>
-              )}
-            </div>
-          </div>
+      <div className="lg:hidden space-y-3 pb-24">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Notifications</h1>
+          {activeTab === 'all' && unreadCount > 0 && (
+            <button
+              onClick={handleMarkAllAsRead}
+              className="text-xs font-bold text-white bg-blue-600 rounded-xl px-3 py-1.5 active:bg-blue-700"
+            >
+              Mark All Read
+            </button>
+          )}
         </div>
 
-        {/* High-Level Tab Bar (Notifications vs Activity Logs) */}
-        <div className="bg-white border-b border-gray-200 px-2 py-2 flex gap-1 w-full justify-between shrink-0 select-none">
+        {/* Stats strip */}
+        <div className="flex border border-gray-100 rounded-2xl overflow-hidden bg-white shadow-sm">
+          {[
+            { val: totalNotifications, label: 'Total', color: 'text-gray-800' },
+            { val: globalUnread, label: 'Unread', color: 'text-blue-600' },
+            { val: globalRead, label: 'Read', color: 'text-gray-500' },
+            { val: totalActivityLogs, label: 'Logs', color: 'text-purple-600' },
+          ].map((item, i) => (
+            <div key={item.label} className={`flex-1 flex flex-col items-center py-3 ${i > 0 ? 'border-l border-gray-100' : ''}`}>
+              <span className={`text-base font-extrabold ${item.color}`}>{item.val}</span>
+              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Toggle: Notifications / Activity Logs */}
+        <div className="flex bg-gray-100 rounded-2xl p-1 gap-1">
           <button
             onClick={() => setActiveTab('all')}
-            className={`flex-1 min-w-0 px-1.5 py-2 text-[11px] font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'all'
-                ? 'bg-blue-50 text-[#0066FF] shadow-sm'
-                : 'text-gray-500 active:bg-gray-100'
-              }`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'all' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+            }`}
           >
-            <Bell className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Notifications</span>
+            <Bell className="w-3.5 h-3.5" />
+            Notifications
             {allUnreadCount > 0 && (
-              <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-red-500 text-white rounded-full leading-none flex items-center justify-center min-w-[15px] h-[15px]">
+              <span className="ml-0.5 bg-blue-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                 {allUnreadCount}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab('activity_logs')}
-            className={`flex-1 min-w-0 px-1.5 py-2 text-[11px] font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 ${activeTab === 'activity_logs'
-                ? 'bg-blue-50 text-[#0066FF] shadow-sm'
-                : 'text-gray-500 active:bg-gray-100'
-              }`}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              activeTab === 'activity_logs' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500'
+            }`}
           >
-            <Activity className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Activity Logs</span>
+            <Activity className="w-3.5 h-3.5" />
+            Activity Log
+            {totalActivityLogs > 0 && (
+              <span className="ml-0.5 bg-purple-100 text-purple-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {totalActivityLogs}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Category Tabs - horizontally scrollable bar */}
-        <div className="bg-white border-b border-gray-100 px-3 py-2.5 shrink-0 overflow-x-auto scrollbar-none flex gap-2 select-none">
+        {/* Category chips */}
+        <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
           {(activeTab === 'all' ? [
-            { id: 'all', label: 'All Notifications', icon: Bell },
+            { id: 'all', label: 'All', icon: Bell },
             { id: 'material', label: 'Material', icon: Factory },
             { id: 'product', label: 'Product', icon: Package },
             { id: 'order', label: 'Order', icon: ShoppingCart },
@@ -1278,42 +1284,29 @@ export default function Notifications() {
             { id: 'supplier', label: 'Supplier', icon: Building2 },
             { id: 'production', label: 'Production', icon: ChefHat },
           ] : [
-            { id: 'all', label: 'All Logs', icon: Activity },
+            { id: 'all', label: 'All', icon: Activity },
             { id: 'material', label: 'Material', icon: Factory },
             { id: 'product', label: 'Product', icon: Package },
             { id: 'order', label: 'Order', icon: ShoppingCart },
             { id: 'customer', label: 'Customer', icon: Users },
             { id: 'supplier', label: 'Supplier', icon: Building2 },
             { id: 'production', label: 'Production', icon: ChefHat },
-          ]).map((category) => {
-            const Icon = category.icon;
-            const count = activeTab === 'all'
-              ? notificationCategoryCounts[category.id] || 0
-              : categoryCounts[category.id] || 0;
-            const isActive = activeTab === 'all'
-              ? activeNotificationCategory === category.id
-              : activeLogCategory === category.id;
-
+          ]).map((cat) => {
+            const Icon = cat.icon;
+            const isActive = activeTab === 'all' ? activeNotificationCategory === cat.id : activeLogCategory === cat.id;
+            const count = activeTab === 'all' ? notificationCategoryCounts[cat.id] || 0 : categoryCounts[cat.id] || 0;
             return (
               <button
-                key={category.id}
-                onClick={() => {
-                  if (activeTab === 'all') {
-                    setActiveNotificationCategory(category.id);
-                  } else {
-                    setActiveLogCategory(category.id);
-                  }
-                }}
-                className={`flex-shrink-0 px-3.5 py-1.5 text-xs font-bold rounded-full transition-all flex items-center gap-1.5 ${isActive
-                    ? 'bg-blue-50 text-[#0066FF] border border-blue-100'
-                    : 'bg-gray-100 text-gray-500 active:bg-gray-200'
-                  }`}
+                key={cat.id}
+                onClick={() => activeTab === 'all' ? setActiveNotificationCategory(cat.id) : setActiveLogCategory(cat.id)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                  isActive ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 border-gray-200'
+                }`}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
-                <span>{category.label.split(' ')[0]}</span>
+                <Icon className="w-3 h-3" />
+                {cat.label}
                 {count > 0 && (
-                  <span className={`px-1.5 py-0.5 text-[9px] rounded-full font-extrabold leading-none ${isActive ? 'bg-[#0066FF] text-white' : 'bg-gray-200 text-gray-600'
-                    }`}>
+                  <span className={`text-[9px] font-extrabold px-1 rounded-full ${isActive ? 'bg-white/30 text-white' : 'bg-gray-100 text-gray-500'}`}>
                     {count}
                   </span>
                 )}
@@ -1322,243 +1315,105 @@ export default function Notifications() {
           })}
         </div>
 
-        {/* Mobile Stats (only for notifications tab) */}
+        {/* Status filter chips — notifications tab only */}
         {activeTab === 'all' && (
-          <div className="grid grid-cols-3 gap-2.5 px-3 py-3 shrink-0">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unread</span>
-              <span className="text-lg font-black text-blue-600 mt-0.5">{globalUnread}</span>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Read</span>
-              <span className="text-lg font-black text-gray-550 mt-0.5">{globalRead}</span>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm text-center">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</span>
-              <span className="text-lg font-black text-gray-700 mt-0.5">{totalNotifications}</span>
-            </div>
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-none">
+            {(['all', 'unread', 'read'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatuses(s === 'all' ? [] : [s])}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
+                  (s === 'all' && filterStatuses.length === 0) || filterStatuses.includes(s)
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-500 border-gray-200'
+                }`}
+              >
+                {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+            {filterStatuses.length > 0 && (
+              <button
+                onClick={() => setFilterStatuses([])}
+                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold border bg-white text-red-500 border-red-200"
+              >
+                <ChevronDown className="w-3 h-3 rotate-90" />
+                Clear
+              </button>
+            )}
           </div>
         )}
 
-        {/* Collapsible Filter Section button */}
-        {(activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
-          <div className="px-3 py-1.5 shrink-0">
-            <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="w-full h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-between px-3.5 text-xs font-bold text-gray-750 active:bg-gray-50 shadow-sm"
-            >
-              <div className="flex items-center gap-2">
-                <ListFilter className="w-4 h-4 text-gray-400" />
-                <span>Filters & Sorting</span>
-                {(monthFilter !== 'all' || filterTypes.length > 0 || filterStatuses.length > 0) && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                )}
-              </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showMobileFilters ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        )}
-
-        {/* Collapsible filters content */}
-        {showMobileFilters && (activeTab === 'all' || (activeTab === 'activity_logs' && activeLogCategory === 'all')) && (
-          <div className="px-3 mt-1.5 shrink-0 animate-in slide-in-from-top-2 duration-200">
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3.5">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Month</label>
-                <Select value={monthFilter} onValueChange={setMonthFilter}>
-                  <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
-                    <SelectValue placeholder="All time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="font-semibold text-xs">
-                      All time
-                    </SelectItem>
-                    {monthOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Type</label>
-                <MultiSelect
-                  options={[
-                    { label: 'Low Stock', value: 'low_stock' },
-                    { label: 'Restock Request', value: 'restock_request' },
-                    { label: 'Out of Stock', value: 'out_of_stock' },
-                    { label: 'Production Request', value: 'production_request' },
-                    { label: 'Order Alert', value: 'order_alert' },
-                    { label: 'Warning', value: 'warning' },
-                    { label: 'Activity Log', value: 'activity_log' },
-                    { label: 'Info', value: 'info' },
-                    { label: 'Success', value: 'success' },
-                    { label: 'Error', value: 'error' },
-                  ]}
-                  selected={filterTypes}
-                  onChange={setFilterTypes}
-                  placeholder="All Types"
-                  className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Status</label>
-                <MultiSelect
-                  options={[
-                    { label: 'Unread', value: 'unread' },
-                    { label: 'Read', value: 'read' },
-                    { label: 'Dismissed', value: 'dismissed' },
-                  ]}
-                  selected={filterStatuses}
-                  onChange={setFilterStatuses}
-                  placeholder="All Status"
-                  className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3.5">
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Sort by</label>
-                  <Select value={sortBy} onValueChange={(v: 'date' | 'type' | 'status') => setSortBy(v)}>
-                    <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="date" className="text-xs">Date</SelectItem>
-                      <SelectItem value="type" className="text-xs">Type</SelectItem>
-                      <SelectItem value="status" className="text-xs">Status</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Order</label>
-                  <Select value={sortOrder} onValueChange={(v: 'asc' | 'desc') => setSortOrder(v)}>
-                    <SelectTrigger className="h-9 rounded-lg text-xs bg-gray-50 border-gray-200">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc" className="text-xs">Descending</SelectItem>
-                      <SelectItem value="asc" className="text-xs">Ascending</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Category-specific filters for Activity Logs on Mobile */}
-        {activeTab === 'activity_logs' && activeLogCategory === 'material' && (
-          <div className="px-3 mt-1.5 shrink-0">
-            <div className="bg-white border border-gray-200 rounded-xl p-3.5 shadow-sm">
-              <MaterialLogFilters
-                filterAction={materialFilterAction}
-                filterStatus={materialFilterStatus}
-                onActionChange={setMaterialFilterAction}
-                onStatusChange={setMaterialFilterStatus}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Mobile Admin select/delete toolbar */}
+        {/* Admin select/delete toolbar */}
         {isAdmin && mobileNotifications.length > 0 && (
-          <div className="px-3 mt-2 shrink-0">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 flex items-center justify-between shadow-sm">
-              <div className="flex gap-1.5">
-                <button
-                  onClick={selectAllOnPage}
-                  className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50"
-                >
-                  Select All
+          <div className="flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-3 py-2.5 shadow-sm">
+            <div className="flex gap-1.5">
+              <button onClick={selectAllOnPage} className="px-2.5 py-1.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50">
+                Select All
+              </button>
+              <button onClick={deselectAll} className="px-2.5 py-1.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50">
+                Deselect
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-gray-400">{selectedIds.size} selected</span>
+              {selectedIds.size > 0 && (
+                <button onClick={handleDeleteSelected} className="px-2.5 py-1.5 rounded-xl bg-red-500 text-white font-bold text-[10px] active:bg-red-600 flex items-center gap-1">
+                  <Trash2 className="w-3 h-3" />
+                  Delete ({selectedIds.size})
                 </button>
-                <button
-                  onClick={deselectAll}
-                  className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[10px] font-bold text-gray-700 bg-white active:bg-gray-50"
-                >
-                  Deselect
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-gray-500">
-                  {selectedIds.size} selected
-                </span>
-                {selectedIds.size > 0 && (
-                  <button
-                    onClick={handleDeleteSelected}
-                    className="px-2.5 py-1.5 rounded-lg bg-red-650 text-white font-bold text-[10px] active:bg-red-700 flex items-center gap-1 shadow-sm"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Delete ({selectedIds.size})
-                  </button>
-                )}
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Mobile List Content */}
-        <div className="flex-1 p-3 overflow-y-auto space-y-3 mt-1.5">
-          {loading && mobileNotifications.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          ) : mobileNotifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
-                <Bell className="w-8 h-8 text-gray-300" />
+        {/* List */}
+        {loading && mobileNotifications.length === 0 ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 animate-pulse">
+                <div className="flex gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gray-100 shrink-0" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-full" />
+                  </div>
+                </div>
               </div>
-              <p className="text-sm font-bold text-gray-700 mb-1">No notifications found</p>
-              <p className="text-xs text-gray-400">Try adjusting your filters</p>
+            ))}
+          </div>
+        ) : mobileNotifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+              <Bell className="w-8 h-8 text-gray-300" />
             </div>
-          ) : activeTab === 'activity_logs' ? (
-            <div className="space-y-2.5">
-              {mobileNotifications.map((notification) => (
-                <div key={notification.id} id={`notification-mob-${notification.id}`}>
-                  <ActivityNotificationCard
-                    notification={notification}
-                    onClick={() => handleNotificationClick(notification)}
-                    expandedId={expandedNotificationId}
-                    onExpand={handleExpand}
-                    onMarkAsRead={handleMarkAsRead}
-                    selectable={isAdmin}
-                    selected={selectedIds.has(notification.id)}
-                    onToggleSelect={toggleSelect}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3.5">
-              {categorizeNotifications(mobileNotifications, sortBy, sortOrder).map((section) => (
-                <div key={section.category} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-                  <NotificationSectionComponent
-                    section={section}
-                    onNotificationClick={handleNotificationClick}
-                    compact={false}
-                    expandedId={expandedNotificationId}
-                    onExpand={handleExpand}
-                    onMarkAsRead={handleMarkAsRead}
-                    selectable={isAdmin}
-                    selectedIds={selectedIds}
-                    onToggleSelect={toggleSelect}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+            <p className="text-sm font-bold text-gray-700 mb-1">No notifications found</p>
+            <p className="text-xs text-gray-400">Try adjusting your filters</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {mobileNotifications.map((notification) => (
+              <ActivityNotificationCard
+                key={notification.id}
+                notification={notification}
+                onClick={() => handleNotificationClick(notification)}
+                expandedId={expandedNotificationId}
+                onExpand={handleExpand}
+                onMarkAsRead={handleMarkAsRead}
+                selectable={isAdmin}
+                selected={selectedIds.has(notification.id)}
+                onToggleSelect={toggleSelect}
+              />
+            ))}
+          </div>
+        )}
 
-          {/* Infinite scroll sentinel */}
-          <div ref={mobileSentinelRef} className="h-4" />
-          {mobileLoadingMore && (
-            <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
-            </div>
-          )}
-        </div>
+        {/* Infinite scroll sentinel */}
+        <div ref={mobileSentinelRef} className="h-4" />
+        {mobileLoadingMore && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-blue-600" />
+          </div>
+        )}
       </div>
 
 
