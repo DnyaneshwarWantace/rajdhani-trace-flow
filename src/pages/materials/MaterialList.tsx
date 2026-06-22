@@ -435,6 +435,11 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
     setFilters({ ...filters, supplier: values, page: 1 });
   };
 
+  // Batch-apply multiple filters at once — avoids stale-closure overwrite bug
+  const handleFiltersChange = (partial: Partial<typeof filters>) => {
+    setFilters(prev => ({ ...prev, ...partial, page: 1 }));
+  };
+
   const handlePageChange = (page: number) => {
     setFilters({ ...filters, page });
   };
@@ -883,6 +888,7 @@ export default function MaterialList({ categoryFilter, pageTitle, pageSubtitle }
             onColorChange={handleColorFilter}
             onSupplierChange={handleSupplierFilter}
             onSortChange={handleSortChange}
+            onFiltersChange={handleFiltersChange}
             onViewModeChange={setViewMode}
             onPageChange={handlePageChange}
             onLimitChange={handleLimitChange}

@@ -25,6 +25,7 @@ interface MaterialInventoryTabProps {
   onColorChange?: (values: string[]) => void;
   onSupplierChange?: (values: string[]) => void;
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void;
+  onFiltersChange?: (partial: Partial<MaterialFilters>) => void;
   onViewModeChange: (mode: 'grid' | 'table') => void;
   onPageChange: (page: number) => void;
   onLimitChange: (limit: number) => void;
@@ -309,6 +310,7 @@ export default function MaterialInventoryTab({
   onColorChange,
   onSupplierChange,
   onSortChange,
+  onFiltersChange,
   onViewModeChange: _onViewModeChange,
   onPageChange,
   onLimitChange,
@@ -652,11 +654,22 @@ export default function MaterialInventoryTab({
           excludeCategories={excludeCategories}
           hideCategorySection={hideCategoryFilter}
           onApply={(f) => {
-            if (f.status !== undefined) onStatusChange(f.status as string[]);
-            if (f.category !== undefined) onCategoryChange(f.category as string[]);
-            if (f.type !== undefined) onTypeChange?.(f.type as string[]);
-            if (f.color !== undefined) onColorChange?.(f.color as string[]);
-            if (f.supplier !== undefined) onSupplierChange?.(f.supplier as string[]);
+            if (onFiltersChange) {
+              // Apply all filters in one atomic update — prevents stale-closure overwrite
+              onFiltersChange({
+                ...(f.status !== undefined   && { status:   f.status as string[] }),
+                ...(f.category !== undefined && { category: f.category as string[] }),
+                ...(f.type !== undefined     && { type:     f.type as string[] }),
+                ...(f.color !== undefined    && { color:    f.color as string[] }),
+                ...(f.supplier !== undefined && { supplier: f.supplier as string[] }),
+              });
+            } else {
+              if (f.status !== undefined) onStatusChange(f.status as string[]);
+              if (f.category !== undefined) onCategoryChange(f.category as string[]);
+              if (f.type !== undefined) onTypeChange?.(f.type as string[]);
+              if (f.color !== undefined) onColorChange?.(f.color as string[]);
+              if (f.supplier !== undefined) onSupplierChange?.(f.supplier as string[]);
+            }
           }}
           onClose={() => setShowFilter(false)}
         />
