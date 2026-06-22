@@ -1,4 +1,4 @@
-import { Loader2, Eye, Edit, Copy, QrCode, BarChart3, Factory, Search, LayoutGrid, AlignJustify } from 'lucide-react';
+import { Loader2, Eye, Edit, Copy, QrCode, BarChart3, Factory, Search, LayoutGrid, AlignJustify, Package } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import ProductTable from '@/components/products/ProductTable';
 import ProductCard from '@/components/products/ProductCard';
@@ -494,6 +494,16 @@ export default function InventoryTab({
                   />
                 ))}
               </div>
+            </div>
+          )}
+          {/* Empty state when filters return no results */}
+          {!isInitialLoad && !isLoadingMore && mobileProducts.length === 0 && (
+            <div className="lg:hidden flex flex-col items-center justify-center py-16 text-center px-4">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mb-3">
+                <Package className="w-7 h-7 text-gray-300" />
+              </div>
+              <p className="text-sm font-bold text-gray-700 mb-1">No Products Found</p>
+              <p className="text-xs text-gray-400">Try adjusting your filters or search</p>
             </div>
           )}
           {/* Infinite scroll sentinel */}

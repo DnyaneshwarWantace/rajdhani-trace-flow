@@ -1507,10 +1507,12 @@ export default function Notifications() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : mobileNotifications.length === 0 ? (
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
-              <Bell className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-700 font-extrabold text-base">No notifications found</p>
-              <p className="text-gray-400 text-xs mt-1">Try adjusting your filters</p>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                <Bell className="w-8 h-8 text-gray-300" />
+              </div>
+              <p className="text-sm font-bold text-gray-700 mb-1">No notifications found</p>
+              <p className="text-xs text-gray-400">Try adjusting your filters</p>
             </div>
           ) : activeTab === 'activity_logs' ? (
             <div className="space-y-2.5">
