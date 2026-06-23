@@ -880,32 +880,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Order Status Breakdown Card */}
-        <div className="bg-white border border-gray-150 rounded-3xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-          <div className="flex items-center gap-2.5 mb-3.5">
-            <div className="w-7 h-7 rounded-lg bg-[#9333EA]/10 flex items-center justify-center text-[#9333EA]">
-              <ShoppingCart className="w-3.5 h-3.5" />
-            </div>
-            <h4 className="text-sm font-extrabold text-gray-900 flex-1">Order Status Breakdown</h4>
-          </div>
-          
-          <StackedBar segments={orderBreakdownSegments} total={orderBreakdownTotal} height={12} />
-
-          <div className="grid grid-cols-4 mt-4 pt-3.5 border-t border-gray-100 text-center">
-            {[
-              { label: 'Pending',    count: dashboardData.stats.ordersPending,    color: '#EA580C' },
-              { label: 'Accepted',   count: dashboardData.stats.ordersAccepted,   color: '#2563EB' },
-              { label: 'Dispatched', count: dashboardData.stats.ordersDispatched, color: '#7C3AED' },
-              { label: 'Delivered',  count: dashboardData.stats.ordersDelivered,  color: '#16A34A' },
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col items-center">
-                <span className="text-base font-extrabold leading-none" style={{ color: item.color }}>{item.count}</span>
-                <span className="text-[9.5px] text-gray-400 font-semibold mt-1 uppercase tracking-wide leading-none">{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Production Overview */}
         <div className="bg-white border border-gray-150 rounded-3xl p-4 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
           <div className="flex items-start justify-between mb-4">
