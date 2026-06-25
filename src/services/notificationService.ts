@@ -4,10 +4,10 @@ const API_URL = getApiUrl();
 
 export interface Notification {
   id: string;
-  type: 'info' | 'warning' | 'error' | 'success' | 'production_request' | 'restock_request' | 'low_stock' | 'order_alert' | 'activity_log';
+  type: 'info' | 'warning' | 'error' | 'success' | 'production_request' | 'restock_request' | 'low_stock' | 'out_of_stock' | 'order_alert' | 'activity_log';
   title: string;
   message: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
+  priority: 'normal' | 'low' | 'medium' | 'high' | 'urgent';
   status: 'unread' | 'read' | 'dismissed';
   module: 'orders' | 'products' | 'materials' | 'production' | 'activity';
   related_id?: string;

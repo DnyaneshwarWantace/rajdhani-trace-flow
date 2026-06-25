@@ -26,6 +26,7 @@ import {
   CheckCircle,
   Info,
   Trash2,
+  AlertTriangle,
   Factory,
   Package,
   ShoppingCart,
