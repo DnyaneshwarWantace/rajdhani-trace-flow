@@ -207,8 +207,8 @@ export default function OrderItemForm({
         </div>
       </div>
 
-      {/* Pricing row — 4 compact fields */}
-      <div className="grid grid-cols-4 gap-2">
+      {/* Pricing row — 3 compact fields */}
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Qty</Label>
           <Input
@@ -227,18 +227,13 @@ export default function OrderItemForm({
 
         <div>
           <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Unit</Label>
-          <Input value={countUnitLabel} readOnly className="h-8 text-xs bg-slate-50 text-slate-500" />
-        </div>
-
-        <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Unit for Pricing</Label>
           <Select value={item.pricing_unit} onValueChange={(v: PricingUnit) => onUpdate(item.id, 'pricing_unit', v)}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {item.product_type === 'raw_material' ? (
-                <SelectItem value="unit">Per {selectedProduct?.unit || 'unit'}</SelectItem>
+                <SelectItem value="unit">{selectedProduct?.unit || 'units'}</SelectItem>
               ) : (() => {
                 const rawUnit = selectedProduct?.count_unit || 'Roll';
                 const countLabel = rawUnit.charAt(0).toUpperCase() + rawUnit.slice(1).toLowerCase();
@@ -246,7 +241,7 @@ export default function OrderItemForm({
                 const hasWeight = !!(selectedProduct?.weight || selectedProduct?.gsm);
                 return (
                   <>
-                    <SelectItem value="unit">Per {countLabel}</SelectItem>
+                    <SelectItem value="unit">{countLabel}</SelectItem>
                     <SelectItem value="sqm">SQM</SelectItem>
                     <SelectItem value="sqft">SQFT</SelectItem>
                     <SelectItem value="running_meter">Running Meter</SelectItem>
@@ -260,7 +255,7 @@ export default function OrderItemForm({
         </div>
 
         <div>
-          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate per unit (₹)</Label>
+          <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Rate / {pricingUnitLabel} (₹)</Label>
           <Input
             type="number"
             value={item.unit_price || ''}

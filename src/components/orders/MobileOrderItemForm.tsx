@@ -85,14 +85,14 @@ export default function MobileOrderItemForm({
     : (selectedProduct?.current_stock ?? 0);
 
   const PRICING_UNITS: { value: PricingUnit; label: string; disabled?: boolean }[] = isProd ? [
-    { value: 'unit', label: `Per ${countUnitLabel}` },
-    { value: 'sqm', label: 'Per SQM', disabled: !sqm },
-    { value: 'sqft', label: 'Per SQFT', disabled: !sqm },
+    { value: 'unit', label: countUnitLabel },
+    { value: 'sqm', label: 'SQM', disabled: !sqm },
+    { value: 'sqft', label: 'SQFT', disabled: !sqm },
     { value: 'running_meter', label: 'Running Meter' },
-    { value: 'gsm', label: 'Per GSM', disabled: !selectedProduct?.weight },
-    { value: 'kg', label: 'Per KG', disabled: !selectedProduct?.weight || !sqm },
+    { value: 'gsm', label: 'GSM', disabled: !selectedProduct?.weight },
+    { value: 'kg', label: 'KG', disabled: !selectedProduct?.weight || !sqm },
   ] : [
-    { value: 'unit', label: `Per ${countUnitLabel}` },
+    { value: 'unit', label: countUnitLabel },
   ];
 
   const isInvalid = !item.isValid && !!item.product_id;
@@ -224,33 +224,25 @@ export default function MobileOrderItemForm({
             </div>
             <div className="flex-1">
               <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Unit</label>
-              <div className="h-11 px-3 rounded-xl border border-gray-200 bg-gray-100 flex items-center">
-                <span className="text-sm text-gray-600">{countUnitLabel}</span>
-              </div>
+              <button
+                onClick={() => setShowPricingUnitPicker(true)}
+                className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between text-sm"
+              >
+                <span className="text-gray-900 font-medium">{PRICING_UNITS.find(u => u.value === item.pricing_unit)?.label || countUnitLabel}</span>
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
             </div>
           </div>
-
-          {/* Pricing Unit */}
-          <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Price Based On</label>
-            <button
-              onClick={() => setShowPricingUnitPicker(true)}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-between text-sm"
-            >
-              <span className="text-gray-900 font-medium">{PRICING_UNITS.find(u => u.value === item.pricing_unit)?.label || `Per ${countUnitLabel}`}</span>
-              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-            {item.pricing_unit !== 'unit' && item.quantity && convertedQty > 0 && (
-              <p className="text-[11px] text-blue-600 mt-1 ml-1">= {convertedQty.toFixed(4)} {pricingUnitLabel} per unit</p>
-            )}
-          </div>
+          {item.pricing_unit !== 'unit' && item.quantity && convertedQty > 0 && (
+            <p className="text-[11px] text-blue-600 -mt-1 ml-1">= {convertedQty.toFixed(2)} {pricingUnitLabel} total</p>
+          )}
 
           {/* Unit Price */}
           <div>
             <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-              Unit Price (₹) — {pricingUnitLabel}
+              Rate / {pricingUnitLabel} (₹)
             </label>
             <div className="flex items-center h-11 px-3 rounded-xl border border-gray-200 bg-gray-50 gap-1">
               <span className="text-gray-400 text-sm">₹</span>
@@ -345,7 +337,7 @@ export default function MobileOrderItemForm({
               <div className="w-9 h-1 rounded-full bg-gray-300" />
             </div>
             <div className="px-4 py-3 border-b border-gray-100">
-              <span className="text-[15px] font-bold text-gray-900">Price Based On</span>
+              <span className="text-[15px] font-bold text-gray-900">Select Unit</span>
             </div>
             <div className="pb-8">
               {PRICING_UNITS.map((opt, i) => {
